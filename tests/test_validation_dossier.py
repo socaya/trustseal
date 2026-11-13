@@ -1,0 +1,115 @@
+"""Deterministic partial-dossier reconstruction and tamper rejection."""
+from datetime import datetime
+from types import SimpleNamespace
+
+import pytest
+
+from app.services.validation_dossier import (
+    ASSURANCE, SCHEMA, build_dossier, digest_manifest, verify_dossier,
+)
+
+
+def fixtures():
+    retention = SimpleNamespace(
+        id=12, organization_id=7, artifact_type="finalized_pdf",
+        artifact_id=31, artifact_sha256="a" * 64,
+    )
+    token = SimpleNamespace(
+        id=8, retention_id=12, organization_id=7,
+        artifact_sha256="a" * 64, token_sha256="b" * 64,
+        tsa_certificate_sha256="c" * 64, gen_time=datetime(2026, 11, 13),
+        token_der_b64="opaque",
+    )
+    return retention, token
+
+
+def patch_trust(monkeypatch):
+    from app.services import validation_dossier as service
+    monkeypatch.setattr(service, "decode_token", lambda _: b"timestamp")
+    monkeypatch.setattr(service, "verify_timestamp", lambda raw, digest, config: {
+        "token_sha256": "b" * 64,
+        "tsa_certificate_sha256": "c" * 64,
+        "gen_time": datetime(2026, 11, 13),
+    })
+    monkeypatch.setattr(service, "_read_pem", lambda *args: b"test-root")
+    monkeypatch.setattr(service, "artifact_for", lambda *args: SimpleNamespace(
+        output_sha256="a" * 64
+    ))
+    monkeypatch.setattr(service, "verify_artifact", lambda *args: "a" * 64)
+    monkeypatch.setattr(service, "verify_ocsp_snapshot", lambda *args: {
+        "status": "good", "subject_certificate_sha256": "c" * 64,
+    })
+    monkeypatch.setattr(service, "verify_snapshot", lambda *args: {
+        "status": "good", "subject_certificate_sha256": "c" * 64,
+    })
+
+
+def test_dossier_never_overclaims_complete_pkix_validation(monkeypatch):
+    patch_trust(monkeypatch)
+    retention, token = fixtures()
+    report = build_dossier(retention, token, [], [], {})
+    assert report["schema"] == SCHEMA
+    assert report["assurance"] == ASSURANCE
+    assert report["complete"] is False
+    assert "full_certificate_path_validation" in report["missing_requirements"]
+    assert "tsa_ocsp_observation" in report["missing_requirements"]
+    assert "tsa_crl_observation" in report["missing_requirements"]
+    assert len(digest_manifest(report)) == 64
+
+
+def test_observations_bounded_to_same_tsa_and_reproducible(monkeypatch):
+    patch_trust(monkeypatch)
+    retention, token = fixtures()
+    ocsp = SimpleNamespace(
+        id=25, timestamp_id=token.id, organization_id=7,
+        status="good", response_sha256="d" * 64,
+        checked_at=datetime(2026, 11, 13),
+    )
+    crl = SimpleNamespace(
+        id=26, timestamp_id=token.id, organization_id=7,
+        status="good", crl_sha256="e" * 64,
+        checked_at=datetime(2026, 11, 13),
+    )
+    manifest = build_dossier(retention, token, [ocsp], [crl], {})
+    assert len(manifest["revocation_observations"]) == 2
+    assert "tsa_crl_observation" not in manifest["missing_requirements"]
+    assert manifest["complete"] is False
+    record = SimpleNamespace(
+        retention_id=12, organization_id=7, timestamp_id=8,
+        manifest=manifest, manifest_sha256=digest_manifest(manifest),
+    )
+    assert verify_dossier(record, retention, token, [ocsp], [crl], {}) == manifest
+    record.manifest_sha256 = "f" * 64
+    with pytest.raises(ValueError):
+        verify_dossier(record, retention, token, [ocsp], [crl], {})
+    ocsp.organization_id = 99
+    with pytest.raises(ValueError):
+        build_dossier(retention, token, [ocsp], [crl], {})
+
+
+def test_wrong_retention_digest_and_duplicate_observation_are_denied(monkeypatch):
+    patch_trust(monkeypatch)
+    retention, token = fixtures()
+    token.artifact_sha256 = "f" * 64
+    with pytest.raises(ValueError):
+        build_dossier(retention, token, [], [], {})
+    token.artifact_sha256 = "a" * 64
+    observation = SimpleNamespace(
+        id=9, timestamp_id=token.id, organization_id=7,
+        status="good", response_sha256="d" * 64,
+        checked_at=datetime(2026, 11, 13),
+    )
+    with pytest.raises(ValueError):
+        build_dossier(retention, token, [observation, observation], [], {})
+
+
+def test_revoked_observation_is_never_counted_as_good(monkeypatch):
+    patch_trust(monkeypatch)
+    retention, token = fixtures()
+    row = SimpleNamespace(
+        id=5, timestamp_id=token.id, organization_id=7,
+        status="revoked", crl_sha256="f" * 64,
+        checked_at=datetime(2026, 11, 13),
+    )
+    with pytest.raises(ValueError):
+        build_dossier(retention, token, [], [row], {})
