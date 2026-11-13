@@ -184,8 +184,17 @@ def verify_stamped_pdf(artifact_id):
     record = db.session.get(StampedPdf, artifact_id)
     if record is None:
         raise click.ClickException("Stamped PDF not found")
+    # Verify the original signed artifact and entire approval/provenance chain,
+    # not only the newly signed output CMS.
+    from app.blueprints.estamp.stamped_pdf_api import _verify_lineage
+    receipt = db.session.get(StampAttestation, record.stamp_attestation_id)
+    application = db.session.get(StampApplication, receipt.application_id) if receipt else None
+    stamp = db.session.get(ManagedStamp, receipt.stamp_id) if receipt else None
+    source = db.session.get(FinalizedPdf, record.source_finalized_pdf_id)
+    if any(item is None for item in (receipt, application, stamp, source)):
+        raise click.ClickException("Stamped PDF approval lineage incomplete")
     try:
-        checked_stamped_pdf(record, current_app.config)
-    except (PdfFinalizationError, IngestionError):
-        raise click.ClickException("Stamped PDF integrity verification failed") from None
-    click.echo("Stamped PDF CMS seal valid: %s" % record.id)
+        _verify_lineage(record, receipt, application, stamp, source)
+    except (ValueError, OSError, PdfFinalizationError, IngestionError):
+        raise click.ClickException("Stamped PDF lineage verification failed") from None
+    click.echo("Stamped PDF and approved provenance valid: %s" % record.id)
