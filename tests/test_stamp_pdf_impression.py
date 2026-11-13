@@ -50,6 +50,8 @@ def test_visible_stamp_contains_full_identity_and_reference():
     {"y_pt": 740},
     {"attestation_id": 0},
     {"stamp_name": "X" * 120},
+    {"stamp_code": "code with spaces"},
+    {"stamp_name": "   "},
     {"stamp_name": "\u202eUnsafe unicode"},
 ])
 def test_invalid_stamp_placement_or_identity_is_rejected(change):
