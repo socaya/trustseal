@@ -203,6 +203,46 @@ def _verify_stamp_design_event(payload, key):
         raise ValueError("Design decision unavailable")
 
 
+def _verify_preservation_event(payload, key):
+    from app.models.evidence_preservation import (
+        EvidenceRetention, EvidenceLegalHold, EvidenceCheckpoint,
+    )
+    aggregate = payload.get("aggregate_id")
+    if type(aggregate) is not int:
+        raise ValueError("Invalid preservation event")
+    if key.startswith("evidence-retention:"):
+        retention = db.session.get(EvidenceRetention, aggregate)
+        if retention is None or key != "evidence-retention:%s" % retention.id:
+            raise ValueError("Retention event invalid")
+    elif key.startswith(("evidence-hold:", "evidence-hold-release:")):
+        hold = db.session.get(EvidenceLegalHold, aggregate)
+        if hold is None:
+            raise ValueError("Legal hold unavailable")
+        if key.startswith("evidence-hold-release:") and hold.released_at is None:
+            raise ValueError("Release missing")
+    elif key.startswith("evidence-checkpoint:"):
+        from app.services.evidence_preservation import (
+            verify_checkpoint, trusted_checkpoint_key,
+        )
+        from flask import current_app
+        try:
+            checkpoint_id = int(key.rsplit(":", 1)[-1])
+        except ValueError:
+            raise ValueError("Invalid checkpoint identifier") from None
+        checkpoint = db.session.get(EvidenceCheckpoint, checkpoint_id)
+        if checkpoint is None or checkpoint.retention_id != aggregate:
+            raise ValueError("Checkpoint not found for retention")
+        evidence = {
+            "payload": checkpoint.payload, "algorithm": checkpoint.algorithm,
+            "key_id": checkpoint.key_id, "signature": checkpoint.signature,
+        }
+        trusted = trusted_checkpoint_key(current_app.config, checkpoint.key_id)
+        if not verify_checkpoint(evidence, trusted):
+            raise ValueError("Checkpoint cryptographic verification failed")
+    else:
+        raise ValueError("Unknown preservation event")
+
+
 HANDLERS = {
     "document.draft.created": _verify_document_event,
     "document.draft.updated": _verify_document_event,
@@ -230,6 +270,10 @@ HANDLERS = {
     "stamp.design.proposed": _verify_stamp_design_event,
     "stamp.design.approved": _verify_stamp_design_event,
     "stamp.design.rejected": _verify_stamp_design_event,
+    "evidence.retention.registered": _verify_preservation_event,
+    "evidence.hold.placed": _verify_preservation_event,
+    "evidence.hold.released": _verify_preservation_event,
+    "evidence.checkpoint.issued": _verify_preservation_event,
 }
 
 
