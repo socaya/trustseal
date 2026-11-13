@@ -184,15 +184,27 @@ def update_document(document_id):
 @document_api.route("/<int:document_id>/", methods=["DELETE"])
 @jwt_required()
 def delete_document(document_id):
-    doc = get_authorized_document_or_abort(document_id, check_ownership_only=True)
+    user = actor()
+    doc = Document.query.filter(
+        Document.id == document_id,
+        Document.created_by == user.id,
+        Document.deleted_at.is_(None),
+    ).with_for_update().first()
+    if doc is None:
+        abort(404)
     if (doc.status or "").lower() != "draft":
         abort(409, description="Non-draft documents cannot be deleted")
+    expected = request.headers.get("If-Match")
+    if expected is None or not expected.isdecimal():
+        abort(428, description="Numeric If-Match revision required")
+    if int(expected) != (doc.version or 1):
+        abort(409, description="Document revision conflict")
     doc.deleted_at = datetime.utcnow()
     from app.services.event_delivery import enqueue
     enqueue(
         event_type="document.draft.deleted", aggregate_type="document",
         aggregate_id=doc.id, organization_id=doc.organization_id,
-        actor_id=actor().id, action="document.draft.deleted",
+        actor_id=user.id, action="document.draft.deleted",
         idempotency_key="document-deleted:%s" % doc.id,
     )
     db.session.commit()
