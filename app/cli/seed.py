@@ -1,4 +1,5 @@
 import random
+import os
 import secrets
 import uuid
 from datetime import datetime, timedelta
@@ -102,10 +103,15 @@ def seed_system_data():
     click.echo("👨‍💼 Creating Default Admin User...")
     # Use configuration or environment variable for admin details ideally
     admin_email = current_app.config.get('ADMIN_EMAIL', "admin@trustseal.com")
-    admin_pass = current_app.config.get('ADMIN_PASSWORD', "admin123") # WARNING: Hardcoded password
+    admin_pass = os.getenv('ADMIN_PASSWORD')
 
     admin_user = User.query.filter_by(email=admin_email).first()
     if not admin_user:
+        if not admin_pass or len(admin_pass) < 16:
+            raise click.ClickException(
+                "ADMIN_PASSWORD environment variable (minimum 16 characters) "
+                "is required to bootstrap the first administrator."
+            )
         admin_user = User(
             username="admin",
             email=admin_email,
@@ -118,7 +124,7 @@ def seed_system_data():
         admin_user.set_password(admin_pass) # Hash the password
         db.session.add(admin_user)
         # Commit immediately to get the user ID
-        _commit_session(f"Admin user ({admin_email}) created. WARNING: Default password is '{admin_pass}'")
+        _commit_session(f"Admin user ({admin_email}) created.")
         admin_user = User.query.filter_by(email=admin_email).first() # Re-fetch
     else:
         click.echo(f"   Admin user ({admin_email}) already exists.")
