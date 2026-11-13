@@ -7,6 +7,7 @@ Private keys must be protected outside the application repository.
 import base64
 import hashlib
 import json
+import stat
 from pathlib import Path
 
 from cryptography.exceptions import InvalidSignature
@@ -37,7 +38,12 @@ def public_key_id(public_key):
 def load_private_key(path):
     if not path or not Path(path).is_absolute():
         raise ValueError("Absolute protected signing key path is required")
-    pem = Path(path).read_bytes()
+    key_path = Path(path)
+    if key_path.is_symlink() or not key_path.is_file():
+        raise ValueError("Protected private signing key file required")
+    if stat.S_IMODE(key_path.stat().st_mode) & 0o077:
+        raise ValueError("Private signing key must not be group/world accessible")
+    pem = key_path.read_bytes()
     key = serialization.load_pem_private_key(pem, password=None)
     if not isinstance(key, Ed25519PrivateKey):
         raise ValueError("Expected an Ed25519 private key")
@@ -86,6 +92,7 @@ def review_payload(envelope, participant, decision):
         raise ValueError("Unrecognized review decision")
     if (decision.envelope_id != envelope.id or
             decision.participant_id != participant.id or
+            decision.user_id != participant.user_id or
             decision.document_sha256 != envelope.document_sha256):
         raise ValueError("Inconsistent review evidence")
     if not decision.recorded_at:
