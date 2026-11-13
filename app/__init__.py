@@ -225,6 +225,8 @@ def create_app(config_class=None):
     from .blueprints.estamp.stamp_custody_api import stamp_custody_api
     from .blueprints.estamp.stamp_attestation_api import stamp_attestation_api
     blueprints.extend([stamp_custody_api, stamp_attestation_api])
+    from .blueprints.estamp.stamped_pdf_api import stamped_pdf_api
+    blueprints.append(stamped_pdf_api)
 
     for bp in blueprints:
         app.register_blueprint(bp)
