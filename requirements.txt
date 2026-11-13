@@ -16,6 +16,7 @@ marshmallow-sqlalchemy>=1.0,<2
 alembic>=1.13,<2
 python-dotenv>=1.0,<2
 psycopg2-binary>=2.9,<3
+psycopg[binary]>=3.2,<4
 requests>=2.31,<3
 Faker>=25,<50
 cryptography>=43,<47
