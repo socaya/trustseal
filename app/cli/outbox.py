@@ -107,6 +107,48 @@ def _verify_pdf_seal_event(payload, key):
         raise ValueError("Unsupported platform PDF profile")
 
 
+def _verify_signer_crypto_event(payload, key):
+    from app.models.signer_cryptographic import SignerPublicKey, SignerEndorsement
+    from app.models.signing_envelope import SigningEnvelope, EnvelopeParticipant
+    from app.models.signer_decision import SignerDecision
+    from app.services.signer_crypto import verify_detached, endorsement_payload
+    aggregate = payload.get("aggregate_id")
+    if type(aggregate) is not int:
+        raise ValueError("Invalid cryptographic event aggregate")
+    if key.startswith("signer-key-"):
+        signer_key = db.session.get(SignerPublicKey, aggregate)
+        if signer_key is None:
+            raise ValueError("Missing signer key")
+        if key.startswith("signer-key-revoked:") and signer_key.revoked_at is None:
+            raise ValueError("Signer key not revoked")
+        return
+    if not key.startswith("signer-document-endorsed:"):
+        raise ValueError("Unknown signer event")
+    participant_id = int(key.rsplit(":", 1)[-1])
+    proof = SignerEndorsement.query.filter_by(
+        envelope_id=aggregate, participant_id=participant_id
+    ).first()
+    if proof is None:
+        raise ValueError("Missing signer endorsement")
+    credential = db.session.get(SignerPublicKey, proof.signer_key_id)
+    envelope = db.session.get(SigningEnvelope, proof.envelope_id)
+    participant = db.session.get(EnvelopeParticipant, proof.participant_id)
+    decision = SignerDecision.query.filter_by(participant_id=participant_id).first()
+    if any(item is None for item in (credential, envelope, participant, decision)):
+        raise ValueError("Signer cryptographic evidence incomplete")
+    expected = endorsement_payload(
+        envelope=envelope, participant=participant, decision=decision,
+        fingerprint=credential.fingerprint,
+        nonce=proof.signed_payload.get("nonce"),
+    )
+    if (proof.user_id != credential.user_id
+            or expected != proof.signed_payload
+            or not verify_detached(
+                credential.public_key_pem, proof.signed_payload, proof.signature_b64
+            )):
+        raise ValueError("Signer endorsement cryptographic validation failed")
+
+
 HANDLERS = {
     "document.draft.created": _verify_document_event,
     "document.draft.updated": _verify_document_event,
@@ -120,6 +162,9 @@ HANDLERS = {
     "envelope.review.declined": _verify_signer_review,
     "review.receipt.issued": _verify_review_receipt_event,
     "platform.pdf.sealed": _verify_pdf_seal_event,
+    "signer.key.registered": _verify_signer_crypto_event,
+    "signer.key.revoked": _verify_signer_crypto_event,
+    "signer.document.endorsed": _verify_signer_crypto_event,
 }
 
 
