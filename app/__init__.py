@@ -230,6 +230,9 @@ def register_error_handlers(app):
     @app.errorhandler(401)
     def unauthorized_error(error):
         current_app.logger.warning(f"401 Unauthorized Error Handler: {request.path} - {error}")
+        if request.path.startswith("/api/"):
+            from flask import jsonify
+            return jsonify(error="Authentication required"), 401
         flash("Authorization is required to access this page.", "warning")
         return redirect(url_for('auth_views.login'))
 
@@ -237,6 +240,9 @@ def register_error_handlers(app):
     def forbidden_error(error):
         user_info = current_user.id if current_user.is_authenticated else 'Anonymous'
         current_app.logger.warning(f"403 Forbidden: User {user_info} attempted to access {request.path} - {error}")
+        if request.path.startswith("/api/"):
+            from flask import jsonify
+            return jsonify(error="Forbidden"), 403
         return render_template("errors/403.html"), 403
 
 # --- Utility ---
