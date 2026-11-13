@@ -7,6 +7,7 @@ from io import BytesIO
 
 from pypdf import PdfReader, PdfWriter
 from reportlab.pdfgen import canvas
+from reportlab.lib.utils import simpleSplit
 
 from app.services.platform_pdf_seal import MAX_SOURCE_BYTES, PdfFinalizationError
 
@@ -30,6 +31,13 @@ def render_stamped_source(source_bytes, *, stamp_code, stamp_name,
         raise PdfFinalizationError("Invalid stamp rendering parameters")
     if any(ord(char) < 32 for char in stamp_name):
         raise PdfFinalizationError("Control characters forbidden in stamp label")
+    try:
+        stamp_name.encode("cp1252")
+    except UnicodeEncodeError:
+        raise PdfFinalizationError("Stamp label requires an approved printable font profile") from None
+    lines = simpleSplit(stamp_name, "Helvetica", 8, PLATE_WIDTH - 20)
+    if len(lines) > 2:
+        raise PdfFinalizationError("Stamp identity will not fit the approved plate")
 
     try:
         reader = PdfReader(BytesIO(source_bytes), strict=True)
@@ -56,10 +64,11 @@ def render_stamped_source(source_bytes, *, stamp_code, stamp_name,
         c.setFont("Helvetica-Bold", 10)
         c.drawString(x_pt + 10, y_pt + 56, "ORGANIZATIONAL STAMP")
         c.setFont("Helvetica", 8)
-        c.drawString(x_pt + 10, y_pt + 40, ("Code: " + stamp_code)[:40])
-        c.drawString(x_pt + 10, y_pt + 26, stamp_name[:34])
+        c.drawString(x_pt + 10, y_pt + 44, "Code: " + stamp_code)
+        for i, label_line in enumerate(lines):
+            c.drawString(x_pt + 10, y_pt + 32 - 11 * i, label_line)
         c.setFont("Helvetica", 7)
-        c.drawString(x_pt + 10, y_pt + 11, "TrustSeal attestation ID: " + str(attestation_id))
+        c.drawString(x_pt + 10, y_pt + 8, "TrustSeal attestation ID: " + str(attestation_id))
         c.showPage()
         c.save()
         overlay = PdfReader(overlay_io)
