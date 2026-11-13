@@ -300,3 +300,74 @@ def export_timestamp(timestamp_id):
     response.headers["Cache-Control"] = "private, no-store"
     response.headers["X-Content-Type-Options"] = "nosniff"
     return response
+
+
+@evidence_preservation_api.route("/timestamps/<int:timestamp_id>/revocations", methods=["GET"])
+@jwt_required()
+def list_revocations(timestamp_id):
+    actor = _admin()
+    from app.models.evidence_timestamp import EvidenceTimestamp
+    from app.models.certificate_revocation import CertificateRevocationEvidence
+    token = EvidenceTimestamp.query.filter_by(
+        id=timestamp_id, organization_id=actor.organization_id
+    ).first()
+    if token is None:
+        abort(404)
+    _retention(token.retention_id, actor)
+    items = CertificateRevocationEvidence.query.filter_by(
+        timestamp_id=token.id, organization_id=actor.organization_id
+    ).order_by(CertificateRevocationEvidence.id.desc()).limit(100).all()
+    response = jsonify([{
+        "id": item.id, "status": item.status,
+        "subject_certificate_sha256": item.subject_certificate_sha256,
+        "issuer_certificate_sha256": item.issuer_certificate_sha256,
+        "crl_sha256": item.crl_sha256,
+        "this_update": item.this_update.isoformat() + "Z",
+        "next_update": item.next_update.isoformat() + "Z",
+        "checked_at": item.checked_at.isoformat() + "Z",
+        "assurance": "historical_signed_crl_observation_not_ocsp",
+    } for item in items])
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
+
+
+@evidence_preservation_api.route("/revocations/<int:revocation_id>/export", methods=["GET"])
+@jwt_required()
+def export_revocation(revocation_id):
+    actor = _admin()
+    from app.models.evidence_timestamp import EvidenceTimestamp
+    from app.models.certificate_revocation import CertificateRevocationEvidence
+    from app.services.certificate_revocation import (
+        RevocationEvidenceError, verify_snapshot, _read_pem,
+    )
+    item = CertificateRevocationEvidence.query.filter_by(
+        id=revocation_id, organization_id=actor.organization_id,
+    ).first()
+    if item is None:
+        abort(404)
+    timestamp = EvidenceTimestamp.query.filter_by(
+        id=item.timestamp_id, organization_id=actor.organization_id,
+    ).first()
+    if timestamp is None:
+        abort(409, description="CRL timestamp reference invalid")
+    _retention(timestamp.retention_id, actor)
+    try:
+        root = _read_pem(current_app.config.get("RFC3161_TRUST_ROOT_PEM"), "Trusted TSA root")
+        result = verify_snapshot(item, root)
+        if (result["subject_certificate_sha256"] != timestamp.tsa_certificate_sha256
+                or item.organization_id != timestamp.organization_id):
+            raise RevocationEvidenceError("CRL not bound to retained TSA")
+    except (RevocationEvidenceError, OSError, ValueError):
+        abort(409, description="CRL evidence verification failed")
+    response = jsonify({
+        "id": item.id, "timestamp_id": item.timestamp_id,
+        "subject_certificate_der_b64": item.subject_der_b64,
+        "issuer_certificate_der_b64": item.issuer_der_b64,
+        "crl_der_b64": item.crl_der_b64,
+        "crl_sha256": item.crl_sha256,
+        "status": item.status,
+        "checked_at": item.checked_at.isoformat() + "Z",
+        "assurance": "historical_signed_crl_observation_not_ocsp",
+    })
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
