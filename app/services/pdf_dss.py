@@ -75,6 +75,26 @@ def collect_dss_material(dossier, ocsp_rows, crl_rows):
             if hashlib.sha256(raw).hexdigest() != ref["sha256"]:
                 raise DssEvidenceError("CRL source hash differs")
             crls.append(raw)
+    platform = manifest.get("platform_signer_chain")
+    if platform is not None:
+        platform_chain = platform["certificate_chain"]
+        platform_certs = [
+            _decode(value, 32768)
+            for value in platform_chain["certificates_der_b64_leaf_to_root"]
+        ]
+        platform_digests = platform_chain["certificates_sha256_leaf_to_root"]
+        if (len(platform_certs) != len(platform_digests)
+                or any(hashlib.sha256(blob).hexdigest() != digest
+                       for blob, digest in zip(platform_certs, platform_digests))):
+            raise DssEvidenceError("PDF platform signing chain evidence altered")
+        certificates.extend(platform_certs)
+        platform_crls = platform.get("crl_inventory")
+        if platform_crls:
+            for observation in platform_crls["observations"]:
+                raw = _decode(observation["crl_der_b64"], 512 * 1024)
+                if hashlib.sha256(raw).hexdigest() != observation["crl_sha256"]:
+                    raise DssEvidenceError("PDF signer CRL bytes altered")
+                crls.append(raw)
     chain_crls = manifest.get("chain_revocation")
     if chain_crls is not None:
         for item in chain_crls["observations"]:
