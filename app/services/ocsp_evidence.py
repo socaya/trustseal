@@ -66,7 +66,6 @@ def validate_ocsp(response_der, subject_pem, issuer_pem, root_pem, *, observed_a
                           subject.tbs_certificate_bytes, subject.signature_hash_algorithm)
         # This intentionally supports only directly CA-signed OCSP status,
         # not delegated responders with separately validated OCSPSigning EKU.
-        issuer_name_hash = x509.Name.public_bytes(issuer.subject) if False else None
         expected = ocsp.OCSPRequestBuilder().add_certificate(
             subject, issuer, hashes.SHA256()
         ).build()
