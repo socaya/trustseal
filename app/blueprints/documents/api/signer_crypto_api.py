@@ -81,8 +81,29 @@ def _eligible(envelope_id, actor, *, lock=False):
         EnvelopeParticipant.signing_order < participant.signing_order,
     ).all()
     for earlier in previous:
-        if not SignerEndorsement.query.filter_by(participant_id=earlier.id).first():
+        prior = SignerEndorsement.query.filter_by(participant_id=earlier.id).first()
+        if prior is None:
             abort(409, description="Previous cryptographic endorsement required")
+        prior_key = db.session.get(SignerPublicKey, prior.signer_key_id)
+        prior_review = SignerDecision.query.filter_by(participant_id=earlier.id).first()
+        if (prior_key is None or prior_review is None
+                or prior_review.decision != "acknowledged"
+                or prior.user_id != earlier.user_id
+                or prior_key.user_id != earlier.user_id
+                or not verify_detached(
+                    prior_key.public_key_pem, prior.signed_payload, prior.signature_b64
+                )):
+            abort(409, description="Previous endorsement integrity failure")
+        try:
+            expected_prior = endorsement_payload(
+                envelope=envelope, participant=earlier, decision=prior_review,
+                fingerprint=prior_key.fingerprint,
+                nonce=prior.signed_payload.get("nonce"),
+            )
+        except (ValueError, TypeError, AttributeError):
+            abort(409, description="Previous endorsement binding failure")
+        if prior.signed_payload != expected_prior:
+            abort(409, description="Previous endorsement does not match document")
     return envelope, participant, decision
 
 
