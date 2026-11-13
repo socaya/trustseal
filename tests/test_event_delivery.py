@@ -46,6 +46,7 @@ def test_no_arbitrary_outbox_handlers_are_registered():
         "evidence.checkpoint.issued",
         "evidence.crl.captured",
         "evidence.dossier.issued",
+        "evidence.dss.issued",
         "evidence.hold.placed",
         "evidence.hold.released",
         "evidence.ocsp.captured",
