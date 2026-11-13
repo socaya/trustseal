@@ -15,6 +15,7 @@ from .documents.document_snapshot import DocumentSnapshot
 from .documents.document_blob import DocumentBlob
 from .revoked_token import RevokedToken
 from .event_delivery import SecurityEvent, OutboxEvent
+from .signing_envelope import SigningEnvelope, EnvelopeParticipant
 from .esignature import (
     SignatureProfile,
     SignatureRequest,
@@ -49,7 +50,7 @@ from .user import (
 __all__ = [
     # Document-related
     "Document","DocumentSignature","DocumentParty","DocumentActivity","DocumentShare","DocumentVersion",
-    "DocumentSnapshot","DocumentBlob","RevokedToken","SecurityEvent","OutboxEvent","DocumentAuditLog","DocumentComment","DocumentDraft","DocumentReminder","DocumentSection","DocumentShare","DocumentType",
+    "DocumentSnapshot","DocumentBlob","RevokedToken","SecurityEvent","OutboxEvent","SigningEnvelope","EnvelopeParticipant","DocumentAuditLog","DocumentComment","DocumentDraft","DocumentReminder","DocumentSection","DocumentShare","DocumentType",
 
     # E-signature-related
     "SignatureProfile", "SignatureRequest", "SignatureRequestActivity",
