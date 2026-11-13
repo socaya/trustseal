@@ -104,9 +104,27 @@ def validate_crl(crl_bytes, subject_pem, issuer_pem, root_pem, *, observed_at=No
         raise RevocationEvidenceError("CRL not valid at observation time")
     if next_update <= this_update:
         raise RevocationEvidenceError("CRL time window invalid")
-    if not (_utc_naive(getattr(issuer, "not_valid_before_utc", None) or issuer.not_valid_before)
-            <= checked <= _utc_naive(getattr(issuer, "not_valid_after_utc", None) or issuer.not_valid_after)):
-        raise RevocationEvidenceError("CRL issuer certificate outside validity interval")
+    for certificate, purpose in ((root, "Trusted root"),
+                                 (issuer, "CRL issuer"),
+                                 (subject, "TSA signer")):
+        if not (_utc_naive(getattr(certificate, "not_valid_before_utc", None)
+                           or certificate.not_valid_before)
+                <= checked <= _utc_naive(getattr(certificate, "not_valid_after_utc", None)
+                                         or certificate.not_valid_after)):
+            raise RevocationEvidenceError(purpose + " certificate outside validity interval")
+    # Where the CRL declares the key of its issuer, prohibit substituting
+    # a different CA certificate with the same name.
+    try:
+        crl_aki = crl.extensions.get_extension_for_oid(
+            ExtensionOID.AUTHORITY_KEY_IDENTIFIER
+        ).value.key_identifier
+        issuer_ski = issuer.extensions.get_extension_for_oid(
+            ExtensionOID.SUBJECT_KEY_IDENTIFIER
+        ).value.digest
+        if crl_aki is not None and crl_aki != issuer_ski:
+            raise RevocationEvidenceError("CRL authority key identifier mismatch")
+    except x509.ExtensionNotFound:
+        pass
     revoked = crl.get_revoked_certificate_by_serial_number(subject.serial_number)
     return {
         "subject_certificate_sha256": hashlib.sha256(subject.public_bytes(serialization.Encoding.DER)).hexdigest(),
