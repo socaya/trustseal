@@ -75,3 +75,14 @@ Before enabling the feature, add and run:
 6. Billing/payment-provider workflows and comprehensive tenant-scoped API policy across remaining legacy routes.
 
 **No production system was migrated or tested in this conversation.**
+
+
+## 7. Follow-up hardening in the same checkpoint
+
+- Admin bootstrap no longer falls back to `admin123` or prints any initial password. Creating the first admin now requires `ADMIN_PASSWORD` with at least 16 characters set through the environment. Existing admin accounts are left unchanged.
+- The production factory rejects missing `SECRET_KEY`/`JWT_SECRET_KEY`, Flask debugging, or the repository's example local PostgreSQL credentials.
+- The legacy document model serializers no longer include internal `file_path`, raw signature data, signature IP addresses or share tokens; nested collections use limited metadata. Direct legacy share, version and signature serialization similarly omits sensitive fields.
+- Fixed the private object-key format validator to accept only `64 hex characters + .pdf` and prevent path-based access.
+- Confirmed the manifest model, private storage service, database migration and endpoint code are present on GitHub after the commits.
+
+**Runtime status remains unchanged:** Python dependencies (including Flask) are unavailable in the execution container; PostgreSQL and ClamAV integrations have not been tested. The new service must not be presented as operationally validated.
