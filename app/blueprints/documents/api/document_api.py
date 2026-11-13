@@ -144,21 +144,37 @@ def create_document():
 @document_api.route("/<int:document_id>/", methods=["PUT"])
 @jwt_required()
 def update_document(document_id):
-    doc = get_authorized_document_or_abort(document_id, check_ownership_only=True)
+    # Lock before reading the revision so concurrent edits cannot overwrite
+    # each other or reuse the same outbox idempotency key.
+    user = actor()
+    doc = Document.query.filter(
+        Document.id == document_id,
+        Document.created_by == user.id,
+        Document.deleted_at.is_(None),
+    ).with_for_update().first()
+    if doc is None:
+        abort(404)
     if (doc.status or "").lower() != "draft":
         abort(409, description="Only drafts are editable")
     data = _payload()
+    expected = data.pop("expected_version", None)
+    if type(expected) is not int or expected < 1:
+        abort(428, description="expected_version integer required")
+    if expected != (doc.version or 1):
+        abort(409, description="Document revision conflict")
+    if not data or set(data) - EDITABLE:
+        abort(400, description="Only editable draft fields are accepted")
     _validate(data)
     for key in EDITABLE:
         if key in data:
             setattr(doc, key, data[key].strip() if key == "title" else data[key])
-    doc.last_modified_by_id = actor().id
-    doc.version = (doc.version or 0) + 1
+    doc.last_modified_by_id = user.id
+    doc.version = expected + 1
     from app.services.event_delivery import enqueue
     enqueue(
         event_type="document.draft.updated", aggregate_type="document",
         aggregate_id=doc.id, organization_id=doc.organization_id,
-        actor_id=actor().id, action="document.draft.updated",
+        actor_id=user.id, action="document.draft.updated",
         idempotency_key="document-updated:%s:%s" % (doc.id, doc.version),
     )
     db.session.commit()
