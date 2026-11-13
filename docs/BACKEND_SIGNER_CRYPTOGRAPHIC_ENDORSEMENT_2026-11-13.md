@@ -109,3 +109,14 @@ Additionally require actual PostgreSQL concurrency tests for two simultaneous en
 Completing **personal CMS/PAdES signatures** requires a separate signing service that incrementally signs a PDF with each signer's protected certificate-backed key, validates every signed byte range and signer certificate chain, and preserves prior signatures. A signer-controlled cryptographic endorsement cannot simply be embedded as a signature appearance or falsely converted into a personal PDF signature.
 
 Other outstanding TrustSeal backend modules include governed electronic-stamp custody, external recipient onboarding, tenant-scoped public verification, retention/legal hold, independent audit checkpoints, payment and notification integrations, complete authorization review, CI/reproducible lockfile, and all operational readiness gates.
+
+
+## CI and legacy migration compatibility discovery
+
+Added `.github/workflows/backend-ci.yml`, which installs backend/test/PDF dependencies, compiles Python sources, runs PostgreSQL schema upgrades and tests, and reports failures as GitHub checks. Initial runs exposed and fixed a missing `psycopg` driver.
+
+The migration rehearsal also exposed an **existing 2025 migration defect**: revision `a257ea2e7653` begins with an ALTER on `subscriptions` and therefore cannot bootstrap an empty database. That revision is not rewritten in this checkpoint.
+
+To exercise the **new trust-service migrations** against a disposable PostgreSQL database, CI now uses guarded `scripts/ci_legacy_schema_baseline.py` to generate legacy model tables only, stamps `1856829bd7b1`, then applies newer migrations. This is **not evidence of full historical migration replay**. A restored, representative pre-upgrade database and a separate migration-repair strategy remain essential before production use.
+
+See the GitHub Actions workflow for actual test results. Do not treat committing tests or configuring CI as a passing test suite.
