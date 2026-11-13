@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, abort, jsonify, request
 from flask_jwt_extended import jwt_required
 
+from sqlalchemy.exc import IntegrityError
 from app.extensions import db
 from app.models.signer_cryptographic import (
     SignerPublicKey, SignerKeyChallenge, SignerEndorsementChallenge,
@@ -141,6 +142,9 @@ def issue_key_challenge():
         abort(400, description="Valid Ed25519 public key required")
     if SignerPublicKey.query.filter_by(fingerprint=fingerprint).first():
         abort(409, description="Key already registered")
+    # Serialize rate-limit and registration checks for this account.
+    from app.models.user import User
+    User.query.filter_by(id=actor.id).with_for_update().first()
     now = datetime.utcnow()
     recent = SignerKeyChallenge.query.filter(
         SignerKeyChallenge.user_id == actor.id,
@@ -175,7 +179,9 @@ def issue_key_challenge():
 def confirm_key():
     actor = _user()
     data = _data({"challenge_id", "nonce", "signature_b64"})
-    if type(data["challenge_id"]) is not int or not isinstance(data["nonce"], str):
+    if (type(data["challenge_id"]) is not int
+            or not isinstance(data["nonce"], str)
+            or not 20 <= len(data["nonce"]) <= 128):
         abort(400)
     challenge = SignerKeyChallenge.query.filter_by(
         id=data["challenge_id"], user_id=actor.id,
@@ -212,7 +218,11 @@ def confirm_key():
         actor_id=actor.id, action="signer.key.registered",
         idempotency_key="signer-key-registered:%s" % key.id,
     )
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        abort(409, description="Signer key already registered")
     return jsonify({"id": key.id, "fingerprint": key.fingerprint,
                     "assurance": "private_key_possession_only"}), 201
 
@@ -296,9 +306,14 @@ def record_endorsement(envelope_id):
         abort(409, description="Challenge unavailable")
     key = _credential(challenge.signer_key_id, actor)
     payload = challenge.signed_payload
+    challenge_nonce = payload.get("nonce")
     if (payload.get("key_fingerprint") != key.fingerprint
-            or payload.get("nonce") is None
-            or hashlib.sha256(payload["nonce"].encode("utf-8")).hexdigest() != challenge.nonce_hash):
+            or not isinstance(challenge_nonce, str)
+            or not 20 <= len(challenge_nonce) <= 128
+            or not secrets.compare_digest(
+                hashlib.sha256(challenge_nonce.encode("utf-8")).hexdigest(),
+                challenge.nonce_hash,
+            )):
         abort(409, description="Signing challenge corrupted")
     expected = endorsement_payload(
         envelope=envelope, participant=participant, decision=decision,
