@@ -72,6 +72,8 @@ def capture(timestamp_id):
             subject_certificate_sha256=result["subject_certificate_sha256"],
             issuer_certificate_sha256=result["issuer_certificate_sha256"],
             response_sha256=result["response_sha256"],
+            responder_certificate_sha256=result["responder_certificate_sha256"],
+            responder_der_b64=result["responder_der_b64"],
             response_der_b64=base64.b64encode(response).decode(),
             subject_der_b64=base64.b64encode(
                 x509.load_pem_x509_certificate(subject).public_bytes(serialization.Encoding.DER)
