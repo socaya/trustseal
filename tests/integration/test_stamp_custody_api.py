@@ -20,7 +20,7 @@ from app.models.signing_envelope import SigningEnvelope
 from app.models.pdf_finalization import FinalizedPdf
 
 
-def test_governed_stamp_approval_and_cross_tenant_guards(monkeypatch):
+def test_governed_stamp_approval_and_cross_tenant_guards(monkeypatch, tmp_path):
     app = create_app()
     with app.app_context():
         suffix = uuid.uuid4().hex[:10]
@@ -43,6 +43,7 @@ def test_governed_stamp_approval_and_cross_tenant_guards(monkeypatch):
         requester = user("stampreq", org)
         custodian = user("stampcust", org)
         reviewer = user("stampreview", org)
+        independent_issuer = user("stampissuer", org)
         foreign = user("stampforeign", other)
         role = Role.query.filter_by(name="admin").first()
         if role is None:
@@ -50,6 +51,7 @@ def test_governed_stamp_approval_and_cross_tenant_guards(monkeypatch):
             db.session.add(role)
             db.session.flush()
         db.session.add(UserRole(user_id=reviewer.id, role_id=role.id))
+        db.session.add(UserRole(user_id=independent_issuer.id, role_id=role.id))
         db.session.commit()
         tokens = {
             label: {"Authorization": "Bearer " + create_access_token(identity=str(account.id))}
@@ -148,6 +150,55 @@ def test_governed_stamp_approval_and_cross_tenant_guards(monkeypatch):
         )
         assert response.status_code == 200, response.get_data(as_text=True)
         assert response.get_json()["status"] == "approved"
+        # The authorized issuer is an independent administrator. The
+        # generated private key exists only in this disposable test fixture.
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        from cryptography.hazmat.primitives import serialization
+        private = Ed25519PrivateKey.generate()
+        private_path = tmp_path / "stamp-private.pem"
+        private_path.write_bytes(private.private_bytes(
+            serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        ))
+        private_path.chmod(0o600)
+        public_path = tmp_path / "stamp-public.pem"
+        public_path.write_bytes(private.public_key().public_bytes(
+            serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo,
+        ))
+        app.config.update(
+            STAMP_ATTESTATION_ENABLED=True,
+            STAMP_ATTESTATION_PRIVATE_KEY=str(private_path),
+            STAMP_ATTESTATION_PUBLIC_KEY=str(public_path),
+            STAMP_ATTESTATION_OPERATOR_ID=str(independent_issuer.id),
+        )
+        import app.cli.stamp_custody as issuance
+        monkeypatch.setattr(issuance, "_verify_pdf", lambda _: None)
+        result = app.test_cli_runner().invoke(
+            args=["stamp-custody", "issue", str(application_id)],
+        )
+        assert result.exit_code == 0, result.output
+        from app.models.stamp_custody import StampAttestation
+        attestation = StampAttestation.query.filter_by(
+            application_id=application_id
+        ).one()
+        from app.services.stamp_attestation import (
+            trusted_stamp_key, verify_attestation,
+        )
+        assert verify_attestation({
+            "payload": attestation.payload, "algorithm": attestation.algorithm,
+            "key_id": attestation.key_id, "signature": attestation.signature,
+        }, trusted_stamp_key(app.config, attestation.key_id))
+        from app.blueprints.estamp import stamp_attestation_api
+        verified = client.get(
+            "/api/stamp-attestations/%s" % attestation.id,
+            headers=tokens["reviewer"],
+        )
+        assert verified.status_code == 200, verified.get_data(as_text=True)
+        assert verified.get_json()["valid"] is True
+        assert client.get(
+            "/api/stamp-attestations/%s/export" % attestation.id,
+            headers=tokens["foreign"],
+        ).status_code == 404
         assert client.post(
             "/api/stamp-custody/applications/%s/decision" % application_id,
             json={"decision": "rejected"}, headers=tokens["reviewer"],
@@ -156,7 +207,7 @@ def test_governed_stamp_approval_and_cross_tenant_guards(monkeypatch):
             "/api/stamp-custody/%s/revoke" % stamp_id,
             headers=tokens["reviewer"],
         ).status_code == 200
-        assert ManagedStamp.query.get(stamp_id).status == "revoked"
+        assert db.session.get(ManagedStamp, stamp_id).status == "revoked"
         assert client.post(
             "/api/stamp-custody/%s/applications" % stamp_id,
             json={"finalized_pdf_id": pdf.id, "reason": "Cannot reuse after revocation"},
