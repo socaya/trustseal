@@ -33,6 +33,7 @@ class OutboxEvent(db.Model):
     attempts = db.Column(db.Integer, nullable=False, default=0)
     next_attempt_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     locked_until = db.Column(db.DateTime)
+    lease_token = db.Column(db.String(36), index=True)
     last_error = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     completed_at = db.Column(db.DateTime)
