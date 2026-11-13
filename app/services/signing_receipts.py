@@ -59,6 +59,36 @@ def load_public_key(path):
     return key
 
 
+
+def resolve_trusted_public_key(config, key_id):
+    """Select only an explicitly configured trusted key matching its fingerprint.
+
+    An optional JSON mapping retains older trusted keys after rotation.
+    Clients must pin fingerprints from a separately trusted channel.
+    """
+    if not isinstance(key_id, str) or not key_id.startswith("ed25519-sha256:"):
+        raise ValueError("Invalid receipt key identifier")
+    current = config.get("REVIEW_RECEIPT_PUBLIC_KEY")
+    paths = {}
+    if current:
+        candidate = load_public_key(current)
+        paths[public_key_id(candidate)] = candidate
+    registry = config.get("REVIEW_RECEIPT_TRUSTED_KEYS_JSON")
+    if registry:
+        mapping = json.loads(registry)
+        if not isinstance(mapping, dict):
+            raise ValueError("Invalid trusted-key registry")
+        for declared, path in mapping.items():
+            if not isinstance(path, str):
+                raise ValueError("Invalid trusted key location")
+            key = load_public_key(path)
+            if declared != public_key_id(key):
+                raise ValueError("Trusted-key fingerprint mismatch")
+            paths[declared] = key
+    if key_id not in paths:
+        raise ValueError("Receipt signing key is not trusted")
+    return paths[key_id]
+
 def sign_receipt(payload, private_key):
     if payload.get("schema") != SCHEMA:
         raise ValueError("Unsupported receipt schema")
