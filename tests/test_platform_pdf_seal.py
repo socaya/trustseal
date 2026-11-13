@@ -45,3 +45,9 @@ def test_non_pdf_rejected_without_invoking_signing_engine():
 def test_large_source_rejected_without_invoking_signing_engine():
     with pytest.raises(PdfFinalizationError, match="size"):
         seal_pdf(b"%PDF-1.7" + b"x" * MAX_PDF_BYTES, {}, "a" * 64)
+
+
+def test_signing_requires_explicit_enablement():
+    from app.services.platform_pdf_seal import seal_pdf
+    with pytest.raises(PdfFinalizationError, match="disabled"):
+        seal_pdf(b"%PDF-1.7\n%%EOF", {}, "a" * 64)
