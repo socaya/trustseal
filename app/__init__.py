@@ -122,8 +122,28 @@ def create_app(config_class=None):
         # Get API prefix robustly (adjust key if needed)
         api_prefix = current_app.config.get('API_URL_PREFIX', '/api/')
         if request.path.startswith(api_prefix):
-            current_app.logger.debug(f"API request to {request.path}, skipping before_request session auth checks.")
-            return  # Let API routes handle their own auth via decorators like @jwt_required()
+            # A number of legacy API routes omit @jwt_required. Apply baseline
+            # authentication centrally until every route has a domain policy.
+            from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
+            from werkzeug.exceptions import Forbidden
+            public_api = {"/api/auth/login", "/api/auth/register"}
+            if request.path not in public_api:
+                verify_jwt_in_request()
+                # Administrative mutation endpoints must not be available to
+                # any signed-in user simply because they possess a token.
+                protected = (
+                    "/api/roles", "/api/permissions", "/api/role-permissions",
+                    "/api/user-roles", "/api/settings", "/api/audit-logs",
+                )
+                if request.path.startswith(protected):
+                    from .models.system import UserRole, Role
+                    user_id = int(get_jwt_identity())
+                    role_names = db.session.query(Role.name).join(
+                        UserRole, UserRole.role_id == Role.id
+                    ).filter(UserRole.user_id == user_id).all()
+                    if not any(name.lower() in {"admin", "administrator", "superadmin", "super_admin"} for (name,) in role_names):
+                        raise Forbidden("Administrative permissions required")
+            return
 
         # --- Allow Static Files ---
         if request.endpoint == 'static':
