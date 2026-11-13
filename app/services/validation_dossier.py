@@ -57,7 +57,7 @@ def _approved_observation(record, timestamp, root, *, ocsp):
 
 
 def build_dossier(retention, timestamp, ocsp_rows, crl_rows, config, *,
-                  require_original=True, chain_mode="auto"):
+                  require_original=True, chain_mode="auto", report_missing_chain=True):
     if len(ocsp_rows) > MAX_STATUS_OBSERVATIONS or len(crl_rows) > MAX_STATUS_OBSERVATIONS:
         raise ValueError("Too many revocation evidence observations")
     if require_original:
@@ -123,7 +123,7 @@ def build_dossier(retention, timestamp, ocsp_rows, crl_rows, config, *,
     }
     if certificate_chain is not None:
         result["certificate_chain"] = certificate_chain
-    else:
+    elif report_missing_chain:
         result["missing_requirements"].append("bounded_explicit_tsa_certificate_path")
         result["missing_requirements"].sort()
     return result
@@ -133,6 +133,10 @@ def verify_dossier(dossier, retention, timestamp, ocsp_rows, crl_rows, config):
     manifest = build_dossier(
         retention, timestamp, ocsp_rows, crl_rows, config,
         chain_mode="included" if "certificate_chain" in dossier.manifest else "none",
+        report_missing_chain=(
+            "bounded_explicit_tsa_certificate_path"
+            in dossier.manifest.get("missing_requirements", [])
+        ),
     )
     if (dossier.retention_id != retention.id
             or dossier.organization_id != retention.organization_id
