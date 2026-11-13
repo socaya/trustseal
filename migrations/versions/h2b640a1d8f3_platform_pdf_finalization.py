@@ -23,6 +23,7 @@ def upgrade():
         sa.Column("source_blob_id", sa.Integer(), sa.ForeignKey("document_blobs.id"),
                   nullable=False),
         sa.Column("source_sha256", sa.String(64), nullable=False),
+        sa.Column("evidence_sha256", sa.String(64), nullable=False),
         sa.Column("object_key", sa.String(96), nullable=False, unique=True),
         sa.Column("output_sha256", sa.String(64), nullable=False),
         sa.Column("output_size", sa.BigInteger(), nullable=False),
