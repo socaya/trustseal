@@ -320,6 +320,56 @@ def _verify_ocsp_event(payload, key):
     verify_ocsp_snapshot(record, root)
 
 
+def _verify_dossier_event(payload, key):
+    from app.models.validation_dossier import ValidationDossier
+    from app.models.evidence_preservation import EvidenceRetention
+    from app.models.evidence_timestamp import EvidenceTimestamp
+    from app.models.ocsp_evidence import OcspEvidence
+    from app.models.certificate_revocation import CertificateRevocationEvidence
+    from app.services.validation_dossier import verify_dossier
+    from flask import current_app
+    if type(payload.get("aggregate_id")) is not int or not key.startswith("evidence-dossier:"):
+        raise ValueError("Invalid validation dossier event")
+    try:
+        dossier_id = int(key.rsplit(":", 1)[1])
+    except ValueError:
+        raise ValueError("Dossier identifier missing") from None
+    item = db.session.get(ValidationDossier, dossier_id)
+    if item is None or item.retention_id != payload["aggregate_id"]:
+        raise ValueError("Dossier event not bound to retention")
+    retention = db.session.get(EvidenceRetention, item.retention_id)
+    timestamp = db.session.get(EvidenceTimestamp, item.timestamp_id)
+    if retention is None or timestamp is None:
+        raise ValueError("Dossier source records missing")
+    refs = item.manifest.get("revocation_observations", [])
+    if not isinstance(refs, list) or len(refs) > 200:
+        raise ValueError("Dossier reference list invalid")
+    ocsp_ids = set()
+    crl_ids = set()
+    for ref in refs:
+        if not isinstance(ref, dict) or type(ref.get("id")) is not int:
+            raise ValueError("Invalid dossier reference")
+        if ref.get("type") == "ocsp":
+            ocsp_ids.add(ref["id"])
+        elif ref.get("type") == "crl":
+            crl_ids.add(ref["id"])
+        else:
+            raise ValueError("Dossier reference type invalid")
+    ocsp = OcspEvidence.query.filter(
+        OcspEvidence.id.in_(ocsp_ids),
+        OcspEvidence.timestamp_id == timestamp.id,
+        OcspEvidence.organization_id == retention.organization_id,
+    ).all() if ocsp_ids else []
+    crl = CertificateRevocationEvidence.query.filter(
+        CertificateRevocationEvidence.id.in_(crl_ids),
+        CertificateRevocationEvidence.timestamp_id == timestamp.id,
+        CertificateRevocationEvidence.organization_id == retention.organization_id,
+    ).all() if crl_ids else []
+    if len(ocsp) != len(ocsp_ids) or len(crl) != len(crl_ids):
+        raise ValueError("Dossier references cannot be resolved")
+    verify_dossier(item, retention, timestamp, ocsp, crl, current_app.config)
+
+
 HANDLERS = {
     "document.draft.created": _verify_document_event,
     "document.draft.updated": _verify_document_event,
@@ -354,6 +404,7 @@ HANDLERS = {
     "evidence.timestamp.issued": _verify_timestamp_event,
     "evidence.crl.captured": _verify_crl_event,
     "evidence.ocsp.captured": _verify_ocsp_event,
+    "evidence.dossier.issued": _verify_dossier_event,
 }
 
 
