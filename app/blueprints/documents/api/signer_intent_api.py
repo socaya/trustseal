@@ -164,7 +164,8 @@ def signer_document(envelope_id):
 def issue_challenge(envelope_id):
     user = _actor()
     data = _payload()
-    if set(data) != {"password"} or not isinstance(data["password"], str):
+    if (set(data) != {"password"} or not isinstance(data["password"], str)
+            or not 1 <= len(data["password"]) <= 1024):
         abort(400, description="Password reauthentication required")
     envelope, participant = _participant(envelope_id, user, lock=True)
     _eligible(envelope, participant)
@@ -228,7 +229,9 @@ def record_decision(envelope_id):
     if (data["consent_version"] != CONSENT_VERSION
             or type(data["affirmed"]) is not bool or data["affirmed"] is not True):
         abort(400, description="Explicit acknowledgement of the displayed statement required")
-    if type(data["challenge_id"]) is not int or not isinstance(data["challenge"], str):
+    if (type(data["challenge_id"]) is not int
+            or not isinstance(data["challenge"], str)
+            or not 1 <= len(data["challenge"]) <= 256):
         abort(400, description="Invalid challenge")
     envelope, participant = _participant(envelope_id, user, lock=True)
     _eligible(envelope, participant)
