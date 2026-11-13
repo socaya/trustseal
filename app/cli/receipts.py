@@ -68,6 +68,17 @@ def issue(decision_id):
         key_id=signed["key_id"], signature=signed["signature"],
     )
     db.session.add(record)
+    db.session.flush()
+    from app.services.event_delivery import enqueue
+    enqueue(
+        event_type="review.receipt.issued",
+        aggregate_type="envelope",
+        aggregate_id=envelope.id,
+        organization_id=envelope.organization_id,
+        actor_id=None,
+        action="review.receipt.issued.system_operator",
+        idempotency_key="review-receipt:%s" % decision.id,
+    )
     try:
         db.session.commit()
     except IntegrityError:
