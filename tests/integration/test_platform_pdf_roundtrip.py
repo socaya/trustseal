@@ -9,8 +9,8 @@ from io import BytesIO
 
 import pytest
 
-pytest.importorskip("pyhanko")
-pytest.importorskip("reportlab")
+import pyhanko  # Required: missing signing dependency must fail, never silently skip.
+import reportlab
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
