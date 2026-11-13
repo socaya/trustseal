@@ -266,3 +266,142 @@ def check_draft_snapshot_integrity(document_id, snapshot_id):
         "verified": verified,
         "assurance": "stored_draft_text_digest_only",
     })
+
+
+# === Private, scanned document file objects ===
+def _blob_metadata(record):
+    return {
+        "id": record.id,
+        "document_id": record.document_id,
+        "revision": record.revision,
+        "file_name": record.file_name,
+        "file_size": record.file_size,
+        "mime_type": record.mime_type,
+        "sha256": record.sha256,
+        "created_by_id": record.created_by_id,
+        "created_at": record.created_at.isoformat() if record.created_at else None,
+        "security_status": "scanned_private_object",
+    }
+
+
+@document_api.route("/<int:document_id>/files", methods=["POST"])
+@jwt_required()
+def ingest_document_file(document_id):
+    """Owner-only; immutable file attachment to a draft document."""
+    from flask import current_app
+    from sqlalchemy import func
+    from app.models.documents.document_blob import DocumentBlob
+    from app.models.documents.document_activity import DocumentActivity
+    from app.services.documents.private_storage import (
+        IngestionError, store_scanned_pdf, cleanup_object,
+    )
+
+    user = actor()
+    doc = Document.query.filter(
+        Document.id == document_id,
+        Document.created_by == user.id,
+        Document.deleted_at.is_(None),
+    ).with_for_update().first()
+    if doc is None:
+        abort(404)
+    if (doc.status or "").lower() != "draft":
+        abort(409, description="Only drafts accept uploaded documents")
+    incoming = request.files.get("file")
+    if incoming is None:
+        abort(400, description="multipart/form-data file field required")
+    if len(request.files) != 1:
+        abort(400, description="Exactly one file is required")
+
+    key = None
+    try:
+        key, name, size, digest, scanner = store_scanned_pdf(
+            incoming.stream, incoming.filename, current_app.config
+        )
+        revision = (db.session.query(func.max(DocumentBlob.revision))
+                    .filter(DocumentBlob.document_id == doc.id).scalar() or 0) + 1
+        record = DocumentBlob(
+            document_id=doc.id,
+            revision=revision,
+            object_key=key,
+            file_name=name,
+            mime_type="application/pdf",
+            file_size=size,
+            sha256=digest,
+            scanner=scanner,
+            created_by_id=user.id,
+        )
+        db.session.add(record)
+        db.session.add(DocumentActivity(
+            document_id=doc.id, user_id=user.id,
+            activity_type="private_file_ingested",
+            details="Private PDF revision %s, SHA-256 %s" % (revision, digest),
+        ))
+        db.session.commit()
+    except IngestionError as exc:
+        db.session.rollback()
+        abort(422, description=str(exc))
+    except Exception:
+        db.session.rollback()
+        if key:
+            try:
+                cleanup_object(key, current_app.config)
+            except IngestionError:
+                current_app.logger.exception("Unable to clean orphaned document file")
+        raise
+    response = jsonify(_blob_metadata(record))
+    response.headers["Cache-Control"] = "no-store"
+    return response, 201
+
+
+@document_api.route("/<int:document_id>/files", methods=["GET"])
+@jwt_required()
+def list_document_files(document_id):
+    from app.models.documents.document_blob import DocumentBlob
+    get_authorized_document_or_abort(document_id)
+    records = DocumentBlob.query.filter(
+        DocumentBlob.document_id == document_id
+    ).order_by(DocumentBlob.revision.desc()).limit(100).all()
+    response = jsonify([_blob_metadata(record) for record in records])
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@document_api.route("/<int:document_id>/files/<int:file_id>/download", methods=["GET"])
+@jwt_required()
+def download_document_file(document_id, file_id):
+    from flask import current_app, send_file
+    from sqlalchemy import or_
+    from app.models.documents.document_blob import DocumentBlob
+    from app.services.documents.private_storage import IngestionError, check_object_digest
+
+    doc = get_authorized_document_or_abort(document_id)
+    user = actor()
+    if doc.created_by != user.id:
+        allowed = DocumentShare.query.filter(
+            DocumentShare.document_id == doc.id,
+            DocumentShare.shared_with_user_id == user.id,
+            DocumentShare.can_view.is_(True),
+            DocumentShare.can_download.is_(True),
+            or_(
+                DocumentShare.expires_at.is_(None),
+                DocumentShare.expires_at > datetime.utcnow(),
+            ),
+        ).first()
+        if allowed is None:
+            abort(404)
+    record = DocumentBlob.query.filter_by(
+        id=file_id, document_id=doc.id
+    ).first_or_404()
+    try:
+        path = check_object_digest(record.object_key, record.sha256, current_app.config)
+    except IngestionError:
+        current_app.logger.exception("Private object integrity or storage check failed")
+        abort(503, description="Document is temporarily unavailable")
+    response = send_file(
+        path, mimetype=record.mime_type,
+        as_attachment=True, download_name=record.file_name,
+        conditional=False, etag=False, max_age=0,
+    )
+    response.headers["Cache-Control"] = "no-store, private"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
