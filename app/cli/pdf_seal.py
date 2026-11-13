@@ -28,6 +28,31 @@ from app.services.platform_review_evidence import canonical_evidence_bundle, evi
 pdf_seal_cli = AppGroup("pdf-seal")
 
 
+def _operator(envelope):
+    """Require an active separate-duty operator configured by deployment.
+
+    This stage is an OS-service identity assertion, not user MFA or an HSM
+    signing authorization. Deployment must protect this configuration.
+    """
+    from app.models.user import User
+    from app.policies.api_access import is_admin
+
+    raw = current_app.config.get("PDF_SEAL_OPERATOR_ID")
+    if raw is None or not str(raw).isdecimal():
+        raise PdfFinalizationError("Platform seal operator identity is not configured")
+    operator = db.session.get(User, int(raw))
+    if (operator is None or not operator.is_active
+            or operator.organization_id != envelope.organization_id
+            or operator.id == envelope.created_by_id
+            or not is_admin(operator.id)):
+        raise PdfFinalizationError("Authorized, independent seal operator required")
+    if EnvelopeParticipant.query.filter_by(
+        envelope_id=envelope.id, user_id=operator.id
+    ).first() is not None:
+        raise PdfFinalizationError("A reviewing participant cannot self-seal")
+    return operator
+
+
 def _complete_review(envelope):
     participants = EnvelopeParticipant.query.filter_by(
         envelope_id=envelope.id
@@ -85,6 +110,7 @@ def finalize(envelope_id):
         raise click.ClickException("Envelope is not prepared")
     object_key = None
     try:
+        operator = _operator(envelope)
         evidence_digest = _complete_review(envelope)
         original = db.session.get(DocumentBlob, envelope.document_blob_id)
         if (original is None or original.document_id != envelope.document_id
@@ -106,6 +132,7 @@ def finalize(envelope_id):
         record = FinalizedPdf(
             envelope_id=envelope.id,
             organization_id=envelope.organization_id,
+            issued_by_id=operator.id,
             source_blob_id=original.id,
             source_sha256=original.sha256,
             evidence_sha256=evidence_digest,
@@ -123,8 +150,8 @@ def finalize(envelope_id):
             aggregate_type="envelope",
             aggregate_id=envelope.id,
             organization_id=envelope.organization_id,
-            actor_id=None,
-            action="platform.pdf.sealed.system_operator",
+            actor_id=operator.id,
+            action="platform.pdf.sealed.authorized_operator",
             idempotency_key="platform-pdf-sealed:%s" % envelope.id,
         )
         db.session.commit()
