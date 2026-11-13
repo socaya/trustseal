@@ -39,11 +39,8 @@ class DocumentShare(db.Model):
             "can_download": self.can_download,
             "can_share": self.can_share,
 
-            "token": self.token,
             "expires_at": self.expires_at.isoformat() if self.expires_at else None,
             "created_by_id": self.created_by_id,
             "created_at": self.created_at.isoformat(),
 
-            "created_by": self.created_by.to_dict() if self.created_by else None,
-            "shared_with_user": self.shared_with_user.to_dict() if self.shared_with_user else None
         }
