@@ -39,9 +39,9 @@ def test_world_readable_private_key_is_rejected(tmp_path):
 
 def test_non_pdf_rejected_without_invoking_signing_engine():
     with pytest.raises(PdfFinalizationError, match="Invalid source PDF"):
-        seal_pdf(b"not-a-pdf", {})
+        seal_pdf(b"not-a-pdf", {}, "a" * 64)
 
 
 def test_large_source_rejected_without_invoking_signing_engine():
     with pytest.raises(PdfFinalizationError, match="size"):
-        seal_pdf(b"%PDF-1.7" + b"x" * MAX_PDF_BYTES, {})
+        seal_pdf(b"%PDF-1.7" + b"x" * MAX_PDF_BYTES, {}, "a" * 64)
