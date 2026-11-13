@@ -40,6 +40,7 @@ class Config:
     PDF_PLATFORM_PKCS12_PASSWORD = os.getenv('PDF_PLATFORM_PKCS12_PASSWORD')
     PDF_TRUST_ROOT_PEM = os.getenv('PDF_TRUST_ROOT_PEM')
     PDF_SEAL_OPERATOR_ID = os.getenv('PDF_SEAL_OPERATOR_ID')
+    PDF_FINALIZATION_ENABLED = os.getenv('PDF_FINALIZATION_ENABLED', 'false').lower() == 'true'
 
     # === JWT Configuration ===
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
