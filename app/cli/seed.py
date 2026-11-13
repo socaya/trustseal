@@ -841,7 +841,9 @@ def seed_user_invitations(users, orgs, n=10):
 def register_cli(app):
     """Registers the seeding command group with the Flask app."""
     app.cli.add_command(seed_cli)
-    click.echo("🌱 Seeding commands registered.")
+    from app.cli.outbox import outbox_cli
+    app.cli.add_command(outbox_cli)
+    click.echo("Seed and outbox commands registered.")
 
 # Example of how you might call this in your app factory (e.g., create_app function)
 # if __name__ == "__main__":
