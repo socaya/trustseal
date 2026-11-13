@@ -182,3 +182,60 @@ def list_checkpoints(retention_id):
     } for row in rows])
     result.headers["Cache-Control"] = "private, no-store"
     return result
+
+
+@evidence_preservation_api.route("/retentions/<int:retention_id>/holds", methods=["GET"])
+@jwt_required()
+def list_holds(retention_id):
+    actor = _admin()
+    item = _retention(retention_id, actor)
+    holds = EvidenceLegalHold.query.filter_by(
+        retention_id=item.id, organization_id=actor.organization_id
+    ).order_by(EvidenceLegalHold.id.desc()).limit(100).all()
+    response = jsonify([{
+        "id": hold.id, "reason": hold.reason,
+        "requested_by_id": hold.requested_by_id,
+        "requested_at": hold.requested_at.isoformat() if hold.requested_at else None,
+        "released_by_id": hold.released_by_id,
+        "released_at": hold.released_at.isoformat() if hold.released_at else None,
+        "release_reason": hold.release_reason,
+        "active": hold.released_at is None,
+    } for hold in holds])
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
+
+
+@evidence_preservation_api.route("/checkpoints/<int:checkpoint_id>/export", methods=["GET"])
+@jwt_required()
+def export_checkpoint(checkpoint_id):
+    actor = _admin()
+    row = EvidenceCheckpoint.query.filter_by(
+        id=checkpoint_id, organization_id=actor.organization_id
+    ).first()
+    if row is None:
+        abort(404)
+    retention = _retention(row.retention_id, actor)
+    if retention.organization_id != row.organization_id:
+        abort(409)
+    from app.services.evidence_preservation import (
+        verify_checkpoint, trusted_checkpoint_key, checkpoint_payload,
+    )
+    signed = {
+        "payload": row.payload, "algorithm": row.algorithm,
+        "key_id": row.key_id, "signature": row.signature,
+    }
+    try:
+        trusted = trusted_checkpoint_key(__import__("flask").current_app.config, row.key_id)
+        valid = (
+            row.payload == checkpoint_payload(
+                retention, row.operator_id, row.created_at
+            )
+            and verify_checkpoint(signed, trusted)
+        )
+    except (ValueError, OSError, TypeError, KeyError):
+        valid = False
+    if not valid:
+        abort(409, description="Checkpoint signature or provenance invalid")
+    response = jsonify(signed)
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
