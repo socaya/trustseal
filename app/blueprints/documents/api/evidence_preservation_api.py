@@ -139,8 +139,12 @@ def place_hold(retention_id):
 def release_hold(hold_id):
     actor = _admin()
     data = request.get_json(silent=True)
-    if data != {}:
-        abort(400, description="Hold release accepts an empty JSON object")
+    if not isinstance(data, dict) or set(data) != {"reason"}:
+        abort(400, description="Documented hold release reason required")
+    reason = data["reason"]
+    if (not isinstance(reason, str) or not 15 <= len(reason.strip()) <= 500
+            or any(ord(ch) < 32 for ch in reason)):
+        abort(400, description="Specific legal hold release reason required")
     hold = EvidenceLegalHold.query.filter_by(
         id=hold_id, organization_id=actor.organization_id
     ).with_for_update().first()
@@ -152,6 +156,7 @@ def release_hold(hold_id):
         abort(403, description="Independent administrator required")
     hold.released_by_id = actor.id
     hold.released_at = datetime.utcnow()
+    hold.release_reason = reason.strip()
     enqueue(
         event_type="evidence.hold.released", aggregate_type="evidence_hold",
         aggregate_id=hold.id, organization_id=actor.organization_id,
