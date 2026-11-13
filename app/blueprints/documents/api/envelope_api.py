@@ -208,6 +208,9 @@ def cancel_envelope(envelope_id):
     envelope = _owned(envelope_id, user, lock=True)
     if envelope.state == "cancelled":
         return jsonify(_details(envelope))
+    from app.models.pdf_finalization import FinalizedPdf
+    if FinalizedPdf.query.filter_by(envelope_id=envelope.id).first() is not None:
+        abort(409, description="Finalized PDF cannot be cancelled")
     if envelope.state not in ("draft", "prepared"):
         abort(409)
     envelope.state = "cancelled"
