@@ -93,6 +93,18 @@ def test_platform_pdf_roundtrip_and_tamper_rejection(signing_config):
     assert checks["field"] == FIELD_NAME
     assert checks["overall_valid"]
     assert inspect_signed_pdf(signed, signing_config, expected_evidence_sha256="a" * 64)["overall_valid"]
+    # Chain trust alone must not allow another certificate issued by same CA.
+    with pytest.raises(PdfFinalizationError, match="fingerprint"):
+        inspect_signed_pdf(
+            signed, signing_config,
+            expected_evidence_sha256="a" * 64,
+            expected_certificate_sha256="f" * 64,
+        )
+    assert inspect_signed_pdf(
+        signed, signing_config,
+        expected_evidence_sha256="a" * 64,
+        expected_certificate_sha256=cert_sha256,
+    )["overall_valid"]
     with pytest.raises(PdfFinalizationError, match="evidence digest"):
         inspect_signed_pdf(signed, signing_config, expected_evidence_sha256="b" * 64)
 
