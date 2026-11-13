@@ -27,6 +27,9 @@ def upgrade():
     )
     op.create_index("ix_security_events_organization_id", "security_events", ["organization_id"])
     op.create_index("ix_security_events_actor_id", "security_events", ["actor_id"])
+    op.execute("""CREATE TRIGGER trg_security_events_append_only
+        BEFORE UPDATE OR DELETE ON security_events
+        FOR EACH ROW EXECUTE FUNCTION trustseal_reject_snapshot_mutation()""")
     op.create_table(
         "outbox_events",
         sa.Column("id", sa.BigInteger(), sa.Identity(), primary_key=True),
@@ -56,6 +59,7 @@ def downgrade():
     op.drop_index("ix_outbox_events_state", table_name="outbox_events")
     op.drop_index("ix_outbox_events_organization_id", table_name="outbox_events")
     op.drop_table("outbox_events")
+    op.execute("DROP TRIGGER IF EXISTS trg_security_events_append_only ON security_events")
     op.drop_index("ix_security_events_actor_id", table_name="security_events")
     op.drop_index("ix_security_events_organization_id", table_name="security_events")
     op.drop_table("security_events")
