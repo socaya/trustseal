@@ -28,6 +28,15 @@ def create_app(config_class=None):
     # Ensure you have a 'CONFIG_NAME' key in your config classes for logging clarity
     loaded_config = config_class or os.getenv('FLASK_CONFIG') or 'config.Config'
     app.config.from_object(loaded_config)
+    # Never start a production deployment with missing or example credentials.
+    if str(app.config.get("FLASK_ENV", "")).lower() == "production":
+        database_uri = app.config.get("SQLALCHEMY_DATABASE_URI") or ""
+        if not app.config.get("SECRET_KEY") or not app.config.get("JWT_SECRET_KEY"):
+            raise RuntimeError("Production SECRET_KEY and JWT_SECRET_KEY are required")
+        if "trustseal:password@localhost" in database_uri:
+            raise RuntimeError("Example database credentials cannot be used in production")
+        if app.config.get("FLASK_DEBUG") or app.config.get("DEBUG"):
+            raise RuntimeError("Flask debugging must be disabled in production")
     # Store the config name for logging, default if not present
     config_name = getattr(loaded_config, 'CONFIG_NAME', str(loaded_config))
 
