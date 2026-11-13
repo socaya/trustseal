@@ -112,3 +112,29 @@ def test_dss_material_not_claimed_lt_without_validation_chain():
     })
     with pytest.raises(DssEvidenceError):
         collect_dss_material(dossier, [], [])
+
+
+def test_dss_collects_separate_platform_signer_chain_and_revocation(signing_config):
+    dossier, row = _sample_material(signing_config)
+    original_chain = dossier.manifest["certificate_chain"]
+    original_crl = row.crl_der_b64
+    raw = base64.b64decode(original_crl)
+    platform_crl_inventory = {
+        "observations": [{
+            "index": 0,
+            "crl_der_b64": original_crl,
+            "crl_sha256": hashlib.sha256(raw).hexdigest(),
+        }],
+    }
+    dossier.manifest["platform_signer_chain"] = {
+        "schema": "trustseal.platform-pdf-chain-evidence.v1",
+        "certificate_chain": original_chain,
+        "crl_inventory": platform_crl_inventory,
+    }
+    certs, ocsps, crls = collect_dss_material(dossier, [], [row])
+    assert len(certs) == 2
+    assert ocsps == []
+    assert crls == [raw]  # Preserve exact bytes without duplicate entries.
+    platform_crl_inventory["observations"][0]["crl_sha256"] = "f" * 64
+    with pytest.raises(DssEvidenceError):
+        collect_dss_material(dossier, [], [row])
