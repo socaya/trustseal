@@ -19,6 +19,7 @@ NEW_TABLES = {
     "signer_challenges", "signer_decisions", "review_receipts",
     "finalized_pdfs", "signer_public_keys", "signer_key_challenges",
     "signer_endorsement_challenges", "signer_endorsements",
+    "managed_stamps", "stamp_applications", "stamp_attestations",
 }
 
 
