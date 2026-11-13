@@ -20,6 +20,10 @@ ADMIN_PREFIXES = (
     "/api/roles/", "/api/permissions/", "/api/settings/",
     "/api/audit-logs/", "/api/role-permissions/", "/api/user-roles/",
 )
+LEGACY_STAMP_PREFIXES = (
+    "/api/stamps", "/api/usages", "/api/api/stamps",
+    "/api/api/usages", "/api/api/templates",
+)
 TRUST_CRITICAL_PREFIXES = (
     "/api/document-signatures", "/api/signature-requests",
     "/api/stamps", "/api/usages", "/api/payments",
@@ -45,6 +49,16 @@ def enforce_legacy_api_security():
         return
     if path in PUBLIC_ENDPOINTS:
         return
+    # Upload-only verification is independent of private accounts and records.
+    if path == "/api/public-verification/pdf" and request.method == "POST":
+        return
+    # Refresh-token decorators validate their own JWT type and revocation.
+    if path == "/api/auth/refresh":
+        return
+    # The old stamp and template APIs exposed unscoped tenant records and
+    # generic updates. Require the governed /api/stamp-custody workflow.
+    if any(_under(path, prefix) for prefix in LEGACY_STAMP_PREFIXES):
+        abort(410, description="Legacy stamp API retired; use stamp custody workflow")
     verify_jwt_in_request()
     try:
         user_id = int(get_jwt_identity())
