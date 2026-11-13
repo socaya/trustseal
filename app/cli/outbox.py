@@ -243,6 +243,30 @@ def _verify_preservation_event(payload, key):
         raise ValueError("Unknown preservation event")
 
 
+def _verify_timestamp_event(payload, key):
+    from app.models.evidence_timestamp import EvidenceTimestamp
+    from app.services.rfc3161_timestamp import decode_token, verify_timestamp
+    from flask import current_app
+    retention_id = payload.get("aggregate_id")
+    if type(retention_id) is not int or not key.startswith("evidence-timestamp:"):
+        raise ValueError("Invalid timestamp event")
+    try:
+        token_id = int(key.rsplit(":", 1)[-1])
+    except ValueError:
+        raise ValueError("Invalid timestamp identifier") from None
+    item = db.session.get(EvidenceTimestamp, token_id)
+    if item is None or item.retention_id != retention_id:
+        raise ValueError("Timestamp does not match retained artifact")
+    verified = verify_timestamp(
+        decode_token(item.token_der_b64), item.artifact_sha256,
+        current_app.config,
+    )
+    if (verified["token_sha256"] != item.token_sha256
+            or verified["tsa_certificate_sha256"] != item.tsa_certificate_sha256
+            or verified["gen_time"] != item.gen_time):
+        raise ValueError("Timestamp immutable evidence mismatch")
+
+
 HANDLERS = {
     "document.draft.created": _verify_document_event,
     "document.draft.updated": _verify_document_event,
@@ -274,6 +298,7 @@ HANDLERS = {
     "evidence.hold.placed": _verify_preservation_event,
     "evidence.hold.released": _verify_preservation_event,
     "evidence.checkpoint.issued": _verify_preservation_event,
+    "evidence.timestamp.issued": _verify_timestamp_event,
 }
 
 
