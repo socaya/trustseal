@@ -99,3 +99,65 @@ def download_platform_pdf(envelope_id):
     response.headers["Cache-Control"] = "private, no-store"
     response.headers["X-Content-Type-Options"] = "nosniff"
     return response
+
+
+@sealed_pdf_api.route("/envelopes/<int:envelope_id>/evidence", methods=["GET"])
+@jwt_required()
+def export_platform_seal_evidence(envelope_id):
+    """Export and verify the exact review receipts bound into the PDF seal."""
+    from app.models.signer_decision import SignerDecision
+    from app.models.review_receipt import ReviewReceipt
+    from app.services.signing_receipts import (
+        resolve_trusted_public_key, verify_receipt, review_payload,
+    )
+    from app.services.platform_review_evidence import (
+        canonical_evidence_bundle, evidence_digest,
+    )
+    envelope, record = _authorized(envelope_id)
+    participants = EnvelopeParticipant.query.filter_by(
+        envelope_id=envelope.id
+    ).order_by(EnvelopeParticipant.signing_order).all()
+    items = []
+    for participant in participants:
+        decision = SignerDecision.query.filter_by(participant_id=participant.id).first()
+        if decision is None or decision.decision != "acknowledged":
+            abort(409, description="Review record incomplete")
+        receipt = ReviewReceipt.query.filter_by(decision_id=decision.id).first()
+        if receipt is None:
+            abort(409, description="Signed evidence is missing")
+        detached = {
+            "payload": receipt.payload,
+            "algorithm": receipt.algorithm,
+            "key_id": receipt.key_id,
+            "signature": receipt.signature,
+        }
+        try:
+            trusted = resolve_trusted_public_key(current_app.config, receipt.key_id)
+            valid = verify_receipt(detached, trusted)
+            expected = review_payload(envelope, participant, decision)
+        except (ValueError, OSError, TypeError, KeyError):
+            abort(503, description="Receipt trust configuration unavailable")
+        if not valid or expected != receipt.payload:
+            abort(409, description="Signed review evidence failed verification")
+        items.append({
+            "participant_id": participant.id,
+            "signing_order": participant.signing_order,
+            "review_decision_id": decision.id,
+            **detached,
+        })
+    try:
+        bundle = canonical_evidence_bundle(envelope.id, items)
+        computed = evidence_digest(bundle)
+    except ValueError:
+        abort(409, description="Evidence sequence is invalid")
+    if computed != record.evidence_sha256:
+        abort(409, description="Evidence hash does not match sealed PDF")
+    response = jsonify({
+        "bundle": bundle,
+        "evidence_sha256": computed,
+        "source_sha256": record.source_sha256,
+        "output_sha256": record.output_sha256,
+        "assurance": "platform_certificate_seal_not_individual_signatures",
+    })
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
