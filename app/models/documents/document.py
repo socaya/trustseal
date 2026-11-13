@@ -76,7 +76,6 @@ class Document(db.Model):
             "title": self.title,
             "description": self.description,
             "file_name": self.file_name,
-            "file_path": self.file_path, # Note: Be careful exposing sensitive paths
             "file_size": self.file_size,
             "file_type": self.file_type,
             "document_type_id": self.document_type_id, # Keep FK for reference
@@ -144,9 +143,9 @@ class Document(db.Model):
             # Use .all() because relationships are set to lazy='dynamic'
             data['parties'] = [party.to_dict() for party in self.parties.all()]
             data['versions'] = [version.to_dict() for version in self.versions.all()]
-            data['signatures'] = [sig.to_dict() for sig in self.signatures.all()]
-            data['activities'] = [act.to_dict() for act in self.activities.all()]
-            data['shares'] = [share.to_dict() for share in self.shares.all()]
+            data['signatures'] = [{"id": sig.id, "signature_type": sig.signature_type, "signed_at": sig.signed_at.isoformat() if sig.signed_at else None} for sig in self.signatures.all()]
+            data['activities'] = [{"id": act.id, "activity_type": act.activity_type, "created_at": act.created_at.isoformat() if act.created_at else None} for act in self.activities.all()]
+            data['shares'] = [{"id": share.id, "shared_with_user_id": share.shared_with_user_id, "can_view": share.can_view, "expires_at": share.expires_at.isoformat() if share.expires_at else None} for share in self.shares.all()]
             # data['usages'] = [usage.to_dict() for usage in self.usages.all()]
 
 
