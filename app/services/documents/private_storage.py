@@ -15,7 +15,7 @@ from pathlib import Path
 
 MAX_FILE_BYTES = 16 * 1024 * 1024
 CHUNK = 64 * 1024
-KEY_RE = re.compile(r"^[0-9a-f]{64}\\.pdf$")
+KEY_RE = re.compile(r"^[0-9a-f]{64}\.pdf$")
 PDF_MIME = "application/pdf"
 
 
