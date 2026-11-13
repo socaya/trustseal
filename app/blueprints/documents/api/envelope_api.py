@@ -169,6 +169,13 @@ def prepare_envelope(envelope_id):
     ).order_by(EnvelopeParticipant.signing_order).all()
     if not valid_signing_order([p.signing_order for p in participants]):
         abort(409, description="Continuous signing order from 1 required")
+    active_recipients = User.query.filter(
+        User.id.in_([p.user_id for p in participants]),
+        User.organization_id == user.organization_id,
+        User.is_active.is_(True),
+    ).count()
+    if active_recipients != len(participants):
+        abort(409, description="A recipient is no longer active in this organisation")
     doc = Document.query.filter_by(
         id=envelope.document_id, created_by=user.id,
         organization_id=user.organization_id, deleted_at=None
