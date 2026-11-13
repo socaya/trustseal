@@ -16,14 +16,22 @@ def upgrade():
         CREATE FUNCTION trustseal_envelope_participant_guard()
         RETURNS trigger LANGUAGE plpgsql AS $$
         DECLARE parent_state text;
+        DECLARE parent_id integer;
         BEGIN
+            IF TG_OP = 'DELETE' THEN
+                parent_id := OLD.envelope_id;
+            ELSE
+                parent_id := NEW.envelope_id;
+            END IF;
             SELECT state INTO parent_state FROM signing_envelopes
-            WHERE id = COALESCE(NEW.envelope_id, OLD.envelope_id)
-            FOR UPDATE;
+            WHERE id = parent_id FOR UPDATE;
             IF parent_state IS NULL OR parent_state <> 'draft' THEN
                 RAISE EXCEPTION 'participants can only change during draft preparation';
             END IF;
-            RETURN COALESCE(NEW, OLD);
+            IF TG_OP = 'DELETE' THEN
+                RETURN OLD;
+            END IF;
+            RETURN NEW;
         END;
         $$;
     """)
