@@ -1,104 +1,96 @@
-from flask import request, jsonify, Blueprint, current_app
-from ....extensions import db, jwt
-from ....models.user import User
+"""Authentication API with durable JWT revocation and basic input validation."""
+from flask import request, jsonify, Blueprint
 from flask_jwt_extended import (
-    create_access_token, create_refresh_token,
-    jwt_required, get_jwt_identity, get_jwt
+    create_access_token, create_refresh_token, jwt_required,
+    get_jwt_identity, get_jwt,
 )
+from sqlalchemy.exc import IntegrityError
 
-auth_api = Blueprint('auth_api', __name__, url_prefix='/api/auth')
+from app.extensions import db
+from app.models.user import User
+from app.services.token_security import revoke_token
 
-REVOKED_TOKENS = set()
+auth_api = Blueprint("auth_api", __name__, url_prefix="/api/auth")
 
-@auth_api.route('/register', methods=['POST'])
+
+def _data():
+    value = request.get_json(silent=True)
+    return value if isinstance(value, dict) else {}
+
+
+@auth_api.route("/register", methods=["POST"])
 def register_api():
-    data = request.get_json()
-    current_app.logger.debug(f"📩 Register request: {data}")
-
-    if not data:
-        return jsonify({"error": "No input data provided"}), 400
-
-    if User.query.filter((User.email == data['email']) | (User.username == data['username'])).first():
-        return jsonify({"error": "Email or username already exists"}), 400
+    data = _data()
+    username = str(data.get("username") or "").strip()
+    email = str(data.get("email") or "").strip().lower()
+    password = data.get("password")
+    if not username or len(username) > 64 or not email or len(email) > 120 or "@" not in email:
+        return jsonify(error="Valid username and email are required"), 400
+    if not isinstance(password, str) or len(password) < 12 or len(password) > 1024:
+        return jsonify(error="Password must contain at least 12 characters"), 400
+    if User.query.filter((User.email == email) | (User.username == username)).first():
+        return jsonify(error="Email or username already exists"), 409
 
     user = User(
-        username=data['username'],
-        email=data['email'],
-        first_name=data.get('first_name'),
-        last_name=data.get('last_name'),
-        phone=data.get('phone')
+        username=username,
+        email=email,
+        first_name=data.get("first_name"),
+        last_name=data.get("last_name"),
+        phone=data.get("phone"),
     )
-    user.set_password(data['password'])
-
+    user.set_password(password)
     db.session.add(user)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify(error="Email or username already exists"), 409
+    return jsonify(
+        message="Registration successful",
+        access_token=create_access_token(identity=str(user.id)),
+        refresh_token=create_refresh_token(identity=str(user.id)),
+        user_id=user.id,
+    ), 201
 
-    access_token = create_access_token(identity=str(user.id))
-    refresh_token = create_refresh_token(identity=str(user.id))
 
-    return jsonify({
-        "message": "Registration successful",
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "user_id": user.id
-    })
-
-@auth_api.route('/login', methods=['POST'])
+@auth_api.route("/login", methods=["POST"])
 def login_api():
-    data = request.get_json()
+    data = _data()
     identifier = data.get("identifier")
     password = data.get("password")
+    if not isinstance(identifier, str) or not isinstance(password, str) or not identifier or not password:
+        return jsonify(error="Missing credentials"), 400
+    user = User.query.filter((User.email == identifier.strip().lower()) |
+                             (User.username == identifier.strip())).first()
+    if user is None or not user.is_active or not user.check_password(password):
+        return jsonify(error="Invalid credentials"), 401
+    return jsonify(
+        access_token=create_access_token(identity=str(user.id)),
+        refresh_token=create_refresh_token(identity=str(user.id)),
+        user=user.to_dict(),
+    ), 200
 
-    if not identifier or not password:
-        return jsonify({"error": "Missing credentials"}), 400
 
-    user = User.query.filter((User.email == identifier) | (User.username == identifier)).first()
-
-    if not user or not user.check_password(password):
-        return jsonify({"error": "Invalid credentials"}), 401
-
-    access_token = create_access_token(identity=str(user.id))
-    refresh_token = create_refresh_token(identity=str(user.id))
-
-    return jsonify({
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "user": user.to_dict()
-    }), 200
-
-@auth_api.route('/logout', methods=['POST'])
-@jwt_required()
+@auth_api.route("/logout", methods=["POST"])
+@jwt_required(verify_type=False)
 def logout_api():
-    jti = get_jwt()["jti"]
-    REVOKED_TOKENS.add(jti)
-    current_app.logger.info(f"👋 Token {jti} logged out.")
-    return jsonify({"message": "Logout successful", "redirect": "/auth/login"})
+    revoke_token(get_jwt())
+    return jsonify(message="Logout successful", redirect="/auth/login"), 200
 
-@auth_api.route('/me', methods=['GET'])
+
+@auth_api.route("/me", methods=["GET"])
 @jwt_required()
 def me_api():
-    user_identity_str = get_jwt_identity()
-    try:
-        user_id = int(user_identity_str)
-    except (TypeError, ValueError):
-        return jsonify({"error": "Invalid token identity"}), 422
+    user = db.session.get(User, int(get_jwt_identity()))
+    if user is None or not user.is_active:
+        return jsonify(error="User not found"), 404
+    return jsonify(
+        id=user.id, username=user.username, email=user.email,
+        first_name=user.first_name, last_name=user.last_name, phone=user.phone,
+    ), 200
 
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({"error": "User not found"}), 404
 
-    return jsonify({
-        "id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "phone": user.phone
-    })
-
-@auth_api.route('/refresh', methods=['POST'])
+@auth_api.route("/refresh", methods=["POST"])
 @jwt_required(refresh=True)
 def refresh_token():
-    current_user = get_jwt_identity()
-    new_token = create_access_token(identity=current_user)
-    return jsonify(access_token=new_token)
+    return jsonify(access_token=create_access_token(identity=get_jwt_identity())), 200
