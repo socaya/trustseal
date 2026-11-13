@@ -294,6 +294,32 @@ def _verify_crl_event(payload, key):
     verify_snapshot(record, root)
 
 
+def _verify_ocsp_event(payload, key):
+    from flask import current_app
+    from app.models.ocsp_evidence import OcspEvidence
+    from app.models.evidence_timestamp import EvidenceTimestamp
+    from app.models.evidence_preservation import EvidenceRetention
+    from app.services.ocsp_evidence import verify_ocsp_snapshot
+    from app.services.certificate_revocation import _read_pem
+    if not key.startswith("evidence-ocsp:") or type(payload.get("aggregate_id")) is not int:
+        raise ValueError("Invalid OCSP event")
+    try:
+        evidence_id = int(key.rsplit(":", 1)[-1])
+    except ValueError:
+        raise ValueError("Invalid OCSP identifier") from None
+    record = db.session.get(OcspEvidence, evidence_id)
+    token = db.session.get(EvidenceTimestamp, record.timestamp_id) if record else None
+    retention = db.session.get(EvidenceRetention, token.retention_id) if token else None
+    if (record is None or token is None or retention is None
+            or retention.id != payload["aggregate_id"]
+            or token.organization_id != record.organization_id
+            or retention.organization_id != record.organization_id
+            or token.tsa_certificate_sha256 != record.subject_certificate_sha256):
+        raise ValueError("OCSP evidence not bound to retained timestamp")
+    root = _read_pem(current_app.config.get("RFC3161_TRUST_ROOT_PEM"), "Trust root")
+    verify_ocsp_snapshot(record, root)
+
+
 HANDLERS = {
     "document.draft.created": _verify_document_event,
     "document.draft.updated": _verify_document_event,
@@ -327,6 +353,7 @@ HANDLERS = {
     "evidence.checkpoint.issued": _verify_preservation_event,
     "evidence.timestamp.issued": _verify_timestamp_event,
     "evidence.crl.captured": _verify_crl_event,
+    "evidence.ocsp.captured": _verify_ocsp_event,
 }
 
 
