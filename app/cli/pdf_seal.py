@@ -17,6 +17,8 @@ from app.models.signer_decision import SignerDecision
 from app.models.review_receipt import ReviewReceipt
 from app.models.documents.document_blob import DocumentBlob
 from app.models.pdf_finalization import FinalizedPdf
+from app.models.signer_cryptographic import SignerPublicKey, SignerEndorsement
+from app.services.signer_crypto import verify_detached, endorsement_payload
 from app.services.documents.private_storage import (
     check_object_digest, store_scanned_pdf, cleanup_object, IngestionError,
 )
@@ -79,7 +81,37 @@ def _complete_review(envelope):
             raise PdfFinalizationError("Review receipt signature invalid")
         if receipt.payload != review_payload(envelope, participant, decision):
             raise PdfFinalizationError("Review receipt evidence mismatch")
+        # A platform seal now requires cryptographic proof from each assigned
+        # signer-held key, not merely the platform's review receipt.
+        endorsement = SignerEndorsement.query.filter_by(
+            envelope_id=envelope.id, participant_id=participant.id
+        ).first()
+        if endorsement is None or endorsement.user_id != participant.user_id:
+            raise PdfFinalizationError("Missing signer-controlled document endorsement")
+        signer_key = db.session.get(SignerPublicKey, endorsement.signer_key_id)
+        if signer_key is None or signer_key.user_id != participant.user_id:
+            raise PdfFinalizationError("Signer public key record unavailable")
+        try:
+            expected_endorsement = endorsement_payload(
+                envelope=envelope, participant=participant, decision=decision,
+                fingerprint=signer_key.fingerprint,
+                nonce=endorsement.signed_payload.get("nonce"),
+            )
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise PdfFinalizationError("Invalid signer endorsement context") from exc
+        if (endorsement.signed_payload != expected_endorsement
+                or not verify_detached(
+                    signer_key.public_key_pem,
+                    endorsement.signed_payload, endorsement.signature_b64
+                )):
+            raise PdfFinalizationError("Signer-controlled endorsement invalid")
         receipts_for_digest.append({
+            "signer_endorsement": {
+                "public_key_pem": signer_key.public_key_pem,
+                "key_fingerprint": signer_key.fingerprint,
+                "signed_payload": endorsement.signed_payload,
+                "signature_b64": endorsement.signature_b64,
+            },
             "participant_id": participant.id,
             "signing_order": participant.signing_order,
             "review_decision_id": decision.id,
