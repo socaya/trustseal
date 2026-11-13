@@ -86,6 +86,11 @@ class Config:
     # JSON array: leaf first, then each intermediate; null means absent.
     VALIDATION_CHAIN_CRL_PATHS_JSON = os.getenv('VALIDATION_CHAIN_CRL_PATHS_JSON')
 
+    # === Separate approved PDF platform signer chain evidence ===
+    VALIDATION_PDF_SEAL_CERT_PEM = os.getenv('VALIDATION_PDF_SEAL_CERT_PEM')
+    VALIDATION_PDF_INTERMEDIATES_JSON = os.getenv('VALIDATION_PDF_INTERMEDIATES_JSON', '[]')
+    VALIDATION_PDF_CHAIN_CRL_PATHS_JSON = os.getenv('VALIDATION_PDF_CHAIN_CRL_PATHS_JSON')
+
     # === DSS-only PDF evidence derivative, never advertised as PAdES-LT ===
     PDF_DSS_DERIVATIVE_ENABLED = os.getenv('PDF_DSS_DERIVATIVE_ENABLED', 'false').lower() == 'true'
 
