@@ -87,11 +87,13 @@ def _sample_pdf():
 
 
 def test_platform_pdf_roundtrip_and_tamper_rejection(signing_config):
-    signed, cert_sha256, checks = seal_pdf(_sample_pdf(), signing_config)
+    signed, cert_sha256, checks = seal_pdf(_sample_pdf(), signing_config, "a" * 64)
     assert len(cert_sha256) == 64
     assert checks["field"] == FIELD_NAME
     assert checks["overall_valid"]
-    assert inspect_signed_pdf(signed, signing_config)["overall_valid"]
+    assert inspect_signed_pdf(signed, signing_config, expected_evidence_sha256="a" * 64)["overall_valid"]
+    with pytest.raises(PdfFinalizationError, match="evidence digest"):
+        inspect_signed_pdf(signed, signing_config, expected_evidence_sha256="b" * 64)
 
     # Alter a signed byte, leaving the CMS bytes otherwise unchanged.
     modified = bytearray(signed)
@@ -108,4 +110,4 @@ def test_platform_pdf_roundtrip_and_tamper_rejection(signing_config):
 def test_signed_source_is_refused_for_single_seal_profile(signing_config):
     sealed, _fingerprint, _status = seal_pdf(_sample_pdf(), signing_config)
     with pytest.raises(PdfFinalizationError, match="already contains"):
-        seal_pdf(sealed, signing_config)
+        seal_pdf(sealed, signing_config, "a" * 64)
