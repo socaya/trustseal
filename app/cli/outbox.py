@@ -74,7 +74,8 @@ def _verify_signer_review(payload, key):
     if participant is None or participant.envelope_id != envelope.id:
         raise ValueError("Review participant mismatch")
     if decision.consent_sha256 != _decision_digest(
-        envelope, participant, decision.user_id, decision.decision
+        envelope, participant, decision.user_id, decision.decision,
+        consent_version=decision.consent_version
     ):
         raise ValueError("Signer review intent digest mismatch")
 
