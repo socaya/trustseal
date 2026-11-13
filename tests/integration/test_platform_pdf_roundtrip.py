@@ -74,6 +74,7 @@ def signing_config(tmp_path):
         "PDF_PLATFORM_PKCS12": str(bundle_path),
         "PDF_PLATFORM_PKCS12_PASSWORD": password.decode("ascii"),
         "PDF_TRUST_ROOT_PEM": str(root_path),
+        "PDF_FINALIZATION_ENABLED": True,
     }
 
 
