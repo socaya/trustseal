@@ -71,8 +71,7 @@ def _parse_response(raw, expected_digest, expected_nonce, tsa_cert_pem):
                 matched = True
         if not matched:
             raise TimestampError("TSA signer certificate absent from response")
-        content = signed["encap_content_info"]["content"].native
-        info = tsp.TSTInfo.load(content)
+        info = signed["encap_content_info"]["content"].parsed
         imprint = info["message_imprint"]
         if (imprint["hash_algorithm"]["algorithm"].native != "sha256"
                 or imprint["hashed_message"].native != bytes.fromhex(expected_digest)):
@@ -124,7 +123,7 @@ def _parse_without_nonce(raw, digest, tsa_cert):
     try:
         response = tsp.TimeStampResp.load(raw, strict=True)
         token = response["time_stamp_token"]
-        info = tsp.TSTInfo.load(token["content"]["encap_content_info"]["content"].native)
+        info = token["content"]["encap_content_info"]["content"].parsed
         nonce = info["nonce"].native
         if nonce is None:
             raise TimestampError("Timestamp nonce missing")
