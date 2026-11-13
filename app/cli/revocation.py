@@ -124,8 +124,15 @@ def verify(evidence_id):
     try:
         root = _read_pem(current_app.config.get("RFC3161_TRUST_ROOT_PEM"), "Trusted TSA root")
         result = verify_snapshot(record, root)
-        if result["subject_certificate_sha256"] != timestamp.tsa_certificate_sha256:
-            raise RevocationEvidenceError("CRL not bound to TSA signer")
+        token = verify_timestamp(
+            decode_token(timestamp.token_der_b64), timestamp.artifact_sha256,
+            current_app.config,
+        )
+        if (result["subject_certificate_sha256"] != timestamp.tsa_certificate_sha256
+                or token["tsa_certificate_sha256"] != timestamp.tsa_certificate_sha256
+                or token["token_sha256"] != timestamp.token_sha256
+                or token["gen_time"] != timestamp.gen_time):
+            raise RevocationEvidenceError("CRL not bound to verified TSA token")
     except (RevocationEvidenceError, ValueError, OSError):
         raise click.ClickException("CRL snapshot integrity verification failed") from None
     click.echo("Historical CRL observation verified: %s" % record.id)
