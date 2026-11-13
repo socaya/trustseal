@@ -115,6 +115,11 @@ def create_app(config_class=None):
     # --- Request Hooks ---
     @app.before_request
     def before_request_handler():
+        # Historical uploads and generated QR files must never be served as
+        # public Flask static assets. Reverse proxies must enforce the same.
+        if request.path.startswith(("/static/uploads/", "/static/qrcodes/")):
+            from flask import abort
+            abort(404)
         session.permanent = True  # Make session persistent
 
         # Apply the interim API policy before legacy blueprints handle requests.
