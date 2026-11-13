@@ -64,7 +64,7 @@ def test_signer_key_registration_endorsement_replay_and_revocation(monkeypatch):
             document_id=doc.id, document_blob_id=blob.id,
             document_sha256=blob.sha256,
             organization_id=org.id, created_by_id=signer.id,
-            state="prepared", prepared_at=datetime.utcnow(),
+            state="draft",
         )
         db.session.add(envelope)
         db.session.flush()
@@ -73,6 +73,9 @@ def test_signer_key_registration_endorsement_replay_and_revocation(monkeypatch):
             signing_order=1, role="signer",
         )
         db.session.add(participant)
+        db.session.flush()
+        envelope.state = "prepared"
+        envelope.prepared_at = datetime.utcnow()
         db.session.flush()
         now = datetime.utcnow()
         challenge = SignerChallenge(
