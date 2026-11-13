@@ -71,7 +71,7 @@ def _signing_credentials(config):
     return signer, cert.fingerprint(hashes.SHA256()).hex()
 
 
-def inspect_signed_pdf(pdf_bytes, config, expected_evidence_sha256=None, expected_certificate_sha256=None):
+def inspect_signed_pdf(pdf_bytes, config, expected_evidence_sha256=None, expected_certificate_sha256=None, evidence_purpose="review"):
     """Validate embedded CMS, byte range, and certificate chain with pinned CA."""
     if not isinstance(pdf_bytes, bytes) or not 0 < len(pdf_bytes) <= MAX_PDF_BYTES:
         raise PdfFinalizationError("Signed PDF size is invalid")
@@ -95,7 +95,11 @@ def inspect_signed_pdf(pdf_bytes, config, expected_evidence_sha256=None, expecte
             if not re.fullmatch(r"[0-9a-f]{64}", expected_evidence_sha256):
                 raise PdfFinalizationError("Invalid evidence digest")
             reason = str(signatures[0].sig_object.get("/Reason", ""))
-            if reason != "TrustSeal review evidence sha256:" + expected_evidence_sha256:
+            prefix = {
+                "review": "TrustSeal review evidence sha256:",
+                "stamp": "TrustSeal stamp evidence sha256:",
+            }.get(evidence_purpose)
+            if prefix is None or reason != prefix + expected_evidence_sha256:
                 raise PdfFinalizationError("Signed PDF evidence digest does not match")
         status = validate_pdf_signature(
             signatures[0], signer_validation_context=_trust_context(config)
@@ -115,7 +119,7 @@ def inspect_signed_pdf(pdf_bytes, config, expected_evidence_sha256=None, expecte
         raise PdfFinalizationError("PDF signature validation failed") from exc
 
 
-def seal_pdf(source_bytes, config, evidence_sha256):
+def seal_pdf(source_bytes, config, evidence_sha256, evidence_purpose="review"):
     """Apply an invisible CMS signature in the designated platform field.
 
     An approved platform certificate and explicit trust root are mandatory.
@@ -126,6 +130,8 @@ def seal_pdf(source_bytes, config, evidence_sha256):
         raise PdfFinalizationError("Invalid source PDF")
     if not isinstance(evidence_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", evidence_sha256):
         raise PdfFinalizationError("A canonical review evidence digest is required")
+    if evidence_purpose not in ("review", "stamp"):
+        raise PdfFinalizationError("Invalid PDF seal evidence purpose")
     if not config.get("PDF_FINALIZATION_ENABLED", False):
         raise PdfFinalizationError("Platform PDF finalization is disabled")
     try:
@@ -151,7 +157,8 @@ def seal_pdf(source_bytes, config, evidence_sha256):
         field_name=FIELD_NAME,
         md_algorithm="sha256",
         subfilter=fields.SigSeedSubFilter.PADES,
-        reason="TrustSeal review evidence sha256:" + evidence_sha256,
+        reason=("TrustSeal review evidence sha256:" if evidence_purpose == "review"
+                else "TrustSeal stamp evidence sha256:") + evidence_sha256,
         embed_validation_info=False,
     )
     try:
@@ -165,7 +172,10 @@ def seal_pdf(source_bytes, config, evidence_sha256):
         raise PdfFinalizationError("PDF signing operation failed") from exc
     if len(signed) > MAX_PDF_BYTES:
         raise PdfFinalizationError("Finalized PDF exceeds private storage size limit")
-    validation = inspect_signed_pdf(signed, config, expected_evidence_sha256=evidence_sha256)
+    validation = inspect_signed_pdf(
+        signed, config, expected_evidence_sha256=evidence_sha256,
+        evidence_purpose=evidence_purpose,
+    )
     if not validation["overall_valid"]:
         raise PdfFinalizationError("New PDF seal did not pass trusted validation")
     return signed, certificate_sha256, validation
