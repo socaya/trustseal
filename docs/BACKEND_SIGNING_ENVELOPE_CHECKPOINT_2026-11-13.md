@@ -30,10 +30,19 @@ Database migration `b7c104ef2a91` follows `a6b7d820e3f1`, adding the new tables,
 
 Envelope source digests are checked against the stored PDF file, but a PostgreSQL superuser or filesystem administrator can still tamper with both data and the private storage. Cryptographic external anchoring and WORM retention remain necessary for stronger evidence assurance.
 
-The current schema uses application-level locking and validates active same-tenant participants when added. Before shipping, add database-level guards against direct edits of prepared recipient assignments, check participant activity again at dispatch/sign time, and implement a controlled amendment/versioning policy.
+The current schema uses application-level locking and validates active same-tenant participants when added. A follow-up PostgreSQL migration, `c8d192f4a610`, adds guards against changing prepared recipients, moving participants between envelopes, changing envelope source identity, hard-deleting envelopes or reversing lifecycle transitions. Recipient activity and tenant membership are rechecked at preparation. These controls still require migration replay and database tests; check participants again at eventual signing time and implement a governed amendment/versioning policy.
 
 ## Validation status and next steps
 
 The GitHub changes are published, but the tool environment has not executed tests, PostgreSQL migrations, or ClamAV. Add integration tests for unauthorized access, mismatched tenant, revoked account, duplicate participant, out-of-order positions, stale prepared envelope, concurrent edits, missing or tampered PDF bytes, cancellation and transaction rollback. Test the entire Alembic revision history from a fresh database and an upgraded production-like staging backup.
 
 Next, implement authenticated signer's acceptance/decline workflow with evidence records and anti-replay semantics. Do not enable legal signing before the full trust/evidence pipeline is independently verified.
+
+## Follow-up hardening
+
+- `c8d192f4a610` follows `b7c104ef2a91` and defines PostgreSQL lifecycle/recipient guards. The prepared and cancelled states prevent ordinary direct edits to participants.
+- Preparation rechecks every recipient's active status and current organisation membership before locking the envelope.
+- Added `tests/test_envelope_preparation.py` for sequential order validation and to confirm that only preparation (not signing) endpoints are registered. Tests are authored but not executed.
+- The new API is registered explicitly in `app/__init__.py`. Legacy signature mutation APIs remain disabled by the central guard.
+
+The frontend remains unchanged. Do **not** treat a prepared envelope as signed, certified, sealed or legally verified.
