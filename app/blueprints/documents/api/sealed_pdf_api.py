@@ -65,6 +65,7 @@ def verify_platform_pdf(envelope_id):
         }
     status.update({
         "artifact_id": record.id,
+        "issued_by_id": record.issued_by_id,
         "envelope_id": envelope.id,
         "source_sha256": record.source_sha256,
         "evidence_sha256": record.evidence_sha256,
