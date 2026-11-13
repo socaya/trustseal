@@ -8,6 +8,7 @@ import hashlib
 import os
 import re
 import secrets
+import stat
 import subprocess
 import tempfile
 from pathlib import Path
@@ -34,21 +35,29 @@ def _storage_root(config):
     configured = config.get("PRIVATE_DOCUMENT_ROOT")
     if not configured:
         raise IngestionError("Private document storage is not configured")
-    root = Path(configured).resolve()
-    # Do not allow serving content from the checked-in static web directory.
+    candidate = Path(configured)
+    if not candidate.is_absolute():
+        raise IngestionError("Private storage must use an absolute path")
+    # Reject symlinks in configured components before resolving the location.
+    walked = Path(candidate.anchor)
+    for component in candidate.parts[1:]:
+        walked = walked / component
+        if walked.is_symlink():
+            raise IngestionError("Symlinked storage paths are forbidden")
+    root = candidate.resolve()
     from flask import current_app
     static_root = Path(current_app.static_folder).resolve()
     if root == static_root or static_root in root.parents:
         raise IngestionError("Storage may not be inside Flask static files")
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
-    if root.is_symlink():
-        raise IngestionError("Symbolic-link storage root is not allowed")
+    if stat.S_IMODE(root.stat().st_mode) & 0o077:
+        raise IngestionError("Private storage directory must have mode 0700")
     return root
 
 
 def _scan_pdf(path, config):
     binary = config.get("DOCUMENT_CLAMSCAN_BINARY")
-    if not binary or not Path(binary).is_absolute() or not Path(binary).is_file():
+    if not binary or not Path(binary).is_absolute() or not Path(binary).is_file() or not os.access(binary, os.X_OK):
         raise IngestionError("Malware scanner is unavailable")
     try:
         result = subprocess.run(
