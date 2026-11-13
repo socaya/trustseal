@@ -124,7 +124,7 @@ def append_dss_derivative(signed_pdf, dossier, ocsp_rows, crl_rows, config, *,
         from pyhanko.sign.validation.dss import DocumentSecurityStore
         _, signature = _dss_parts(signed_pdf)
         contents = signature.sig_object.raw_get("/Contents")
-        signature_hex = contents.original_bytes.hex()
+        signature_contents = contents.original_bytes
         # The PDF seal signer and TSA certificate hierarchy can differ.
         if signature.signer_cert is None:
             raise DssEvidenceError("Platform seal has no signer certificate")
@@ -136,7 +136,7 @@ def append_dss_derivative(signed_pdf, dossier, ocsp_rows, crl_rows, config, *,
         output = io.BytesIO(signed_pdf)
         output.seek(0)
         DocumentSecurityStore.add_dss(
-            output, signature_hex, certs=certificates,
+            output, signature_contents, certs=certificates,
             ocsps=ocsps, crls=crls, force_write=True,
         )
         derivative = output.getvalue()
