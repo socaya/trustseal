@@ -109,6 +109,6 @@ def test_platform_pdf_roundtrip_and_tamper_rejection(signing_config):
 
 
 def test_signed_source_is_refused_for_single_seal_profile(signing_config):
-    sealed, _fingerprint, _status = seal_pdf(_sample_pdf(), signing_config)
+    sealed, _fingerprint, _status = seal_pdf(_sample_pdf(), signing_config, "a" * 64)
     with pytest.raises(PdfFinalizationError, match="already contains"):
         seal_pdf(sealed, signing_config, "a" * 64)
