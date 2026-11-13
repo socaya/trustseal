@@ -31,3 +31,26 @@ This checkpoint is based on direct inspection of the GitHub `main` tree, impleme
 
 ## Safety note
 The additions remain **partial** and need independent review before deployment. No production database was migrated; no production environment was modified. As legacy routes remain vulnerable, do not expose this backend publicly until the release gates are satisfied.
+
+
+## 2026-11-13 continuation: legacy API hardening checkpoint
+
+Additional changes committed to `main`:
+
+- `app/policies/api_access.py`: central authentication and administrative access policy; deny generic signing, stamping and payment mutations that would otherwise create false trusted records. Trust-critical writes now return HTTP 409 until governed domain services replace the legacy operations. Sensitive legacy collection reads require platform-admin privileges temporarily, **not** a final tenant policy.
+- `app/__init__.py`: activate the new policy and return JSON for API 401/403 responses.
+- `app/blueprints/documents/api/document_share_api.py`: prevent arbitrary model-field updates, token disclosure and cross-organisation recipient assignment; only document owners can manage explicit seven-day shares to active members of the same organisation.
+- `app/blueprints/organizations/routes/organization_api.py`: scope organisation reads to membership, prevent caller-controlled verification flags, deactivate rather than cascade-delete an organisation.
+- `app/blueprints/organizations/routes/clients_api.py`: scope directory operations to the current organisation, prevent caller-controlled organisation IDs, soft-deactivate clients.
+- `app/blueprints/system/routes/settings_api.py`: fix endpoints that referenced nonexistent `SystemSettings.key/value` fields, expose/update only non-secret allowlisted settings under platform-admin access.
+- `app/blueprints/users/routes/user_api.py`: validate administrative account creation/update, prevent mass assignment, avoid hard-delete of attribution history.
+- `tests/test_api_security_policy.py`: regression cases covering public auth, protected endpoints, platform-administration access and blocked trust-critical writes.
+
+### Explicit limitations of this checkpoint
+
+- No runtime or integration test was executed; `git ls-remote` from the test container failed due to DNS resolution of `github.com`. GitHub connector writes were successful, but **commit success is not test success**.
+- The interim platform-admin role test relies on pre-existing globally named roles. It is not a replacement for tenant membership, delegated authority, permission scope, stronger account bootstrap or separation of duties.
+- Backend HTML view handlers, document child APIs, subscriptions, signature profiles, template/editor routes and other legacy endpoints still require individual authorization audits. The central policy only protects the cases documented above.
+- Existing clients may need adaptation: non-admin global listings are restricted, arbitrary document-share fields are rejected, trust-critical CRUD writes are blocked, and organisation deletion becomes deactivation.
+- Full signing, stamping, payment and verification functionality is **not implemented** by this hardening. These must be added as proper domain workflows, not unblocked by removing the interim guard.
+- No production migrations were run. The persistent JWT revocation migration remains an operational prerequisite for authenticated requests.
