@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from app.services.signing_receipts import (
     SCHEMA, canonical_bytes, public_key_id, review_payload,
-    sign_receipt, verify_receipt,
+    sign_receipt, verify_receipt, resolve_trusted_public_key,
 )
 
 
@@ -60,3 +60,34 @@ def test_canonicalization_ignores_json_key_insertion_order():
     one = {"schema": SCHEMA, "value": 1}
     two = {"value": 1, "schema": SCHEMA}
     assert canonical_bytes(one) == canonical_bytes(two)
+
+
+def test_trusted_key_registry_rejects_unconfigured_keys(tmp_path):
+    key = Ed25519PrivateKey.generate()
+    try:
+        resolve_trusted_public_key({}, public_key_id(key.public_key()))
+    except ValueError as exc:
+        assert "not trusted" in str(exc)
+    else:
+        raise AssertionError("A key must not be trusted without configuration")
+
+
+def test_historical_key_fingerprint_must_match(tmp_path):
+    from cryptography.hazmat.primitives import serialization
+    import json
+    key = Ed25519PrivateKey.generate()
+    pub = tmp_path / "historical.pem"
+    pub.write_bytes(key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    ))
+    correct = public_key_id(key.public_key())
+    config = {"REVIEW_RECEIPT_TRUSTED_KEYS_JSON": json.dumps({correct: str(pub)})}
+    assert public_key_id(resolve_trusted_public_key(config, correct)) == correct
+    wrong = {"REVIEW_RECEIPT_TRUSTED_KEYS_JSON": json.dumps({"ed25519-sha256:" + "f" * 64: str(pub)})}
+    try:
+        resolve_trusted_public_key(wrong, correct)
+    except ValueError as exc:
+        assert "fingerprint mismatch" in str(exc)
+    else:
+        raise AssertionError("Forged key fingerprints must fail")
