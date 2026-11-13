@@ -75,6 +75,7 @@ def create_app(config_class=None):
     migrate.init_app(app, db)
     ma.init_app(app)
     jwt.init_app(app) # Initialize Flask-JWT-Extended
+    from .services import token_security  # Registers durable JWT blocklist callback
 
     # --- Flask-Login Configuration ---
     login_manager.init_app(app)
