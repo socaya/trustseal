@@ -1,0 +1,21 @@
+# TrustSeal Flask backend runtime dependencies.
+# Version bands provide compatibility constraints, NOT a deployment lockfile.
+# Generate an approved hash-locked lockfile before production deployment.
+Flask>=3.0,<4
+Flask-SQLAlchemy>=3.1,<4
+Flask-Migrate>=4.0,<5
+Flask-Login>=0.6,<0.7
+Flask-Marshmallow>=1.2,<2
+Flask-JWT-Extended>=4.6,<5
+Flask-WTF>=1.2,<2
+WTForms>=3.1,<4
+email-validator>=2,<3
+SQLAlchemy>=2.0,<3
+marshmallow>=3.20,<5
+marshmallow-sqlalchemy>=1.0,<2
+alembic>=1.13,<2
+python-dotenv>=1.0,<2
+psycopg2-binary>=2.9,<3
+requests>=2.31,<3
+Faker>=25,<50
+cryptography>=43,<47
