@@ -150,6 +150,13 @@ def add_participant(envelope_id):
     return jsonify(_details(envelope)), 201
 
 
+def valid_signing_order(orders):
+    """Signing positions must be contiguous and unambiguous."""
+    return bool(orders) and all(type(value) is int for value in orders) and (
+        sorted(orders) == list(range(1, len(orders) + 1))
+    )
+
+
 @envelope_api.route("/<int:envelope_id>/prepare", methods=["POST"])
 @jwt_required()
 def prepare_envelope(envelope_id):
@@ -160,7 +167,7 @@ def prepare_envelope(envelope_id):
     participants = EnvelopeParticipant.query.filter_by(
         envelope_id=envelope.id
     ).order_by(EnvelopeParticipant.signing_order).all()
-    if not participants or [p.signing_order for p in participants] != list(range(1, len(participants) + 1)):
+    if not valid_signing_order([p.signing_order for p in participants]):
         abort(409, description="Continuous signing order from 1 required")
     doc = Document.query.filter_by(
         id=envelope.document_id, created_by=user.id,
