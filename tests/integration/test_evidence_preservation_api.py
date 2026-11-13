@@ -116,6 +116,10 @@ def test_tenant_retention_and_independent_hold_release(monkeypatch, tmp_path):
             headers=auth(administrator),
         )
         assert report.get_json()["active_legal_holds"] == 1
+        holds_page = client.get(hold_path, headers=auth(administrator))
+        assert holds_page.status_code == 200
+        assert holds_page.get_json()[0]["id"] == hold_id
+        assert holds_page.get_json()[0]["active"] is True
         release_path = "/api/evidence-preservation/holds/%s/release" % hold_id
         release = {"reason": "Court matter resolved and counsel authorized release"}
         assert client.post(
@@ -192,6 +196,16 @@ def test_tenant_retention_and_independent_hold_release(monkeypatch, tmp_path):
         )
         assert exported.status_code == 200
         assert exported.get_json()[0]["id"] == checkpoint.id
+        bundle_response = client.get(
+            "/api/evidence-preservation/checkpoints/%s/export" % checkpoint.id,
+            headers=auth(administrator),
+        )
+        assert bundle_response.status_code == 200
+        assert bundle_response.get_json()["signature"] == checkpoint.signature
+        assert client.get(
+            "/api/evidence-preservation/checkpoints/%s/export" % checkpoint.id,
+            headers=auth(outsider),
+        ).status_code == 404
         assert client.get(
             "/api/evidence-preservation/retentions/%s/checkpoints" % retention_id,
             headers=auth(outsider),
