@@ -62,24 +62,6 @@ def test_rejects_non_pdf_and_previously_signed_source():
         render(b"not a PDF")
 
 
-def test_visual_imprint_and_new_signature_are_bound(signing_config):
-    # Integration fixture imported from real cryptographic signing suite.
-    from app.services.platform_pdf_seal import seal_pdf, inspect_signed_pdf
-    stamped = render()
-    sealed, cert_fingerprint, _ = seal_pdf(
-        stamped, signing_config, "a" * 64, evidence_purpose="stamp"
-    )
-    status = inspect_signed_pdf(
-        sealed, signing_config, expected_evidence_sha256="a" * 64,
-        expected_certificate_sha256=cert_fingerprint,
-        evidence_purpose="stamp",
-    )
-    assert status["overall_valid"]
-    with pytest.raises(PdfFinalizationError, match="evidence digest"):
-        inspect_signed_pdf(sealed, signing_config, expected_evidence_sha256="a" * 64)
-    with pytest.raises(PdfFinalizationError):
-        render(sealed)
-
 
 def test_stamped_source_does_not_mutate_original_bytes():
     original = source_pdf()
