@@ -64,3 +64,13 @@ def test_outbox_missing_handler_is_not_executed():
                 finish.assert_called_once_with(
                     14, "lease", success=False, error="No registered handler"
                 )
+
+
+def test_lease_fencing_rejects_prior_worker_token():
+    """A reclaimed event must not be finished by a previous lease holder."""
+    from app.services.event_delivery import finish
+    with patch("app.services.event_delivery.db") as db:
+        db.session.query.return_value.filter_by.return_value.with_for_update.return_value.first.return_value = None
+        assert finish(7, "older-lease-uuid", success=True) is False
+        db.session.commit.assert_not_called()
+        db.session.rollback.assert_called_once()
