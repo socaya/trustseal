@@ -50,6 +50,7 @@ def test_tenant_retention_and_independent_hold_release(monkeypatch, tmp_path):
         db.session.add_all([
             UserRole(user_id=administrator.id, role_id=role.id),
             UserRole(user_id=independent.id, role_id=role.id),
+            UserRole(user_id=outsider.id, role_id=role.id),
         ])
         draft = Document(
             title="Preservation source", created_by=author.id,
