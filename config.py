@@ -79,6 +79,9 @@ class Config:
     # === Immutable partial PKIX evidence dossier ===
     VALIDATION_DOSSIER_ENABLED = os.getenv('VALIDATION_DOSSIER_ENABLED', 'false').lower() == 'true'
 
+    # Bounded explicit TSA certificate chain (JSON array of approved PEM paths).
+    VALIDATION_TSA_INTERMEDIATES_JSON = os.getenv('VALIDATION_TSA_INTERMEDIATES_JSON', '[]')
+
     # === JWT Configuration ===
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=5)
