@@ -149,6 +149,34 @@ def _verify_signer_crypto_event(payload, key):
         raise ValueError("Signer endorsement cryptographic validation failed")
 
 
+def _verify_stamp_custody_event(payload, key):
+    from app.models.stamp_custody import ManagedStamp, StampApplication, StampAttestation
+    event_id = payload.get("aggregate_id")
+    if type(event_id) is not int:
+        raise ValueError("Invalid stamp event aggregate")
+    if key.startswith(("stamp-registration:", "stamp-activated:", "stamp-revoked:")):
+        stamp = db.session.get(ManagedStamp, event_id)
+        if stamp is None:
+            raise ValueError("Stamp registration missing")
+        if key.startswith("stamp-activated:") and stamp.status not in ("active", "revoked"):
+            raise ValueError("Stamp not approved")
+        if key.startswith("stamp-revoked:") and stamp.status != "revoked":
+            raise ValueError("Stamp not revoked")
+        return
+    if key.startswith(("stamp-use-requested:", "stamp-use-decision:", "stamp-attestation:")):
+        application = db.session.get(StampApplication, event_id)
+        if application is None:
+            raise ValueError("Stamp application missing")
+        if key.startswith("stamp-use-decision:") and application.status == "pending":
+            raise ValueError("Stamp decision missing")
+        if key.startswith("stamp-attestation:"):
+            receipt = StampAttestation.query.filter_by(application_id=application.id).first()
+            if receipt is None:
+                raise ValueError("Stamp attestation missing")
+        return
+    raise ValueError("Stamp event has no recognized idempotency key")
+
+
 HANDLERS = {
     "document.draft.created": _verify_document_event,
     "document.draft.updated": _verify_document_event,
@@ -165,6 +193,13 @@ HANDLERS = {
     "signer.key.registered": _verify_signer_crypto_event,
     "signer.key.revoked": _verify_signer_crypto_event,
     "signer.document.endorsed": _verify_signer_crypto_event,
+    "stamp.registration.requested": _verify_stamp_custody_event,
+    "stamp.registration.approved": _verify_stamp_custody_event,
+    "stamp.registration.revoked": _verify_stamp_custody_event,
+    "stamp.use.requested": _verify_stamp_custody_event,
+    "stamp.use.approved": _verify_stamp_custody_event,
+    "stamp.use.rejected": _verify_stamp_custody_event,
+    "stamp.attestation.issued": _verify_stamp_custody_event,
 }
 
 
