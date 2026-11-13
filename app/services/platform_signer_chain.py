@@ -11,7 +11,7 @@ import json
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 
-from app.services.certificate_revocation import _read_pem
+from app.services.certificate_revocation import _read_pem, RevocationEvidenceError
 from app.services.explicit_certificate_chain import (
     ChainValidationError, MAX_INTERMEDIATES, validate_explicit_chain,
 )
@@ -44,12 +44,15 @@ def build_platform_chain(config, *, certificate_sha256, at,
         return None
     if not root:
         raise ChainValidationError("Approved platform PDF root unavailable")
-    chain = validate_explicit_chain(
-        _read_pem(leaf, "PDF platform signer"),
-        [_read_pem(path, "PDF intermediate") for path in _paths(config)],
-        _read_pem(root, "PDF platform trusted root"),
-        at, purpose="pdf_seal",
-    )
+    try:
+        chain = validate_explicit_chain(
+            _read_pem(leaf, "PDF platform signer"),
+            [_read_pem(path, "PDF intermediate") for path in _paths(config)],
+            _read_pem(root, "PDF platform trusted root"),
+            at, purpose="pdf_seal",
+        )
+    except RevocationEvidenceError as exc:
+        raise ChainValidationError("Approved PDF signer certificate files invalid") from exc
     if chain["leaf_sha256"] != certificate_sha256:
         raise ChainValidationError("PDF signing certificate does not match sealed PDF")
     if retained is not None:
