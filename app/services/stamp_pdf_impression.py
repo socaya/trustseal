@@ -78,10 +78,11 @@ def render_stamped_source(source_bytes, *, stamp_code, stamp_name,
         c.save()
         overlay = PdfReader(overlay_io)
         writer = PdfWriter()
-        for idx, page in enumerate(reader.pages):
-            if idx == page_number - 1:
-                page.merge_page(overlay.pages[0])
+        # Merge on an owned writer page, not a reader page that might be
+        # referenced elsewhere. This also avoids deprecated pypdf behavior.
+        for page in reader.pages:
             writer.add_page(page)
+        writer.pages[page_number - 1].merge_page(overlay.pages[0])
         result = BytesIO()
         writer.write(result)
         raw = result.getvalue()
