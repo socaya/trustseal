@@ -38,6 +38,9 @@ def test_no_arbitrary_outbox_handlers_are_registered():
         "document.draft.updated",
         "document.file.ingested",
         "document.snapshot.created",
+        "envelope.cancelled",
+        "envelope.draft.created",
+        "envelope.prepared",
     ]
 
 
