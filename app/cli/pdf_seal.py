@@ -4,6 +4,8 @@ Generates a certificate-backed *platform seal*. It does not sign on behalf
 of each human participant. No HTTP endpoint can request finalization.
 """
 import hashlib
+import io
+import json
 
 import click
 from flask import current_app
@@ -32,6 +34,7 @@ def _complete_review(envelope):
     ).order_by(EnvelopeParticipant.signing_order).all()
     if not participants:
         raise PdfFinalizationError("Envelope has no participants")
+    receipts_for_digest = []
     for participant in participants:
         decision = SignerDecision.query.filter_by(participant_id=participant.id).first()
         if (decision is None or decision.envelope_id != envelope.id
@@ -51,6 +54,19 @@ def _complete_review(envelope):
             raise PdfFinalizationError("Review receipt signature invalid")
         if receipt.payload != review_payload(envelope, participant, decision):
             raise PdfFinalizationError("Review receipt evidence mismatch")
+        receipts_for_digest.append({
+            "participant_id": participant.id,
+            "review_decision_id": decision.id,
+            "payload": receipt.payload,
+            "algorithm": receipt.algorithm,
+            "key_id": receipt.key_id,
+            "signature": receipt.signature,
+        })
+    evidence_bytes = json.dumps(
+        {"schema": 1, "envelope_id": envelope.id, "receipts": receipts_for_digest},
+        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    ).encode("utf-8")
+    return hashlib.sha256(evidence_bytes).hexdigest()
 
 
 @pdf_seal_cli.command("finalize")
@@ -71,7 +87,7 @@ def finalize(envelope_id):
         raise click.ClickException("Envelope is not prepared")
     object_key = None
     try:
-        _complete_review(envelope)
+        evidence_digest = _complete_review(envelope)
         original = db.session.get(DocumentBlob, envelope.document_blob_id)
         if (original is None or original.document_id != envelope.document_id
                 or original.sha256 != envelope.document_sha256):
@@ -81,9 +97,11 @@ def finalize(envelope_id):
         ).read_bytes()
         if hashlib.sha256(source).hexdigest() != envelope.document_sha256:
             raise PdfFinalizationError("Source bytes do not match envelope")
-        signed, certificate_sha256, _status = seal_pdf(source, current_app.config)
+        signed, certificate_sha256, _status = seal_pdf(
+            source, current_app.config, evidence_digest
+        )
         object_key, _name, size, output_digest, _scanner = store_scanned_pdf(
-            __import__("io").BytesIO(signed),
+            io.BytesIO(signed),
             "TrustSeal-sealed-envelope-%s.pdf" % envelope.id,
             current_app.config,
         )
@@ -92,6 +110,7 @@ def finalize(envelope_id):
             organization_id=envelope.organization_id,
             source_blob_id=original.id,
             source_sha256=original.sha256,
+            evidence_sha256=evidence_digest,
             object_key=object_key,
             output_sha256=output_digest,
             output_size=size,
@@ -132,7 +151,10 @@ def verify(envelope_id):
         raise click.ClickException("No finalized PDF for envelope")
     try:
         path = check_object_digest(record.object_key, record.output_sha256, current_app.config)
-        status = inspect_signed_pdf(path.read_bytes(), current_app.config)
+        status = inspect_signed_pdf(
+            path.read_bytes(), current_app.config,
+            expected_evidence_sha256=record.evidence_sha256,
+        )
     except (IngestionError, PdfFinalizationError):
         raise click.ClickException("Finalized PDF integrity check failed") from None
     if not status["overall_valid"]:
