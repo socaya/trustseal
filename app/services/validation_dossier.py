@@ -12,6 +12,7 @@ from app.services.certificate_revocation import verify_snapshot, _read_pem
 from app.services.ocsp_evidence import verify_ocsp_snapshot
 from app.services.explicit_certificate_chain import chain_from_config
 from app.services.chain_crl_inventory import configured_chain_crls, validate_chain_crl_inventory
+from app.services.platform_signer_chain import build_platform_chain
 
 SCHEMA = "trustseal.validation-dossier.v1"
 ASSURANCE = "partial_tsa_status_evidence_not_full_chain_or_pades_lt"
@@ -59,7 +60,8 @@ def _approved_observation(record, timestamp, root, *, ocsp):
 
 def build_dossier(retention, timestamp, ocsp_rows, crl_rows, config, *,
                   require_original=True, chain_mode="auto", report_missing_chain=True,
-                  retained_chain_crls=None, include_chain_crls=True):
+                  retained_chain_crls=None, include_chain_crls=True,
+                  retained_platform_chain=None, include_platform_chain=True):
     if len(ocsp_rows) > MAX_STATUS_OBSERVATIONS or len(crl_rows) > MAX_STATUS_OBSERVATIONS:
         raise ValueError("Too many revocation evidence observations")
     if require_original:
@@ -140,6 +142,30 @@ def build_dossier(retention, timestamp, ocsp_rows, crl_rows, config, *,
     elif report_missing_chain:
         result["missing_requirements"].append("bounded_explicit_tsa_certificate_path")
         result["missing_requirements"].sort()
+    if retained_platform_chain is not None or (
+            include_platform_chain and config.get("VALIDATION_PDF_SEAL_CERT_PEM")):
+        # Reconfirm the original PDF signer certificate, not the separate TSA.
+        platform_artifact = artifact_for(
+            retention.artifact_type, retention.artifact_id,
+            retention.organization_id,
+        )
+        if platform_artifact.output_sha256 != retention.artifact_sha256:
+            raise ValueError("Platform signer artifact digest changed")
+        platform_report = build_platform_chain(
+            config, certificate_sha256=platform_artifact.certificate_sha256,
+            at=timestamp.gen_time, retained=retained_platform_chain,
+            include_new_crls=include_platform_chain,
+        )
+        result["platform_signer_chain"] = platform_report
+        if "crl_inventory" not in platform_report:
+            result["missing_requirements"].append(
+                "platform_signer_historical_revocation_evidence"
+            )
+        elif platform_report["crl_inventory"]["missing_positions"]:
+            result["missing_requirements"].append(
+                "platform_signer_intermediate_revocation_coverage"
+            )
+        result["missing_requirements"].sort()
     return result
 
 
@@ -153,6 +179,8 @@ def verify_dossier(dossier, retention, timestamp, ocsp_rows, crl_rows, config):
         ),
         retained_chain_crls=dossier.manifest.get("chain_revocation"),
         include_chain_crls=False,
+        retained_platform_chain=dossier.manifest.get("platform_signer_chain"),
+        include_platform_chain=False,
     )
     if (dossier.retention_id != retention.id
             or dossier.organization_id != retention.organization_id
