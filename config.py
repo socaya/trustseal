@@ -46,6 +46,7 @@ class Config:
 
     # === Governed organizational stamp issuance (operator-only) ===
     STAMP_ATTESTATION_ENABLED = os.getenv('STAMP_ATTESTATION_ENABLED', 'false').lower() == 'true'
+    STAMP_PDF_RENDER_ENABLED = os.getenv('STAMP_PDF_RENDER_ENABLED', 'false').lower() == 'true'
     STAMP_ATTESTATION_PRIVATE_KEY = os.getenv('STAMP_ATTESTATION_PRIVATE_KEY')
     STAMP_ATTESTATION_PUBLIC_KEY = os.getenv('STAMP_ATTESTATION_PUBLIC_KEY')
     STAMP_ATTESTATION_TRUSTED_KEYS_JSON = os.getenv('STAMP_ATTESTATION_TRUSTED_KEYS_JSON')
