@@ -33,6 +33,7 @@ class Config:
     # Protected private key path, never a URL, static asset or checked-in secret.
     REVIEW_RECEIPT_PRIVATE_KEY = os.getenv('REVIEW_RECEIPT_PRIVATE_KEY')
     REVIEW_RECEIPT_PUBLIC_KEY = os.getenv('REVIEW_RECEIPT_PUBLIC_KEY')
+    REVIEW_RECEIPT_TRUSTED_KEYS_JSON = os.getenv('REVIEW_RECEIPT_TRUSTED_KEYS_JSON')
 
     # === JWT Configuration ===
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
