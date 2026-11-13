@@ -163,7 +163,7 @@ def _verify_stamp_custody_event(payload, key):
         if key.startswith("stamp-revoked:") and stamp.status != "revoked":
             raise ValueError("Stamp not revoked")
         return
-    if key.startswith(("stamp-use-requested:", "stamp-use-decision:", "stamp-attestation:")):
+    if key.startswith(("stamp-use-requested:", "stamp-use-decision:", "stamp-attestation:", "stamp-pdf:")):
         application = db.session.get(StampApplication, event_id)
         if application is None:
             raise ValueError("Stamp application missing")
@@ -173,6 +173,14 @@ def _verify_stamp_custody_event(payload, key):
             receipt = StampAttestation.query.filter_by(application_id=application.id).first()
             if receipt is None:
                 raise ValueError("Stamp attestation missing")
+        if key.startswith("stamp-pdf:"):
+            from app.models.stamped_pdf import StampedPdf
+            receipt = StampAttestation.query.filter_by(application_id=application.id).first()
+            if receipt is None or key != "stamp-pdf:%s" % receipt.id:
+                raise ValueError("Stamp PDF attestation mismatch")
+            stamped = StampedPdf.query.filter_by(stamp_attestation_id=receipt.id).first()
+            if stamped is None or stamped.organization_id != application.organization_id:
+                raise ValueError("Stamp PDF derivative unavailable")
         return
     raise ValueError("Stamp event has no recognized idempotency key")
 
@@ -200,6 +208,7 @@ HANDLERS = {
     "stamp.use.approved": _verify_stamp_custody_event,
     "stamp.use.rejected": _verify_stamp_custody_event,
     "stamp.attestation.issued": _verify_stamp_custody_event,
+    "stamp.pdf.issued": _verify_stamp_custody_event,
 }
 
 
