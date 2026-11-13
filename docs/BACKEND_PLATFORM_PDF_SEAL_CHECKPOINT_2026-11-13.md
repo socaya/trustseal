@@ -119,3 +119,20 @@ PDF_SEAL_OPERATOR_ID=
 ```
 
 No actual signature was generated or validated by the assistant runtime in this checkpoint. The repository was updated through the GitHub connector, but no tested deployment should be assumed.
+
+
+## Runtime installation manifest
+
+The repository now also includes `requirements.txt` for the Flask backend and `requirements-test.txt` for automated tests, alongside `requirements-signing.txt` for pyHanko. These manifests contain reviewed dependency *ranges*, not a reproducible hash-locked resolution. They have not been installed or tested in the assistant environment. Confirm versions against application imports and run dependency/OS security checks, then generate a deployment-specific pinned, hashed lockfile before release.
+
+Minimum staging verification sequence:
+
+```bash
+python -m pip install -r requirements.txt -r requirements-signing.txt -r requirements-test.txt
+python -m compileall -q app tests
+python -m pytest -q
+flask db upgrade
+flask pdf-seal verify 123
+```
+
+Do not run the last two commands against production without migration replay and a real test artifact. The check sequence is not evidence of a passing test suite; it remains a required release gate.
