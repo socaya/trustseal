@@ -82,6 +82,10 @@ class Config:
     # Bounded explicit TSA certificate chain (JSON array of approved PEM paths).
     VALIDATION_TSA_INTERMEDIATES_JSON = os.getenv('VALIDATION_TSA_INTERMEDIATES_JSON', '[]')
 
+    # Optional issuer-signed DER CRLs aligned with non-root chain positions.
+    # JSON array: leaf first, then each intermediate; null means absent.
+    VALIDATION_CHAIN_CRL_PATHS_JSON = os.getenv('VALIDATION_CHAIN_CRL_PATHS_JSON')
+
     # === JWT Configuration ===
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=5)
