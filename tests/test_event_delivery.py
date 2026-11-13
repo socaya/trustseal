@@ -49,6 +49,7 @@ def test_no_arbitrary_outbox_handlers_are_registered():
         "signer.key.registered",
         "signer.key.revoked",
         "stamp.attestation.issued",
+        "stamp.pdf.issued",
         "stamp.registration.approved",
         "stamp.registration.requested",
         "stamp.registration.revoked",
