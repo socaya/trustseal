@@ -1,0 +1,4 @@
+# Test-only dependencies for the PDF signing integration cases.
+# Install alongside the reviewed backend dependencies and requirements-signing.txt.
+pytest>=8,<10
+reportlab>=4,<5
