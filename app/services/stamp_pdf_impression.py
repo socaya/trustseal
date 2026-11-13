@@ -4,6 +4,7 @@ Never overlays a pre-signed PDF: that would invalidate an existing CMS
 signature. Fixed, non-decorative imprint contains a verifiable issuance ID.
 """
 from io import BytesIO
+import re
 
 from pypdf import PdfReader, PdfWriter
 from reportlab.pdfgen import canvas
@@ -30,7 +31,9 @@ def render_stamped_source(source_bytes, *, stamp_code, stamp_name,
             or type(page_number) is not int or page_number < 1
             or type(x_pt) is not int or type(y_pt) is not int):
         raise PdfFinalizationError("Invalid stamp rendering parameters")
-    if any(ord(char) < 32 for char in stamp_name):
+    if not re.fullmatch(r"[A-Z0-9][A-Z0-9_-]{2,31}", stamp_code):
+        raise PdfFinalizationError("Stamp code is not an approved identifier")
+    if not stamp_name.strip() or any(ord(char) < 32 for char in stamp_name):
         raise PdfFinalizationError("Control characters forbidden in stamp label")
     try:
         stamp_name.encode("cp1252")
