@@ -178,6 +178,12 @@ def request_timestamp(digest, config):
     if len(raw) > MAX_TOKEN:
         raise TimestampError("TSA response exceeds bounded size")
     result = verify_timestamp(raw, digest, config, expected_nonce=nonce)
+    # Reject replayed responses or a TSA with a severely incorrect clock.
+    # This applies only when issuing a *new* timestamp, not when validating
+    # an old retained timestamp whose original generation time is expected.
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if abs((now - result["gen_time"]).total_seconds()) > 600:
+        raise TimestampError("TSA generation time outside approved issuance window")
     return raw, result
 
 
