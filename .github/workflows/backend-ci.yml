@@ -46,7 +46,11 @@ jobs:
           python -m pip install -r requirements.txt -r requirements-signing.txt -r requirements-test.txt
       - name: Compile all backend modules
         run: python -m compileall -q app tests examples
-      - name: Apply complete schema migrations
-        run: flask db upgrade
+      - name: Construct disposable legacy-model baseline
+        run: python scripts/ci_legacy_schema_baseline.py
+      - name: Stamp historical checkpoint and replay new trust migrations
+        run: |
+          flask db stamp 1856829bd7b1
+          flask db upgrade
       - name: Run all backend tests
         run: python -m pytest -q
