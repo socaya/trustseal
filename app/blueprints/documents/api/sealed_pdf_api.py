@@ -34,6 +34,8 @@ def _authorized(envelope_id):
     ).first()
     if record is None:
         abort(404)
+    if record.source_blob_id != envelope.document_blob_id or record.source_sha256 != envelope.document_sha256:
+        abort(409, description="Finalized PDF source mismatch")
     return envelope, record
 
 
@@ -52,7 +54,10 @@ def verify_platform_pdf(envelope_id):
     envelope, record = _authorized(envelope_id)
     path = _checked_path(record)
     try:
-        status = inspect_signed_pdf(path.read_bytes(), current_app.config)
+        status = inspect_signed_pdf(
+            path.read_bytes(), current_app.config,
+            expected_evidence_sha256=record.evidence_sha256,
+        )
     except PdfFinalizationError:
         status = {
             "signature_valid": False, "intact": False,
@@ -62,6 +67,7 @@ def verify_platform_pdf(envelope_id):
         "artifact_id": record.id,
         "envelope_id": envelope.id,
         "source_sha256": record.source_sha256,
+        "evidence_sha256": record.evidence_sha256,
         "output_sha256": record.output_sha256,
         "assurance": "platform_certificate_seal_not_individual_signatures",
         "not_individual_signatures": True,
@@ -77,7 +83,10 @@ def download_platform_pdf(envelope_id):
     envelope, record = _authorized(envelope_id)
     path = _checked_path(record)
     try:
-        result = inspect_signed_pdf(path.read_bytes(), current_app.config)
+        result = inspect_signed_pdf(
+            path.read_bytes(), current_app.config,
+            expected_evidence_sha256=record.evidence_sha256,
+        )
     except PdfFinalizationError:
         abort(503, description="PDF certificate validation unavailable")
     if not result["overall_valid"]:
