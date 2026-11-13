@@ -10,7 +10,8 @@ from datetime import datetime
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.x509 import ocsp
-from cryptography.x509.oid import ExtensionOID
+from cryptography.x509.oid import ExtensionOID, ExtendedKeyUsageOID
+from asn1crypto import keys
 
 from app.services.certificate_revocation import (
     RevocationEvidenceError, _utc_naive, _verify_signature,
@@ -37,7 +38,32 @@ def _load_cert(data):
         raise OcspEvidenceError("Invalid PEM certificate") from exc
 
 
-def validate_ocsp(response_der, subject_pem, issuer_pem, root_pem, *, observed_at=None):
+def _responder_key_hash(certificate):
+    spki = keys.PublicKeyInfo.load(
+        certificate.public_key().public_bytes(
+            serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+    )
+    return hashlib.sha1(spki["public_key"].contents[1:]).digest()
+
+
+def _responder_certificate(response, issuer):
+    """Resolve the exact OCSP signer, never trusting arbitrary embedded certs."""
+    candidates = [issuer, *response.certificates]
+    matched = []
+    for certificate in candidates:
+        if (response.responder_name is not None and response.responder_name == certificate.subject
+                or response.responder_key_hash is not None
+                and response.responder_key_hash == _responder_key_hash(certificate)):
+            if all(_sha256(certificate) != _sha256(old) for old in matched):
+                matched.append(certificate)
+    if len(matched) != 1:
+        raise OcspEvidenceError("OCSP signer is absent or ambiguous")
+    return matched[0]
+
+
+def validate_ocsp(response_der, subject_pem, issuer_pem, root_pem, *,
+                  observed_at=None, expected_responder_der=None):
     if not isinstance(response_der, bytes) or not 0 < len(response_der) <= MAX_OCSP:
         raise OcspEvidenceError("OCSP response size exceeds limit")
     try:
@@ -74,22 +100,43 @@ def validate_ocsp(response_der, subject_pem, issuer_pem, root_pem, *, observed_a
                 or response.issuer_key_hash != expected.issuer_key_hash
                 or response.hash_algorithm.name != "sha256"):
             raise OcspEvidenceError("OCSP CertID differs from pinned certificate")
-        if response.responder_name is not None and response.responder_name != issuer.subject:
-            raise OcspEvidenceError("OCSP responder name is not the authorized issuer")
-        if response.responder_key_hash is not None:
-            # cryptography builds the responder's SHA-1 key hash using the
-            # exact SPKI BIT STRING representation.
-            from cryptography.hazmat.primitives.serialization import Encoding
-            from cryptography.hazmat.primitives.serialization import PublicFormat
-            from asn1crypto import keys
-            spki = keys.PublicKeyInfo.load(
-                issuer.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
+        signer = _responder_certificate(response, issuer)
+        delegated = _sha256(signer) != _sha256(issuer)
+        if delegated:
+            if signer.issuer != issuer.subject:
+                raise OcspEvidenceError("Delegated responder not issued by certificate authority")
+            if all(_sha256(signer) != _sha256(embedded) for embedded in response.certificates):
+                raise OcspEvidenceError("Delegated certificate not retained in signed response")
+            _verify_signature(
+                issuer.public_key(), signer.signature,
+                signer.tbs_certificate_bytes, signer.signature_hash_algorithm,
             )
-            expected_key_hash = hashlib.sha1(spki["public_key"].contents[1:]).digest()
-            if response.responder_key_hash != expected_key_hash:
-                raise OcspEvidenceError("OCSP responder key differs from issuer")
-        _verify_signature(issuer.public_key(), response.signature,
-                          response.tbs_response_bytes, response.signature_hash_algorithm)
+            try:
+                eku = signer.extensions.get_extension_for_oid(
+                    ExtensionOID.EXTENDED_KEY_USAGE
+                ).value
+                ku = signer.extensions.get_extension_for_oid(
+                    ExtensionOID.KEY_USAGE
+                ).value
+                if ExtendedKeyUsageOID.OCSP_SIGNING not in eku or not ku.digital_signature:
+                    raise OcspEvidenceError("Delegated responder lacks OCSP signing authority")
+            except x509.ExtensionNotFound as exc:
+                raise OcspEvidenceError("Delegated OCSP signer EKU/key usage required") from exc
+            try:
+                bc = signer.extensions.get_extension_for_oid(
+                    ExtensionOID.BASIC_CONSTRAINTS
+                ).value
+                if bc.ca:
+                    raise OcspEvidenceError("Delegated OCSP responder cannot be a CA")
+            except x509.ExtensionNotFound:
+                raise OcspEvidenceError("Delegated responder constraints absent") from None
+        actual_responder_der = signer.public_bytes(serialization.Encoding.DER)
+        if expected_responder_der is not None and actual_responder_der != expected_responder_der:
+            raise OcspEvidenceError("Responder certificate differs from retained evidence")
+        _verify_signature(
+            signer.public_key(), response.signature,
+            response.tbs_response_bytes, response.signature_hash_algorithm,
+        )
         checked = _utc_naive(observed_at or datetime.utcnow())
         produced = _utc_naive(getattr(response, "produced_at_utc", None) or response.produced_at)
         start = _utc_naive(getattr(response, "this_update_utc", None) or response.this_update)
@@ -98,7 +145,7 @@ def validate_ocsp(response_der, subject_pem, issuer_pem, root_pem, *, observed_a
             raise OcspEvidenceError("OCSP response outside validity interval")
         if produced > checked:
             raise OcspEvidenceError("OCSP response claims future production time")
-        for certificate in (subject, issuer, root):
+        for certificate in (subject, issuer, root, signer):
             begin = _utc_naive(getattr(certificate, "not_valid_before_utc", None)
                                or certificate.not_valid_before)
             finish = _utc_naive(getattr(certificate, "not_valid_after_utc", None)
@@ -116,6 +163,9 @@ def validate_ocsp(response_der, subject_pem, issuer_pem, root_pem, *, observed_a
             "response_sha256": hashlib.sha256(response_der).hexdigest(),
             "produced_at": produced, "this_update": start, "next_update": end,
             "checked_at": checked, "status": status,
+            "responder_certificate_sha256": _sha256(signer),
+            "responder_der_b64": base64.b64encode(actual_responder_der).decode("ascii"),
+            "delegated": delegated,
         }
     except OcspEvidenceError:
         raise
@@ -132,12 +182,23 @@ def verify_ocsp_snapshot(record, root_pem, *, require_current=False):
         issuer = x509.load_der_x509_certificate(base64.b64decode(
             record.issuer_der_b64, validate=True
         ))
+        stored_responder = getattr(record, "responder_der_b64", None)
+        expected_responder = (
+            base64.b64decode(stored_responder, validate=True)
+            if stored_responder is not None else None
+        )
         result = validate_ocsp(
             response,
             subject.public_bytes(serialization.Encoding.PEM),
             issuer.public_bytes(serialization.Encoding.PEM),
             root_pem, observed_at=record.checked_at,
+            expected_responder_der=expected_responder,
         )
+        stored_sha = getattr(record, "responder_certificate_sha256", None)
+        if stored_sha is not None and stored_sha != result["responder_certificate_sha256"]:
+            raise OcspEvidenceError("Responder fingerprint changed")
+        if stored_responder is None and result["delegated"]:
+            raise OcspEvidenceError("Historical delegated responder evidence missing")
         fields = ("subject_certificate_sha256", "issuer_certificate_sha256",
                   "response_sha256", "status", "produced_at",
                   "this_update", "next_update")
