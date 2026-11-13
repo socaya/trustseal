@@ -66,6 +66,11 @@ class Config:
     RFC3161_TRUST_ROOT_PEM = os.getenv('RFC3161_TRUST_ROOT_PEM')
     RFC3161_OPENSSL_BINARY = os.getenv('RFC3161_OPENSSL_BINARY', 'openssl')
 
+    # === Controlled TSA issuer CRL evidence; no arbitrary remote fetching ===
+    CRL_EVIDENCE_ENABLED = os.getenv('CRL_EVIDENCE_ENABLED', 'false').lower() == 'true'
+    CRL_EVIDENCE_DER = os.getenv('CRL_EVIDENCE_DER')
+    CRL_ISSUER_CERT_PEM = os.getenv('CRL_ISSUER_CERT_PEM')
+
     # === JWT Configuration ===
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=5)
