@@ -95,6 +95,18 @@ def _verify_review_receipt_event(payload, key):
     # verification with the pinned key.
 
 
+def _verify_pdf_seal_event(payload, key):
+    from app.models.pdf_finalization import FinalizedPdf
+    envelope_id = payload.get("aggregate_id")
+    if type(envelope_id) is not int or key != "platform-pdf-sealed:%s" % envelope_id:
+        raise ValueError("Unexpected PDF seal event")
+    artifact = FinalizedPdf.query.filter_by(envelope_id=envelope_id).first()
+    if artifact is None:
+        raise ValueError("Missing platform PDF artifact")
+    if artifact.profile != "platform_pades_b_b":
+        raise ValueError("Unsupported platform PDF profile")
+
+
 HANDLERS = {
     "document.draft.created": _verify_document_event,
     "document.draft.updated": _verify_document_event,
@@ -107,6 +119,7 @@ HANDLERS = {
     "envelope.review.acknowledged": _verify_signer_review,
     "envelope.review.declined": _verify_signer_review,
     "review.receipt.issued": _verify_review_receipt_event,
+    "platform.pdf.sealed": _verify_pdf_seal_event,
 }
 
 
