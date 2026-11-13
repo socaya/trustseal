@@ -112,12 +112,12 @@ def seal_pdf(source_bytes, config, evidence_sha256):
     """
     if not isinstance(source_bytes, bytes) or not 0 < len(source_bytes) <= MAX_SOURCE_BYTES:
         raise PdfFinalizationError("Source PDF size is invalid")
-    if not config.get("PDF_FINALIZATION_ENABLED", False):
-        raise PdfFinalizationError("Platform PDF finalization is disabled")
     if not source_bytes.startswith(b"%PDF-"):
         raise PdfFinalizationError("Invalid source PDF")
     if not isinstance(evidence_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", evidence_sha256):
         raise PdfFinalizationError("A canonical review evidence digest is required")
+    if not config.get("PDF_FINALIZATION_ENABLED", False):
+        raise PdfFinalizationError("Platform PDF finalization is disabled")
     try:
         from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
         from pyhanko.sign import fields, signers
