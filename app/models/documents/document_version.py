@@ -20,7 +20,6 @@ class DocumentVersion(db.Model):
             "id": self.id,
             "version_number": self.version_number,
             "file_name": self.file_name,
-            "file_path": self.file_path,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "created_by_id": self.created_by_id,
             "document_id": self.document_id,
