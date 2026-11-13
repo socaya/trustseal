@@ -34,6 +34,8 @@ def test_enqueue_requires_bounded_idempotency_key(bad_key):
 def test_no_arbitrary_outbox_handlers_are_registered():
     assert sorted(HANDLERS) == [
         "document.draft.created",
+        "document.draft.deleted",
+        "document.draft.updated",
         "document.file.ingested",
         "document.snapshot.created",
     ]
