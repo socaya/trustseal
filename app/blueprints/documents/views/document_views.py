@@ -294,75 +294,11 @@ def delete_document_view(document_id):
 
 # === DOWNLOAD ===
 @document_views.route('/<int:document_id>/download')
-@login_required # Ensure user is logged in
+@login_required
 def download_document(document_id):
-    """Handles file downloads for a specific document."""
-    # 1. Get document metadata from API
-    current_app.logger.debug(f"User {current_user.id} fetching metadata for document {document_id} to download...")
-    api_endpoint = f"documents/{document_id}/"
-    doc = api_client.get_data(api_endpoint) # Use trailing slash if API expects it
+    """Legacy static-path delivery is disabled until file migration is complete.
 
-    # 2. Handle errors (document not found, API error, invalid format)
-    error_message = None
-    if not doc or (isinstance(doc, dict) and doc.get("error")):
-        error_message = "Could not retrieve document information."
-        status_code = None
-        if isinstance(doc, dict):
-            error_message = doc.get("error", error_message)
-            status_code = doc.get("status_code")
-        flash(error_message, "danger")
-        current_app.logger.warning(f"Download failed: Cannot get metadata for document {document_id}. User: {current_user.id}, Status: {status_code}, Error: {error_message}")
-        # Redirect back safely
-        referer = request.headers.get("Referer")
-        if referer and 'download' in referer: return redirect(url_for(".index")) # Avoid loop
-        return redirect(referer or url_for(".index"))
-
-    if not isinstance(doc, dict):
-         flash("Could not retrieve document information: Invalid format.", "danger")
-         current_app.logger.error(f"Download failed: Unexpected data type for document {document_id}: {type(doc)}")
-         return redirect(url_for(".index"))
-
-    # 3. Extract file information
-    file_path_relative = doc.get("file_path") # Filename or relative path within UPLOAD_FOLDER
-    original_filename = doc.get("file_name") # Original filename for download prompt
-
-    if not file_path_relative:
-        flash("Document record found, but no associated file path is available.", "warning")
-        current_app.logger.warning(f"Download failed: No file_path found for document {document_id}. User: {current_user.id}")
-        # Redirect to details page might be better here
-        return redirect(url_for(".view_document", document_id=document_id))
-
-    # Determine the name for the download prompt (prefer original, fallback to path basename)
-    download_name = original_filename if original_filename else os.path.basename(file_path_relative)
-
-    # 4. Get upload directory from config
-    upload_folder = current_app.config.get('UPLOAD_FOLDER')
-    # CRITICAL: Ensure UPLOAD_FOLDER is configured and is an ABSOLUTE path for security
-    if not upload_folder or not os.path.isabs(upload_folder):
-        current_app.logger.error(f"UPLOAD_FOLDER ('{upload_folder}') is not configured correctly or is not an absolute path.")
-        flash("Server configuration error: Cannot determine file location.", "danger")
-        return redirect(url_for(".view_document", document_id=document_id))
-
-    current_app.logger.info(f"Attempting to send file for document {document_id}: directory='{upload_folder}', path='{file_path_relative}', download_name='{download_name}' for user {current_user.id}")
-
-    # 5. Send the file using send_from_directory
-    try:
-        # Let send_from_directory handle joining directory and path safely
-        return send_from_directory(
-            directory=upload_folder,
-            path=file_path_relative,
-            as_attachment=True,
-            download_name=download_name
-        )
-    except FileNotFoundError:
-         # Log the path where the file was expected
-         expected_path = os.path.normpath(os.path.join(upload_folder, file_path_relative))
-         current_app.logger.error(f"Download failed: File not found for document {document_id}. User: {current_user.id}. Expected at '{expected_path}'")
-         flash("Error: The document file could not be found on the server.", "danger")
-         # Use abort(404) for a cleaner file-not-found response to the client
-         abort(404, description="Document file not found on server.")
-    except Exception as e:
-         # Catch other potential errors (e.g., permissions, network issues)
-         current_app.logger.error(f"Error sending file for document {document_id}. User: {current_user.id}. Error: {e}", exc_info=True)
-         flash("An unexpected error occurred while trying to download the file.", "danger")
-         return redirect(url_for(".view_document", document_id=document_id))
+    Use authorized /api/documents/<id>/files/<file_id>/download for
+    scanned, private files. Never redirect to raw static upload paths.
+    """
+    abort(410, description="Legacy document downloads require migration to private storage.")
