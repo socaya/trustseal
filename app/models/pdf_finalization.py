@@ -17,6 +17,7 @@ class FinalizedPdf(db.Model):
     source_blob_id = db.Column(db.Integer, db.ForeignKey("document_blobs.id"),
                                nullable=False)
     source_sha256 = db.Column(db.String(64), nullable=False)
+    evidence_sha256 = db.Column(db.String(64), nullable=False)
     object_key = db.Column(db.String(96), nullable=False, unique=True)
     output_sha256 = db.Column(db.String(64), nullable=False)
     output_size = db.Column(db.BigInteger, nullable=False)
