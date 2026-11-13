@@ -41,7 +41,11 @@ def enqueue(*, event_type, aggregate_type, aggregate_id, organization_id,
 
 
 def claim_next():
-    """Use PostgreSQL row locks to claim one due message safely."""
+    """Claim a due event, recovering expired leases safely.
+
+    Each claim increments attempts. If a crashed worker exhausted the retry
+    budget, the lease is marked dead without repeating its side effects.
+    """
     now = datetime.utcnow()
     query = db.session.query(OutboxEvent).filter(
         or_(
@@ -49,23 +53,50 @@ def claim_next():
             and_(OutboxEvent.state == "processing", OutboxEvent.locked_until <= now),
         )
     ).order_by(OutboxEvent.id).with_for_update(skip_locked=True)
-    item = query.first()
-    if item is None:
+    while True:
+        item = query.first()
+        if item is None:
+            db.session.commit()
+            return None
+        if item.attempts >= MAX_ATTEMPTS:
+            item.state = "dead"
+            item.locked_until = None
+            item.last_error = "Retry budget exhausted after lease expiry"
+            db.session.commit()
+            continue
+        item.state = "processing"
+        item.attempts += 1
+        # Microsecond uniqueness across claims is not a complete fencing
+        # token. External side effects still require consumer idempotency.
+        item.locked_until = now + timedelta(seconds=LEASE_SECONDS)
+        db.session.commit()
+        return item.id, item.locked_until
+
+
+def renew_lease(event_id, lease_until):
+    """Extend a lease held by this worker before executing a long handler."""
+    now = datetime.utcnow()
+    item = db.session.query(OutboxEvent).filter_by(
+        id=event_id, state="processing", locked_until=lease_until
+    ).with_for_update().first()
+    if item is None or item.locked_until <= now:
         db.session.rollback()
         return None
-    item.state = "processing"
-    item.attempts += 1
     item.locked_until = now + timedelta(seconds=LEASE_SECONDS)
     db.session.commit()
-    return item.id, item.locked_until
+    return item.locked_until
 
 
 def finish(event_id, lease_until, *, success, error=None):
-    """Update delivery result after the handler returns."""
+    """A stale worker must not acknowledge a newer worker's lease."""
     item = db.session.query(OutboxEvent).filter_by(
         id=event_id, state="processing", locked_until=lease_until
     ).with_for_update().first()
     if item is None:
+        db.session.rollback()
+        return False
+    # If lease expired, do not acknowledge; recovery owns the next attempt.
+    if item.locked_until <= datetime.utcnow():
         db.session.rollback()
         return False
     item.locked_until = None
