@@ -7,3 +7,6 @@ cryptography>=43,<47
 # Controlled visible stamp impression and PDF page merging
 pypdf>=5,<7
 reportlab>=4,<5
+
+# Strictly decoded, bounded logo PNG artwork
+Pillow>=11,<13
