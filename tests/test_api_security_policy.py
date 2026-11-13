@@ -38,7 +38,6 @@ def test_public_auth_routes(path):
         "/api/document-signatures/",
         "/api/document-signatures/12",
         "/api/signature-requests/3",
-        "/api/stamps",
         "/api/payments",
     ],
 )
@@ -70,3 +69,20 @@ def test_document_api_requires_jwt():
 
 def test_non_admin_cannot_read_all_signature_profiles():
     assert check("/api/signature-profiles") == (403, True)
+
+
+@pytest.mark.parametrize("method", ["GET", "POST", "PUT", "PATCH", "DELETE"])
+@pytest.mark.parametrize(
+    "path",
+    ["/api/stamps", "/api/api/stamps", "/api/api/templates", "/api/usages"],
+)
+def test_legacy_stamp_routes_retired_without_generic_access(path, method):
+    assert check(path, method, admin=True) == (410, False)
+
+
+def test_governed_stamp_api_keeps_jwt_authorization():
+    assert check("/api/stamp-custody") == (None, True)
+
+
+def test_anonymous_uploaded_pdf_verification_is_public():
+    assert check("/api/public-verification/pdf", "POST") == (None, False)
