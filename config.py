@@ -71,6 +71,11 @@ class Config:
     CRL_EVIDENCE_DER = os.getenv('CRL_EVIDENCE_DER')
     CRL_ISSUER_CERT_PEM = os.getenv('CRL_ISSUER_CERT_PEM')
 
+    # === Pinned, operator-supplied TSA OCSP response evidence ===
+    OCSP_EVIDENCE_ENABLED = os.getenv('OCSP_EVIDENCE_ENABLED', 'false').lower() == 'true'
+    OCSP_EVIDENCE_DER = os.getenv('OCSP_EVIDENCE_DER')
+    OCSP_ISSUER_CERT_PEM = os.getenv('OCSP_ISSUER_CERT_PEM')
+
     # === JWT Configuration ===
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=5)
