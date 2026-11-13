@@ -57,13 +57,13 @@ def claim_next():
     item.attempts += 1
     item.locked_until = now + timedelta(seconds=LEASE_SECONDS)
     db.session.commit()
-    return item.id
+    return item.id, item.locked_until
 
 
-def finish(event_id, *, success, error=None):
+def finish(event_id, lease_until, *, success, error=None):
     """Update delivery result after the handler returns."""
     item = db.session.query(OutboxEvent).filter_by(
-        id=event_id, state="processing"
+        id=event_id, state="processing", locked_until=lease_until
     ).with_for_update().first()
     if item is None:
         db.session.rollback()
@@ -87,19 +87,20 @@ def finish(event_id, *, success, error=None):
 
 def deliver_one(handlers):
     """Dispatch only explicitly registered, trusted handlers by event type."""
-    event_id = claim_next()
-    if event_id is None:
+    claim = claim_next()
+    if claim is None:
         return False
+    event_id, lease_until = claim
     item = db.session.get(OutboxEvent, event_id)
     handler = handlers.get(item.event_type)
     if handler is None:
-        finish(event_id, success=False, error="No registered handler")
+        finish(event_id, lease_until, success=False, error="No registered handler")
         return True
     try:
         handler(dict(item.payload), item.idempotency_key)
     except Exception as exc:
         db.session.rollback()
-        finish(event_id, success=False, error=type(exc).__name__)
+        finish(event_id, lease_until, success=False, error=type(exc).__name__)
     else:
-        finish(event_id, success=True)
+        finish(event_id, lease_until, success=True)
     return True
