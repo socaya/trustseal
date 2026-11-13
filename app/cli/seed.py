@@ -851,6 +851,8 @@ def register_cli(app):
     app.cli.add_command(stamp_cli)
     from app.cli.stamped_pdf import stamped_pdf_cli
     app.cli.add_command(stamped_pdf_cli)
+    from app.cli.preservation import preservation_cli
+    app.cli.add_command(preservation_cli)
     click.echo("Seed and outbox commands registered.")
 
 # Example of how you might call this in your app factory (e.g., create_app function)
