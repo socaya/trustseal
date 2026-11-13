@@ -425,8 +425,16 @@ def export_ocsp(evidence_id):
     try:
         root = _read_pem(current_app.config.get("RFC3161_TRUST_ROOT_PEM"), "Approved root")
         checked = verify_ocsp_snapshot(record, root)
-        if checked["subject_certificate_sha256"] != token.tsa_certificate_sha256:
-            raise OcspEvidenceError("OCSP certificate does not match timestamp")
+        from app.services.rfc3161_timestamp import decode_token, verify_timestamp
+        source = verify_timestamp(
+            decode_token(token.token_der_b64), token.artifact_sha256,
+            current_app.config,
+        )
+        if (checked["subject_certificate_sha256"] != token.tsa_certificate_sha256
+                or source["tsa_certificate_sha256"] != token.tsa_certificate_sha256
+                or source["token_sha256"] != token.token_sha256
+                or source["gen_time"] != token.gen_time):
+            raise OcspEvidenceError("OCSP evidence not bound to an intact TSA timestamp")
     except (OcspEvidenceError, ValueError, OSError):
         abort(409, description="OCSP response validation failed")
     response = jsonify({
