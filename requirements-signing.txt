@@ -3,3 +3,7 @@
 # Not a complete TrustSeal application dependency manifest.
 pyHanko>=0.32,<0.39
 cryptography>=43,<47
+
+# Controlled visible stamp impression and PDF page merging
+pypdf>=5,<7
+reportlab>=4,<5
