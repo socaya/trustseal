@@ -185,6 +185,24 @@ def _verify_stamp_custody_event(payload, key):
     raise ValueError("Stamp event has no recognized idempotency key")
 
 
+def _verify_stamp_design_event(payload, key):
+    from app.models.stamp_design import StampDesignVersion
+    stamp_id = payload.get("aggregate_id")
+    if type(stamp_id) is not int or not key.startswith("stamp-design-"):
+        raise ValueError("Invalid stamp design event")
+    try:
+        design_id = int(key.rsplit(":", 1)[-1])
+    except (ValueError, IndexError):
+        raise ValueError("Invalid design event identity") from None
+    item = StampDesignVersion.query.filter_by(
+        id=design_id, stamp_id=stamp_id,
+    ).first()
+    if item is None:
+        raise ValueError("Design version missing")
+    if key.startswith("stamp-design-decision:") and item.state == "pending":
+        raise ValueError("Design decision unavailable")
+
+
 HANDLERS = {
     "document.draft.created": _verify_document_event,
     "document.draft.updated": _verify_document_event,
@@ -209,6 +227,9 @@ HANDLERS = {
     "stamp.use.rejected": _verify_stamp_custody_event,
     "stamp.attestation.issued": _verify_stamp_custody_event,
     "stamp.pdf.issued": _verify_stamp_custody_event,
+    "stamp.design.proposed": _verify_stamp_design_event,
+    "stamp.design.approved": _verify_stamp_design_event,
+    "stamp.design.rejected": _verify_stamp_design_event,
 }
 
 
