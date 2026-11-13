@@ -108,6 +108,8 @@ def export_platform_seal_evidence(envelope_id):
     """Export and verify the exact review receipts bound into the PDF seal."""
     from app.models.signer_decision import SignerDecision
     from app.models.review_receipt import ReviewReceipt
+    from app.models.signer_cryptographic import SignerPublicKey, SignerEndorsement
+    from app.services.signer_crypto import verify_detached, endorsement_payload
     from app.services.signing_receipts import (
         resolve_trusted_public_key, verify_receipt, review_payload,
     )
@@ -140,7 +142,35 @@ def export_platform_seal_evidence(envelope_id):
             abort(503, description="Receipt trust configuration unavailable")
         if not valid or expected != receipt.payload:
             abort(409, description="Signed review evidence failed verification")
+        endorsement = SignerEndorsement.query.filter_by(
+            envelope_id=envelope.id, participant_id=participant.id
+        ).first()
+        if endorsement is None or endorsement.user_id != participant.user_id:
+            abort(409, description="Signer cryptographic proof missing")
+        key = db.session.get(SignerPublicKey, endorsement.signer_key_id)
+        if key is None or key.user_id != participant.user_id:
+            abort(409, description="Signer public key evidence missing")
+        try:
+            bound_payload = endorsement_payload(
+                envelope=envelope, participant=participant, decision=decision,
+                fingerprint=key.fingerprint,
+                nonce=endorsement.signed_payload.get("nonce"),
+            )
+        except (ValueError, TypeError, AttributeError):
+            abort(409, description="Signer cryptographic evidence malformed")
+        if (endorsement.signed_payload != bound_payload
+                or not verify_detached(
+                    key.public_key_pem, endorsement.signed_payload,
+                    endorsement.signature_b64,
+                )):
+            abort(409, description="Signer cryptographic evidence invalid")
         items.append({
+            "signer_endorsement": {
+                "public_key_pem": key.public_key_pem,
+                "key_fingerprint": key.fingerprint,
+                "signed_payload": endorsement.signed_payload,
+                "signature_b64": endorsement.signature_b64,
+            },
             "participant_id": participant.id,
             "signing_order": participant.signing_order,
             "review_decision_id": decision.id,
