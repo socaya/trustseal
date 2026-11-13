@@ -441,6 +441,8 @@ def export_ocsp(evidence_id):
         "timestamp_id": token.id,
         "id": record.id,
         "response_der_b64": record.response_der_b64,
+        "responder_certificate_sha256": record.responder_certificate_sha256,
+        "responder_certificate_der_b64": record.responder_der_b64,
         "subject_certificate_der_b64": record.subject_der_b64,
         "issuer_certificate_der_b64": record.issuer_der_b64,
         "status": record.status,
