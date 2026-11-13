@@ -452,3 +452,86 @@ def export_ocsp(evidence_id):
     })
     response.headers["Cache-Control"] = "private, no-store"
     return response
+
+
+@evidence_preservation_api.route("/retentions/<int:retention_id>/dossiers", methods=["GET"])
+@jwt_required()
+def list_validation_dossiers(retention_id):
+    actor = _admin()
+    retention = _retention(retention_id, actor)
+    from app.models.validation_dossier import ValidationDossier
+    rows = ValidationDossier.query.filter_by(
+        retention_id=retention.id, organization_id=actor.organization_id
+    ).order_by(ValidationDossier.id.desc()).limit(100).all()
+    result = jsonify([{
+        "id": item.id,
+        "timestamp_id": item.timestamp_id,
+        "manifest_sha256": item.manifest_sha256,
+        "assurance": "partial_tsa_status_evidence_not_full_chain_or_pades_lt",
+        "complete": False,
+        "created_at": item.created_at.isoformat() + "Z",
+    } for item in rows])
+    result.headers["Cache-Control"] = "private, no-store"
+    return result
+
+
+@evidence_preservation_api.route("/dossiers/<int:dossier_id>/export", methods=["GET"])
+@jwt_required()
+def export_validation_dossier(dossier_id):
+    actor = _admin()
+    from app.models.validation_dossier import ValidationDossier
+    from app.models.evidence_timestamp import EvidenceTimestamp
+    from app.models.ocsp_evidence import OcspEvidence
+    from app.models.certificate_revocation import CertificateRevocationEvidence
+    from app.services.validation_dossier import verify_dossier
+    item = ValidationDossier.query.filter_by(
+        id=dossier_id, organization_id=actor.organization_id
+    ).first()
+    if item is None:
+        abort(404)
+    retention = _retention(item.retention_id, actor)
+    timestamp = EvidenceTimestamp.query.filter_by(
+        id=item.timestamp_id, organization_id=actor.organization_id,
+        retention_id=retention.id,
+    ).first()
+    if timestamp is None:
+        abort(409, description="Retained timestamp missing")
+    try:
+        references = item.manifest["revocation_observations"]
+        if not isinstance(references, list) or len(references) > 200:
+            raise ValueError("Invalid dossier observations")
+        ocsp_ids = set()
+        crl_ids = set()
+        for ref in references:
+            if not isinstance(ref, dict) or type(ref.get("id")) is not int:
+                raise ValueError("Invalid dossier observation")
+            if ref.get("type") == "ocsp":
+                ocsp_ids.add(ref["id"])
+            elif ref.get("type") == "crl":
+                crl_ids.add(ref["id"])
+            else:
+                raise ValueError("Unrecognized dossier observation")
+        ocsp = OcspEvidence.query.filter(
+            OcspEvidence.id.in_(ocsp_ids),
+            OcspEvidence.timestamp_id == timestamp.id,
+            OcspEvidence.organization_id == actor.organization_id,
+        ).all() if ocsp_ids else []
+        crl = CertificateRevocationEvidence.query.filter(
+            CertificateRevocationEvidence.id.in_(crl_ids),
+            CertificateRevocationEvidence.timestamp_id == timestamp.id,
+            CertificateRevocationEvidence.organization_id == actor.organization_id,
+        ).all() if crl_ids else []
+        if len(ocsp) != len(ocsp_ids) or len(crl) != len(crl_ids):
+            raise ValueError("Referenced evidence unavailable")
+        manifest = verify_dossier(
+            item, retention, timestamp, ocsp, crl, current_app.config
+        )
+    except (ValueError, OSError, TypeError, KeyError, AttributeError):
+        abort(409, description="Dossier source validation failed")
+    result = jsonify({
+        "id": item.id,
+        "manifest_sha256": item.manifest_sha256,
+        "manifest": manifest,
+    })
+    result.headers["Cache-Control"] = "private, no-store"
+    return result
