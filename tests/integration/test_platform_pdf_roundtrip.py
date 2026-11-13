@@ -157,3 +157,36 @@ def test_real_public_http_pdf_verification(signing_config):
     assert check("a" * 64).get_json()["status"] == "valid"
     assert check("b" * 64).get_json()["status"] == "invalid"
     assert check("a" * 64, certificate="f" * 64).get_json()["status"] == "invalid"
+
+
+def test_visible_stamp_derivative_gets_new_valid_cms_seal(signing_config):
+    """A stamped derivative is newly signed; prior signed artifact is untouched."""
+    from pypdf import PdfReader
+    from app.services.stamp_pdf_impression import render_stamped_source
+    original_unsigned = _sample_pdf()
+    first_signed, first_certificate, _ = seal_pdf(
+        original_unsigned, signing_config, "b" * 64
+    )
+    impression = render_stamped_source(
+        original_unsigned,
+        stamp_code="VW-001", stamp_name="Vitalworks Limited",
+        attestation_id=99, page_number=1, x_pt=350, y_pt=60,
+    )
+    assert "Vitalworks Limited" in PdfReader(BytesIO(impression)).pages[0].extract_text()
+    stamped, cert, _ = seal_pdf(
+        impression, signing_config, "c" * 64, evidence_purpose="stamp"
+    )
+    assert inspect_signed_pdf(
+        stamped, signing_config,
+        expected_evidence_sha256="c" * 64,
+        expected_certificate_sha256=cert,
+        evidence_purpose="stamp",
+    )["overall_valid"]
+    assert inspect_signed_pdf(
+        first_signed, signing_config,
+        expected_evidence_sha256="b" * 64,
+        expected_certificate_sha256=first_certificate,
+    )["overall_valid"]
+    assert first_signed != stamped
+    with pytest.raises(PdfFinalizationError):
+        seal_pdf(first_signed, signing_config, "c" * 64, evidence_purpose="stamp")
