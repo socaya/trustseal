@@ -8,6 +8,7 @@ from io import BytesIO
 from pypdf import PdfReader, PdfWriter
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import simpleSplit
+from reportlab.pdfbase.pdfmetrics import stringWidth
 
 from app.services.platform_pdf_seal import MAX_SOURCE_BYTES, PdfFinalizationError
 
@@ -36,7 +37,11 @@ def render_stamped_source(source_bytes, *, stamp_code, stamp_name,
     except UnicodeEncodeError:
         raise PdfFinalizationError("Stamp label requires an approved printable font profile") from None
     lines = simpleSplit(stamp_name, "Helvetica", 8, PLATE_WIDTH - 20)
-    if len(lines) > 2:
+    if (len(lines) > 2
+            or any(stringWidth(line, "Helvetica", 8) > PLATE_WIDTH - 20 for line in lines)
+            or stringWidth("Code: " + stamp_code, "Helvetica", 8) > PLATE_WIDTH - 20
+            or stringWidth("TrustSeal attestation ID: " + str(attestation_id),
+                           "Helvetica", 7) > PLATE_WIDTH - 20):
         raise PdfFinalizationError("Stamp identity will not fit the approved plate")
 
     try:
