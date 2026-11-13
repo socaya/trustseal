@@ -10,7 +10,7 @@ from app.models.review_receipt import ReviewReceipt
 from app.models.signing_envelope import SigningEnvelope, EnvelopeParticipant
 from app.models.signer_decision import SignerDecision
 from app.services.token_security import active_token_user
-from app.services.signing_receipts import load_public_key, verify_receipt, review_payload
+from app.services.signing_receipts import resolve_trusted_public_key, verify_receipt, review_payload
 
 receipt_api = Blueprint("receipt_api", __name__, url_prefix="/api/review-receipts")
 
@@ -42,9 +42,7 @@ def verify_stored_receipt(receipt_id):
         "signature": record.signature,
     }
     try:
-        trusted_key = load_public_key(
-            current_app.config.get("REVIEW_RECEIPT_PUBLIC_KEY")
-        )
+        trusted_key = resolve_trusted_public_key(current_app.config, record.key_id)
     except (OSError, ValueError, TypeError):
         abort(503, description="Trusted receipt verifier is unavailable")
     verified = verify_receipt(receipt, trusted_key)
