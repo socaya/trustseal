@@ -222,6 +222,9 @@ def create_app(config_class=None):
     blueprints.append(signer_crypto_api)
     from .blueprints.documents.api.public_pdf_verify_api import public_pdf_verify_api
     blueprints.append(public_pdf_verify_api)
+    from .blueprints.estamp.stamp_custody_api import stamp_custody_api
+    from .blueprints.estamp.stamp_attestation_api import stamp_attestation_api
+    blueprints.extend([stamp_custody_api, stamp_attestation_api])
 
     for bp in blueprints:
         app.register_blueprint(bp)
