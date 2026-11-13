@@ -195,3 +195,45 @@ def test_historical_chain_crl_inventory_is_retained_and_reverified(monkeypatch):
     record.manifest["chain_revocation"]["observations"][0]["crl_sha256"] = "f" * 64
     with pytest.raises(ValueError):
         verify_dossier(record, retention, token, [], [], {})
+
+
+def test_dossier_records_pdf_seal_path_without_qualifying_signature(monkeypatch):
+    patch_trust(monkeypatch)
+    from app.services import validation_dossier as service
+    from types import SimpleNamespace
+    retention, token = fixtures()
+    platform_chain = {
+        "schema": "trustseal.platform-pdf-chain-evidence.v1",
+        "certificate_chain": {
+            "leaf_sha256": "e" * 64,
+            "root_sha256": "d" * 64,
+            "complete_pkix_validation": False,
+        },
+    }
+    monkeypatch.setattr(service, "artifact_for", lambda *args: SimpleNamespace(
+        output_sha256="a" * 64, certificate_sha256="e" * 64,
+    ))
+    def fake_build(config, *, certificate_sha256, at, retained=None,
+                   include_new_crls=True):
+        assert certificate_sha256 == "e" * 64
+        assert at == token.gen_time
+        if retained is not None and retained != platform_chain:
+            raise ValueError("Platform signer path altered")
+        return platform_chain
+    monkeypatch.setattr(service, "build_platform_chain", fake_build)
+    config = {"VALIDATION_PDF_SEAL_CERT_PEM": "/approved/seal.pem"}
+    report = build_dossier(retention, token, [], [], config)
+    assert report["platform_signer_chain"] == platform_chain
+    assert "platform_signer_historical_revocation_evidence" in report["missing_requirements"]
+    assert report["complete"] is False
+    record = SimpleNamespace(
+        retention_id=retention.id, organization_id=retention.organization_id,
+        timestamp_id=token.id, manifest=report,
+        manifest_sha256=digest_manifest(report),
+    )
+    assert verify_dossier(record, retention, token, [], [], config) == report
+    # A later configuration change cannot invent an upgraded verification
+    # result, and a historical dossier remains tied to its retained chain.
+    record.manifest["platform_signer_chain"]["certificate_chain"]["leaf_sha256"] = "f" * 64
+    with pytest.raises(ValueError):
+        verify_dossier(record, retention, token, [], [], config)
