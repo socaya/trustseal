@@ -15,6 +15,8 @@ from app.extensions import db
 from app.models.documents.document_blob import DocumentBlob
 from app.models.pdf_finalization import FinalizedPdf
 from app.models.stamped_pdf import StampedPdf
+from app.models.stamp_design import StampDesignVersion
+from app.services.stamp_designs import checked_design
 from app.models.stamp_custody import ManagedStamp, StampApplication, StampAttestation
 from app.services.documents.private_storage import (
     check_object_digest, store_scanned_pdf, cleanup_object, IngestionError,
@@ -68,8 +70,9 @@ def checked_stamped_pdf(record, config):
 @click.option("--page", type=int, required=True)
 @click.option("--x", "x_pt", type=int, required=True)
 @click.option("--y", "y_pt", type=int, required=True)
+@click.option("--design-id", type=int, default=None, help="Approved stamp design version ID")
 @with_appcontext
-def issue_stamped_pdf(attestation_id, page, x_pt, y_pt):
+def issue_stamped_pdf(attestation_id, page, x_pt, y_pt, design_id):
     """Create one approved visible impression and seal a NEW PDF derivative."""
     if (not current_app.config.get("STAMP_PDF_RENDER_ENABLED", False)
             or not current_app.config.get("PDF_FINALIZATION_ENABLED", False)):
@@ -122,9 +125,21 @@ def issue_stamped_pdf(attestation_id, page, x_pt, y_pt):
         original = check_object_digest(
             source_blob.object_key, source_blob.sha256, current_app.config
         ).read_bytes()
+        design = None
+        layout = None
+        logo = None
+        if design_id is not None:
+            design = StampDesignVersion.query.filter_by(
+                id=design_id, stamp_id=stamp.id,
+                organization_id=stamp.organization_id, state="approved",
+            ).first()
+            if design is None:
+                raise ValueError("Approved design version is required")
+            layout, logo = checked_design(design)
         rendered = render_stamped_source(
             original, stamp_code=stamp.code, stamp_name=stamp.name,
             attestation_id=receipt.id, page_number=page, x_pt=x_pt, y_pt=y_pt,
+            layout=layout, logo_png=logo,
         )
         provenance = build_stamp_provenance(
             source_pdf_sha256=pdf.output_sha256,
@@ -134,6 +149,8 @@ def issue_stamped_pdf(attestation_id, page, x_pt, y_pt):
             stamp_attestation_id=receipt.id,
             stamp_code=stamp.code,
             page_number=page, x_pt=x_pt, y_pt=y_pt,
+            design_version_id=design.id if design else None,
+            design_sha256=design.design_sha256 if design else None,
         )
         bound_digest = provenance_sha256(provenance)
         sealed, cert_fingerprint, _status = seal_pdf(
@@ -146,6 +163,8 @@ def issue_stamped_pdf(attestation_id, page, x_pt, y_pt):
         record = StampedPdf(
             organization_id=stamp.organization_id,
             stamp_attestation_id=receipt.id,
+            design_version_id=design.id if design else None,
+            design_sha256=design.design_sha256 if design else None,
             source_finalized_pdf_id=pdf.id,
             source_finalized_sha256=pdf.output_sha256,
             original_document_sha256=source_blob.sha256,
