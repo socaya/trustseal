@@ -1,5 +1,5 @@
-# Signing/verification adapter. Install into an isolated, locked deployment
-# with approved versions and hashes; no complete runtime lock exists yet.
+# PDF signing adapter. Resolve and pin compatible transitive dependencies
+# (including pyhanko-certvalidator) in the deployment's lockfile.
+# Not a complete TrustSeal application dependency manifest.
 pyHanko>=0.32,<0.39
-pyhanko-certvalidator>=0.26,<0.30
 cryptography>=43,<47
