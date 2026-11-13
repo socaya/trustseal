@@ -34,12 +34,34 @@ def _verify_document_event(payload, key):
     # Internal consistency acknowledgement only; not an external notification.
 
 
+
+def _verify_envelope_event(payload, key):
+    from app.models.signing_envelope import SigningEnvelope, EnvelopeParticipant
+    envelope_id = payload.get("aggregate_id")
+    if type(envelope_id) is not int:
+        raise ValueError("Invalid envelope ID")
+    envelope = db.session.get(SigningEnvelope, envelope_id)
+    if envelope is None:
+        raise ValueError("Envelope not found")
+    if key.startswith("envelope-prepared:"):
+        if envelope.state not in ("prepared", "cancelled"):
+            raise ValueError("Envelope has not been prepared")
+        if not EnvelopeParticipant.query.filter_by(envelope_id=envelope.id).first():
+            raise ValueError("Prepared envelope lacks participants")
+    if key.startswith("envelope-cancelled:") and envelope.state != "cancelled":
+        raise ValueError("Envelope cancellation missing")
+
+
+
 HANDLERS = {
     "document.draft.created": _verify_document_event,
     "document.draft.updated": _verify_document_event,
     "document.draft.deleted": _verify_document_event,
     "document.snapshot.created": _verify_document_event,
     "document.file.ingested": _verify_document_event,
+    "envelope.draft.created": _verify_envelope_event,
+    "envelope.prepared": _verify_envelope_event,
+    "envelope.cancelled": _verify_envelope_event,
 }
 
 
