@@ -242,3 +242,27 @@ def get_draft_snapshot(document_id, snapshot_id):
     result = _snapshot_meta(record)
     result["content"] = record.canonical_content
     return jsonify(result)
+
+
+@document_api.route("/<int:document_id>/snapshots/<int:snapshot_id>/integrity", methods=["GET"])
+@jwt_required()
+def check_draft_snapshot_integrity(document_id, snapshot_id):
+    """Recompute stored draft-text digest; does not attest external storage."""
+    import hmac
+    from app.models.documents.document_snapshot import DocumentSnapshot
+    from app.services.documents.snapshots import snapshot_digest
+
+    get_authorized_document_or_abort(document_id)
+    record = DocumentSnapshot.query.filter_by(
+        id=snapshot_id, document_id=document_id
+    ).first_or_404()
+    actual = snapshot_digest(
+        record.document_id, record.revision, record.canonical_content
+    )
+    verified = hmac.compare_digest(actual, record.content_sha256)
+    return jsonify({
+        **_snapshot_meta(record),
+        "integrity": "MATCH" if verified else "MISMATCH",
+        "verified": verified,
+        "assurance": "stored_draft_text_digest_only",
+    })
