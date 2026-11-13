@@ -20,6 +20,7 @@ def upgrade():
                   nullable=False, unique=True),
         sa.Column("organization_id", sa.Integer(), sa.ForeignKey("organizations.id"),
                   nullable=False),
+        sa.Column("issued_by_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("source_blob_id", sa.Integer(), sa.ForeignKey("document_blobs.id"),
                   nullable=False),
         sa.Column("source_sha256", sa.String(64), nullable=False),
