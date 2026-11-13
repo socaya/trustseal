@@ -154,6 +154,13 @@ def update_document(document_id):
             setattr(doc, key, data[key].strip() if key == "title" else data[key])
     doc.last_modified_by_id = actor().id
     doc.version = (doc.version or 0) + 1
+    from app.services.event_delivery import enqueue
+    enqueue(
+        event_type="document.draft.updated", aggregate_type="document",
+        aggregate_id=doc.id, organization_id=doc.organization_id,
+        actor_id=actor().id, action="document.draft.updated",
+        idempotency_key="document-updated:%s:%s" % (doc.id, doc.version),
+    )
     db.session.commit()
     return jsonify(_serialize(doc))
 
@@ -165,6 +172,13 @@ def delete_document(document_id):
     if (doc.status or "").lower() != "draft":
         abort(409, description="Non-draft documents cannot be deleted")
     doc.deleted_at = datetime.utcnow()
+    from app.services.event_delivery import enqueue
+    enqueue(
+        event_type="document.draft.deleted", aggregate_type="document",
+        aggregate_id=doc.id, organization_id=doc.organization_id,
+        actor_id=actor().id, action="document.draft.deleted",
+        idempotency_key="document-deleted:%s" % doc.id,
+    )
     db.session.commit()
     return "", 204
 
