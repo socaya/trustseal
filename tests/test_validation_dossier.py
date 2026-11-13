@@ -113,3 +113,45 @@ def test_revoked_observation_is_never_counted_as_good(monkeypatch):
     )
     with pytest.raises(ValueError):
         build_dossier(retention, token, [], [row], {})
+
+
+def test_legacy_dossier_without_chain_metadata_remains_verifiable(monkeypatch):
+    patch_trust(monkeypatch)
+    retention, token = fixtures()
+    legacy = build_dossier(
+        retention, token, [], [], {},
+        chain_mode="none", report_missing_chain=False,
+    )
+    assert "certificate_chain" not in legacy
+    assert "bounded_explicit_tsa_certificate_path" not in legacy["missing_requirements"]
+    record = SimpleNamespace(
+        retention_id=retention.id, organization_id=retention.organization_id,
+        timestamp_id=token.id, manifest=legacy,
+        manifest_sha256=digest_manifest(legacy),
+    )
+    assert verify_dossier(record, retention, token, [], [], {}) == legacy
+
+
+def test_explicit_tsa_chain_is_recorded_but_never_upgrades_assurance(monkeypatch):
+    patch_trust(monkeypatch)
+    from app.services import validation_dossier as service
+    retention, token = fixtures()
+    chain = {
+        "schema": "trustseal.explicit-tsa-chain.v1",
+        "leaf_sha256": token.tsa_certificate_sha256,
+        "root_sha256": "d" * 64,
+        "complete_pkix_validation": False,
+    }
+    monkeypatch.setattr(service, "chain_from_config", lambda config, when: chain)
+    manifest = build_dossier(retention, token, [], [], {})
+    assert manifest["certificate_chain"] == chain
+    assert manifest["complete"] is False
+    assert "full_certificate_path_validation" in manifest["missing_requirements"]
+    dossier = SimpleNamespace(
+        retention_id=12, organization_id=7, timestamp_id=8,
+        manifest=manifest, manifest_sha256=digest_manifest(manifest),
+    )
+    assert verify_dossier(dossier, retention, token, [], [], {}) == manifest
+    chain["leaf_sha256"] = "e" * 64
+    with pytest.raises(ValueError):
+        verify_dossier(dossier, retention, token, [], [], {})
