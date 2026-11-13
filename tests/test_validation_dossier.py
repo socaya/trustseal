@@ -155,3 +155,43 @@ def test_explicit_tsa_chain_is_recorded_but_never_upgrades_assurance(monkeypatch
     chain["leaf_sha256"] = "e" * 64
     with pytest.raises(ValueError):
         verify_dossier(dossier, retention, token, [], [], {})
+
+
+def test_historical_chain_crl_inventory_is_retained_and_reverified(monkeypatch):
+    patch_trust(monkeypatch)
+    from app.services import validation_dossier as service
+    retention, token = fixtures()
+    chain = {
+        "schema": "trustseal.explicit-tsa-chain.v1",
+        "leaf_sha256": token.tsa_certificate_sha256,
+        "root_sha256": "d" * 64,
+        "complete_pkix_validation": False,
+    }
+    inventory = {
+        "schema": "trustseal.chain-crl-inventory.v1",
+        "status": "partial",
+        "missing_positions": [1],
+        "observations": [{"index": 0, "crl_sha256": "e" * 64}],
+        "full_historical_pkix_assurance": False,
+    }
+    monkeypatch.setattr(service, "chain_from_config", lambda cfg, now: chain)
+    monkeypatch.setattr(
+        service, "configured_chain_crls",
+        lambda cfg, manifest, now: inventory,
+    )
+    monkeypatch.setattr(
+        service, "validate_chain_crl_inventory",
+        lambda manifest, now, entries: inventory if entries == inventory["observations"] else {},
+    )
+    manifest = build_dossier(retention, token, [], [], {})
+    assert manifest["chain_revocation"] == inventory
+    assert manifest["complete"] is False
+    record = SimpleNamespace(
+        retention_id=retention.id, organization_id=retention.organization_id,
+        timestamp_id=token.id, manifest=manifest,
+        manifest_sha256=digest_manifest(manifest),
+    )
+    assert verify_dossier(record, retention, token, [], [], {}) == manifest
+    record.manifest["chain_revocation"]["observations"][0]["crl_sha256"] = "f" * 64
+    with pytest.raises(ValueError):
+        verify_dossier(record, retention, token, [], [], {})
