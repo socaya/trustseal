@@ -121,7 +121,7 @@ def test_tenant_retention_and_independent_hold_release(monkeypatch, tmp_path):
         assert client.post(
             release_path, json=release, headers=auth(administrator)
         ).status_code == 403
-        assert client.post(release_path, json={}, headers=auth(outsider)).status_code == 404
+        assert client.post(release_path, json=release, headers=auth(outsider)).status_code == 404
         response = client.post(
             release_path, json={}, headers=auth(independent)
         )
