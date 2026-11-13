@@ -16,6 +16,8 @@ class OcspEvidence(db.Model):
     subject_certificate_sha256 = db.Column(db.String(64), nullable=False)
     issuer_certificate_sha256 = db.Column(db.String(64), nullable=False)
     response_sha256 = db.Column(db.String(64), nullable=False)
+    responder_certificate_sha256 = db.Column(db.String(64))
+    responder_der_b64 = db.Column(db.Text)
     response_der_b64 = db.Column(db.Text, nullable=False)
     subject_der_b64 = db.Column(db.Text, nullable=False)
     issuer_der_b64 = db.Column(db.Text, nullable=False)
