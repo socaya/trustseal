@@ -78,7 +78,17 @@ def verify(dossier_id):
         raise click.ClickException("Dossier chain unavailable")
     try:
         ocsp, crl = _sources(timestamp)
-        verify_dossier(item, retention, timestamp, ocsp, crl, current_app.config)
+        references = item.manifest.get("revocation_observations", [])
+        wanted_ocsp = {ref["id"] for ref in references if ref["type"] == "ocsp"}
+        wanted_crl = {ref["id"] for ref in references if ref["type"] == "crl"}
+        selected_ocsp = [row for row in ocsp if row.id in wanted_ocsp]
+        selected_crl = [row for row in crl if row.id in wanted_crl]
+        if len(selected_ocsp) != len(wanted_ocsp) or len(selected_crl) != len(wanted_crl):
+            raise ValueError("Dossier references missing historical evidence")
+        verify_dossier(
+            item, retention, timestamp, selected_ocsp, selected_crl,
+            current_app.config,
+        )
     except (ValueError, OSError, TypeError):
         raise click.ClickException("Dossier source or cryptographic evidence invalid") from None
     click.echo("Partial dossier source validation succeeded: %s" % item.id)
