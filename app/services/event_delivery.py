@@ -61,23 +61,25 @@ def claim_next():
         if item.attempts >= MAX_ATTEMPTS:
             item.state = "dead"
             item.locked_until = None
+            item.lease_token = None
             item.last_error = "Retry budget exhausted after lease expiry"
             db.session.commit()
             continue
         item.state = "processing"
         item.attempts += 1
-        # Microsecond uniqueness across claims is not a complete fencing
-        # token. External side effects still require consumer idempotency.
+        # Each claim gets an independent UUID; external consumers still
+        # require idempotency if side effects may outlive a lease.
         item.locked_until = now + timedelta(seconds=LEASE_SECONDS)
+        item.lease_token = str(uuid.uuid4())
         db.session.commit()
-        return item.id, item.locked_until
+        return item.id, item.lease_token
 
 
-def renew_lease(event_id, lease_until):
+def renew_lease(event_id, lease_token):
     """Extend a lease held by this worker before executing a long handler."""
     now = datetime.utcnow()
     item = db.session.query(OutboxEvent).filter_by(
-        id=event_id, state="processing", locked_until=lease_until
+        id=event_id, state="processing", lease_token=lease_token
     ).with_for_update().first()
     if item is None or item.locked_until <= now:
         db.session.rollback()
@@ -87,10 +89,10 @@ def renew_lease(event_id, lease_until):
     return item.locked_until
 
 
-def finish(event_id, lease_until, *, success, error=None):
+def finish(event_id, lease_token, *, success, error=None):
     """A stale worker must not acknowledge a newer worker's lease."""
     item = db.session.query(OutboxEvent).filter_by(
-        id=event_id, state="processing", locked_until=lease_until
+        id=event_id, state="processing", lease_token=lease_token
     ).with_for_update().first()
     if item is None:
         db.session.rollback()
@@ -100,6 +102,7 @@ def finish(event_id, lease_until, *, success, error=None):
         db.session.rollback()
         return False
     item.locked_until = None
+    item.lease_token = None
     if success:
         item.state = "completed"
         item.completed_at = datetime.utcnow()
@@ -121,17 +124,17 @@ def deliver_one(handlers):
     claim = claim_next()
     if claim is None:
         return False
-    event_id, lease_until = claim
+    event_id, lease_token = claim
     item = db.session.get(OutboxEvent, event_id)
     handler = handlers.get(item.event_type)
     if handler is None:
-        finish(event_id, lease_until, success=False, error="No registered handler")
+        finish(event_id, lease_token, success=False, error="No registered handler")
         return True
     try:
         handler(dict(item.payload), item.idempotency_key)
     except Exception as exc:
         db.session.rollback()
-        finish(event_id, lease_until, success=False, error=type(exc).__name__)
+        finish(event_id, lease_token, success=False, error=type(exc).__name__)
     else:
-        finish(event_id, lease_until, success=True)
+        finish(event_id, lease_token, success=True)
     return True
