@@ -53,6 +53,32 @@ def _verify_envelope_event(payload, key):
 
 
 
+def _verify_signer_review(payload, key):
+    from app.models.signing_envelope import SigningEnvelope
+    from app.models.signer_decision import SignerDecision
+    from app.blueprints.documents.api.signer_intent_api import _decision_digest
+    envelope_id = payload.get("aggregate_id")
+    if type(envelope_id) is not int:
+        raise ValueError("Invalid review envelope ID")
+    envelope = db.session.get(SigningEnvelope, envelope_id)
+    if envelope is None:
+        raise ValueError("Missing review envelope")
+    participant_id = int(key.rsplit(":", 1)[-1])
+    decision = SignerDecision.query.filter_by(
+        envelope_id=envelope.id, participant_id=participant_id
+    ).first()
+    if decision is None:
+        raise ValueError("Missing signer review decision")
+    from app.models.signing_envelope import EnvelopeParticipant
+    participant = db.session.get(EnvelopeParticipant, participant_id)
+    if participant is None or participant.envelope_id != envelope.id:
+        raise ValueError("Review participant mismatch")
+    if decision.consent_sha256 != _decision_digest(
+        envelope, participant, decision.user_id, decision.decision
+    ):
+        raise ValueError("Signer review intent digest mismatch")
+
+
 HANDLERS = {
     "document.draft.created": _verify_document_event,
     "document.draft.updated": _verify_document_event,
@@ -62,6 +88,8 @@ HANDLERS = {
     "envelope.draft.created": _verify_envelope_event,
     "envelope.prepared": _verify_envelope_event,
     "envelope.cancelled": _verify_envelope_event,
+    "envelope.review.acknowledged": _verify_signer_review,
+    "envelope.review.declined": _verify_signer_review,
 }
 
 
