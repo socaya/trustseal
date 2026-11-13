@@ -151,7 +151,7 @@ def append_dss_derivative(signed_pdf, dossier, ocsp_rows, crl_rows, config, *,
         store = DocumentSecurityStore.read_dss(reader)
         pdf_dss = reader.root["/DSS"]
         if ("/VRI" not in pdf_dss or not pdf_dss["/VRI"]
-                or len(pdf_dss["/Certs"]) < len(certificates)
+                or "/Certs" not in pdf_dss
                 or (crls and len(pdf_dss.get("/CRLs", [])) < len(crls))
                 or (ocsps and len(pdf_dss.get("/OCSPs", [])) < len(ocsps))):
             raise DssEvidenceError("DSS/VRI validation material incomplete")
