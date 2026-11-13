@@ -212,6 +212,8 @@ def create_app(config_class=None):
     # Authorized envelope preparation API; legacy signature writes remain blocked.
     from .blueprints.documents.api.envelope_api import envelope_api
     blueprints.append(envelope_api)
+    from .blueprints.documents.api.signer_intent_api import signer_intent_api
+    blueprints.append(signer_intent_api)
 
     for bp in blueprints:
         app.register_blueprint(bp)
