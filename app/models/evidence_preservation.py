@@ -29,6 +29,7 @@ class EvidenceLegalHold(db.Model):
     requested_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     released_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
     released_at = db.Column(db.DateTime)
+    release_reason = db.Column(db.String(500))
 
 
 class EvidenceCheckpoint(db.Model):
