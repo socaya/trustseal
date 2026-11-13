@@ -123,13 +123,13 @@ def test_tenant_retention_and_independent_hold_release(monkeypatch, tmp_path):
         ).status_code == 403
         assert client.post(release_path, json=release, headers=auth(outsider)).status_code == 404
         response = client.post(
-            release_path, json={}, headers=auth(independent)
+            release_path, json=release, headers=auth(independent)
         )
         assert response.status_code == 200, response.get_data(as_text=True)
         assert response.get_json()["active"] is False
         released_hold = db.session.get(EvidenceLegalHold, hold_id)
         assert released_hold.release_reason == release["reason"]
-        assert client.post(release_path, json={}, headers=auth(independent)).status_code == 409
+        assert client.post(release_path, json=release, headers=auth(independent)).status_code == 409
         record = db.session.get(EvidenceRetention, retention_id)
         assert record.retain_until.year >= 2036
         assert EvidenceLegalHold.query.filter_by(retention_id=retention_id).count() == 1
