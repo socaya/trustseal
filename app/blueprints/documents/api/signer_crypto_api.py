@@ -325,6 +325,9 @@ def record_endorsement(envelope_id):
         abort(403, description="Signer signature invalid")
     _document_file(envelope)
     challenge.consumed_at = now
+    # The DB integrity trigger requires a consumed challenge. Flush its
+    # update before INSERT, but keep both changes in one atomic transaction.
+    db.session.flush()
     record = SignerEndorsement(
         envelope_id=envelope.id, participant_id=participant.id,
         user_id=actor.id, signer_key_id=key.id,
