@@ -176,6 +176,17 @@ def issue_challenge(envelope_id):
     if count >= MAX_CHALLENGES_PER_10_MIN:
         abort(429, description="Too many review challenges")
     if not user.check_password(data["password"]):
+        # Persist a nonusable, already-consumed attempt so failures count
+        # towards the same per-participant lockout as successful issuance.
+        failed = SignerChallenge(
+            envelope_id=envelope.id, participant_id=participant.id,
+            user_id=user.id, document_sha256=envelope.document_sha256,
+            nonce_sha256=hashlib.sha256(secrets.token_bytes(32)).hexdigest(),
+            issued_at=now, expires_at=now + timedelta(seconds=CHALLENGE_SECONDS),
+            consumed_at=now,
+        )
+        db.session.add(failed)
+        db.session.commit()
         abort(403, description="Reauthentication failed")
     _document_file(envelope)
     nonce = secrets.token_urlsafe(32)
