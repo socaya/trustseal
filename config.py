@@ -41,6 +41,8 @@ class Config:
     PDF_TRUST_ROOT_PEM = os.getenv('PDF_TRUST_ROOT_PEM')
     PDF_SEAL_OPERATOR_ID = os.getenv('PDF_SEAL_OPERATOR_ID')
     PDF_FINALIZATION_ENABLED = os.getenv('PDF_FINALIZATION_ENABLED', 'false').lower() == 'true'
+    PUBLIC_PDF_VERIFICATION_ENABLED = os.getenv('PUBLIC_PDF_VERIFICATION_ENABLED', 'false').lower() == 'true'
+    PUBLIC_PDF_VERIFICATION_CERT_SHA256 = os.getenv('PUBLIC_PDF_VERIFICATION_CERT_SHA256')
 
     # === JWT Configuration ===
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
