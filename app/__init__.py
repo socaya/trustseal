@@ -229,6 +229,8 @@ def create_app(config_class=None):
     blueprints.append(stamped_pdf_api)
     from .blueprints.estamp.stamp_design_api import stamp_design_api
     blueprints.append(stamp_design_api)
+    from .blueprints.documents.api.evidence_preservation_api import evidence_preservation_api
+    blueprints.append(evidence_preservation_api)
 
     for bp in blueprints:
         app.register_blueprint(bp)
