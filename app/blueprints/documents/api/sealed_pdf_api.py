@@ -57,6 +57,7 @@ def verify_platform_pdf(envelope_id):
         status = inspect_signed_pdf(
             path.read_bytes(), current_app.config,
             expected_evidence_sha256=record.evidence_sha256,
+            expected_certificate_sha256=record.certificate_sha256,
         )
     except PdfFinalizationError:
         status = {
@@ -87,6 +88,7 @@ def download_platform_pdf(envelope_id):
         result = inspect_signed_pdf(
             path.read_bytes(), current_app.config,
             expected_evidence_sha256=record.evidence_sha256,
+            expected_certificate_sha256=record.certificate_sha256,
         )
     except PdfFinalizationError:
         abort(503, description="PDF certificate validation unavailable")
