@@ -80,6 +80,21 @@ def _verify_signer_review(payload, key):
         raise ValueError("Signer review intent digest mismatch")
 
 
+def _verify_review_receipt_event(payload, key):
+    from app.models.review_receipt import ReviewReceipt
+    envelope_id = payload.get("aggregate_id")
+    if type(envelope_id) is not int or not key.startswith("review-receipt:"):
+        raise ValueError("Invalid review receipt event")
+    decision_id = int(key.rsplit(":", 1)[-1])
+    item = ReviewReceipt.query.filter_by(
+        decision_id=decision_id, envelope_id=envelope_id
+    ).first()
+    if item is None:
+        raise ValueError("Missing issued review receipt")
+    # This consistency check does not replace standalone cryptographic
+    # verification with the pinned key.
+
+
 HANDLERS = {
     "document.draft.created": _verify_document_event,
     "document.draft.updated": _verify_document_event,
@@ -91,6 +106,7 @@ HANDLERS = {
     "envelope.cancelled": _verify_envelope_event,
     "envelope.review.acknowledged": _verify_signer_review,
     "envelope.review.declined": _verify_signer_review,
+    "review.receipt.issued": _verify_review_receipt_event,
 }
 
 
