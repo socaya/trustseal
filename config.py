@@ -29,6 +29,11 @@ class Config:
     DOCUMENT_CLAMSCAN_BINARY = os.getenv('DOCUMENT_CLAMSCAN_BINARY')
     DOCUMENT_SCAN_TIMEOUT = int(os.getenv('DOCUMENT_SCAN_TIMEOUT', '30'))
 
+    # === Detached review attestation keys (operator issuance only) ===
+    # Protected private key path, never a URL, static asset or checked-in secret.
+    REVIEW_RECEIPT_PRIVATE_KEY = os.getenv('REVIEW_RECEIPT_PRIVATE_KEY')
+    REVIEW_RECEIPT_PUBLIC_KEY = os.getenv('REVIEW_RECEIPT_PUBLIC_KEY')
+
     # === JWT Configuration ===
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=5)
