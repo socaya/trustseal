@@ -22,6 +22,7 @@ NEW_TABLES = {
     "managed_stamps", "stamp_applications", "stamp_attestations",
     "stamped_pdfs", "stamp_design_versions",
     "evidence_retentions", "evidence_legal_holds", "evidence_checkpoints",
+    "evidence_timestamps",
 }
 
 
