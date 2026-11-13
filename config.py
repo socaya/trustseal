@@ -20,7 +20,7 @@ class Config:
     UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static/uploads')
     QR_CODE_FOLDER = os.path.join(os.path.dirname(__file__), 'static/qrcodes')
     ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'docx'}
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
+    MAX_CONTENT_LENGTH = 17 * 1024 * 1024  # 16 MiB file plus multipart framing
 
     # === New private document ingest service (not the legacy upload path) ===
     # Must be an absolute path outside the Flask static directory, backed up
