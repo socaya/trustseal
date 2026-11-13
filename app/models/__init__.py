@@ -19,6 +19,7 @@ from .signing_envelope import SigningEnvelope, EnvelopeParticipant
 from .signer_decision import SignerChallenge, SignerDecision
 from .review_receipt import ReviewReceipt
 from .pdf_finalization import FinalizedPdf
+from .signer_cryptographic import (SignerPublicKey, SignerKeyChallenge, SignerEndorsementChallenge, SignerEndorsement)
 from .esignature import (
     SignatureProfile,
     SignatureRequest,
@@ -53,7 +54,7 @@ from .user import (
 __all__ = [
     # Document-related
     "Document","DocumentSignature","DocumentParty","DocumentActivity","DocumentShare","DocumentVersion",
-    "DocumentSnapshot","DocumentBlob","RevokedToken","SecurityEvent","OutboxEvent","SigningEnvelope","EnvelopeParticipant","SignerChallenge","SignerDecision","ReviewReceipt","FinalizedPdf","DocumentAuditLog","DocumentComment","DocumentDraft","DocumentReminder","DocumentSection","DocumentShare","DocumentType",
+    "DocumentSnapshot","DocumentBlob","RevokedToken","SecurityEvent","OutboxEvent","SigningEnvelope","EnvelopeParticipant","SignerChallenge","SignerDecision","ReviewReceipt","FinalizedPdf","SignerPublicKey","SignerKeyChallenge","SignerEndorsementChallenge","SignerEndorsement","DocumentAuditLog","DocumentComment","DocumentDraft","DocumentReminder","DocumentSection","DocumentShare","DocumentType",
 
     # E-signature-related
     "SignatureProfile", "SignatureRequest", "SignatureRequestActivity",
