@@ -1,0 +1,53 @@
+<aside class="main-sidebar sidebar-dark-primary elevation-4">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <nav class="mt-2">
+      <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu">
+
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'system.main_views.home' %}active{% endif %}" href="{{ url_for('system.main_views.home') }}">
+            <i class="nav-icon fas fa-home"></i>
+            <span>Dashboard</span>
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'document_views.index' %}active{% endif %}" href="{{ url_for('document_views.index') }}">
+            <i class="nav-icon fas fa-file-alt"></i>
+            <span>Documents</span>
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('system.main_views.home') }}">
+            <i class="nav-icon fas fa-stamp"></i>
+            <span>eStamp</span>
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('system.main_views.home') }}">
+            <i class="nav-icon fas fa-signature"></i>
+            <span>eSignatures</span>
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('system.main_views.home') }}">
+            <i class="nav-icon fas fa-sync"></i>
+            <span>Subscriptions</span>
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('system.main_views.home') }}">
+            <i class="nav-icon fas fa-users"></i>
+            <span>Users</span>
+          </a>
+        </li>
+
+      </ul>
+    </nav>
+  </div>
+
+</aside>

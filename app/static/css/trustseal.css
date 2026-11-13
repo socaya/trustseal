@@ -1,0 +1,138 @@
+
+/* TrustSeal Theme - Base Colors */
+:root {
+  --trustseal-primary: #0f3b82;
+  --trustseal-accent: #0e664d;
+  --trustseal-bg-light: #f8f9fa;
+}
+
+/* Sidebar Styles */
+.main-sidebar {
+  width: 240px;
+  background-color: #1e2a38 !important;
+  color: #ffffff;
+}
+
+.main-sidebar .nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  font-size: 0.95rem;
+  transition: background-color 0.2s ease;
+}
+
+.main-sidebar .nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.main-sidebar .nav-link.active {
+  background-color: var(--trustseal-primary);
+  color: #fff;
+}
+
+.main-sidebar .nav-icon {
+  font-size: 1rem;
+}
+
+/* Navbar Styles */
+.navbar {
+  background-color: #ffffff;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.navbar-brand img {
+  height: 32px;
+  margin-right: 10px;
+}
+
+.navbar-brand {
+  font-weight: 600;
+  color: var(--trustseal-primary);
+}
+
+.navbar-brand:hover {
+  color: var(--trustseal-primary);
+}
+
+/* Layout Containers */
+.content-wrapper {
+  background-color: var(--trustseal-bg-light);
+  padding: 0;
+}
+
+.content-wrapper .container-fluid {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Form Styling */
+.form-control {
+  font-size: 0.95rem;
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.form-label {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+textarea.form-control {
+  min-height: 160px;
+}
+
+.form-check-input {
+  margin-top: 0.3rem;
+}
+
+/* Tab Navigation */
+.nav-tabs .nav-link.active {
+  background-color: var(--trustseal-primary);
+  color: #fff;
+}
+
+.nav-tabs .nav-link {
+  border-radius: 0.375rem 0.375rem 0 0;
+  padding: 0.5rem 1rem;
+}
+
+/* Table Styling */
+.table {
+  font-size: 0.92rem;
+  margin-bottom: 0;
+}
+
+.table thead th {
+  background-color: #f1f1f1;
+  border-bottom: 2px solid #dee2e6;
+}
+
+/* Buttons */
+.btn-primary {
+  background-color: var(--trustseal-primary);
+  border-color: var(--trustseal-primary);
+}
+
+.btn-primary:hover {
+  background-color: #0c2e66;
+  border-color: #0c2e66;
+}
+
+.btn-success {
+  background-color: var(--trustseal-accent);
+  border-color: var(--trustseal-accent);
+}
+
+.btn-success:hover {
+  background-color: #0b553f;
+  border-color: #0b553f;
+}
+
+/* Header Styles */
+.module-header h2,
+.card-header {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--trustseal-primary);
+}

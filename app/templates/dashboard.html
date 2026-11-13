@@ -1,0 +1,91 @@
+{% extends "layouts/module_base.html" %}
+{% block title %}Dashboard | TrustSeal{% endblock %}
+
+{% block content %}
+<section class="content pt-3 px-3">
+  <div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+      <div class="col">
+        <h1 class="mb-0 fw-bold">Welcome, {{ current_user.username }}</h1>
+        <span class="text-muted">Here is an overview of your account.</span>
+      </div>
+    </div>
+
+    <!-- Card Grid -->
+    <div class="row">
+      <!-- Documents Card -->
+      <div class="col-md-6 col-lg-3">
+        <div class="card card-outline card-primary">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h5 class="mb-1">Documents</h5>
+                <p class="text-sm text-muted mb-0">Manage uploaded contracts and files.</p>
+              </div>
+              <i class="fas fa-file-alt fa-2x text-primary"></i>
+            </div>
+          </div>
+          <div class="card-footer bg-white text-end">
+            <a href="{{ url_for('document_views.index') }}" class="btn btn-sm btn-primary">View Documents</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- eStamp Card -->
+      <div class="col-md-6 col-lg-3">
+        <div class="card card-outline card-success">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h5 class="mb-1">eStamp</h5>
+                <p class="text-sm text-muted mb-0">Create and apply digital stamps.</p>
+              </div>
+              <i class="fas fa-stamp fa-2x text-success"></i>
+            </div>
+          </div>
+          <div class="card-footer bg-white text-end">
+            <a href="{{ url_for('system.main_views.home') }}" class="btn btn-sm btn-success">Manage Stamps</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- eSignature Card -->
+      <div class="col-md-6 col-lg-3">
+        <div class="card card-outline card-info">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h5 class="mb-1">eSignatures</h5>
+                <p class="text-sm text-muted mb-0">Assign or validate digital signatures.</p>
+              </div>
+              <i class="fas fa-signature fa-2x text-info"></i>
+            </div>
+          </div>
+          <div class="card-footer bg-white text-end">
+            <a href="{{ url_for('system.main_views.home') }}" class="btn btn-sm btn-info">eSignature Tools</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subscriptions Card -->
+      <div class="col-md-6 col-lg-3">
+        <div class="card card-outline card-warning">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h5 class="mb-1">Subscriptions</h5>
+                <p class="text-sm text-muted mb-0">Check your active plans and usage.</p>
+              </div>
+              <i class="fas fa-sync fa-2x text-warning"></i>
+            </div>
+          </div>
+          <div class="card-footer bg-white text-end">
+            <a href="{{ url_for('system.main_views.home') }}" class="btn btn-sm btn-warning">View Plan</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

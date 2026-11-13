@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="content pt-3 px-3">
+  <div class="container-fluid">
+
+    <!-- Page Header -->
+    <div class="mb-4">
+      {% block module_header %}
+        <h2 class="fw-bold">Module Title</h2>
+      {% endblock %}
+    </div>
+
+    <!-- Tabs or Filters -->
+    {% block module_nav %}
+    {% endblock %}
+
+    <!-- Main Module Content -->
+    <div class="mt-0">
+      {% block module_content %}
+      {% endblock %}
+    </div>
+
+  </div>
+</section>
+{% endblock %}

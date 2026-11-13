@@ -1,0 +1,27 @@
+{% extends "layouts/module_base.html" %}
+
+{% block module_header %}
+  <h2 class="fw-bold text-primary"><i class="fas fa-edit me-2"></i> Edit Document</h2>
+{% endblock %}
+
+{% block module_content %}
+<div class="card card-outline card-success">
+  <div class="card-body">
+    <form method="POST" enctype="multipart/form-data">
+      {{ form.hidden_tag() }}
+
+      <div class="mb-3">
+        {{ form.title.label(class="form-label") }}
+        {{ form.title(class="form-control") }}
+      </div>
+      <div class="mb-3">
+        {{ form.description.label(class="form-label") }}
+        {{ form.description(class="form-control") }}
+      </div>
+      <div class="text-end">
+        <button type="submit" class="btn btn-success">Update</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

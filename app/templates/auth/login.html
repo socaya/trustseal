@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Login | TrustSeal{% endblock %}
+
+{% block login_content %}
+<div class="login-box">
+    <div class="card card-outline card-primary shadow-sm">
+        <div class="card-header text-center">
+            <a href="#" class="h4 fw-bold text-primary">TrustSeal</a>
+            <p class="text-muted small mb-0">Secure Login</p>
+        </div>
+        <div class="card-body">
+
+            {% include 'partials/messages.html' %}
+            <form method="POST" action="{{ url_for('auth_views.login') }}">
+                {{ form.hidden_tag() }}
+                {% if request.args.get('next') %}
+                    <input type="hidden" name="next" value="{{ request.args.get('next') }}">
+                {% endif %}
+
+                <div class="mb-3">
+                    {{ form.identifier.label(class="form-label") }}
+                    {{ form.identifier(class="form-control", placeholder="Username or Email") }}
+                    {% for error in form.identifier.errors %}
+                        <div class="text-danger small">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div class="mb-3">
+                    {{ form.password.label(class="form-label") }}
+                    {{ form.password(class="form-control", placeholder="Password") }}
+                    {% for error in form.password.errors %}
+                        <div class="text-danger small">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </div>
+            </form>
+
+            <p class="mt-3 text-center small">
+                Don’t have an account? <a href="{{ url_for('auth_views.register') }}" class="text-primary">Register</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

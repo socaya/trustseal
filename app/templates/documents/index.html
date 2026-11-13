@@ -1,0 +1,17 @@
+{% extends "layouts/module_base.html" %}
+
+{% block module_header %}
+  <h2 class="fw-bold mb-0"><i class="fas fa-file-alt me-1"></i> Documents</h2>
+{% endblock %}
+
+{% block module_nav %}
+<div class="d-flex justify-content-end mb-3">
+  <a href="{{ url_for('document_views.create_document') }}" class="btn btn-sm btn-primary">
+    <i class="fas fa-plus me-1"></i> Upload New
+  </a>
+</div>
+{% endblock %}
+
+{% block module_content %}
+  {% include 'documents/list.html' %}
+{% endblock %}
