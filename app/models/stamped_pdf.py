@@ -15,6 +15,8 @@ class StampedPdf(db.Model):
     stamp_attestation_id = db.Column(
         db.BigInteger, db.ForeignKey("stamp_attestations.id"), nullable=False, unique=True
     )
+    design_version_id = db.Column(db.BigInteger, db.ForeignKey("stamp_design_versions.id"))
+    design_sha256 = db.Column(db.String(64))
     source_finalized_pdf_id = db.Column(
         db.BigInteger, db.ForeignKey("finalized_pdfs.id"), nullable=False
     )
