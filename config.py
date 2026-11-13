@@ -22,6 +22,13 @@ class Config:
     ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'docx'}
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
 
+    # === New private document ingest service (not the legacy upload path) ===
+    # Must be an absolute path outside the Flask static directory, backed up
+    # separately, writable only by the application service account.
+    PRIVATE_DOCUMENT_ROOT = os.getenv('PRIVATE_DOCUMENT_ROOT')
+    DOCUMENT_CLAMSCAN_BINARY = os.getenv('DOCUMENT_CLAMSCAN_BINARY')
+    DOCUMENT_SCAN_TIMEOUT = int(os.getenv('DOCUMENT_SCAN_TIMEOUT', '30'))
+
     # === JWT Configuration ===
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=5)
