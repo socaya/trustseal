@@ -86,6 +86,7 @@ def retry_dead(event_id, confirm):
     item.attempts = 0
     item.next_attempt_at = datetime.utcnow()
     item.locked_until = None
+    item.lease_token = None
     item.last_error = None
     db.session.commit()
     click.echo("Retry queued for event %s" % event_id)
