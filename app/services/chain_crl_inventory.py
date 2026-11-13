@@ -66,6 +66,24 @@ def _verify_one(crl_der, subject, issuer, at, position):
             raise ChainValidationError("Chain issuer does not have CRL signing authority")
         if crl.issuer != issuer.subject or subject.issuer != issuer.subject:
             raise ChainValidationError("CRL issuer mismatch")
+        # Indirect and delta CRLs require additional issuer/reason processing
+        # and must not be treated as complete direct-issued CRL evidence.
+        try:
+            issuing = crl.extensions.get_extension_for_oid(
+                ExtensionOID.ISSUING_DISTRIBUTION_POINT
+            ).value
+            if issuing.indirect_crl or issuing.only_contains_attribute_certs:
+                raise ChainValidationError("Indirect or attribute CRLs unsupported")
+            if issuing.only_some_reasons is not None:
+                raise ChainValidationError("Partial-reasons CRLs unsupported")
+        except x509.ExtensionNotFound:
+            pass
+        try:
+            crl.extensions.get_extension_for_oid(ExtensionOID.DELTA_CRL_INDICATOR)
+        except x509.ExtensionNotFound:
+            pass
+        else:
+            raise ChainValidationError("Delta CRLs require a verified base CRL")
         try:
             aki = crl.extensions.get_extension_for_oid(
                 ExtensionOID.AUTHORITY_KEY_IDENTIFIER
