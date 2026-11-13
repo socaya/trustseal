@@ -247,3 +247,56 @@ def export_checkpoint(checkpoint_id):
     response = jsonify(signed)
     response.headers["Cache-Control"] = "private, no-store"
     return response
+
+
+@evidence_preservation_api.route("/retentions/<int:retention_id>/timestamps", methods=["GET"])
+@jwt_required()
+def list_timestamps(retention_id):
+    actor = _admin()
+    retention = _retention(retention_id, actor)
+    from app.models.evidence_timestamp import EvidenceTimestamp
+    records = EvidenceTimestamp.query.filter_by(
+        retention_id=retention.id, organization_id=actor.organization_id,
+    ).order_by(EvidenceTimestamp.id.desc()).limit(100).all()
+    response = jsonify([{
+        "id": record.id,
+        "artifact_sha256": record.artifact_sha256,
+        "tsa_certificate_sha256": record.tsa_certificate_sha256,
+        "token_sha256": record.token_sha256,
+        "gen_time": record.gen_time.isoformat() + "Z",
+    } for record in records])
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
+
+
+@evidence_preservation_api.route("/timestamps/<int:timestamp_id>/export", methods=["GET"])
+@jwt_required()
+def export_timestamp(timestamp_id):
+    actor = _admin()
+    from app.models.evidence_timestamp import EvidenceTimestamp
+    from app.services.rfc3161_timestamp import decode_token, verify_timestamp, TimestampError
+    item = EvidenceTimestamp.query.filter_by(
+        id=timestamp_id, organization_id=actor.organization_id,
+    ).first()
+    if item is None:
+        abort(404)
+    retention = _retention(item.retention_id, actor)
+    if item.artifact_sha256 != retention.artifact_sha256:
+        abort(409, description="Timestamp retention binding mismatch")
+    try:
+        raw = decode_token(item.token_der_b64)
+        verified = verify_timestamp(raw, item.artifact_sha256, current_app.config)
+        if (verified["token_sha256"] != item.token_sha256
+                or verified["tsa_certificate_sha256"] != item.tsa_certificate_sha256
+                or verified["gen_time"] != item.gen_time):
+            raise TimestampError("Retained timestamp changed")
+    except (TimestampError, OSError):
+        abort(409, description="Timestamp trust verification failed")
+    from flask import Response
+    response = Response(
+        raw, mimetype="application/timestamp-reply",
+        headers={"Content-Disposition": 'attachment; filename="trustseal-timestamp-%s.tsr"' % item.id},
+    )
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
