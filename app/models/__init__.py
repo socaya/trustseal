@@ -12,6 +12,7 @@ from .documents.document_type import DocumentType
 from .documents.document_template import DocumentTemplate
 from .documents.document_version import DocumentVersion
 from .documents.document_snapshot import DocumentSnapshot
+from .documents.document_blob import DocumentBlob
 from .revoked_token import RevokedToken
 from .esignature import (
     SignatureProfile,
@@ -47,7 +48,7 @@ from .user import (
 __all__ = [
     # Document-related
     "Document","DocumentSignature","DocumentParty","DocumentActivity","DocumentShare","DocumentVersion",
-    "DocumentSnapshot","RevokedToken","DocumentAuditLog","DocumentComment","DocumentDraft","DocumentReminder","DocumentSection","DocumentShare","DocumentType",
+    "DocumentSnapshot","DocumentBlob","RevokedToken","DocumentAuditLog","DocumentComment","DocumentDraft","DocumentReminder","DocumentSection","DocumentShare","DocumentType",
 
     # E-signature-related
     "SignatureProfile", "SignatureRequest", "SignatureRequestActivity",
