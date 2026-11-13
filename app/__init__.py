@@ -117,32 +117,10 @@ def create_app(config_class=None):
     def before_request_handler():
         session.permanent = True  # Make session persistent
 
-        # --- Skip API endpoints (they handle their own auth, e.g., JWT) ---
-        # Check if the request path starts with the API prefix
-        # Get API prefix robustly (adjust key if needed)
-        api_prefix = current_app.config.get('API_URL_PREFIX', '/api/')
-        if request.path.startswith(api_prefix):
-            # A number of legacy API routes omit @jwt_required. Apply baseline
-            # authentication centrally until every route has a domain policy.
-            from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
-            from werkzeug.exceptions import Forbidden
-            public_api = {"/api/auth/login", "/api/auth/register"}
-            if request.path not in public_api:
-                verify_jwt_in_request()
-                # Administrative mutation endpoints must not be available to
-                # any signed-in user simply because they possess a token.
-                protected = (
-                    "/api/roles", "/api/permissions", "/api/role-permissions",
-                    "/api/user-roles", "/api/settings", "/api/audit-logs",
-                )
-                if request.path.startswith(protected):
-                    from .models.system import UserRole, Role
-                    user_id = int(get_jwt_identity())
-                    role_names = db.session.query(Role.name).join(
-                        UserRole, UserRole.role_id == Role.id
-                    ).filter(UserRole.user_id == user_id).all()
-                    if not any(name.lower() in {"admin", "administrator", "superadmin", "super_admin"} for (name,) in role_names):
-                        raise Forbidden("Administrative permissions required")
+        # Apply the interim API policy before legacy blueprints handle requests.
+        from .policies.api_access import enforce_legacy_api_security
+        enforce_legacy_api_security()
+        if request.path.rstrip("/").startswith("/api/"):
             return
 
         # --- Allow Static Files ---
