@@ -1,0 +1,5 @@
+# Signing/verification adapter. Install into an isolated, locked deployment
+# with approved versions and hashes; no complete runtime lock exists yet.
+pyHanko>=0.32,<0.39
+pyhanko-certvalidator>=0.26,<0.30
+cryptography>=43,<47
