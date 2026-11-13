@@ -116,3 +116,10 @@ PostgreSQL migration replay in CI uses a guarded disposable legacy-schema baseli
 7. Historical upgrade rehearsal on an actual restored dataset.
 
 This checkpoint introduces operational preservation controls; it is **not a complete legally certified archiving or qualified trust service**. Consult the current GitHub Actions result for actual executed test counts.
+
+
+## Additional integrity safeguards
+
+A retention commitment is now registered **only after** the actual privately stored PDF passes SHA-256 verification, CMS platform signature verification against the configured trust anchor, signed evidence digest verification and exact certificate-fingerprint matching. A stamped PDF requires a stronger full-lineage check: its original platform-signed PDF, approved stamp attestation, frozen source, approved artwork design and the derivative signature must all remain consistent. This prevents registering a retention entry against an unverified or missing artifact.
+
+The preservation API has no destructive endpoints. This is a policy-control and integrity-verification foundation, not an assurance that administrators with direct filesystem or database access cannot alter retained documents. Deploy WORM controls externally before treating retention periods as legally enforced.
