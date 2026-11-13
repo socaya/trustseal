@@ -36,6 +36,8 @@ def _verify_document_event(payload, key):
 
 HANDLERS = {
     "document.draft.created": _verify_document_event,
+    "document.draft.updated": _verify_document_event,
+    "document.draft.deleted": _verify_document_event,
     "document.snapshot.created": _verify_document_event,
     "document.file.ingested": _verify_document_event,
 }
