@@ -11,6 +11,7 @@ from app.services.rfc3161_timestamp import decode_token, verify_timestamp
 from app.services.certificate_revocation import verify_snapshot, _read_pem
 from app.services.ocsp_evidence import verify_ocsp_snapshot
 from app.services.explicit_certificate_chain import chain_from_config
+from app.services.chain_crl_inventory import configured_chain_crls, validate_chain_crl_inventory
 
 SCHEMA = "trustseal.validation-dossier.v1"
 ASSURANCE = "partial_tsa_status_evidence_not_full_chain_or_pades_lt"
@@ -57,7 +58,8 @@ def _approved_observation(record, timestamp, root, *, ocsp):
 
 
 def build_dossier(retention, timestamp, ocsp_rows, crl_rows, config, *,
-                  require_original=True, chain_mode="auto", report_missing_chain=True):
+                  require_original=True, chain_mode="auto", report_missing_chain=True,
+                  retained_chain_crls=None, include_chain_crls=True):
     if len(ocsp_rows) > MAX_STATUS_OBSERVATIONS or len(crl_rows) > MAX_STATUS_OBSERVATIONS:
         raise ValueError("Too many revocation evidence observations")
     if require_original:
@@ -123,6 +125,18 @@ def build_dossier(retention, timestamp, ocsp_rows, crl_rows, config, *,
     }
     if certificate_chain is not None:
         result["certificate_chain"] = certificate_chain
+        if retained_chain_crls is not None:
+            inventory = validate_chain_crl_inventory(
+                certificate_chain, timestamp.gen_time,
+                retained_chain_crls.get("observations", []),
+            )
+            if inventory != retained_chain_crls:
+                raise ValueError("Historical chain CRL inventory is inconsistent")
+            result["chain_revocation"] = inventory
+        elif include_chain_crls:
+            inventory = configured_chain_crls(config, certificate_chain, timestamp.gen_time)
+            if inventory is not None:
+                result["chain_revocation"] = inventory
     elif report_missing_chain:
         result["missing_requirements"].append("bounded_explicit_tsa_certificate_path")
         result["missing_requirements"].sort()
@@ -137,6 +151,8 @@ def verify_dossier(dossier, retention, timestamp, ocsp_rows, crl_rows, config):
             "bounded_explicit_tsa_certificate_path"
             in dossier.manifest.get("missing_requirements", [])
         ),
+        retained_chain_crls=dossier.manifest.get("chain_revocation"),
+        include_chain_crls=False,
     )
     if (dossier.retention_id != retention.id
             or dossier.organization_id != retention.organization_id
