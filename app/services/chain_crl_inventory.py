@@ -74,6 +74,12 @@ def _verify_one(crl_der, subject, issuer, at, position):
             ).value
             if issuing.indirect_crl or issuing.only_contains_attribute_certs:
                 raise ChainValidationError("Indirect or attribute CRLs unsupported")
+            target_ca = subject.extensions.get_extension_for_oid(
+                ExtensionOID.BASIC_CONSTRAINTS
+            ).value.ca
+            if (issuing.only_contains_ca_certs and not target_ca
+                    or issuing.only_contains_user_certs and target_ca):
+                raise ChainValidationError("CRL distribution point excludes target certificate")
             if issuing.only_some_reasons is not None:
                 raise ChainValidationError("Partial-reasons CRLs unsupported")
         except x509.ExtensionNotFound:
