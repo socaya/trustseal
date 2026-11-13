@@ -23,7 +23,7 @@ NEW_TABLES = {
     "stamped_pdfs", "stamp_design_versions",
     "evidence_retentions", "evidence_legal_holds", "evidence_checkpoints",
     "evidence_timestamps", "certificate_revocation_evidence",
-    "ocsp_evidence", "validation_dossiers",
+    "ocsp_evidence", "validation_dossiers", "pdf_dss_derivatives",
 }
 
 
