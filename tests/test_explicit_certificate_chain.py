@@ -144,3 +144,104 @@ def test_config_requires_exact_ordered_pinned_paths(tmp_path):
     config["VALIDATION_TSA_INTERMEDIATES_JSON"] = "not JSON"
     with pytest.raises(ChainValidationError):
         chain_from_config(config, now)
+
+
+def test_signed_chain_crls_bind_both_leaf_and_intermediate(tmp_path):
+    import base64
+    import hashlib
+    import json
+    from app.services.chain_crl_inventory import (
+        configured_chain_crls, validate_chain_crl_inventory,
+    )
+    at = datetime(2026, 11, 13, tzinfo=timezone.utc)
+    root_key = key()
+    root = build("CRL Root", root_key, None, None, at, ca=True, path_length=1)
+    issuer_key = key()
+    issuer = build("CRL Intermediate", issuer_key, root, root_key, at,
+                   ca=True, path_length=0)
+    leaf_key = key()
+    leaf = build("CRL TSA", leaf_key, issuer, issuer_key, at, ca=False, tsa=True)
+    chain_manifest = validate_explicit_chain(
+        pem(leaf), [pem(issuer)], pem(root), at,
+    )
+
+    def signed_crl(issuer_cert, signing_key, *, revoked_serial=None,
+                   bad_key=False, expired=False):
+        builder = (
+            x509.CertificateRevocationListBuilder()
+            .issuer_name(issuer_cert.subject)
+            .last_update(at - timedelta(days=4 if expired else 1))
+            .next_update(at - timedelta(days=1) if expired else at + timedelta(days=1))
+            .add_extension(
+                x509.AuthorityKeyIdentifier.from_issuer_public_key(
+                    signing_key.public_key()
+                ),
+                critical=False,
+            )
+        )
+        if revoked_serial is not None:
+            builder = builder.add_revoked_certificate(
+                x509.RevokedCertificateBuilder()
+                .serial_number(revoked_serial)
+                .revocation_date(at - timedelta(hours=4))
+                .build()
+            )
+        return builder.sign(
+            key() if bad_key else signing_key, hashes.SHA256()
+        ).public_bytes(serialization.Encoding.DER)
+
+    first = signed_crl(issuer, issuer_key)
+    second = signed_crl(root, root_key)
+    paths = []
+    for number, raw in enumerate([first, second]):
+        path = tmp_path / ("chain-%s.crl" % number)
+        path.write_bytes(raw)
+        paths.append(str(path))
+    config = {"VALIDATION_CHAIN_CRL_PATHS_JSON": json.dumps(paths)}
+    inventory = configured_chain_crls(config, chain_manifest, at)
+    assert inventory["status"] == "non_root_crls_checked"
+    assert inventory["covered_positions"] == [0, 1]
+    assert inventory["missing_positions"] == []
+    assert inventory["full_historical_pkix_assurance"] is False
+    assert validate_chain_crl_inventory(
+        chain_manifest, at, inventory["observations"]
+    ) == inventory
+
+    # A partial inventory is never a positive assertion for the missing CA.
+    config["VALIDATION_CHAIN_CRL_PATHS_JSON"] = json.dumps([paths[0], None])
+    partial = configured_chain_crls(config, chain_manifest, at)
+    assert partial["status"] == "partial"
+    assert partial["missing_positions"] == [1]
+
+    # The first signed CRL is valid, but missing the second issuer's status.
+    edited = [dict(row) for row in inventory["observations"]]
+    edited[0]["crl_sha256"] = "f" * 64
+    with pytest.raises(ChainValidationError):
+        validate_chain_crl_inventory(chain_manifest, at, edited)
+    edited = [dict(row) for row in inventory["observations"]]
+    edited.append(dict(edited[0]))
+    with pytest.raises(ChainValidationError):
+        validate_chain_crl_inventory(chain_manifest, at, edited)
+
+    for altered in (
+        signed_crl(issuer, issuer_key, revoked_serial=leaf.serial_number),
+        signed_crl(issuer, issuer_key, expired=True),
+        signed_crl(issuer, issuer_key, bad_key=True),
+    ):
+        (tmp_path / "chain-0.crl").write_bytes(altered)
+        with pytest.raises(ChainValidationError):
+            configured_chain_crls(config, chain_manifest, at)
+
+
+def test_chain_crls_reject_untrusted_configuration_and_misordered_evidence(tmp_path):
+    import json
+    from app.services.chain_crl_inventory import configured_chain_crls
+    at, (leaf, middle, root) = chain()
+    dossier_chain = validate_explicit_chain(leaf, [middle], root, at)
+    for unsafe in ('not-json', '["relative.crl", null]', '[]',
+                   '[null]', '[false, null]'):
+        with pytest.raises(ChainValidationError):
+            configured_chain_crls(
+                {"VALIDATION_CHAIN_CRL_PATHS_JSON": unsafe},
+                dossier_chain, at,
+            )
