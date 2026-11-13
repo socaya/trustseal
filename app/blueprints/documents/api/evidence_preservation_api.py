@@ -12,7 +12,9 @@ from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.models.evidence_preservation import EvidenceRetention, EvidenceLegalHold, EvidenceCheckpoint
-from app.services.evidence_preservation import artifact_for, protection_status
+from app.services.evidence_preservation import artifact_for, protection_status, verify_artifact
+from app.services.documents.private_storage import IngestionError
+from app.services.platform_pdf_seal import PdfFinalizationError
 from app.services.event_delivery import enqueue
 from app.services.token_security import active_token_user
 from app.policies.api_access import is_admin
@@ -63,6 +65,12 @@ def register_retention():
         artifact = artifact_for(kind, artifact_id, actor.organization_id)
     except ValueError:
         abort(404)
+    try:
+        checked_digest = verify_artifact(artifact, kind, current_app.config)
+    except (ValueError, OSError, IngestionError, PdfFinalizationError):
+        abort(409, description="Evidence artifact failed integrity verification")
+    if checked_digest != artifact.output_sha256:
+        abort(409, description="Evidence artifact hash mismatch")
     existing = EvidenceRetention.query.filter_by(
         artifact_type=kind, artifact_id=artifact_id
     ).first()
