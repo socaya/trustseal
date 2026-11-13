@@ -10,7 +10,7 @@ from app.models.review_receipt import ReviewReceipt
 from app.models.signing_envelope import SigningEnvelope, EnvelopeParticipant
 from app.models.signer_decision import SignerDecision
 from app.services.token_security import active_token_user
-from app.services.signing_receipts import load_public_key, verify_receipt
+from app.services.signing_receipts import load_public_key, verify_receipt, review_payload
 
 receipt_api = Blueprint("receipt_api", __name__, url_prefix="/api/review-receipts")
 
@@ -48,18 +48,17 @@ def verify_stored_receipt(receipt_id):
     except (OSError, ValueError, TypeError):
         abort(503, description="Trusted receipt verifier is unavailable")
     verified = verify_receipt(receipt, trusted_key)
-    payload = record.payload
-    # A valid detached signature must also correspond to the current
-    # immutable decision and exact prepared PDF reference.
-    bound = (
-        payload.get("envelope_id") == envelope.id
-        and payload.get("review_decision_id") == decision.id
-        and payload.get("document_sha256") == envelope.document_sha256
-        and payload.get("decision") == decision.decision
-        and payload.get("consent_sha256") == decision.consent_sha256
-        and payload.get("participant_id") == decision.participant_id
-        and payload.get("organization_id") == envelope.organization_id
-    )
+    signer = db.session.get(EnvelopeParticipant, decision.participant_id)
+    try:
+        expected = review_payload(envelope, signer, decision)
+        bound = (
+            record.organization_id == envelope.organization_id
+            and record.decision_id == decision.id
+            and record.envelope_id == decision.envelope_id
+            and record.payload == expected
+        )
+    except (AttributeError, ValueError, TypeError):
+        bound = False
     response = jsonify({
         "id": record.id,
         "valid": bool(verified and bound),
