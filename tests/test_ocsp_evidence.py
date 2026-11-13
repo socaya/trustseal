@@ -108,9 +108,11 @@ def test_expired_ocsp_and_forged_issuer_signature_are_rejected():
     response, subject, issuer = _response(expired=True)
     with pytest.raises(OcspEvidenceError):
         validate_ocsp(response, subject, issuer, issuer)
-    response, subject, issuer = _response(wrong_key=True)
+    response, subject, issuer = _response()
+    forged = bytearray(response)
+    forged[-1] ^= 1
     with pytest.raises(OcspEvidenceError):
-        validate_ocsp(response, subject, issuer, issuer)
+        validate_ocsp(bytes(forged), subject, issuer, issuer)
 
 
 def test_wrong_leaf_and_untrusted_root_are_rejected():
