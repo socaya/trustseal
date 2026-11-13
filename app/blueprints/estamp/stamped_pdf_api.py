@@ -10,6 +10,8 @@ from app.extensions import db
 from app.models.documents.document_blob import DocumentBlob
 from app.models.pdf_finalization import FinalizedPdf
 from app.models.stamped_pdf import StampedPdf
+from app.models.stamp_design import StampDesignVersion
+from app.services.stamp_designs import checked_design
 from app.models.stamp_custody import ManagedStamp, StampApplication, StampAttestation
 from app.policies.api_access import is_admin
 from app.services.token_security import active_token_user
@@ -84,6 +86,17 @@ def _verify_lineage(artifact, receipt, application, stamp, source):
     if (receipt.payload != expected_receipt
             or not verify_attestation(signed_receipt, trusted)):
         raise ValueError("Stamp approval signature invalid")
+    design = None
+    if artifact.design_version_id is not None:
+        design = db.session.get(StampDesignVersion, artifact.design_version_id)
+        if (design is None or design.state != "approved"
+                or design.stamp_id != stamp.id
+                or design.organization_id != stamp.organization_id
+                or artifact.design_sha256 != design.design_sha256):
+            raise ValueError("Approved design identity mismatch")
+        checked_design(design)
+    elif artifact.design_sha256 is not None:
+        raise ValueError("Design hash without version")
     provenance = build_stamp_provenance(
         source_pdf_sha256=source.output_sha256,
         unsigned_pdf_sha256=frozen.sha256,
@@ -94,6 +107,8 @@ def _verify_lineage(artifact, receipt, application, stamp, source):
         page_number=artifact.page_number,
         x_pt=artifact.x_pt,
         y_pt=artifact.y_pt,
+        design_version_id=design.id if design else None,
+        design_sha256=design.design_sha256 if design else None,
     )
     if (artifact.stamp_evidence_sha256 != provenance["stamp_attestation_sha256"]
             or artifact.signed_evidence_sha256 != provenance_sha256(provenance)):
