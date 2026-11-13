@@ -95,8 +95,7 @@ def test_platform_pdf_roundtrip_and_tamper_rejection(signing_config):
 
     # Alter a signed byte, leaving the CMS bytes otherwise unchanged.
     modified = bytearray(signed)
-    pos = modified.find(b"Test only")
-    assert pos < 0 or pos >= 0  # PDF may compress text and remove this literal.
+    # Mutate document bytes while keeping the original CMS signature intact.
     modified[20] = modified[20] ^ 1
     try:
         verified = inspect_signed_pdf(bytes(modified), signing_config)
