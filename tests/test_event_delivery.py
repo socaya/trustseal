@@ -41,6 +41,8 @@ def test_no_arbitrary_outbox_handlers_are_registered():
         "envelope.cancelled",
         "envelope.draft.created",
         "envelope.prepared",
+        "envelope.review.acknowledged",
+        "envelope.review.declined",
     ]
 
 
