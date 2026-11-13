@@ -216,6 +216,8 @@ def create_app(config_class=None):
     blueprints.append(signer_intent_api)
     from .blueprints.documents.api.review_receipt_api import receipt_api
     blueprints.append(receipt_api)
+    from .blueprints.documents.api.sealed_pdf_api import sealed_pdf_api
+    blueprints.append(sealed_pdf_api)
 
     for bp in blueprints:
         app.register_blueprint(bp)
