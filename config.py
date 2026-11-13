@@ -35,6 +35,11 @@ class Config:
     REVIEW_RECEIPT_PUBLIC_KEY = os.getenv('REVIEW_RECEIPT_PUBLIC_KEY')
     REVIEW_RECEIPT_TRUSTED_KEYS_JSON = os.getenv('REVIEW_RECEIPT_TRUSTED_KEYS_JSON')
 
+    # === Gated platform PDF seal (not individual signer credentials) ===
+    PDF_PLATFORM_PKCS12 = os.getenv('PDF_PLATFORM_PKCS12')
+    PDF_PLATFORM_PKCS12_PASSWORD = os.getenv('PDF_PLATFORM_PKCS12_PASSWORD')
+    PDF_TRUST_ROOT_PEM = os.getenv('PDF_TRUST_ROOT_PEM')
+
     # === JWT Configuration ===
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=5)
