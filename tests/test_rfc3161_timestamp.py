@@ -1,6 +1,7 @@
 """RFC 3161 validation must be fail-closed for malformed and untrusted input."""
 import base64
 import hashlib
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pytest
@@ -79,6 +80,7 @@ def test_valid_request_contains_exact_sha256_and_nonce():
         with patch("app.services.rfc3161_timestamp.verify_timestamp", return_value={
             "tsa_certificate_sha256": "a" * 64,
             "token_sha256": "b" * 64,
+            "gen_time": datetime.now(timezone.utc).replace(tzinfo=None),
         }) as verify:
             raw, result = request_timestamp(DIGEST, {
                 "RFC3161_ENABLED": True,
