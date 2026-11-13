@@ -370,6 +370,23 @@ def _verify_dossier_event(payload, key):
     verify_dossier(item, retention, timestamp, ocsp, crl, current_app.config)
 
 
+def _verify_pdf_dss_event(payload, key):
+    from app.models.pdf_dss_derivative import PdfDssDerivative
+    from app.cli.pdf_dss import checked_derivative
+    from flask import current_app
+    if (type(payload.get("aggregate_id")) is not int
+            or not key.startswith("evidence-dss:")):
+        raise ValueError("Invalid PDF DSS event")
+    try:
+        derivative_id = int(key.rsplit(":", 1)[-1])
+    except ValueError:
+        raise ValueError("DSS event identifier invalid") from None
+    item = db.session.get(PdfDssDerivative, derivative_id)
+    if item is None or item.retention_id != payload["aggregate_id"]:
+        raise ValueError("DSS derivative event not bound to retention")
+    checked_derivative(item, current_app.config)
+
+
 HANDLERS = {
     "document.draft.created": _verify_document_event,
     "document.draft.updated": _verify_document_event,
@@ -405,6 +422,7 @@ HANDLERS = {
     "evidence.crl.captured": _verify_crl_event,
     "evidence.ocsp.captured": _verify_ocsp_event,
     "evidence.dossier.issued": _verify_dossier_event,
+    "evidence.dss.issued": _verify_pdf_dss_event,
 }
 
 
