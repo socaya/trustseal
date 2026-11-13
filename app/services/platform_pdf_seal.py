@@ -71,7 +71,7 @@ def _signing_credentials(config):
     return signer, cert.fingerprint(hashes.SHA256()).hex()
 
 
-def inspect_signed_pdf(pdf_bytes, config, expected_evidence_sha256=None):
+def inspect_signed_pdf(pdf_bytes, config, expected_evidence_sha256=None, expected_certificate_sha256=None):
     """Validate embedded CMS, byte range, and certificate chain with pinned CA."""
     if not isinstance(pdf_bytes, bytes) or not 0 < len(pdf_bytes) <= MAX_PDF_BYTES:
         raise PdfFinalizationError("Signed PDF size is invalid")
@@ -82,6 +82,15 @@ def inspect_signed_pdf(pdf_bytes, config, expected_evidence_sha256=None):
         signatures = reader.embedded_signatures
         if len(signatures) != 1 or signatures[0].field_name != FIELD_NAME:
             raise PdfFinalizationError("Expected one platform seal field")
+        signer_certificate = signatures[0].signer_cert
+        if signer_certificate is None:
+            raise PdfFinalizationError("Embedded signature has no signer certificate")
+        actual_cert_sha256 = hashlib.sha256(signer_certificate.dump()).hexdigest()
+        if expected_certificate_sha256 is not None:
+            if (not isinstance(expected_certificate_sha256, str)
+                    or not re.fullmatch(r"[0-9a-f]{64}", expected_certificate_sha256)
+                    or actual_cert_sha256 != expected_certificate_sha256):
+                raise PdfFinalizationError("Platform signer certificate fingerprint mismatch")
         if expected_evidence_sha256 is not None:
             if not re.fullmatch(r"[0-9a-f]{64}", expected_evidence_sha256):
                 raise PdfFinalizationError("Invalid evidence digest")
@@ -98,6 +107,7 @@ def inspect_signed_pdf(pdf_bytes, config, expected_evidence_sha256=None):
             "overall_valid": bool(status.bottom_line),
             "field": FIELD_NAME,
             "profile": PROFILE,
+            "certificate_sha256": actual_cert_sha256,
         }
     except PdfFinalizationError:
         raise
