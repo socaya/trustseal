@@ -267,6 +267,33 @@ def _verify_timestamp_event(payload, key):
         raise ValueError("Timestamp immutable evidence mismatch")
 
 
+def _verify_crl_event(payload, key):
+    from app.models.certificate_revocation import CertificateRevocationEvidence
+    from app.models.evidence_timestamp import EvidenceTimestamp
+    from app.models.evidence_preservation import EvidenceRetention
+    from app.services.certificate_revocation import verify_snapshot, _read_pem
+    from flask import current_app
+    if not key.startswith("evidence-crl:") or type(payload.get("aggregate_id")) is not int:
+        raise ValueError("Invalid CRL event")
+    try:
+        evidence_id = int(key.rsplit(":", 1)[-1])
+    except ValueError:
+        raise ValueError("Invalid CRL event identifier") from None
+    record = db.session.get(CertificateRevocationEvidence, evidence_id)
+    if record is None:
+        raise ValueError("CRL evidence missing")
+    timestamp = db.session.get(EvidenceTimestamp, record.timestamp_id)
+    retention = db.session.get(EvidenceRetention, timestamp.retention_id) if timestamp else None
+    if (timestamp is None or retention is None
+            or retention.id != payload["aggregate_id"]
+            or timestamp.organization_id != record.organization_id
+            or retention.organization_id != record.organization_id
+            or timestamp.tsa_certificate_sha256 != record.subject_certificate_sha256):
+        raise ValueError("CRL evidence organizational or certificate mismatch")
+    root = _read_pem(current_app.config.get("RFC3161_TRUST_ROOT_PEM"), "Trusted TSA root")
+    verify_snapshot(record, root)
+
+
 HANDLERS = {
     "document.draft.created": _verify_document_event,
     "document.draft.updated": _verify_document_event,
@@ -299,6 +326,7 @@ HANDLERS = {
     "evidence.hold.released": _verify_preservation_event,
     "evidence.checkpoint.issued": _verify_preservation_event,
     "evidence.timestamp.issued": _verify_timestamp_event,
+    "evidence.crl.captured": _verify_crl_event,
 }
 
 
