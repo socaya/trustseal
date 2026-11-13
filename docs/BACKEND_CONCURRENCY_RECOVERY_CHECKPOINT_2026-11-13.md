@@ -22,7 +22,7 @@ Status: committed; **NOT executed against a live PostgreSQL database**
 ## Important remaining constraints
 
 - No exactly-once semantics: external side effects must have their own idempotency guarantees. Leases and row locks only coordinate DB claiming/acknowledgment.
-- Current lease identity uses `locked_until` timestamps; introduce unique per-claim fencing UUIDs in a future schema migration before enabling parallel long-running or external providers.
+- Lease identity now uses a unique per-claim UUID persisted as `outbox_events.lease_token` (migration `a6b7d820e3f1`). Stale completion and renewal requests require the matching token. External side effects still require provider-level idempotency.
 - Lease renewal is not automatically scheduled; long-running handlers must explicitly renew or use supervised bounded execution.
 - No live worker supervisor, queue heartbeat dashboard, alert thresholds or full concurrency and crash tests have been deployed.
 - No integrated optimistic concurrency check exists yet for every legacy draft/template and HTML mutation; the contract in this checkpoint applies to `/api/documents/<id>/` only.
@@ -43,6 +43,12 @@ These commands have **not** been executed as part of this change; no automated t
 ## Next implementation target
 
 1. PostgreSQL tests, migration replay, and route-level authorization regression tests.
-2. Unique lease fencing tokens and audited dead-letter operator action.
+2. Audited dead-letter operator action, worker supervision and lease renewal for long-running operations.
 3. Independent audit integrity checkpoints and canonical event schemas.
 4. Complete signature envelope/participant state machine and consent workflow bound to immutable PDF revision and digest.
+
+## Additional commit: per-claim UUID fencing
+
+Added `lease_token` to the `OutboxEvent` model with migration `a6b7d820e3f1`, following `f9b135a0c642`. Each new claim receives an independently generated UUID. `finish()` and `renew_lease()` query by both event ID and lease UUID. Manual requeue clears the previous token. This reduces the risk of old workers accidentally acknowledging reclaimed events, but does not make third-party effects exactly-once.
+
+The migration and recovery regressions have **not** been executed. Apply the new revision in staging and verify concurrent claims, crash/reclaim and rollback before production.
