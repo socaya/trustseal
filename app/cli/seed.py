@@ -844,9 +844,11 @@ def register_cli(app):
     from app.cli.outbox import outbox_cli
     from app.cli.receipts import receipts_cli
     from app.cli.pdf_seal import pdf_seal_cli
+    from app.cli.stamp_custody import stamp_cli
     app.cli.add_command(outbox_cli)
     app.cli.add_command(receipts_cli)
     app.cli.add_command(pdf_seal_cli)
+    app.cli.add_command(stamp_cli)
     click.echo("Seed and outbox commands registered.")
 
 # Example of how you might call this in your app factory (e.g., create_app function)
