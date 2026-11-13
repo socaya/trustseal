@@ -76,6 +76,7 @@ def test_issue_visible_stamped_pdf_with_real_cms_and_verified_download(
             db.session.add(role)
             db.session.flush()
         db.session.add(UserRole(user_id=output_issuer.id, role_id=role.id))
+        db.session.add(UserRole(user_id=approver.id, role_id=role.id))
 
         draft = Document(
             title="Frozen source for stamp", created_by=creator.id,
@@ -178,15 +179,52 @@ def test_issue_visible_stamped_pdf_with_real_cms_and_verified_download(
         receipt_id = stamp_receipt.id
         original_digest = original_signed.output_sha256
 
+        # Register an actual organizational logo and approve design v1 with
+        # independent admin credentials before using it for PDF issuance.
+        from PIL import Image
+        import base64
+        artwork = BytesIO()
+        Image.new("RGBA", (64, 64), (15, 55, 130, 255)).save(
+            artwork, format="PNG",
+        )
+        client = app.test_client()
+        custodian_token = create_access_token(identity=str(custodian.id))
+        admin_token = create_access_token(identity=str(approver.id))
+        response = client.post(
+            "/api/stamp-designs/stamps/%s" % stamp.id,
+            json={
+                "layout": {"size": "standard", "ink": "blue", "border": "rectangle"},
+                "logo_png_b64": base64.b64encode(artwork.getvalue()).decode(),
+            },
+            headers={"Authorization": "Bearer " + custodian_token},
+        )
+        assert response.status_code == 201, response.get_data(as_text=True)
+        design_id = response.get_json()["id"]
+        response = client.post(
+            "/api/stamp-designs/%s/decision" % design_id,
+            json={"decision": "approved"},
+            headers={"Authorization": "Bearer " + admin_token},
+        )
+        assert response.status_code == 200, response.get_data(as_text=True)
+        preview = client.get(
+            "/api/stamp-designs/%s/preview" % design_id,
+            headers={"Authorization": "Bearer " + custodian_token},
+        )
+        assert preview.status_code == 200
+        assert preview.data.startswith(b"%PDF-")
+
         cli = app.test_cli_runner().invoke(
             args=["stamped-pdf", "issue", str(receipt_id),
-                  "--page", "1", "--x", "350", "--y", "60"]
+                  "--page", "1", "--x", "350", "--y", "60",
+                  "--design-id", str(design_id)]
         )
         assert cli.exit_code == 0, cli.output
         artifact = StampedPdf.query.filter_by(
             stamp_attestation_id=receipt_id
         ).one()
         assert artifact.source_finalized_sha256 == original_digest
+        assert artifact.design_version_id == design_id
+        assert len(artifact.design_sha256) == 64
         assert artifact.output_sha256 != original_digest
 
         token = create_access_token(identity=str(custodian.id))
