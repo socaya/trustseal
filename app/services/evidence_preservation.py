@@ -36,6 +36,30 @@ def artifact_for(kind, artifact_id, organization_id):
 
 
 def verify_artifact(record, kind, config):
+    if kind == "stamped_pdf":
+        # A stamp derivative requires the signed original PDF, immutable
+        # issuance approval and complete stamp-design provenance as well.
+        from app.extensions import db
+        from app.models.stamp_custody import (
+            ManagedStamp, StampApplication, StampAttestation,
+        )
+        from app.blueprints.estamp.stamped_pdf_api import _verify_lineage
+        receipt = db.session.get(StampAttestation, record.stamp_attestation_id)
+        application = (
+            db.session.get(StampApplication, receipt.application_id)
+            if receipt is not None else None
+        )
+        stamp = (
+            db.session.get(ManagedStamp, receipt.stamp_id)
+            if receipt is not None else None
+        )
+        original = db.session.get(FinalizedPdf, record.source_finalized_pdf_id)
+        if any(item is None for item in (receipt, application, stamp, original)):
+            raise ValueError("Stamp preservation approval lineage missing")
+        path, _provenance = _verify_lineage(
+            record, receipt, application, stamp, original
+        )
+        return hashlib.sha256(path.read_bytes()).hexdigest()
     path = check_object_digest(record.object_key, record.output_sha256, config)
     data = path.read_bytes()
     status = inspect_signed_pdf(
