@@ -14,6 +14,7 @@ class FinalizedPdf(db.Model):
                             nullable=False, unique=True)
     organization_id = db.Column(db.Integer, db.ForeignKey("organizations.id"),
                                 nullable=False, index=True)
+    issued_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     source_blob_id = db.Column(db.Integer, db.ForeignKey("document_blobs.id"),
                                nullable=False)
     source_sha256 = db.Column(db.String(64), nullable=False)
