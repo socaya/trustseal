@@ -9,6 +9,7 @@ trust root. Signing is disabled if any prerequisite is unavailable.
 import hashlib
 import io
 import os
+import re
 from pathlib import Path
 
 MAX_PDF_BYTES = 20 * 1024 * 1024
@@ -69,7 +70,7 @@ def _signing_credentials(config):
     return signer, cert.fingerprint(hashes.SHA256()).hex()
 
 
-def inspect_signed_pdf(pdf_bytes, config):
+def inspect_signed_pdf(pdf_bytes, config, expected_evidence_sha256=None):
     """Validate embedded CMS, byte range, and certificate chain with pinned CA."""
     if not isinstance(pdf_bytes, bytes) or not 0 < len(pdf_bytes) <= MAX_PDF_BYTES:
         raise PdfFinalizationError("Signed PDF size is invalid")
@@ -80,6 +81,12 @@ def inspect_signed_pdf(pdf_bytes, config):
         signatures = reader.embedded_signatures
         if len(signatures) != 1 or signatures[0].field_name != FIELD_NAME:
             raise PdfFinalizationError("Expected one platform seal field")
+        if expected_evidence_sha256 is not None:
+            if not re.fullmatch(r"[0-9a-f]{64}", expected_evidence_sha256):
+                raise PdfFinalizationError("Invalid evidence digest")
+            reason = str(signatures[0].sig_object.get("/Reason", ""))
+            if reason != "TrustSeal review evidence sha256:" + expected_evidence_sha256:
+                raise PdfFinalizationError("Signed PDF evidence digest does not match")
         status = validate_pdf_signature(
             signatures[0], signer_validation_context=_trust_context(config)
         )
@@ -97,7 +104,7 @@ def inspect_signed_pdf(pdf_bytes, config):
         raise PdfFinalizationError("PDF signature validation failed") from exc
 
 
-def seal_pdf(source_bytes, config):
+def seal_pdf(source_bytes, config, evidence_sha256):
     """Apply an invisible CMS signature in the designated platform field.
 
     An approved platform certificate and explicit trust root are mandatory.
@@ -106,6 +113,8 @@ def seal_pdf(source_bytes, config):
         raise PdfFinalizationError("Source PDF size is invalid")
     if not source_bytes.startswith(b"%PDF-"):
         raise PdfFinalizationError("Invalid source PDF")
+    if not isinstance(evidence_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", evidence_sha256):
+        raise PdfFinalizationError("A canonical review evidence digest is required")
     try:
         from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
         from pyhanko.sign import fields, signers
@@ -129,7 +138,7 @@ def seal_pdf(source_bytes, config):
         field_name=FIELD_NAME,
         md_algorithm="sha256",
         subfilter=fields.SigSeedSubFilter.PADES,
-        reason="TrustSeal platform attestation of completed review workflow",
+        reason="TrustSeal review evidence sha256:" + evidence_sha256,
         embed_validation_info=False,
     )
     try:
@@ -141,7 +150,7 @@ def seal_pdf(source_bytes, config):
         signed = output.getvalue()
     except Exception as exc:
         raise PdfFinalizationError("PDF signing operation failed") from exc
-    validation = inspect_signed_pdf(signed, config)
+    validation = inspect_signed_pdf(signed, config, expected_evidence_sha256=evidence_sha256)
     if not validation["overall_valid"]:
         raise PdfFinalizationError("New PDF seal did not pass trusted validation")
     return signed, certificate_sha256, validation
