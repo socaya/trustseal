@@ -124,3 +124,36 @@ def test_signed_source_is_refused_for_single_seal_profile(signing_config):
     sealed, _fingerprint, _status = seal_pdf(_sample_pdf(), signing_config, "a" * 64)
     with pytest.raises(PdfFinalizationError, match="already contains"):
         seal_pdf(sealed, signing_config, "a" * 64)
+
+
+def test_real_public_http_pdf_verification(signing_config):
+    """Exercise real CMS signature verification through the multipart API."""
+    from flask import Flask
+    from app.blueprints.documents.api.public_pdf_verify_api import public_pdf_verify_api
+
+    signed, fingerprint, _ = seal_pdf(_sample_pdf(), signing_config, "a" * 64)
+    app = Flask(__name__)
+    app.config.update(
+        **signing_config,
+        TESTING=True,
+        PUBLIC_PDF_VERIFICATION_ENABLED=True,
+        PUBLIC_PDF_VERIFICATION_CERT_SHA256=fingerprint,
+        MAX_CONTENT_LENGTH=17 * 1024 * 1024,
+    )
+    app.register_blueprint(public_pdf_verify_api)
+
+    def check(evidence, certificate=None):
+        if certificate is not None:
+            app.config["PUBLIC_PDF_VERIFICATION_CERT_SHA256"] = certificate
+        return app.test_client().post(
+            "/api/public-verification/pdf",
+            data={
+                "pdf": (BytesIO(signed), "verified.pdf", "application/pdf"),
+                "evidence_sha256": evidence,
+            },
+            content_type="multipart/form-data",
+        )
+
+    assert check("a" * 64).get_json()["status"] == "valid"
+    assert check("b" * 64).get_json()["status"] == "invalid"
+    assert check("a" * 64, certificate="f" * 64).get_json()["status"] == "invalid"
