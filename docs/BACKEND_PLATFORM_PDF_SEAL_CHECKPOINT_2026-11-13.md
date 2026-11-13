@@ -103,3 +103,19 @@ The final manifest now also records `evidence_sha256`, the SHA-256 of a determin
 Finalization now also requires `PDF_SEAL_OPERATOR_ID` in deployment configuration. The configured identity must be an active administrator in the envelope's organization, distinct from the document creator and **not** one of the reviewers. The user ID is stored in the immutable PDF manifest as `issued_by_id` and in the transactional security-event actor field. This is a staging-level controlled operator identity, NOT an HSM attestation, interactive MFA, OS identity verification or dual-control cryptographic key authorization. A production custody service must verify authorized operators through an independent security boundary.
 
 The `h2b640a1d8f3` migration was updated to include the nonnullable `evidence_sha256` and `issued_by_id` columns. Since these migrations have never been run in a target environment here, replay must occur from the full original revision history. If this initial migration has already been applied anywhere else, create a separate forward-only migration instead of editing an applied revision.
+
+
+## Final integration hardening: feature gate and size budget
+
+The signing service is **disabled by default**. The deployment must explicitly set `PDF_FINALIZATION_ENABLED=true` after all staging tests, certificate approvals and operational checks pass. The feature gate is checked before the PDF parser and cryptographic signer are invoked.
+
+`PDF_SEAL_OPERATOR_ID` is mandatory when finalization is enabled, and must identify an active administrator in the same organization, distinct from the envelope author and participants. The final artifact and audit event record this configured operator ID. This remains an operator assertion from deployment configuration, not independent MFA or HSM-enforced custody.
+
+The signed PDF maximum is aligned with the private storage limit (16 MiB). To allow room for the CMS signature, source PDFs must be at most 15 MiB for this profile. The integration test fixture enables finalization explicitly; `tests/test_platform_pdf_seal.py` confirms the disabled gate. The true size cost depends on the certificate chain and PDF and must be characterized in staging.
+
+```dotenv
+PDF_FINALIZATION_ENABLED=false
+PDF_SEAL_OPERATOR_ID=
+```
+
+No actual signature was generated or validated by the assistant runtime in this checkpoint. The repository was updated through the GitHub connector, but no tested deployment should be assumed.
