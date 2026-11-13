@@ -1,0 +1,52 @@
+name: TrustSeal backend verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: trustseal_test
+          POSTGRES_PASSWORD: temporary_ci_only
+          POSTGRES_DB: trustseal_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U trustseal_test -d trustseal_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://trustseal_test:temporary_ci_only@localhost:5432/trustseal_ci
+      SECRET_KEY: temporary-ci-session-secret-not-for-production
+      JWT_SECRET_KEY: temporary-ci-jwt-secret-not-for-production
+      FLASK_APP: main:app
+      FLASK_ENV: testing
+      FLASK_DEBUG: "0"
+      PDF_FINALIZATION_ENABLED: "false"
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install backend and PDF signing dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-signing.txt -r requirements-test.txt
+      - name: Compile all backend modules
+        run: python -m compileall -q app tests examples
+      - name: Apply complete schema migrations
+        run: flask db upgrade
+      - name: Run all backend tests
+        run: python -m pytest -q
