@@ -95,7 +95,7 @@ def _check_signature(cert, issuer):
         raise ChainValidationError("Certificate signature invalid") from exc
 
 
-def validate_explicit_chain(leaf_pem, intermediate_pems, root_pem, at):
+def validate_explicit_chain(leaf_pem, intermediate_pems, root_pem, at, *, purpose="tsa"):
     if not isinstance(intermediate_pems, (list, tuple)) or len(intermediate_pems) > MAX_INTERMEDIATES:
         raise ChainValidationError("Certificate chain exceeds policy limits")
     leaf = _read_certificate(leaf_pem)
@@ -128,15 +128,29 @@ def validate_explicit_chain(leaf_pem, intermediate_pems, root_pem, at):
         )
         if constraints.path_length is not None and subordinate_cas > constraints.path_length:
             raise ChainValidationError("Issuer path length constraint exceeded")
-    tsa_eku = _extension(leaf, ExtensionOID.EXTENDED_KEY_USAGE, "TSA EKU")
-    if ExtendedKeyUsageOID.TIME_STAMPING not in tsa_eku:
-        raise ChainValidationError("Leaf certificate not authorized for timestamp signing")
-    leaf_usage = _extension(leaf, ExtensionOID.KEY_USAGE, "TSA key usage")
-    leaf_ca = _extension(leaf, ExtensionOID.BASIC_CONSTRAINTS, "TSA CA constraints")
-    if leaf_ca.ca or not leaf_usage.digital_signature or not leaf_usage.content_commitment:
-        raise ChainValidationError("Leaf certificate not a signing-only TSA certificate")
+    if purpose not in ("tsa", "pdf_seal"):
+        raise ChainValidationError("Unsupported signing certificate purpose")
+    if purpose == "tsa":
+        tsa_eku = _extension(leaf, ExtensionOID.EXTENDED_KEY_USAGE, "TSA EKU")
+        if ExtendedKeyUsageOID.TIME_STAMPING not in tsa_eku:
+            raise ChainValidationError("Leaf certificate not authorized for timestamp signing")
+    else:
+        try:
+            eku = leaf.extensions.get_extension_for_oid(
+                ExtensionOID.EXTENDED_KEY_USAGE
+            ).value
+        except x509.ExtensionNotFound:
+            eku = None
+        if eku is not None and len(eku) == 1 and ExtendedKeyUsageOID.TIME_STAMPING in eku:
+            raise ChainValidationError("TSA-only certificate cannot be reused for PDF seal")
+    leaf_usage = _extension(leaf, ExtensionOID.KEY_USAGE, "Signing key usage")
+    leaf_ca = _extension(leaf, ExtensionOID.BASIC_CONSTRAINTS, "Signing CA constraints")
+    if leaf_ca.ca or not leaf_usage.digital_signature:
+        raise ChainValidationError("Leaf certificate cannot sign documents")
+    if purpose == "tsa" and not leaf_usage.content_commitment:
+        raise ChainValidationError("TSA signer lacks content commitment")
     return {
-        "schema": "trustseal.explicit-tsa-chain.v1",
+        "schema": ("trustseal.explicit-tsa-chain.v1" if purpose == "tsa" else "trustseal.explicit-pdf-seal-chain.v1"),
         "assurance": "bounded_explicit_certificate_path_not_full_rfc5280",
         "complete_pkix_validation": False,
         "validation_time": observed.isoformat(timespec="microseconds") + "Z",
