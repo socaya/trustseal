@@ -12,7 +12,8 @@ import os
 import re
 from pathlib import Path
 
-MAX_PDF_BYTES = 20 * 1024 * 1024
+MAX_PDF_BYTES = 16 * 1024 * 1024
+MAX_SOURCE_BYTES = 15 * 1024 * 1024
 FIELD_NAME = "TrustSealPlatformSeal"
 PROFILE = "platform_pades_b_b"
 
@@ -109,8 +110,10 @@ def seal_pdf(source_bytes, config, evidence_sha256):
 
     An approved platform certificate and explicit trust root are mandatory.
     """
-    if not isinstance(source_bytes, bytes) or not 0 < len(source_bytes) <= MAX_PDF_BYTES:
+    if not isinstance(source_bytes, bytes) or not 0 < len(source_bytes) <= MAX_SOURCE_BYTES:
         raise PdfFinalizationError("Source PDF size is invalid")
+    if not config.get("PDF_FINALIZATION_ENABLED", False):
+        raise PdfFinalizationError("Platform PDF finalization is disabled")
     if not source_bytes.startswith(b"%PDF-"):
         raise PdfFinalizationError("Invalid source PDF")
     if not isinstance(evidence_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", evidence_sha256):
@@ -150,6 +153,8 @@ def seal_pdf(source_bytes, config, evidence_sha256):
         signed = output.getvalue()
     except Exception as exc:
         raise PdfFinalizationError("PDF signing operation failed") from exc
+    if len(signed) > MAX_PDF_BYTES:
+        raise PdfFinalizationError("Finalized PDF exceeds private storage size limit")
     validation = inspect_signed_pdf(signed, config, expected_evidence_sha256=evidence_sha256)
     if not validation["overall_valid"]:
         raise PdfFinalizationError("New PDF seal did not pass trusted validation")
