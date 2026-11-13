@@ -32,6 +32,8 @@ CONSENT_TEXT = (
     "This records my review decision only; it is not a cryptographic "
     "signature or a completed legally signed PDF."
 )
+# Existing wording must never be rewritten after decisions are recorded.
+CONSENT_REGISTRY = {CONSENT_VERSION: CONSENT_TEXT}
 CHALLENGE_SECONDS = 600
 MAX_CHALLENGES_PER_10_MIN = 3
 
@@ -94,10 +96,11 @@ def _document_file(envelope):
         abort(503, description="Document file is unavailable or fails integrity validation")
 
 
-def _decision_digest(envelope, participant, user_id, decision):
+def _decision_digest(envelope, participant, user_id, decision, consent_version=CONSENT_VERSION):
+    consent_text = CONSENT_REGISTRY[consent_version]
     payload = {
-        "schema": 1, "consent_version": CONSENT_VERSION,
-        "consent_text": CONSENT_TEXT, "envelope_id": envelope.id,
+        "schema": 1, "consent_version": consent_version,
+        "consent_text": consent_text, "envelope_id": envelope.id,
         "participant_id": participant.id, "user_id": user_id,
         "document_sha256": envelope.document_sha256, "decision": decision,
     }
