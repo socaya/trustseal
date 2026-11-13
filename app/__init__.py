@@ -220,6 +220,8 @@ def create_app(config_class=None):
     blueprints.append(sealed_pdf_api)
     from .blueprints.documents.api.signer_crypto_api import signer_crypto_api
     blueprints.append(signer_crypto_api)
+    from .blueprints.documents.api.public_pdf_verify_api import public_pdf_verify_api
+    blueprints.append(public_pdf_verify_api)
 
     for bp in blueprints:
         app.register_blueprint(bp)
