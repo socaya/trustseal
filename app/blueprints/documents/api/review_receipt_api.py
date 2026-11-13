@@ -70,3 +70,33 @@ def verify_stored_receipt(receipt_id):
     })
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@receipt_api.route("/<int:receipt_id>/export", methods=["GET"])
+@jwt_required()
+def export_detached_receipt(receipt_id):
+    """Export the detached signed statement, never the signing private key."""
+    user = active_token_user()
+    if user is None or not user.is_active or user.organization_id is None:
+        abort(401)
+    record = db.session.get(ReviewReceipt, receipt_id)
+    if record is None or record.organization_id != user.organization_id:
+        abort(404)
+    envelope = db.session.get(SigningEnvelope, record.envelope_id)
+    if envelope is None or envelope.organization_id != user.organization_id:
+        abort(404)
+    participant = EnvelopeParticipant.query.filter_by(
+        envelope_id=envelope.id, user_id=user.id
+    ).first()
+    if envelope.created_by_id != user.id and participant is None:
+        abort(404)
+    response = jsonify({
+        "payload": record.payload,
+        "algorithm": record.algorithm,
+        "key_id": record.key_id,
+        "signature": record.signature,
+        "assurance": "platform_attestation_of_review_only",
+        "not_a_pdf_signature": True,
+    })
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
