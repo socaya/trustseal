@@ -37,16 +37,6 @@ def upgrade():
       BEFORE UPDATE OR DELETE ON signer_public_keys
       FOR EACH ROW EXECUTE FUNCTION trustseal_signer_public_key_guard()
     """)
-    for table in ("signer_key_challenges", "signer_endorsement_challenges"):
-        op.execute("""
-          CREATE TRIGGER trg_%s_consume_once
-          BEFORE UPDATE OR DELETE ON %s
-          FOR EACH ROW EXECUTE FUNCTION trustseal_challenge_consume_only()
-        """ % (table, table))
-    # The older challenge guard refers to columns belonging to signer_challenges,
-    # so the above triggers are replaced below with a generic row-level guard.
-    for table in ("signer_key_challenges", "signer_endorsement_challenges"):
-        op.execute("DROP TRIGGER trg_%s_consume_once ON %s" % (table, table))
     op.execute("""
       CREATE FUNCTION trustseal_crypto_challenge_guard()
       RETURNS trigger LANGUAGE plpgsql AS $$
@@ -74,11 +64,11 @@ def upgrade():
       CREATE FUNCTION trustseal_endorsement_consistency()
       RETURNS trigger LANGUAGE plpgsql AS $$
       DECLARE
-        c signer_endorsement_challenges%%ROWTYPE;
-        k signer_public_keys%%ROWTYPE;
-        p envelope_participants%%ROWTYPE;
-        e signing_envelopes%%ROWTYPE;
-        d signer_decisions%%ROWTYPE;
+        c signer_endorsement_challenges%ROWTYPE;
+        k signer_public_keys%ROWTYPE;
+        p envelope_participants%ROWTYPE;
+        e signing_envelopes%ROWTYPE;
+        d signer_decisions%ROWTYPE;
       BEGIN
         SELECT * INTO c FROM signer_endorsement_challenges
           WHERE id = NEW.challenge_id FOR SHARE;
