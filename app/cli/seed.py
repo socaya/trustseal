@@ -857,6 +857,8 @@ def register_cli(app):
     app.cli.add_command(timestamp_cli)
     from app.cli.revocation import revocation_cli
     app.cli.add_command(revocation_cli)
+    from app.cli.ocsp import ocsp_cli
+    app.cli.add_command(ocsp_cli)
     click.echo("Seed and outbox commands registered.")
 
 # Example of how you might call this in your app factory (e.g., create_app function)
