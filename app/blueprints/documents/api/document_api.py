@@ -159,3 +159,80 @@ def delete_document(document_id):
     doc.deleted_at = datetime.utcnow()
     db.session.commit()
     return "", 204
+
+
+# === Immutable draft-text snapshots (not completed legal evidence) ===
+@document_api.route("/<int:document_id>/snapshots", methods=["POST"])
+@jwt_required()
+def create_draft_snapshot(document_id):
+    from sqlalchemy.exc import IntegrityError
+    from app.models.documents.document_snapshot import DocumentSnapshot
+    from app.services.documents.snapshots import snapshot_digest
+
+    user = actor()
+    # Serialize concurrent writers before checking the revision.
+    doc = Document.query.filter_by(
+        id=document_id, created_by=user.id, deleted_at=None
+    ).with_for_update().first()
+    if doc is None:
+        abort(404)
+    if (doc.status or "").lower() != "draft":
+        abort(409, description="Only draft text can be snapshotted")
+    if not isinstance(doc.content, str):
+        abort(409, description="Document has no text content")
+    if len(doc.content.encode("utf-8")) > 1024 * 1024:
+        abort(413, description="Draft text exceeds snapshot limit")
+    revision = doc.version or 1
+    digest = snapshot_digest(doc.id, revision, doc.content)
+    prior = DocumentSnapshot.query.filter_by(
+        document_id=doc.id, revision=revision
+    ).first()
+    if prior is not None:
+        if prior.content_sha256 != digest:
+            abort(409, description="Revision content conflict")
+        return jsonify(_snapshot_meta(prior)), 200
+    record = DocumentSnapshot(
+        document_id=doc.id, revision=revision, content_sha256=digest,
+        canonical_content=doc.content, created_by_id=user.id,
+    )
+    db.session.add(record)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        abort(409, description="Snapshot revision conflict")
+    return jsonify(_snapshot_meta(record)), 201
+
+
+def _snapshot_meta(snapshot):
+    return {
+        "id": snapshot.id, "document_id": snapshot.document_id,
+        "revision": snapshot.revision, "sha256": snapshot.content_sha256,
+        "created_by_id": snapshot.created_by_id,
+        "created_at": snapshot.created_at.isoformat() if snapshot.created_at else None,
+        "assurance": "draft_text_integrity_only",
+    }
+
+
+@document_api.route("/<int:document_id>/snapshots", methods=["GET"])
+@jwt_required()
+def list_draft_snapshots(document_id):
+    from app.models.documents.document_snapshot import DocumentSnapshot
+    get_authorized_document_or_abort(document_id)
+    records = DocumentSnapshot.query.filter_by(document_id=document_id).order_by(
+        DocumentSnapshot.revision.desc()
+    ).limit(100).all()
+    return jsonify([_snapshot_meta(record) for record in records])
+
+
+@document_api.route("/<int:document_id>/snapshots/<int:snapshot_id>", methods=["GET"])
+@jwt_required()
+def get_draft_snapshot(document_id, snapshot_id):
+    from app.models.documents.document_snapshot import DocumentSnapshot
+    get_authorized_document_or_abort(document_id)
+    record = DocumentSnapshot.query.filter_by(
+        id=snapshot_id, document_id=document_id
+    ).first_or_404()
+    result = _snapshot_meta(record)
+    result["content"] = record.canonical_content
+    return jsonify(result)
