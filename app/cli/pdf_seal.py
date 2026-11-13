@@ -5,7 +5,6 @@ of each human participant. No HTTP endpoint can request finalization.
 """
 import hashlib
 import io
-import json
 
 import click
 from flask import current_app
@@ -24,6 +23,7 @@ from app.services.documents.private_storage import (
 from app.services.platform_pdf_seal import seal_pdf, inspect_signed_pdf, PdfFinalizationError
 from app.services.signing_receipts import resolve_trusted_public_key, verify_receipt, review_payload
 from app.services.event_delivery import enqueue
+from app.services.platform_review_evidence import canonical_evidence_bundle, evidence_digest
 
 pdf_seal_cli = AppGroup("pdf-seal")
 
@@ -56,17 +56,15 @@ def _complete_review(envelope):
             raise PdfFinalizationError("Review receipt evidence mismatch")
         receipts_for_digest.append({
             "participant_id": participant.id,
+            "signing_order": participant.signing_order,
             "review_decision_id": decision.id,
             "payload": receipt.payload,
             "algorithm": receipt.algorithm,
             "key_id": receipt.key_id,
             "signature": receipt.signature,
         })
-    evidence_bytes = json.dumps(
-        {"schema": 1, "envelope_id": envelope.id, "receipts": receipts_for_digest},
-        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
-    ).encode("utf-8")
-    return hashlib.sha256(evidence_bytes).hexdigest()
+    bundle = canonical_evidence_bundle(envelope.id, receipts_for_digest)
+    return evidence_digest(bundle)
 
 
 @pdf_seal_cli.command("finalize")
