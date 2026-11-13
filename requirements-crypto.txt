@@ -1,0 +1,3 @@
+# Additional dependency for detached Ed25519 review attestations.
+# Install into the same resolved Flask environment; pin hashes in deployment lockfile.
+cryptography>=43,<47
