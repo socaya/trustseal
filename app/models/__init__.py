@@ -24,6 +24,7 @@ from .stamped_pdf import StampedPdf
 from .stamp_design import StampDesignVersion
 from .evidence_preservation import EvidenceRetention, EvidenceLegalHold, EvidenceCheckpoint
 from .evidence_timestamp import EvidenceTimestamp
+from .certificate_revocation import CertificateRevocationEvidence
 from .signer_cryptographic import (SignerPublicKey, SignerKeyChallenge, SignerEndorsementChallenge, SignerEndorsement)
 from .esignature import (
     SignatureProfile,
@@ -59,7 +60,7 @@ from .user import (
 __all__ = [
     # Document-related
     "Document","DocumentSignature","DocumentParty","DocumentActivity","DocumentShare","DocumentVersion",
-    "DocumentSnapshot","DocumentBlob","RevokedToken","SecurityEvent","OutboxEvent","SigningEnvelope","EnvelopeParticipant","SignerChallenge","SignerDecision","ReviewReceipt","FinalizedPdf","ManagedStamp","StampApplication","StampAttestation","StampedPdf","StampDesignVersion","EvidenceRetention","EvidenceLegalHold","EvidenceCheckpoint","EvidenceTimestamp","SignerPublicKey","SignerKeyChallenge","SignerEndorsementChallenge","SignerEndorsement","DocumentAuditLog","DocumentComment","DocumentDraft","DocumentReminder","DocumentSection","DocumentShare","DocumentType",
+    "DocumentSnapshot","DocumentBlob","RevokedToken","SecurityEvent","OutboxEvent","SigningEnvelope","EnvelopeParticipant","SignerChallenge","SignerDecision","ReviewReceipt","FinalizedPdf","ManagedStamp","StampApplication","StampAttestation","StampedPdf","StampDesignVersion","EvidenceRetention","EvidenceLegalHold","EvidenceCheckpoint","EvidenceTimestamp","CertificateRevocationEvidence","SignerPublicKey","SignerKeyChallenge","SignerEndorsementChallenge","SignerEndorsement","DocumentAuditLog","DocumentComment","DocumentDraft","DocumentReminder","DocumentSection","DocumentShare","DocumentType",
 
     # E-signature-related
     "SignatureProfile", "SignatureRequest", "SignatureRequestActivity",
