@@ -535,3 +535,51 @@ def export_validation_dossier(dossier_id):
     })
     result.headers["Cache-Control"] = "private, no-store"
     return result
+
+
+@evidence_preservation_api.route("/retentions/<int:retention_id>/dss", methods=["GET"])
+@jwt_required()
+def list_pdf_dss_derivatives(retention_id):
+    actor = _admin()
+    retention = _retention(retention_id, actor)
+    from app.models.pdf_dss_derivative import PdfDssDerivative
+    records = PdfDssDerivative.query.filter_by(
+        retention_id=retention.id, organization_id=actor.organization_id,
+    ).order_by(PdfDssDerivative.id.desc()).limit(100).all()
+    response = jsonify([{
+        "id": row.id,
+        "dossier_id": row.dossier_id,
+        "source_sha256": row.source_sha256,
+        "output_sha256": row.output_sha256,
+        "profile": row.profile,
+        "complete_pades_lt": False,
+    } for row in records])
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
+
+
+@evidence_preservation_api.route("/dss/<int:derivative_id>/download", methods=["GET"])
+@jwt_required()
+def download_pdf_dss_derivative(derivative_id):
+    actor = _admin()
+    from app.models.pdf_dss_derivative import PdfDssDerivative
+    from app.cli.pdf_dss import checked_derivative
+    from flask import send_file
+    item = PdfDssDerivative.query.filter_by(
+        id=derivative_id, organization_id=actor.organization_id,
+    ).first()
+    if item is None:
+        abort(404)
+    _retention(item.retention_id, actor)
+    try:
+        path = checked_derivative(item, current_app.config)
+    except Exception:
+        abort(409, description="DSS derivative source or signature invalid")
+    response = send_file(
+        path, mimetype="application/pdf", as_attachment=True,
+        download_name="TrustSeal-validation-material-%s.pdf" % item.id,
+        conditional=False, etag=False, max_age=0,
+    )
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
