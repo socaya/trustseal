@@ -195,6 +195,17 @@ def create_app(config_class=None):
         document_version_api
     ]
 
+    # Register remaining document APIs (legacy factory omitted these modules).
+    # HTML routes remain unchanged; each API must enforce object authorization.
+    from .blueprints.documents import (
+        document_draft_api, document_type_api, document_template_api,
+        document_section_api, document_reminder_api, document_audit_log_api,
+    )
+    blueprints.extend([
+        document_draft_api, document_type_api, document_template_api,
+        document_section_api, document_reminder_api, document_audit_log_api,
+    ])
+
     for bp in blueprints:
         app.register_blueprint(bp)
         # Use app.logger here instead of current_app.logger
