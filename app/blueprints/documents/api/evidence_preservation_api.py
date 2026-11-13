@@ -6,7 +6,7 @@ Admins can place holds; only a different admin may release them.
 import re
 from datetime import datetime, timedelta
 
-from flask import Blueprint, abort, jsonify, request
+from flask import Blueprint, abort, current_app, jsonify, request
 from flask_jwt_extended import jwt_required
 from sqlalchemy.exc import IntegrityError
 
@@ -225,7 +225,7 @@ def export_checkpoint(checkpoint_id):
         "key_id": row.key_id, "signature": row.signature,
     }
     try:
-        trusted = trusted_checkpoint_key(__import__("flask").current_app.config, row.key_id)
+        trusted = trusted_checkpoint_key(current_app.config, row.key_id)
         valid = (
             row.payload == checkpoint_payload(
                 retention, row.operator_id, row.created_at
