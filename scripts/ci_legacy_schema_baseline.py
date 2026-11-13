@@ -21,6 +21,7 @@ NEW_TABLES = {
     "signer_endorsement_challenges", "signer_endorsements",
     "managed_stamps", "stamp_applications", "stamp_attestations",
     "stamped_pdfs", "stamp_design_versions",
+    "evidence_retentions", "evidence_legal_holds", "evidence_checkpoints",
 }
 
 
