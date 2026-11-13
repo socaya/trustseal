@@ -59,6 +59,13 @@ class Config:
     EVIDENCE_CHECKPOINT_TRUSTED_KEYS_JSON = os.getenv('EVIDENCE_CHECKPOINT_TRUSTED_KEYS_JSON')
     EVIDENCE_CHECKPOINT_OPERATOR_ID = os.getenv('EVIDENCE_CHECKPOINT_OPERATOR_ID')
 
+    # === Detached RFC 3161 TSA integration (network disabled by default) ===
+    RFC3161_ENABLED = os.getenv('RFC3161_ENABLED', 'false').lower() == 'true'
+    RFC3161_TSA_URL = os.getenv('RFC3161_TSA_URL')
+    RFC3161_TSA_CERT_PEM = os.getenv('RFC3161_TSA_CERT_PEM')
+    RFC3161_TRUST_ROOT_PEM = os.getenv('RFC3161_TRUST_ROOT_PEM')
+    RFC3161_OPENSSL_BINARY = os.getenv('RFC3161_OPENSSL_BINARY', 'openssl')
+
     # === JWT Configuration ===
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=5)
