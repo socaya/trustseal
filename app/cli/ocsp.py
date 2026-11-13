@@ -61,12 +61,11 @@ def capture(timestamp_id):
         subject = _read_pem(current_app.config.get("RFC3161_TSA_CERT_PEM"), "TSA signer")
         issuer = _read_pem(current_app.config.get("OCSP_ISSUER_CERT_PEM"), "OCSP issuer")
         root = _read_pem(current_app.config.get("RFC3161_TRUST_ROOT_PEM"), "TSA trust root")
-        result = validate_ocsp(_approved_response(current_app.config),
-                               subject, issuer, root, observed_at=datetime.utcnow())
+        response = _approved_response(current_app.config)
+        result = validate_ocsp(response, subject, issuer, root, observed_at=datetime.utcnow())
         if (result["status"] != "good"
                 or result["subject_certificate_sha256"] != token.tsa_certificate_sha256):
             raise OcspEvidenceError("TSA signer status not verified good")
-        response = _approved_response(current_app.config)
         item = OcspEvidence(
             organization_id=retention.organization_id, timestamp_id=token.id,
             operator_id=operator.id,
