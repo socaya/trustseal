@@ -129,6 +129,14 @@ def create_document():
         if key in data:
             setattr(doc, key, data[key])
     db.session.add(doc)
+    db.session.flush()
+    from app.services.event_delivery import enqueue
+    enqueue(
+        event_type="document.draft.created", aggregate_type="document",
+        aggregate_id=doc.id, organization_id=doc.organization_id,
+        actor_id=user.id, action="document.draft.created",
+        idempotency_key="document-created:%s" % doc.id,
+    )
     db.session.commit()
     return jsonify(_serialize(doc)), 201
 
@@ -197,6 +205,13 @@ def create_draft_snapshot(document_id):
         canonical_content=doc.content, created_by_id=user.id,
     )
     db.session.add(record)
+    from app.services.event_delivery import enqueue
+    enqueue(
+        event_type="document.snapshot.created", aggregate_type="document",
+        aggregate_id=doc.id, organization_id=doc.organization_id,
+        actor_id=user.id, action="document.snapshot.created",
+        idempotency_key="document-snapshot:%s:%s" % (doc.id, revision),
+    )
     db.session.add(DocumentActivity(
         document_id=doc.id, user_id=user.id,
         activity_type="draft_snapshot_created",
@@ -331,6 +346,13 @@ def ingest_document_file(document_id):
             created_by_id=user.id,
         )
         db.session.add(record)
+        from app.services.event_delivery import enqueue
+        enqueue(
+            event_type="document.file.ingested", aggregate_type="document",
+            aggregate_id=doc.id, organization_id=doc.organization_id,
+            actor_id=user.id, action="document.file.ingested",
+            idempotency_key="document-file:%s:%s" % (doc.id, revision),
+        )
         db.session.add(DocumentActivity(
             document_id=doc.id, user_id=user.id,
             activity_type="private_file_ingested",
