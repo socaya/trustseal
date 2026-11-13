@@ -47,6 +47,7 @@ def test_no_arbitrary_outbox_handlers_are_registered():
         "evidence.hold.placed",
         "evidence.hold.released",
         "evidence.retention.registered",
+        "evidence.timestamp.issued",
         "platform.pdf.sealed",
         "review.receipt.issued",
         "signer.document.endorsed",
