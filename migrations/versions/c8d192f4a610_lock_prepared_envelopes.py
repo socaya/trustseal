@@ -18,6 +18,9 @@ def upgrade():
         DECLARE parent_state text;
         DECLARE parent_id integer;
         BEGIN
+            IF TG_OP = 'UPDATE' AND NEW.envelope_id <> OLD.envelope_id THEN
+                RAISE EXCEPTION 'participant envelope cannot be reassigned';
+            END IF;
             IF TG_OP = 'DELETE' THEN
                 parent_id := OLD.envelope_id;
             ELSE
