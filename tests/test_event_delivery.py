@@ -39,3 +39,28 @@ def test_no_arbitrary_outbox_handlers_are_registered():
         "document.file.ingested",
         "document.snapshot.created",
     ]
+
+
+def test_finish_refuses_expired_or_stale_claim():
+    from datetime import datetime, timedelta
+    from app.services.event_delivery import finish
+    stale = datetime.utcnow() - timedelta(seconds=1)
+    with patch("app.services.event_delivery.db") as db:
+        query = db.session.query.return_value
+        query.filter_by.return_value.with_for_update.return_value.first.return_value = None
+        assert finish(12, stale, success=True) is False
+        db.session.rollback.assert_called_once()
+        db.session.commit.assert_not_called()
+
+
+def test_outbox_missing_handler_is_not_executed():
+    from app.services.event_delivery import deliver_one
+    with patch("app.services.event_delivery.claim_next", return_value=(14, "lease")):
+        with patch("app.services.event_delivery.db") as db:
+            item = db.session.get.return_value
+            item.event_type = "arbitrary.module.call"
+            with patch("app.services.event_delivery.finish", return_value=True) as finish:
+                assert deliver_one({}) is True
+                finish.assert_called_once_with(
+                    14, "lease", success=False, error="No registered handler"
+                )
