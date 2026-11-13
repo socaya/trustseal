@@ -13,10 +13,10 @@ def sample_review():
         id=10, organization_id=8, document_id=20, document_blob_id=30,
         document_sha256="a" * 64,
     )
-    participant = SimpleNamespace(id=40)
+    participant = SimpleNamespace(id=40, user_id=60)
     from datetime import datetime
     decision = SimpleNamespace(
-        id=50, envelope_id=10, participant_id=40,
+        id=50, envelope_id=10, participant_id=40, user_id=60,
         decision="acknowledged", document_sha256="a" * 64,
         consent_version="review-intent-v1", consent_sha256="b" * 64,
         recorded_at=datetime(2026, 11, 13, 10, 0, 0),
