@@ -1,14 +1,14 @@
-"""Small regression checks for envelope ordering and public route contract.
+"""Envelope order and public API-surface regressions.
 
-These do not replace PostgreSQL integration tests of locks and migration.
+These are isolated unit cases; they do not replace PostgreSQL integration tests.
 """
 import pytest
+from flask import Flask
+
 from app.blueprints.documents.api.envelope_api import valid_signing_order, envelope_api
 
 
-@pytest.mark.parametrize("orders", [
-    [1], [1, 2, 3], [3, 1, 2],
-])
+@pytest.mark.parametrize("orders", [[1], [1, 2, 3], [3, 1, 2]])
 def test_valid_signing_order(orders):
     assert valid_signing_order(orders)
 
@@ -20,13 +20,10 @@ def test_invalid_signing_order(orders):
     assert not valid_signing_order(orders)
 
 
-def test_envelope_api_is_preparation_only():
-    methods = {
-        rule.rule: rule.methods for rule in envelope_api.deferred_functions
-    } if False else None
-    # Explicitly guard against introducing a signing action in this module.
-    import inspect
-    from app.blueprints.documents.api import envelope_api as module
-    source = inspect.getsource(module)
-    assert '@envelope_api.route("/<int:envelope_id>/sign"' not in source
-    assert "document_sha256" in source
+def test_envelope_api_has_no_sign_endpoint():
+    app = Flask(__name__)
+    app.register_blueprint(envelope_api)
+    routes = {rule.rule for rule in app.url_map.iter_rules()}
+    assert "/api/envelopes/<int:envelope_id>/prepare" in routes
+    assert "/api/envelopes/<int:envelope_id>/cancel" in routes
+    assert not any(route.endswith("/sign") or route.endswith("/complete") for route in routes)
