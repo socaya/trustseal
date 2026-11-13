@@ -371,3 +371,74 @@ def export_revocation(revocation_id):
     })
     response.headers["Cache-Control"] = "private, no-store"
     return response
+
+
+@evidence_preservation_api.route("/timestamps/<int:timestamp_id>/ocsp", methods=["GET"])
+@jwt_required()
+def list_ocsp(timestamp_id):
+    actor = _admin()
+    from app.models.evidence_timestamp import EvidenceTimestamp
+    from app.models.ocsp_evidence import OcspEvidence
+    token = EvidenceTimestamp.query.filter_by(
+        id=timestamp_id, organization_id=actor.organization_id
+    ).first()
+    if token is None:
+        abort(404)
+    _retention(token.retention_id, actor)
+    records = OcspEvidence.query.filter_by(
+        timestamp_id=token.id, organization_id=actor.organization_id
+    ).order_by(OcspEvidence.id.desc()).limit(100).all()
+    response = jsonify([{
+        "id": row.id, "response_sha256": row.response_sha256,
+        "subject_certificate_sha256": row.subject_certificate_sha256,
+        "issuer_certificate_sha256": row.issuer_certificate_sha256,
+        "status": row.status,
+        "produced_at": row.produced_at.isoformat() + "Z",
+        "this_update": row.this_update.isoformat() + "Z",
+        "next_update": row.next_update.isoformat() + "Z",
+        "checked_at": row.checked_at.isoformat() + "Z",
+        "assurance": "historical_issuer_signed_ocsp_observation",
+    } for row in records])
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
+
+
+@evidence_preservation_api.route("/ocsp/<int:evidence_id>/export", methods=["GET"])
+@jwt_required()
+def export_ocsp(evidence_id):
+    actor = _admin()
+    from app.models.ocsp_evidence import OcspEvidence
+    from app.models.evidence_timestamp import EvidenceTimestamp
+    from app.services.ocsp_evidence import verify_ocsp_snapshot, OcspEvidenceError
+    from app.services.certificate_revocation import _read_pem
+    record = OcspEvidence.query.filter_by(
+        id=evidence_id, organization_id=actor.organization_id
+    ).first()
+    if record is None:
+        abort(404)
+    token = EvidenceTimestamp.query.filter_by(
+        id=record.timestamp_id, organization_id=actor.organization_id
+    ).first()
+    if token is None:
+        abort(409, description="OCSP evidence has no retained timestamp")
+    _retention(token.retention_id, actor)
+    try:
+        root = _read_pem(current_app.config.get("RFC3161_TRUST_ROOT_PEM"), "Approved root")
+        checked = verify_ocsp_snapshot(record, root)
+        if checked["subject_certificate_sha256"] != token.tsa_certificate_sha256:
+            raise OcspEvidenceError("OCSP certificate does not match timestamp")
+    except (OcspEvidenceError, ValueError, OSError):
+        abort(409, description="OCSP response validation failed")
+    response = jsonify({
+        "timestamp_id": token.id,
+        "id": record.id,
+        "response_der_b64": record.response_der_b64,
+        "subject_certificate_der_b64": record.subject_der_b64,
+        "issuer_certificate_der_b64": record.issuer_der_b64,
+        "status": record.status,
+        "response_sha256": record.response_sha256,
+        "checked_at": record.checked_at.isoformat() + "Z",
+        "assurance": "historical_issuer_signed_ocsp_observation",
+    })
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
