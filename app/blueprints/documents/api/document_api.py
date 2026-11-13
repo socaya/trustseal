@@ -167,6 +167,7 @@ def delete_document(document_id):
 def create_draft_snapshot(document_id):
     from sqlalchemy.exc import IntegrityError
     from app.models.documents.document_snapshot import DocumentSnapshot
+    from app.models.documents.document_activity import DocumentActivity
     from app.services.documents.snapshots import snapshot_digest
 
     user = actor()
@@ -196,6 +197,11 @@ def create_draft_snapshot(document_id):
         canonical_content=doc.content, created_by_id=user.id,
     )
     db.session.add(record)
+    db.session.add(DocumentActivity(
+        document_id=doc.id, user_id=user.id,
+        activity_type="draft_snapshot_created",
+        details="Draft revision %s, SHA-256 %s" % (revision, digest),
+    ))
     try:
         db.session.commit()
     except IntegrityError:
