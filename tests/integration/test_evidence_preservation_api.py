@@ -88,6 +88,14 @@ def test_tenant_retention_and_independent_hold_release(monkeypatch, tmp_path):
         )
         db.session.add(pdf)
         db.session.commit()
+        # This suite validates authorization, not PDF cryptography. Real
+        # PDF cryptographic checks are exercised in the signing integration
+        # suite; the preservation API still calls the verifier in production.
+        import app.blueprints.documents.api.evidence_preservation_api as preservation_api
+        monkeypatch.setattr(
+            preservation_api, "verify_artifact",
+            lambda artifact, kind, config: artifact.output_sha256,
+        )
         client = app.test_client()
 
         def auth(who):
