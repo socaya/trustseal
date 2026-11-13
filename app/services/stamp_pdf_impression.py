@@ -10,6 +10,8 @@ from pypdf import PdfReader, PdfWriter
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import simpleSplit
 from reportlab.pdfbase.pdfmetrics import stringWidth
+from reportlab.lib.utils import ImageReader
+from app.services.stamp_designs import validate_layout, INKS, SIZES
 
 from app.services.platform_pdf_seal import MAX_SOURCE_BYTES, PdfFinalizationError
 
@@ -18,8 +20,63 @@ PLATE_HEIGHT = 78
 MARGIN = 18
 
 
+def _draw_plate(c, *, x_pt, y_pt, stamp_code, stamp_name, reference,
+                layout=None, logo_png=None):
+    layout = validate_layout(layout) if layout is not None else {
+        "size": "standard", "ink": "black", "border": "rectangle",
+    }
+    width, height = SIZES[layout["size"]]
+    ink = INKS[layout["ink"]]
+    c.setStrokeColorRGB(*ink)
+    c.setFillColorRGB(*ink)
+    c.setLineWidth(0.8)
+    if layout["border"] == "rectangle":
+        c.rect(x_pt, y_pt, width, height, fill=0, stroke=1)
+    content_left = x_pt + 10
+    if logo_png:
+        c.drawImage(
+            ImageReader(BytesIO(logo_png)), content_left, y_pt + height - 48,
+            width=36, height=36, preserveAspectRatio=True, anchor="c",
+            mask="auto",
+        )
+        content_left += 44
+    label_width = width - (content_left - x_pt) - 9
+    lines = simpleSplit(stamp_name, "Helvetica", 8, label_width)
+    if (not lines or len(lines) > 2
+            or any(stringWidth(line, "Helvetica", 8) > label_width for line in lines)
+            or stringWidth("Code: " + stamp_code, "Helvetica", 8) > label_width):
+        raise PdfFinalizationError("Stamp label does not fit approved artwork")
+    c.setFont("Helvetica-Bold", 9 if logo_png else 10)
+    c.drawString(content_left, y_pt + height - 21, "ORGANIZATIONAL STAMP")
+    c.setFont("Helvetica", 8)
+    c.drawString(content_left, y_pt + height - 34, "Code: " + stamp_code)
+    for i, line in enumerate(lines):
+        c.drawString(content_left, y_pt + height - 47 - 11 * i, line)
+    c.setFont("Helvetica", 7)
+    c.drawString(x_pt + 10, y_pt + 8, reference)
+
+
+def preview_stamp_pdf(stamp_code, stamp_name, version, layout, logo_png):
+    """Render a draft specimen, not an issuable PDF or approved stamp."""
+    layout = validate_layout(layout)
+    width, height = SIZES[layout["size"]]
+    output = BytesIO()
+    c = canvas.Canvas(output, pagesize=(width + 48, height + 68))
+    _draw_plate(
+        c, x_pt=24, y_pt=34, stamp_code=stamp_code,
+        stamp_name=stamp_name, reference="PREVIEW - NOT ISSUED",
+        layout=layout, logo_png=logo_png,
+    )
+    c.setFont("Helvetica", 7)
+    c.drawString(24, 17, "Design version %s - SAMPLE ONLY" % version)
+    c.showPage()
+    c.save()
+    return output.getvalue()
+
+
 def render_stamped_source(source_bytes, *, stamp_code, stamp_name,
-                          attestation_id, page_number, x_pt, y_pt):
+                          attestation_id, page_number, x_pt, y_pt,
+                          layout=None, logo_png=None):
     if (not isinstance(source_bytes, bytes)
             or not 0 < len(source_bytes) <= MAX_SOURCE_BYTES
             or not source_bytes.startswith(b"%PDF-")):
@@ -39,6 +96,8 @@ def render_stamped_source(source_bytes, *, stamp_code, stamp_name,
         stamp_name.encode("cp1252")
     except UnicodeEncodeError:
         raise PdfFinalizationError("Stamp label requires an approved printable font profile") from None
+    layout = validate_layout(layout) if layout is not None else {"size": "standard", "ink": "black", "border": "rectangle"}
+    plate_width, plate_height = SIZES[layout["size"]]
     lines = simpleSplit(stamp_name, "Helvetica", 8, PLATE_WIDTH - 20)
     if (len(lines) > 2
             or any(stringWidth(line, "Helvetica", 8) > PLATE_WIDTH - 20 for line in lines)
@@ -61,22 +120,17 @@ def render_stamped_source(source_bytes, *, stamp_code, stamp_name,
             raise PdfFinalizationError("Annotated source cannot be safely flattened")
         width, height = float(target.mediabox.width), float(target.mediabox.height)
         if (x_pt < MARGIN or y_pt < MARGIN
-                or x_pt + PLATE_WIDTH + MARGIN > width
-                or y_pt + PLATE_HEIGHT + MARGIN > height):
+                or x_pt + plate_width + MARGIN > width
+                or y_pt + plate_height + MARGIN > height):
             raise PdfFinalizationError("Stamp impression lies outside allowed page margins")
         overlay_io = BytesIO()
         c = canvas.Canvas(overlay_io, pagesize=(width, height), pageCompression=0)
-        c.setStrokeColorRGB(0, 0, 0)
-        c.setLineWidth(0.8)
-        c.rect(x_pt, y_pt, PLATE_WIDTH, PLATE_HEIGHT, fill=0, stroke=1)
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(x_pt + 10, y_pt + 56, "ORGANIZATIONAL STAMP")
-        c.setFont("Helvetica", 8)
-        c.drawString(x_pt + 10, y_pt + 44, "Code: " + stamp_code)
-        for i, label_line in enumerate(lines):
-            c.drawString(x_pt + 10, y_pt + 32 - 11 * i, label_line)
-        c.setFont("Helvetica", 7)
-        c.drawString(x_pt + 10, y_pt + 8, "TrustSeal attestation ID: " + str(attestation_id))
+        _draw_plate(
+            c, x_pt=x_pt, y_pt=y_pt, stamp_code=stamp_code,
+            stamp_name=stamp_name,
+            reference="TrustSeal attestation ID: " + str(attestation_id),
+            layout=layout, logo_png=logo_png,
+        )
         c.showPage()
         c.save()
         overlay = PdfReader(overlay_io)
