@@ -18,7 +18,7 @@ from app.models.evidence_preservation import (
 )
 
 
-def test_tenant_retention_and_independent_hold_release():
+def test_tenant_retention_and_independent_hold_release(monkeypatch, tmp_path):
     app = create_app()
     with app.app_context():
         suffix = uuid.uuid4().hex[:10]
@@ -129,3 +129,67 @@ def test_tenant_retention_and_independent_hold_release():
         record = db.session.get(EvidenceRetention, retention_id)
         assert record.retain_until.year >= 2036
         assert EvidenceLegalHold.query.filter_by(retention_id=retention_id).count() == 1
+
+        # A signed integrity checkpoint needs a separate authorized operator,
+        # and may only be issued after the source PDF integrity check succeeds.
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        from cryptography.hazmat.primitives import serialization
+        private = Ed25519PrivateKey.generate()
+        pem = tmp_path / "preservation-private.pem"
+        pem.write_bytes(private.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        ))
+        pem.chmod(0o600)
+        public = tmp_path / "preservation-public.pem"
+        public.write_bytes(private.public_key().public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        ))
+        app.config.update(
+            EVIDENCE_CHECKPOINT_ENABLED=True,
+            EVIDENCE_CHECKPOINT_PRIVATE_KEY=str(pem),
+            EVIDENCE_CHECKPOINT_PUBLIC_KEY=str(public),
+            EVIDENCE_CHECKPOINT_OPERATOR_ID=str(independent.id),
+        )
+        import app.cli.preservation as preservation
+        monkeypatch.setattr(
+            preservation, "verify_artifact",
+            lambda artifact, kind, config: artifact.output_sha256,
+        )
+        response = app.test_cli_runner().invoke(
+            args=["preservation", "checkpoint", str(retention_id)]
+        )
+        assert response.exit_code == 0, response.output
+        from app.models.evidence_preservation import EvidenceCheckpoint
+        checkpoint = EvidenceCheckpoint.query.filter_by(
+            retention_id=retention_id
+        ).one()
+        from app.services.evidence_preservation import (
+            trusted_checkpoint_key, verify_checkpoint,
+        )
+        assert verify_checkpoint(
+            {
+                "payload": checkpoint.payload,
+                "algorithm": checkpoint.algorithm,
+                "key_id": checkpoint.key_id,
+                "signature": checkpoint.signature,
+            },
+            trusted_checkpoint_key(app.config, checkpoint.key_id),
+        )
+        verify_result = app.test_cli_runner().invoke(
+            args=["preservation", "verify", str(checkpoint.id)]
+        )
+        assert verify_result.exit_code == 0, verify_result.output
+        exported = client.get(
+            "/api/evidence-preservation/retentions/%s/checkpoints" % retention_id,
+            headers=auth(administrator),
+        )
+        assert exported.status_code == 200
+        assert exported.get_json()[0]["id"] == checkpoint.id
+        assert client.get(
+            "/api/evidence-preservation/retentions/%s/checkpoints" % retention_id,
+            headers=auth(outsider),
+        ).status_code == 404
+
