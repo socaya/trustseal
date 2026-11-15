@@ -18,6 +18,11 @@ class SecurityEvent(db.Model):
     outcome = db.Column(db.String(24), nullable=False, default="success")
     correlation_id = db.Column(db.String(64), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    # Chained-hash integrity: ``event_hash`` is SHA-256 over the
+    # canonical event payload prefixed by ``prev_event_hash``. Nullable
+    # so the service can backfill legacy rows without locking writers.
+    prev_event_hash = db.Column(db.String(64))
+    event_hash = db.Column(db.String(64))
 
 
 class OutboxEvent(db.Model):

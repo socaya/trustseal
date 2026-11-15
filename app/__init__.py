@@ -49,6 +49,10 @@ def create_app(config_class=None):
     from .metrics import configure_metrics
     configure_metrics(app)
 
+    # --- Audit chain integrity hook ---
+    from .services.audit_chain import register_chain_hook
+    register_chain_hook(app)
+
     # --- Extension Initialization ---
     db.init_app(app)
     migrate.init_app(app, db)
@@ -213,6 +217,8 @@ def create_app(config_class=None):
     blueprints.append(mfa_api)
     from .blueprints.integrations.scim_api import scim_api
     blueprints.append(scim_api)
+    from .blueprints.integrations.openapi_api import openapi_api
+    blueprints.append(openapi_api)
     from .blueprints.trust.views.verify_views import verify_views
     blueprints.append(verify_views)
     from .blueprints.trust.views.evidence_views import evidence_views

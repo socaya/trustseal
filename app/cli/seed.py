@@ -865,6 +865,10 @@ def register_cli(app):
     app.cli.add_command(dss_cli)
     from app.cli.worker import worker_cli
     app.cli.add_command(worker_cli)
+    from app.cli.audit import audit_cli
+    app.cli.add_command(audit_cli)
+    from app.cli.openapi import openapi_cli
+    app.cli.add_command(openapi_cli)
     click.echo("Seed and outbox commands registered.")
 
 # Example of how you might call this in your app factory (e.g., create_app function)

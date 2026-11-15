@@ -47,6 +47,29 @@ def _trust_context(config):
 
 
 def _signing_credentials(config):
+    """Return ``(pyhanko_signer, signer_cert_sha256_hex)``.
+
+    Selects the backend by ``PLATFORM_SIGNER_BACKEND``:
+
+    * ``"local_pkcs12"`` (default) — load a PKCS#12 bundle from disk.
+      Preserves the original behaviour; dev and CI only.
+    * ``"aws_kms"`` — sign with an AWS KMS asymmetric key. The
+      signing certificate PEM is referenced by
+      ``PLATFORM_SIGNER_KMS_CERT_PEM`` (see ADR 0001 §6).
+    """
+    try:
+        from cryptography.hazmat.primitives import hashes
+    except ImportError as exc:
+        raise PdfFinalizationError("PDF signing dependencies unavailable") from exc
+    backend = (config.get("PLATFORM_SIGNER_BACKEND") or "local_pkcs12").strip().lower()
+    if backend == "local_pkcs12":
+        return _local_pkcs12_credentials(config)
+    if backend == "aws_kms":
+        return _aws_kms_credentials(config)
+    raise PdfFinalizationError(f"Unknown PLATFORM_SIGNER_BACKEND: {backend!r}")
+
+
+def _local_pkcs12_credentials(config):
     try:
         from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.serialization import pkcs12
@@ -68,6 +91,48 @@ def _signing_credentials(config):
             raise ValueError("PKCS12 signer unavailable")
     except (ValueError, TypeError) as exc:
         raise PdfFinalizationError("Invalid platform signing credentials") from exc
+    return signer, cert.fingerprint(hashes.SHA256()).hex()
+
+
+def _aws_kms_credentials(config):
+    """Build a pyHanko KMS-backed external signer."""
+    try:
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes
+    except ImportError as exc:
+        raise PdfFinalizationError("PDF signing dependencies unavailable") from exc
+    key_id = config.get("PLATFORM_SIGNER_KMS_KEY_ID")
+    cert_path = config.get("PLATFORM_SIGNER_KMS_CERT_PEM")
+    algorithm = config.get("PLATFORM_SIGNER_KMS_ALGORITHM", "RSASSA_PSS_SHA_256")
+    region = config.get("PLATFORM_SIGNER_KMS_REGION")
+    kms_client = config.get("PLATFORM_SIGNER_KMS_CLIENT")  # test injection
+    if not key_id:
+        raise PdfFinalizationError(
+            "PLATFORM_SIGNER_KMS_KEY_ID required for aws_kms backend"
+        )
+    if not cert_path:
+        raise PdfFinalizationError(
+            "PLATFORM_SIGNER_KMS_CERT_PEM required for aws_kms backend"
+        )
+    cert_file = _required_file(cert_path, "Platform signing certificate")
+    try:
+        cert = x509.load_pem_x509_certificate(cert_file.read_bytes())
+    except ValueError as exc:
+        raise PdfFinalizationError("Invalid signing certificate PEM") from exc
+    try:
+        from .integrations.kms.pyhanko_external import build_kms_pyhanko_signer
+    except ImportError as exc:
+        raise PdfFinalizationError("KMS signing dependencies unavailable") from exc
+    try:
+        signer = build_kms_pyhanko_signer(
+            key_id=key_id,
+            cert_pem_path=str(cert_file),
+            signing_algorithm=algorithm,
+            region=region,
+            kms_client=kms_client,
+        )
+    except Exception as exc:
+        raise PdfFinalizationError("KMS signer initialisation failed") from exc
     return signer, cert.fingerprint(hashes.SHA256()).hex()
 
 

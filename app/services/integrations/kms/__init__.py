@@ -30,6 +30,7 @@ from .factory import build_detached_signer
 from .local_pkcs12 import LocalPkcs12Signer
 from .local_ed25519 import LocalEd25519Signer
 from .aws_kms import AwsKmsSigner
+from .pyhanko_external import KmsPyhankoSigner, build_kms_pyhanko_signer
 
 __all__ = [
     "Signer",
@@ -39,5 +40,7 @@ __all__ = [
     "LocalPkcs12Signer",
     "LocalEd25519Signer",
     "AwsKmsSigner",
+    "KmsPyhankoSigner",
     "build_detached_signer",
+    "build_kms_pyhanko_signer",
 ]
