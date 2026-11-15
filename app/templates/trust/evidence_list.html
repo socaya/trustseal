@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Evidence retentions · TrustSeal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-3"
+     style="border-bottom: 1px solid #D6DADE;">
+  <div>
+    <h1 class="h3 mb-1" style="color: #164C83; font-weight: 600;">Evidence retentions</h1>
+    <p class="text-muted mb-0" style="font-size: 0.95rem;">
+      Preserved sealed artifacts, legal holds, checkpoints, timestamps,
+      OCSP / CRL responses and validation dossiers.
+    </p>
+  </div>
+</div>
+
+{% if not retentions %}
+<section class="p-3" style="border: 1px solid #D6DADE; background: #FFFFFF;">
+  <p class="mb-0" style="font-size: 0.95rem;">
+    No retentions have been recorded for your tenant yet.
+  </p>
+</section>
+{% else %}
+<section style="border: 1px solid #D6DADE; background: #FFFFFF;">
+  <table class="table mb-0" style="font-size: 0.9rem;">
+    <thead style="background: #F6F7F8;">
+      <tr>
+        <th scope="col" style="color: #164C83; width: 12%;">#</th>
+        <th scope="col" style="color: #164C83;">Artifact</th>
+        <th scope="col" style="color: #164C83;">SHA-256</th>
+        <th scope="col" style="color: #164C83; width: 18%;">Retain until</th>
+        <th scope="col" style="color: #164C83; width: 10%;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in retentions %}
+      <tr>
+        <td>{{ r.id }}</td>
+        <td>{{ r.artifact_type }} #{{ r.artifact_id }}</td>
+        <td style="font-family: monospace; word-break: break-all;">
+          {{ r.artifact_sha256 }}
+        </td>
+        <td>{{ r.retain_until.strftime("%Y-%m-%d") if r.retain_until else "—" }}</td>
+        <td>
+          <a href="{{ url_for('evidence_views.show_retention', retention_id=r.id) }}"
+             style="color: #164C83;">Open</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

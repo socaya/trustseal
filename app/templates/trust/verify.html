@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Verify a sealed document · TrustSeal{% endblock %}
+
+{% block login_content %}
+<div class="verify-shell" style="width: 100%; max-width: 760px;">
+  <header class="pb-3 mb-4" style="border-bottom: 1px solid #D6DADE;">
+    <h1 class="h3 mb-1" style="color: #164C83; font-weight: 600;">Verify a sealed document</h1>
+    <p class="text-muted mb-0" style="font-size: 0.95rem;">
+      Independently check a PDF you have received against the platform's
+      sealing certificate. Verification does not look up any tenant or
+      personal record.
+    </p>
+  </header>
+
+  {% if not enabled %}
+  <section role="alert" aria-live="polite" class="p-3 mb-4"
+           style="border: 1px solid #D6DADE; background: #FFFFFF;">
+    <strong style="color: #164C83;">Verification unavailable.</strong>
+    <p class="mb-0 mt-2" style="font-size: 0.95rem;">
+      This deployment has not enabled public verification. Contact the
+      document sender for an alternative method.
+    </p>
+  </section>
+  {% endif %}
+
+  {% if error %}
+  <section role="alert" aria-live="polite" class="p-3 mb-4"
+           style="border: 1px solid #D6DADE; background: #FFFFFF;">
+    <strong style="color: #164C83;">
+      <span aria-hidden="true">&#9888;</span>
+      Request rejected
+    </strong>
+    <p class="mb-0 mt-2" style="font-size: 0.95rem;">{{ error }}</p>
+  </section>
+  {% endif %}
+
+  {% if verdict %}
+  <section aria-labelledby="verdict-heading" class="p-3 mb-4"
+           style="border: 1px solid #D6DADE; background: #FFFFFF;">
+    <h2 id="verdict-heading" class="h5 mb-3"
+        style="color: #164C83; font-weight: 600;">
+      {% if verdict == "valid" %}
+        <span aria-hidden="true">&#10003;</span> Verified
+      {% elif verdict == "mismatch" %}
+        <span aria-hidden="true">&#8800;</span> Digest mismatch
+      {% elif verdict == "untrusted" %}
+        <span aria-hidden="true">&#8856;</span> Untrusted signer
+      {% else %}
+        <span aria-hidden="true">&#8856;</span> Verification failed
+      {% endif %}
+    </h2>
+    <p class="mb-3" style="font-size: 0.95rem;">{{ verdict_detail }}</p>
+
+    <dl class="row mb-0" style="font-size: 0.9rem;">
+      {% if document_sha256 %}
+      <dt class="col-sm-4 text-muted">Document SHA-256</dt>
+      <dd class="col-sm-8" style="font-family: monospace; word-break: break-all;">
+        {{ document_sha256 }}
+      </dd>
+      {% endif %}
+      {% if evidence_sha256 %}
+      <dt class="col-sm-4 text-muted">Evidence digest</dt>
+      <dd class="col-sm-8" style="font-family: monospace; word-break: break-all;">
+        {{ evidence_sha256 }}
+      </dd>
+      {% endif %}
+      {% if certificate_sha256 %}
+      <dt class="col-sm-4 text-muted">Signer certificate</dt>
+      <dd class="col-sm-8" style="font-family: monospace; word-break: break-all;">
+        {{ certificate_sha256 }}
+      </dd>
+      {% endif %}
+      <dt class="col-sm-4 text-muted">Assurance tier</dt>
+      <dd class="col-sm-8">
+        Platform certificate seal — not an individual signer certificate.
+      </dd>
+    </dl>
+  </section>
+  {% endif %}
+
+  <section aria-labelledby="form-heading" class="p-3"
+           style="border: 1px solid #D6DADE; background: #FFFFFF;">
+    <h2 id="form-heading" class="h5 mb-3"
+        style="color: #164C83; font-weight: 600;">
+      Verify another document
+    </h2>
+    <form method="POST" enctype="multipart/form-data"
+          action="{{ url_for('verify_views.verify_pdf') }}" novalidate>
+      <div class="mb-3">
+        <label for="evidence_sha256" class="form-label" style="font-weight: 600;">
+          Evidence digest (SHA-256)
+        </label>
+        <input type="text" id="evidence_sha256" name="evidence_sha256"
+               required
+               pattern="[0-9a-fA-F]{64}" minlength="64" maxlength="64"
+               class="form-control"
+               style="border-radius: 0; border-color: #D6DADE; font-family: monospace;"
+               aria-describedby="evidence-help">
+        <small id="evidence-help" class="form-text text-muted">
+          The 64-character hex digest supplied by the issuer in the
+          document's evidence package.
+        </small>
+      </div>
+      <div class="mb-3">
+        <label for="pdf" class="form-label" style="font-weight: 600;">
+          Sealed PDF
+        </label>
+        <input type="file" id="pdf" name="pdf"
+               accept="application/pdf,.pdf" required
+               class="form-control"
+               style="border-radius: 0; border-color: #D6DADE;"
+               aria-describedby="pdf-help">
+        <small id="pdf-help" class="form-text text-muted">
+          Up to 16 MiB. Uploaded bytes are hashed and discarded; nothing
+          is stored.
+        </small>
+      </div>
+      <button type="submit" class="btn"
+              style="background-color: #164C83; color: #FFFFFF;
+                     border-radius: 0; border: 1px solid #164C83;">
+        Verify document
+      </button>
+    </form>
+  </section>
+</div>
+{% endblock %}

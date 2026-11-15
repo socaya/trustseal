@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}Retention #{{ retention.id }} · TrustSeal{% endblock %}
+
+{% macro section(title) %}
+<section class="mb-4" style="border: 1px solid #D6DADE; background: #FFFFFF;">
+  <header class="px-3 py-2" style="background: #F6F7F8; border-bottom: 1px solid #D6DADE;">
+    <h2 class="h6 mb-0" style="color: #164C83; font-weight: 600;">{{ title }}</h2>
+  </header>
+  <div class="px-3 py-3">
+    {{ caller() }}
+  </div>
+</section>
+{% endmacro %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 pb-3"
+     style="border-bottom: 1px solid #D6DADE;">
+  <div>
+    <h1 class="h3 mb-1" style="color: #164C83; font-weight: 600;">
+      Retention #{{ retention.id }}
+    </h1>
+    <p class="text-muted mb-0" style="font-size: 0.95rem;">
+      {{ retention.artifact_type }} #{{ retention.artifact_id }} —
+      retain until {{ retention.retain_until.strftime("%Y-%m-%d") if retention.retain_until else "—" }}.
+    </p>
+  </div>
+  <a href="{{ url_for('evidence_views.list_retentions') }}" style="color: #164C83;">
+    &larr; Back to retentions
+  </a>
+</div>
+
+{% call section("Canonical digest") %}
+<dl class="row mb-0" style="font-size: 0.9rem;">
+  <dt class="col-sm-3 text-muted">Artifact SHA-256</dt>
+  <dd class="col-sm-9" style="font-family: monospace; word-break: break-all;">
+    {{ retention.artifact_sha256 }}
+  </dd>
+  <dt class="col-sm-3 text-muted">Created</dt>
+  <dd class="col-sm-9">{{ retention.created_at.isoformat(sep=" ") if retention.created_at else "—" }}</dd>
+</dl>
+{% endcall %}
+
+{% call section("Legal holds") %}
+{% if not holds %}
+<p class="mb-0 text-muted" style="font-size: 0.9rem;">No legal holds recorded.</p>
+{% else %}
+<table class="table mb-0" style="font-size: 0.9rem;">
+  <thead>
+    <tr><th>#</th><th>Reason</th><th>Requested at</th><th>Released at</th></tr>
+  </thead>
+  <tbody>
+    {% for h in holds %}
+    <tr>
+      <td>{{ h.id }}</td>
+      <td>{{ h.reason }}</td>
+      <td>{{ h.requested_at.isoformat(sep=" ") if h.requested_at else "—" }}</td>
+      <td>
+        {% if h.released_at %}
+          {{ h.released_at.isoformat(sep=" ") }}
+        {% else %}
+          <span aria-hidden="true">&#9679;</span> active
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endcall %}
+
+{% call section("Checkpoints (chained integrity)") %}
+<p class="mb-3" style="font-size: 0.9rem;">
+  Integrity scan:
+  {% if integrity.status == "chain_ok" %}
+    <span aria-hidden="true">&#10003;</span> chain consistent across
+    {{ checkpoints|length }} checkpoint(s).
+  {% elif integrity.status == "chain_break" %}
+    <strong style="color: #164C83;"><span aria-hidden="true">&#9888;</span>
+    chain break at checkpoint #{{ integrity.break_at }}.</strong>
+  {% else %}
+    <span class="text-muted">no checkpoints issued</span>
+  {% endif %}
+</p>
+{% if checkpoints %}
+<table class="table mb-0" style="font-size: 0.9rem;">
+  <thead>
+    <tr><th>#</th><th>Operator</th><th>Algorithm</th><th>Key</th><th>Issued</th></tr>
+  </thead>
+  <tbody>
+    {% for c in checkpoints %}
+    <tr>
+      <td>{{ c.id }}</td>
+      <td>{{ c.operator_id }}</td>
+      <td>{{ c.algorithm }}</td>
+      <td style="font-family: monospace; word-break: break-all;">{{ c.key_id }}</td>
+      <td>{{ c.created_at.isoformat(sep=" ") if c.created_at else "—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endcall %}
+
+{% call section("Timestamps (RFC 3161)") %}
+{% if not timestamps %}
+<p class="mb-0 text-muted" style="font-size: 0.9rem;">No timestamps issued.</p>
+{% else %}
+<table class="table mb-0" style="font-size: 0.9rem;">
+  <thead>
+    <tr><th>#</th><th>TSA cert SHA-256</th><th>Token SHA-256</th><th>Gen time</th></tr>
+  </thead>
+  <tbody>
+    {% for t in timestamps %}
+    <tr>
+      <td>{{ t.id }}</td>
+      <td style="font-family: monospace; word-break: break-all;">
+        {{ t.tsa_certificate_sha256 }}
+      </td>
+      <td style="font-family: monospace; word-break: break-all;">
+        {{ t.token_sha256 }}
+      </td>
+      <td>{{ t.gen_time.isoformat(sep=" ") if t.gen_time else "—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endcall %}
+
+{% call section("OCSP responses") %}
+{% if not ocsp_rows %}
+<p class="mb-0 text-muted" style="font-size: 0.9rem;">No OCSP responses captured.</p>
+{% else %}
+<table class="table mb-0" style="font-size: 0.9rem;">
+  <thead>
+    <tr><th>#</th><th>Timestamp</th><th>Subject cert SHA-256</th><th>Cert status</th></tr>
+  </thead>
+  <tbody>
+    {% for o in ocsp_rows %}
+    <tr>
+      <td>{{ o.id }}</td>
+      <td>{{ o.timestamp_id }}</td>
+      <td style="font-family: monospace; word-break: break-all;">
+        {{ o.subject_certificate_sha256 }}
+      </td>
+      <td>
+        {% if o.cert_status == "good" %}
+          <span aria-hidden="true">&#10003;</span>
+        {% else %}
+          <span aria-hidden="true">&#9888;</span>
+        {% endif %}
+        {{ o.cert_status }}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endcall %}
+
+{% call section("CRL evidence") %}
+{% if not crl_rows %}
+<p class="mb-0 text-muted" style="font-size: 0.9rem;">No CRL evidence captured.</p>
+{% else %}
+<table class="table mb-0" style="font-size: 0.9rem;">
+  <thead>
+    <tr><th>#</th><th>Timestamp</th><th>Subject cert SHA-256</th><th>Captured</th></tr>
+  </thead>
+  <tbody>
+    {% for c in crl_rows %}
+    <tr>
+      <td>{{ c.id }}</td>
+      <td>{{ c.timestamp_id }}</td>
+      <td style="font-family: monospace; word-break: break-all;">
+        {{ c.subject_certificate_sha256 }}
+      </td>
+      <td>{{ c.created_at.isoformat(sep=" ") if c.created_at else "—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endcall %}
+
+{% call section("Validation dossiers") %}
+{% if not dossiers %}
+<p class="mb-0 text-muted" style="font-size: 0.9rem;">No dossiers assembled.</p>
+{% else %}
+<table class="table mb-0" style="font-size: 0.9rem;">
+  <thead>
+    <tr><th>#</th><th>Timestamp</th><th>Manifest SHA-256</th><th>Operator</th><th>Issued</th></tr>
+  </thead>
+  <tbody>
+    {% for d in dossiers %}
+    <tr>
+      <td>{{ d.id }}</td>
+      <td>{{ d.timestamp_id }}</td>
+      <td style="font-family: monospace; word-break: break-all;">
+        {{ d.manifest_sha256 }}
+      </td>
+      <td>{{ d.operator_id }}</td>
+      <td>{{ d.created_at.isoformat(sep=" ") if d.created_at else "—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endcall %}
+
+{% call section("PDF DSS derivatives") %}
+{% if not dss_rows %}
+<p class="mb-0 text-muted" style="font-size: 0.9rem;">No DSS derivatives created.</p>
+{% else %}
+<table class="table mb-0" style="font-size: 0.9rem;">
+  <thead>
+    <tr><th>#</th><th>Source SHA-256</th><th>Output SHA-256</th><th>Profile</th></tr>
+  </thead>
+  <tbody>
+    {% for d in dss_rows %}
+    <tr>
+      <td>{{ d.id }}</td>
+      <td style="font-family: monospace; word-break: break-all;">
+        {{ d.source_sha256 }}
+      </td>
+      <td style="font-family: monospace; word-break: break-all;">
+        {{ d.output_sha256 }}
+      </td>
+      <td>{{ d.profile }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endcall %}
+{% endblock %}
