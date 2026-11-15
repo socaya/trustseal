@@ -28,6 +28,12 @@ from .certificate_revocation import CertificateRevocationEvidence
 from .ocsp_evidence import OcspEvidence
 from .validation_dossier import ValidationDossier
 from .pdf_dss_derivative import PdfDssDerivative
+from .idempotency_record import IdempotencyRecord
+from .webhook import WebhookDelivery, WebhookEndpoint
+from .mfa import MfaCredential, MfaRecoveryCode
+from .refresh_token import RefreshTokenFamily, RefreshTokenJti
+from .oidc_provider import OidcProvider
+from .scim import ScimServiceAccount
 from .signer_cryptographic import (SignerPublicKey, SignerKeyChallenge, SignerEndorsementChallenge, SignerEndorsement)
 from .esignature import (
     SignatureProfile,
@@ -63,7 +69,7 @@ from .user import (
 __all__ = [
     # Document-related
     "Document","DocumentSignature","DocumentParty","DocumentActivity","DocumentShare","DocumentVersion",
-    "DocumentSnapshot","DocumentBlob","RevokedToken","SecurityEvent","OutboxEvent","SigningEnvelope","EnvelopeParticipant","SignerChallenge","SignerDecision","ReviewReceipt","FinalizedPdf","ManagedStamp","StampApplication","StampAttestation","StampedPdf","StampDesignVersion","EvidenceRetention","EvidenceLegalHold","EvidenceCheckpoint","EvidenceTimestamp","CertificateRevocationEvidence","OcspEvidence","ValidationDossier","PdfDssDerivative","SignerPublicKey","SignerKeyChallenge","SignerEndorsementChallenge","SignerEndorsement","DocumentAuditLog","DocumentComment","DocumentDraft","DocumentReminder","DocumentSection","DocumentShare","DocumentType",
+    "DocumentSnapshot","DocumentBlob","RevokedToken","SecurityEvent","OutboxEvent","SigningEnvelope","EnvelopeParticipant","SignerChallenge","SignerDecision","ReviewReceipt","FinalizedPdf","ManagedStamp","StampApplication","StampAttestation","StampedPdf","StampDesignVersion","EvidenceRetention","EvidenceLegalHold","EvidenceCheckpoint","EvidenceTimestamp","CertificateRevocationEvidence","OcspEvidence","ValidationDossier","PdfDssDerivative","IdempotencyRecord","WebhookEndpoint","WebhookDelivery","MfaCredential","MfaRecoveryCode","RefreshTokenFamily","RefreshTokenJti","OidcProvider","ScimServiceAccount","SignerPublicKey","SignerKeyChallenge","SignerEndorsementChallenge","SignerEndorsement","DocumentAuditLog","DocumentComment","DocumentDraft","DocumentReminder","DocumentSection","DocumentShare","DocumentType",
 
     # E-signature-related
     "SignatureProfile", "SignatureRequest", "SignatureRequestActivity",

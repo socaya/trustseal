@@ -30,7 +30,30 @@ def token_is_revoked(_header, payload):
         user = db.session.get(User, user_id)
         if user is None or not user.is_active:
             return True
-        return db.session.get(RevokedToken, jti) is not None
+        if db.session.get(RevokedToken, jti) is not None:
+            # A revoked refresh-token jti belongs to a family. If that
+            # family is still alive (i.e. the holder has a newer jti),
+            # presentation of the old one indicates reuse — revoke the
+            # whole family and emit a security event. This runs in the
+            # blocklist callback so the reuse signal is captured even
+            # when the view handler never executes.
+            from app.models.refresh_token import RefreshTokenJti
+
+            lineage = db.session.get(RefreshTokenJti, jti)
+            if lineage is not None:
+                from app.services.refresh_tokens import revoke_family
+
+                family = db.session.get(
+                    __import__(
+                        "app.models.refresh_token", fromlist=["RefreshTokenFamily"]
+                    ).RefreshTokenFamily,
+                    lineage.family_id,
+                )
+                if family is not None and family.revoked_at is None:
+                    revoke_family(family, reason="reuse_detected")
+                    db.session.commit()
+            return True
+        return False
     except (KeyError, TypeError, ValueError):
         return True
 

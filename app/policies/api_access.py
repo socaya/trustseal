@@ -55,6 +55,11 @@ def enforce_legacy_api_security():
     # Refresh-token decorators validate their own JWT type and revocation.
     if path == "/api/auth/refresh":
         return
+    # Self-service password change is authenticated per-user inside the
+    # view.
+    if path == "/api/auth/change-password":
+        verify_jwt_in_request()
+        return
     # The old stamp and template APIs exposed unscoped tenant records and
     # generic updates. Require the governed /api/stamp-custody workflow.
     if any(_under(path, prefix) for prefix in LEGACY_STAMP_PREFIXES):

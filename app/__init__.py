@@ -41,43 +41,13 @@ def create_app(config_class=None):
     config_name = getattr(loaded_config, 'CONFIG_NAME', str(loaded_config))
 
 
-    # --- Logging Configuration (Early Setup - Robust Handling) ---
-    # Use app.logger instance available immediately after Flask(__name__)
-    temp_logger = app.logger # Use the direct logger instance during setup
+    # --- Structured logging, request IDs, and redaction ---
+    from .observability import configure_observability
+    configure_observability(app)
 
-    log_level_setting = app.config.get("LOGGING_LEVEL", "INFO") # Get setting (could be str or int)
-    log_level = logging.INFO # Default level
-    log_level_name = "INFO" # Default name
-
-    if isinstance(log_level_setting, str):
-        # If it's a string, convert name to level, default to INFO on bad name
-        log_level_name_temp = log_level_setting.upper()
-        log_level = getattr(logging, log_level_name_temp, logging.INFO)
-        log_level_name = logging.getLevelName(log_level) # Get canonical name
-        if log_level == logging.INFO and log_level_name_temp != "INFO":
-             temp_logger.warning(f"Invalid LOGGING_LEVEL name '{log_level_name_temp}'. Defaulting to INFO.")
-    elif isinstance(log_level_setting, int):
-        # If it's an int, use it directly (basic validation optional)
-        # You might want to check if it's a valid logging level int e.g., if log_level_setting in logging._levelToName:
-        log_level = log_level_setting
-        log_level_name = logging.getLevelName(log_level) # Get canonical name
-    else:
-         # If it's neither string nor int, default to INFO
-         temp_logger.warning(f"Invalid LOGGING_LEVEL type '{type(log_level_setting)}'. Defaulting to INFO.")
-         log_level = logging.INFO
-         log_level_name = logging.getLevelName(log_level)
-
-    # Set the validated level on the app's logger directly
-    temp_logger.setLevel(log_level)
-
-    # Remove default Flask handler to avoid duplicate logs if adding custom ones
-    temp_logger.handlers.clear()
-    # Add a default handler (e.g., StreamHandler)
-    handler = logging.StreamHandler()
-    # You might want a more detailed formatter
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    temp_logger.addHandler(handler)
+    # --- Prometheus metrics ---
+    from .metrics import configure_metrics
+    configure_metrics(app)
 
     # --- Extension Initialization ---
     db.init_app(app)
@@ -136,6 +106,10 @@ def create_app(config_class=None):
         enforce_legacy_api_security()
         if request.path.rstrip("/").startswith("/api/"):
             return
+        # SCIM 2.0 endpoints use their own bearer-token authentication;
+        # do not redirect anonymous callers to the HTML login view.
+        if request.path.startswith("/scim/"):
+            return
 
         # --- Allow Static Files ---
         if request.endpoint == 'static':
@@ -145,6 +119,8 @@ def create_app(config_class=None):
         public_endpoints = [
             'auth_views.login',
             'auth_views.register',
+            'verify_views.verify_form',
+            'verify_views.verify_pdf',
             # DO NOT list API endpoints here
         ]
         if request.endpoint in public_endpoints:
@@ -231,6 +207,16 @@ def create_app(config_class=None):
     blueprints.append(stamp_design_api)
     from .blueprints.documents.api.evidence_preservation_api import evidence_preservation_api
     blueprints.append(evidence_preservation_api)
+    from .blueprints.integrations.webhook_api import webhook_api
+    blueprints.append(webhook_api)
+    from .blueprints.auth.routes.mfa_api import mfa_api
+    blueprints.append(mfa_api)
+    from .blueprints.integrations.scim_api import scim_api
+    blueprints.append(scim_api)
+    from .blueprints.trust.views.verify_views import verify_views
+    blueprints.append(verify_views)
+    from .blueprints.trust.views.evidence_views import evidence_views
+    blueprints.append(evidence_views)
 
     for bp in blueprints:
         app.register_blueprint(bp)
@@ -240,47 +226,16 @@ def create_app(config_class=None):
     # --- Register CLI Commands ---
     register_cli(app)
 
-    # --- Register Error Handlers ---
-    register_error_handlers(app)
+    # --- Register Error Handlers (RFC 7807 for /api/, Jinja for views) ---
+    from .errors.problem import register_problem_handlers
+    register_problem_handlers(app)
 
-    # Final log after setup is complete, using app.logger and the determined log level name
-    app.logger.info(f"Flask App '{app.name}' created with config '{config_name}'")
-    app.logger.info(f"Logging level set to: {log_level_name}") # Use the determined name
-
+    app.logger.info(
+        "application_started",
+        extra={"config": config_name, "env": app.config.get("FLASK_ENV")},
+    )
     return app
 
-
-# --- Error Handlers ---
-def register_error_handlers(app):
-    """Register custom error handlers for the application."""
-    @app.errorhandler(404)
-    def not_found_error(error):
-        current_app.logger.warning(f"404 Not Found: {request.path} - {error}")
-        return render_template("errors/404.html"), 404
-
-    @app.errorhandler(500)
-    def internal_error(error):
-        db.session.rollback()
-        current_app.logger.error(f"500 Internal Server Error: {error}", exc_info=True)
-        return render_template("errors/500.html"), 500
-
-    @app.errorhandler(401)
-    def unauthorized_error(error):
-        current_app.logger.warning(f"401 Unauthorized Error Handler: {request.path} - {error}")
-        if request.path.startswith("/api/"):
-            from flask import jsonify
-            return jsonify(error="Authentication required"), 401
-        flash("Authorization is required to access this page.", "warning")
-        return redirect(url_for('auth_views.login'))
-
-    @app.errorhandler(403)
-    def forbidden_error(error):
-        user_info = current_user.id if current_user.is_authenticated else 'Anonymous'
-        current_app.logger.warning(f"403 Forbidden: User {user_info} attempted to access {request.path} - {error}")
-        if request.path.startswith("/api/"):
-            from flask import jsonify
-            return jsonify(error="Forbidden"), 403
-        return render_template("errors/403.html"), 403
 
 # --- Utility ---
 def get_config_name():

@@ -101,3 +101,5 @@ def delete_user(user_id):
     user.is_active = False
     db.session.commit()
     return jsonify(message="User deactivated"), 200
+
+
