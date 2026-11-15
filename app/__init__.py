@@ -231,6 +231,10 @@ def create_app(config_class=None):
     blueprints.append(webhook_api)
     from .blueprints.auth.routes.mfa_api import mfa_api
     blueprints.append(mfa_api)
+    from .blueprints.organizations.routes.teams_api import teams_api
+    blueprints.append(teams_api)
+    from .blueprints.organizations.routes.delegations_api import delegations_api
+    blueprints.append(delegations_api)
     from .blueprints.integrations.scim_api import scim_api
     blueprints.append(scim_api)
     from .blueprints.integrations.openapi_api import openapi_api

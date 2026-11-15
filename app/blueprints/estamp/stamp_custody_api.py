@@ -145,7 +145,20 @@ def approve_registration(stamp_id):
     item = _stamp(stamp_id, user, lock=True)
     if item.status != "pending":
         abort(409, description="Stamp is not pending")
-    if user.id in (item.created_by_id, item.custodian_id):
+    from app.policies.separation_of_duties import (
+        SeparationOfDutiesViolation,
+        enforce,
+    )
+
+    try:
+        enforce(
+            user.id,
+            item,
+            action="stamp.registration.approve",
+            fields=("created_by_id", "custodian_id"),
+        )
+    except SeparationOfDutiesViolation:
+        db.session.commit()
         abort(403, description="Stamp approval requires independent administrator")
     custodian = db.session.get(User, item.custodian_id)
     if custodian is None or not custodian.is_active or custodian.organization_id != user.organization_id:

@@ -41,6 +41,8 @@ from .signer_appearance import SignerAppearance
 from .email_verification_token import EmailVerificationToken
 from .password_reset_token import PasswordResetToken
 from .user_session import UserSession
+from .team import Team, TeamMembership
+from .delegation import Delegation
 from .signer_cryptographic import (SignerPublicKey, SignerKeyChallenge, SignerEndorsementChallenge, SignerEndorsement)
 from .esignature import (
     SignatureProfile,
