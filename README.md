@@ -452,8 +452,8 @@ Status legend:
 | OpenAPI 3 + published SDKs | Shipped | `app/blueprints/openapi/` |
 | Subscription records + billing hooks | Partial | `app/models/subscription.py` (Stripe integration gated) |
 | Automated test suite | Shipped | 534 tests against real PostgreSQL |
-| SBOM + supply-chain provenance | Shipped | `.github/workflows/sbom.yml` |
-| SAST / dependency / secrets scanning | Shipped | `.github/workflows/sast.yml` |
+| SBOM + supply-chain provenance | Deferred | Tooling-only policy decision |
+| SAST / dependency / secrets scanning | Deferred | Tooling-only policy decision |
 | Accessibility — static checks | Shipped | `tests/test_accessibility.py` |
 | Accessibility — axe-core / Playwright | Deferred | Tracked as G5 |
 | External penetration test | Deferred | Tracked as G6 |

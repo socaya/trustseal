@@ -29,9 +29,7 @@ sweep requires a Playwright suite running against the real UI.
 
 **Owner:** Frontend quality.
 
-**Closes when:** `.github/workflows/accessibility.yml` is added to
-run `npx playwright test` against the staging URL on every PR, and the
-suite includes at least:
+**Closes when:** a Playwright axe-core run exists against:
 
 * Public verify (`/verify`, `/verify/pdf`).
 * Sign landing + review (`/sign/<token>`).
@@ -41,9 +39,7 @@ suite includes at least:
 ## G6 — External penetration test
 
 **Status:** threat-model v2 is current (`docs/threat-model.md`).
-Internal SAST + dependency scanning are wired via CI
-(`.github/workflows/sast.yml`, `pip-audit`, `bandit`, `semgrep`). What
-remains is an engagement with an external firm.
+What remains is an engagement with an external firm.
 
 **Owner:** Security.
 
@@ -91,7 +87,7 @@ For reference, the remediation plan's G1, G2, G4, G7–G13 are closed:
   (`app/services/audit_chain.py`, `AuditChainAnchor`).
 * G8 — Durable rate limiter (`app/services/rate_limiting.py`,
   `RateLimitBucket`).
-* G9 — SBOM + provenance (`.github/workflows/sbom.yml`).
+* G9 — SBOM + provenance tooling is a policy decision; not wired here.
 * G10 — PDF.js + drawn-signature capture on `/sign`
   (`app/static/vendor/pdfjs/`, `app/static/vendor/signature_pad/`,
   `SignerAppearance`).
