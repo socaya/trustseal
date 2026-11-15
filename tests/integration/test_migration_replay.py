@@ -70,7 +70,19 @@ def _flask(cmd: list[str], env: dict[str, str]) -> subprocess.CompletedProcess:
 
 class TestReplay:
     def test_upgrade_from_legacy_baseline(self, disposable_db):
-        """Primary CI contract: stamp legacy head, then upgrade."""
+        """Primary CI contract: stamp legacy head, then upgrade.
+
+        Uses a dedicated SQLAlchemy engine bound to ``disposable_db``
+        for schema inspection and table creation. Flask-SQLAlchemy's
+        ``db.engine`` is already bound to the pytest session's
+        disposable test database (by the main ``conftest.py``
+        ``_session_app`` fixture) and cannot be re-bound without
+        rebuilding the extension, so routing *this* test's schema
+        work through ``db.engine`` would corrupt the session DB.
+        ``flask db stamp`` + ``flask db upgrade`` run as subprocesses
+        with ``DATABASE_URL`` overridden, so Alembic's own operations
+        correctly target ``disposable_db``.
+        """
         env = {
             "FLASK_APP": "main:app",
             "FLASK_ENV": "testing",
@@ -86,28 +98,31 @@ class TestReplay:
         # the strict host check that script applies; the URL assertion
         # is cosmetic for the integration run.
         from scripts.ci_legacy_schema_baseline import compute_new_tables
-        from app import create_app
         from app.extensions import db
 
-        os.environ.update(env)
-        app = create_app()
-        with app.app_context():
-            existing = inspect(db.engine).get_table_names()
+        disposable = create_engine(disposable_db)
+        try:
+            existing = inspect(disposable).get_table_names()
             assert not existing, "expected a clean disposable database"
             new_tables = compute_new_tables()
             legacy_tables = [
                 table for name, table in db.metadata.tables.items()
                 if name not in new_tables
             ]
-            db.metadata.create_all(bind=db.engine, tables=legacy_tables)
+            db.metadata.create_all(bind=disposable, tables=legacy_tables)
             assert new_tables, "no trust-service tables detected"
+        finally:
+            disposable.dispose()
         stamp = _flask(["db", "stamp", "1856829bd7b1"], env)
         assert stamp.returncode == 0, stamp.stderr
         upgrade = _flask(["db", "upgrade"], env)
         assert upgrade.returncode == 0, upgrade.stderr
         # Verify a representative trust-service table now exists.
-        with app.app_context():
-            names = inspect(db.engine).get_table_names()
+        disposable = create_engine(disposable_db)
+        try:
+            names = inspect(disposable).get_table_names()
+        finally:
+            disposable.dispose()
         assert "idempotency_records" in names
         assert "refresh_token_jtis" in names
 
