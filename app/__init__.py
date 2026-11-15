@@ -64,6 +64,7 @@ def create_app(config_class=None):
     jwt.init_app(app) # Initialize Flask-JWT-Extended
     from .services import token_security  # Registers durable JWT blocklist callback
 
+
     # --- Flask-Login Configuration ---
     login_manager.init_app(app)
     login_manager.login_view = 'auth_views.login'  # Route name for the login page view
@@ -176,6 +177,14 @@ def create_app(config_class=None):
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         return response
+
+    # --- PostgreSQL row-level security tenant propagation ---
+    # Registered AFTER the login_manager + app before_request chain so
+    # Flask-Login has already resolved current_user by the time this
+    # hook runs. RLS is defence-in-depth behind the application-layer
+    # TenantScopedRepository.
+    from .services.tenant_rls import register_rls_hook
+    register_rls_hook(app)
 
     # --- Blueprint Registration ---
     from .blueprints import ( # Assuming blueprints are in ./blueprints/__init__.py

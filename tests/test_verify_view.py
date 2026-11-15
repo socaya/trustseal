@@ -126,10 +126,14 @@ class TestPostValidation:
 
 class TestRateLimiting:
     def test_rate_limit_triggers_after_many_requests(self, enabled_app):
-        # Reset the global tracker so this test starts from a clean slate.
-        from app.blueprints.trust.views import verify_views as module
+        # Reset the shared DB-backed limiter state for this test.
+        from app.extensions import db
+        from app.models.rate_limit_bucket import RateLimitBucket
+        from app.services import rate_limiting
 
-        module._RATE_TRACKER.clear()
+        rate_limiting.clear_cache()
+        db.session.query(RateLimitBucket).delete()
+        db.session.commit()
         client = enabled_app.test_client()
         for _ in range(11):
             r = client.post(

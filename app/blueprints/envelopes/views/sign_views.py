@@ -27,11 +27,8 @@ client-side crypto.
 from __future__ import annotations
 
 import hashlib
-import time
 import uuid
-from collections import deque
 from datetime import datetime
-from threading import Lock
 
 from flask import (
     Blueprint,
@@ -47,6 +44,7 @@ from flask import (
 from app.extensions import db
 from app.models.signer_decision import SignerChallenge, SignerDecision
 from app.services import signer_invitations
+from app.services.rate_limiting import RateLimitError, consume
 
 sign_views = Blueprint(
     "sign_views",
@@ -57,8 +55,6 @@ sign_views = Blueprint(
 
 _RATE_WINDOW_SECONDS = 60
 _RATE_MAX = 20
-_RATE_LOCK = Lock()
-_RATE_TRACKER: dict[str, deque] = {}
 
 
 def _client_identifier() -> str:
@@ -70,15 +66,15 @@ def _client_identifier() -> str:
 
 def _rate_limited() -> bool:
     identity = _client_identifier()
-    now = time.monotonic()
-    with _RATE_LOCK:
-        bucket = _RATE_TRACKER.setdefault(identity, deque())
-        while bucket and (now - bucket[0]) > _RATE_WINDOW_SECONDS:
-            bucket.popleft()
-        if len(bucket) >= _RATE_MAX:
-            return True
-        bucket.append(now)
-    return False
+    try:
+        decision = consume(
+            bucket_key=f"sign:{identity}",
+            max_hits=_RATE_MAX,
+            window_seconds=_RATE_WINDOW_SECONDS,
+        )
+    except RateLimitError:
+        return False
+    return not decision.allowed
 
 
 def _unavailable(token: str, status: int = 404):
@@ -238,10 +234,44 @@ def decision(token: str):
         recorded_at=now,
     )
     db.session.add(decision_row)
+    db.session.flush()
+
+    # Optional drawn signature appearance. Signers may submit the
+    # form without drawing (e.g. a decline) and the field is simply
+    # empty. Any decode / size / format failure aborts the decision
+    # so a tampered payload can never be persisted silently.
+    appearance_payload = (request.form.get("appearance_png_data_url") or "").strip()
+    appearance_stored = False
+    if choice == "acknowledged" and appearance_payload:
+        from app.services import signer_appearances
+
+        try:
+            signer_appearances.store(
+                decision=decision_row,
+                envelope=envelope,
+                participant=participant,
+                payload=appearance_payload,
+                config=current_app.config,
+            )
+            appearance_stored = True
+        except signer_appearances.AppearanceError as exc:
+            db.session.rollback()
+            current_app.logger.info(
+                "signer_appearance_rejected",
+                extra={"reason": str(exc)},
+            )
+            flash(
+                "We could not record your drawn signature. "
+                "Please redraw and try again.",
+                "danger",
+            )
+            return redirect(url_for("sign_views.landing", token=token))
+
     signer_invitations.consume(resolved.invitation)
     db.session.commit()
     return render_template(
         "envelopes/sign/recorded.html",
         choice=choice,
         envelope=envelope,
+        appearance_stored=appearance_stored,
     )

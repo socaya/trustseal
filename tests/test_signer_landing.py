@@ -232,9 +232,13 @@ class TestService:
 
 class TestLandingView:
     def _reset_rate_limiter(self):
-        from app.blueprints.envelopes.views import sign_views as module
+        from app.services import rate_limiting
+        from app.extensions import db
+        from app.models.rate_limit_bucket import RateLimitBucket
 
-        module._RATE_TRACKER.clear()
+        rate_limiting.clear_cache()
+        db.session.query(RateLimitBucket).delete()
+        db.session.commit()
 
     def test_unknown_token_shows_unavailable(self, pg_app):
         self._reset_rate_limiter()
@@ -265,9 +269,13 @@ class TestLandingView:
 
 class TestDecisionFlow:
     def _reset(self):
-        from app.blueprints.envelopes.views import sign_views as module
+        from app.services import rate_limiting
+        from app.extensions import db
+        from app.models.rate_limit_bucket import RateLimitBucket
 
-        module._RATE_TRACKER.clear()
+        rate_limiting.clear_cache()
+        db.session.query(RateLimitBucket).delete()
+        db.session.commit()
 
     def test_acknowledge_records_decision_and_consumes_invitation(
         self, pg_app, seeded
@@ -352,9 +360,13 @@ class TestDecisionFlow:
 
 class TestRateLimit:
     def test_rate_limit_triggers(self, pg_app, seeded):
-        from app.blueprints.envelopes.views import sign_views as module
+        from app.services import rate_limiting
+        from app.extensions import db
+        from app.models.rate_limit_bucket import RateLimitBucket
 
-        module._RATE_TRACKER.clear()
+        rate_limiting.clear_cache()
+        db.session.query(RateLimitBucket).delete()
+        db.session.commit()
         from app.extensions import db
         from app.services import signer_invitations
 

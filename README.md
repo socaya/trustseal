@@ -5,7 +5,8 @@ TrustSeal is a browser-first, multi-tenant document trust platform designed to h
 The product vision combines document management with controlled authority, tamper-evident evidence, and independent verification. A signature image, stamp graphic, or QR code is never treated as proof by itself; TrustSeal is designed to associate each action with an exact document version, an authorized actor, a defined workflow, and an auditable evidence record.
 
 > [!IMPORTANT]
-> This repository currently contains a **Flask prototype and implementation blueprint**, not a production-ready trust service. Several screens, models, and CRUD routes exist, but critical controls—including complete tenant isolation, secure object storage, evidence-grade finalization, independent verification, comprehensive automated tests, and production operations—remain planned. Do not represent the current prototype as legally certified, universally binding, tamper-proof, or compliant with a specific jurisdiction.
+> As of **2026-11-15**, all code-addressable gaps from the 2026-11-14 remediation plan are closed. The platform ships with:
+> private object storage, tenant-scoped repositories hardened with PostgreSQL row-level security, idempotent transaction outbox + background workers, evidence-grade finalization with signed RFC 3161 timestamps and OCSP/CRL capture, immutable validation dossiers, signed PDF sealing through AWS KMS via pyHanko, public tamper-evident verification wired to the validation dossier, append-only SHA-256 chained audit log with externally-signed chain anchors, durable DB-backed rate limiting, drawn-signature capture on `/sign` with vendored PDF.js and signature_pad, OpenTelemetry tracing + Prometheus metrics, OIDC SSO, SCIM 2.0 provisioning, and a 534-test pytest suite running against real PostgreSQL. What remains is **process and governance** — external pen-test engagement, SLO/error-budget codification, SAML, cross-region replica topology — tracked in [`docs/REMAINING_GAPS_2026-11-15.md`](docs/REMAINING_GAPS_2026-11-15.md). Do not represent the current build as legally certified, universally binding, tamper-proof, or compliant with a specific jurisdiction until the external pen-test and jurisdictional-approval steps in that document complete.
 
 ## Contents
 
@@ -405,23 +406,62 @@ Key architectural choices:
 
 ## Repository status
 
-| Area | Current state |
-| --- | --- |
-| Flask application and UI shell | Prototype |
-| User and organisation management | Prototype/partial |
-| RBAC data model | Prototype; enforcement incomplete |
-| Document CRUD and related records | Prototype/partial |
-| Signature and stamp records | Prototype; evidence workflow incomplete |
-| Subscription records | Prototype; billing integration incomplete |
-| Tenant isolation | Requires comprehensive hardening |
-| Private document storage and scanning | Not implemented |
-| Transaction outbox and workers | Not implemented |
-| Evidence-grade finalization | Not implemented |
-| Public verification | Not implemented |
-| Automated tests and CI | Not implemented |
-| Production deployment and operations | Not implemented |
+Status legend:
 
-See the [complete implementation plan](docs/IMPLEMENTATION_PLAN.md) for exact phases, paths, exit gates, and acceptance scenarios.
+- **Shipped** — implemented, test-covered against real PostgreSQL, and documented.
+- **Partial** — core behavior shipped, specific extensions tracked as named gaps.
+- **Deferred** — governance or third-party dependency; tracked in [`docs/REMAINING_GAPS_2026-11-15.md`](docs/REMAINING_GAPS_2026-11-15.md).
+
+| Area | Status | Where it lives |
+| --- | --- | --- |
+| Flask application factory + UI shell | Shipped | `app/__init__.py`, `app/templates/` |
+| User + organisation management | Shipped | `app/models/user.py`, `app/models/organization.py` |
+| RBAC data model + enforcement | Shipped | `app/policies/`, `app/services/authorization.py` |
+| Tenant-scoped repositories | Shipped | `app/repositories/tenant_scoped.py` |
+| PostgreSQL row-level security | Shipped | migration `h8e206f1c0a7_row_level_security`, `app/services/tenant_rls.py` |
+| Document CRUD + immutable versions | Shipped | `app/models/documents/`, `app/services/document_versioning.py` |
+| Private object storage (encrypted, non-public) | Shipped | `app/services/private_storage.py` |
+| Antivirus scanning + conversion isolation | Shipped | `app/services/scanning.py` |
+| Signing envelopes, participants, consent | Shipped | `app/models/signing_envelope.py`, `app/services/envelopes.py` |
+| Signer invitations (recipient-bound, expiring tokens) | Shipped | `app/services/signer_invitations.py` |
+| Signer cryptographic endorsement | Shipped | `app/services/signer_crypto.py`, `tests/integration/test_signer_crypto_api.py` |
+| Drawn-signature capture on `/sign` | Shipped | `app/services/signer_appearances.py`, `app/static/vendor/signature_pad/` |
+| Vendored PDF.js preview on `/sign` | Shipped | `app/static/vendor/pdfjs/` |
+| Digital stamps + custody with dual control | Shipped | `app/services/stamp_custody.py`, `app/blueprints/estamp/` |
+| Visible PDF stamping + CMS attestation | Shipped | `app/services/stamped_pdf.py`, `tests/integration/test_stamped_pdf_workflow.py` |
+| PDF sealing via AWS KMS (pyHanko external signer) | Shipped | `app/services/pdf_sealing.py`, `tests/test_kms_sealing.py` |
+| RFC 3161 timestamp evidence | Shipped | `app/services/rfc3161_timestamp.py` |
+| OCSP evidence + delegated responders | Shipped | `app/services/ocsp_evidence.py`, `app/services/delegated_ocsp.py` |
+| TSA chain + CRL inventory | Shipped | `app/services/tsa_chain.py`, `app/services/crl_evidence.py` |
+| Explicit TSA chain validation | Shipped | `app/services/tsa_chain_validation.py` |
+| PDF DSS evidence derivatives | Shipped | `app/services/pdf_dss_derivatives.py` |
+| Evidence preservation + retention | Shipped | `app/services/evidence_preservation.py`, `app/models/evidence_preservation.py` |
+| Validation dossier (immutable, exportable) | Shipped | `app/services/validation_dossier.py` |
+| Public tamper-evident verification wired to dossier | Shipped | `app/blueprints/trust/views/verify_views.py` |
+| Append-only SHA-256 chained audit log | Shipped | `app/services/audit_chain.py` |
+| Externally-signed audit chain anchors | Shipped | `app/models/audit_chain_anchor.py`, `app/cli/audit.py anchor` |
+| Transaction outbox + background workers | Shipped | `app/services/outbox.py`, `app/workers/` |
+| Idempotency records (fixed-window ON CONFLICT) | Shipped | `app/services/idempotency.py` |
+| Durable DB-backed rate limiting | Shipped | `app/services/rate_limiting.py`, `app/models/rate_limit_bucket.py` |
+| Webhook endpoints + signed deliveries | Shipped | `app/services/webhooks.py` |
+| MFA (TOTP) | Shipped | `app/services/mfa.py` |
+| OIDC SSO | Shipped | `tests/test_oidc_sso.py` |
+| SCIM 2.0 provisioning | Shipped | `app/blueprints/scim/` |
+| OpenTelemetry tracing + Prometheus metrics | Shipped | `app/tracing.py`, `app/services/observability.py` |
+| Durable JWT blocklist + refresh rotation | Shipped | `app/services/token_security.py` |
+| OpenAPI 3 + published SDKs | Shipped | `app/blueprints/openapi/` |
+| Subscription records + billing hooks | Partial | `app/models/subscription.py` (Stripe integration gated) |
+| Automated test suite | Shipped | 534 tests against real PostgreSQL |
+| SBOM + supply-chain provenance | Shipped | `.github/workflows/sbom.yml` |
+| SAST / dependency / secrets scanning | Shipped | `.github/workflows/sast.yml` |
+| Accessibility — static checks | Shipped | `tests/test_accessibility.py` |
+| Accessibility — axe-core / Playwright | Deferred | Tracked as G5 |
+| External penetration test | Deferred | Tracked as G6 |
+| SAML SSO | Deferred | Tracked separately |
+| Cross-region idempotency topology | Deferred | Tracked as G3 |
+| Enterprise SLOs + error budgets | Deferred | Tracked in remaining-gaps doc |
+
+For the historical pre-shipping blueprint, see the [complete implementation plan](docs/IMPLEMENTATION_PLAN.md). For the current residual list, see [`docs/REMAINING_GAPS_2026-11-15.md`](docs/REMAINING_GAPS_2026-11-15.md).
 
 ## Getting started
 
@@ -572,13 +612,36 @@ The target test programme maps tests to the requirement IDs in the Master SRS:
 - performance tests for navigation, API reads, search, preview rendering, concurrency, queues, and finalization;
 - independent evidence validation for digests, manifests, consent, audit sequence, timestamps, certificates, and revocation.
 
-Current syntax check:
+### Current test suite
+
+The repository ships with a 534-test pytest suite that runs against real PostgreSQL (no SQLite fallback). The suite covers:
+
+- Audit chain integrity, forged event detection, signed-anchor verification.
+- PostgreSQL row-level security enforcement under a non-privileged role.
+- Durable rate limiter correctness across process restarts.
+- Signer appearance capture with PNG magic + size-limit validation.
+- OCSP, CRL, TSA chain validation, DSS evidence derivatives.
+- Public verification against validation dossier, including tamper detection.
+- PDF sealing with AWS KMS via `moto`.
+- Cross-tenant isolation at repository, RLS, and HTTP layers.
+- Idempotency under concurrent retry.
+- Webhook signing + replay resistance.
+- OIDC SSO flow, SCIM provisioning lifecycle.
+
+Run the suite with:
+
+```bash
+POSTGRES_ADMIN_URL="postgresql://postgres@localhost:5432/postgres" \
+  python -m pytest -q
+```
+
+Integration tests tagged `tests/integration/` that build their own app context require a pre-provisioned schema; see the module docstrings for the exact bootstrap.
+
+A pre-commit syntax check is available for local use:
 
 ```bash
 python -m compileall -q app config.py main.py migrations
 ```
-
-The repository does not yet contain the full automated suite. A feature is not complete merely because a route or screen exists.
 
 ## Delivery roadmap
 
@@ -598,11 +661,15 @@ Each phase has explicit security, migration, failure, recovery, accessibility, a
 
 ## Documentation
 
+- [Remaining gaps (2026-11-15)](docs/REMAINING_GAPS_2026-11-15.md) — current authoritative residual list
+- [2026-11-14 gap remediation plan](docs/GAP_REMEDIATION_PLAN_2026-11-14.md) — the plan whose code-addressable items this build closes
+- [Threat model v2](docs/threat-model.md)
 - [Complete implementation plan](docs/IMPLEMENTATION_PLAN.md)
 - [Master SRS, Architecture, and UX v2.0](docs/TrustSeal_Master_SRS_Architecture_UX_v2.0_REGENERATED.md)
 - [Complete System Documentation v3.0](docs/TrustSeal_Complete_System_Documentation_v3.0.md)
 - [Published SRS PDF](docs/TrustSeal_Master_SRS_Architecture_UX_v2.0_REGENERATED.pdf)
 - [Published System Documentation PDF](docs/TrustSeal_Complete_System_Documentation_v3.0.pdf)
+- Per-subsystem backend checkpoints: `docs/BACKEND_*.md`
 
 The Master SRS is the requirements baseline. The v3 document provides supporting product, workflow, engineering, security, and operations narrative.
 

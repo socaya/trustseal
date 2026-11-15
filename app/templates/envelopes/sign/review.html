@@ -96,6 +96,33 @@
       Choose one of the options below. Your decision is recorded along with
       the document digest so an auditor can later verify what you saw.
     </p>
+
+    <fieldset class="mb-3" style="border: 1px solid #D6DADE; padding: 12px;">
+      <legend class="h6" style="color: #164C83; font-weight: 600;">
+        Draw your signature (optional)
+      </legend>
+      <p class="text-muted" style="font-size: 0.85rem;">
+        A drawn signature is stored alongside your decision for visual
+        reference only. It does not create a cryptographic signature
+        on the sealed PDF; the platform seal and your signer-held
+        endorsement remain the authoritative evidence.
+      </p>
+      <canvas id="signature-pad"
+              aria-label="Drawn signature capture area"
+              style="width: 100%; max-width: 480px; height: 160px;
+                     display: block; background: #FFFFFF;
+                     border: 1px dashed #164C83; touch-action: none;">
+      </canvas>
+      <div class="d-flex gap-2 mt-2">
+        <button type="button" id="signature-clear"
+                class="btn btn-sm"
+                style="border-radius: 0; border: 1px solid #D6DADE; background: #FFFFFF;">
+          Clear
+        </button>
+      </div>
+      <input type="hidden" id="appearance-input" name="appearance_png_data_url" value="">
+    </fieldset>
+
     <div class="d-flex gap-3 flex-wrap">
       <button type="submit" name="choice" value="acknowledged"
               class="btn"
@@ -111,6 +138,16 @@
       </button>
     </div>
   </form>
+
+  <script src="{{ url_for('static', filename='vendor/signature_pad/signature_pad.umd.min.js') }}"></script>
+  <script type="module">
+    import { mountSignaturePad } from "{{ url_for('static', filename='vendor/signature_pad/trustseal-signature.mjs') }}";
+    mountSignaturePad({
+      canvas: document.getElementById("signature-pad"),
+      clearBtn: document.getElementById("signature-clear"),
+      hiddenInput: document.getElementById("appearance-input"),
+    });
+  </script>
 
   <script type="module">
     import { mountViewer } from "{{ url_for('static', filename='vendor/pdfjs/trustseal-viewer.mjs') }}";

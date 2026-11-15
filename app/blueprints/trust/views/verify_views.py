@@ -22,9 +22,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-import time
-from collections import deque
-from threading import Lock
 from typing import Any
 
 from flask import (
@@ -40,6 +37,7 @@ from app.services.platform_pdf_seal import (
     PdfFinalizationError,
     inspect_signed_pdf,
 )
+from app.services.rate_limiting import RateLimitError, consume
 
 verify_views = Blueprint(
     "verify_views",
@@ -51,8 +49,6 @@ verify_views = Blueprint(
 _CERT_HEX = re.compile(r"[0-9a-f]{64}")
 _WINDOW_SECONDS = 60
 _MAX_REQUESTS_PER_WINDOW = 10
-_RATE_LOCK = Lock()
-_RATE_TRACKER: dict[str, deque] = {}
 
 
 def _client_identifier() -> str:
@@ -69,15 +65,15 @@ def _client_identifier() -> str:
 
 def _rate_limited() -> bool:
     identity = _client_identifier()
-    now = time.monotonic()
-    with _RATE_LOCK:
-        bucket = _RATE_TRACKER.setdefault(identity, deque())
-        while bucket and (now - bucket[0]) > _WINDOW_SECONDS:
-            bucket.popleft()
-        if len(bucket) >= _MAX_REQUESTS_PER_WINDOW:
-            return True
-        bucket.append(now)
-    return False
+    try:
+        decision = consume(
+            bucket_key=f"verify:{identity}",
+            max_hits=_MAX_REQUESTS_PER_WINDOW,
+            window_seconds=_WINDOW_SECONDS,
+        )
+    except RateLimitError:
+        return False
+    return not decision.allowed
 
 
 def _verdict_from(result: dict[str, Any]) -> tuple[str, str]:

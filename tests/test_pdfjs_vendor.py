@@ -117,9 +117,13 @@ def seeded(pg_app):
 
 
 def _reset_rate_limiter():
-    from app.blueprints.envelopes.views import sign_views as module
+    from app.extensions import db
+    from app.models.rate_limit_bucket import RateLimitBucket
+    from app.services import rate_limiting
 
-    module._RATE_TRACKER.clear()
+    rate_limiting.clear_cache()
+    db.session.query(RateLimitBucket).delete()
+    db.session.commit()
 
 
 class TestVendorFiles:

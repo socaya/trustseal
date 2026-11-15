@@ -191,9 +191,22 @@ def register_chain_hook(app) -> None:
 
 
 def verify_chain(
-    tenant_id: int, *, batch_size: int = 500
+    tenant_id: int,
+    *,
+    batch_size: int = 500,
+    anchor_trusted_key_resolver=None,
 ) -> ChainReport:
     """Walk ``tenant_id``'s security events and recompute each hash.
+
+    The internal chained-hash probe catches tampering that preserves
+    neither a row's content nor its position. To catch a DB-level
+    rewrite that *does* preserve the chain shape, pass
+    ``anchor_trusted_key_resolver(key_id) -> PublicKey``. Every
+    :class:`AuditChainAnchor` is then verified: its signature must
+    check against the resolved public key, and the recomputed chain
+    tip at the anchor's ``anchor_event_id`` must match the signed
+    ``chain_tip_hash``. Any mismatch is surfaced as a
+    :class:`ChainBreak`.
 
     Returns a :class:`ChainReport`. The function is read-only.
     """
@@ -202,6 +215,7 @@ def verify_chain(
     unhashed = 0
     last_id = 0
     tip = GENESIS
+    tip_at_event: dict[int, str] = {}
     while True:
         batch: Iterable[SecurityEvent] = (
             SecurityEvent.query.filter(
@@ -220,6 +234,7 @@ def verify_chain(
             last_id = row.id
             if row.event_hash is None:
                 unhashed += 1
+                tip_at_event[row.id] = tip
                 continue
             if row.prev_event_hash != tip:
                 breaks.append(
@@ -241,6 +256,12 @@ def verify_chain(
                     )
                 )
             tip = row.event_hash
+            tip_at_event[row.id] = tip
+    if anchor_trusted_key_resolver is not None:
+        for anchor_break in _verify_anchors(
+            tenant_id, tip_at_event, anchor_trusted_key_resolver
+        ):
+            breaks.append(anchor_break)
     return ChainReport(
         tenant_id=tenant_id,
         checked=checked,
@@ -284,3 +305,193 @@ def backfill(tenant_id: int, *, batch_size: int = 500) -> int:
             hashed += 1
         db.session.commit()
     return hashed
+
+
+# ---------------------------------------------------------------- anchoring
+
+ANCHOR_SCHEMA = "trustseal.audit-chain-anchor.v1"
+
+
+def _anchor_payload(
+    tenant_id: int | None,
+    anchor_event_id: int | None,
+    chain_tip_hash: str,
+    operator_id: int,
+    created_at,
+) -> dict:
+    return {
+        "schema": ANCHOR_SCHEMA,
+        "assurance": "platform_signed_audit_chain_observation_only",
+        "organization_id": tenant_id,
+        "anchor_event_id": anchor_event_id,
+        "chain_tip_hash": chain_tip_hash,
+        "operator_id": operator_id,
+        "created_at": created_at.isoformat(timespec="microseconds") + "Z",
+    }
+
+
+def anchor_chain(
+    tenant_id: int,
+    *,
+    operator_id: int,
+    private_key,
+) -> "AuditChainAnchor":
+    """Snapshot the current chain tip for ``tenant_id`` and sign it.
+
+    The returned row is persisted but not committed; the caller is
+    responsible for the surrounding transaction so a failed anchor
+    does not leave half-written state.
+    """
+    import base64
+
+    from app.models.audit_chain_anchor import AuditChainAnchor
+    from app.services.signing_receipts import canonical_bytes, public_key_id
+
+    latest = (
+        SecurityEvent.query.filter(
+            SecurityEvent.organization_id == tenant_id,
+            SecurityEvent.event_hash.isnot(None),
+        )
+        .order_by(SecurityEvent.id.desc())
+        .first()
+    )
+    if latest is None:
+        chain_tip_hash = GENESIS
+        anchor_event_id = None
+    else:
+        chain_tip_hash = latest.event_hash
+        anchor_event_id = latest.id
+    from datetime import datetime
+
+    now = datetime.utcnow()
+    payload = _anchor_payload(
+        tenant_id=tenant_id,
+        anchor_event_id=anchor_event_id,
+        chain_tip_hash=chain_tip_hash,
+        operator_id=operator_id,
+        created_at=now,
+    )
+    signature = base64.b64encode(
+        private_key.sign(canonical_bytes(payload))
+    ).decode("ascii")
+    row = AuditChainAnchor(
+        organization_id=tenant_id,
+        anchor_event_id=anchor_event_id,
+        chain_tip_hash=chain_tip_hash,
+        payload=payload,
+        algorithm="Ed25519",
+        key_id=public_key_id(private_key.public_key()),
+        signature=signature,
+        operator_id=operator_id,
+        created_at=now,
+    )
+    db.session.add(row)
+    db.session.flush()
+    return row
+
+
+def _verify_anchors(
+    tenant_id: int,
+    tip_at_event: dict[int, str],
+    trusted_key_resolver,
+) -> list[ChainBreak]:
+    """Validate every :class:`AuditChainAnchor` for ``tenant_id``.
+
+    ``tip_at_event`` maps each event id walked by ``verify_chain`` to
+    the recomputed chain tip after that event.
+    """
+    import base64
+
+    from cryptography.exceptions import InvalidSignature
+
+    from app.models.audit_chain_anchor import AuditChainAnchor
+    from app.services.signing_receipts import canonical_bytes, public_key_id
+
+    breaks: list[ChainBreak] = []
+    anchors = (
+        AuditChainAnchor.query.filter_by(organization_id=tenant_id)
+        .order_by(AuditChainAnchor.id.asc())
+        .all()
+    )
+    for anchor in anchors:
+        try:
+            key = trusted_key_resolver(anchor.key_id)
+        except Exception as exc:
+            breaks.append(
+                ChainBreak(
+                    at_id=anchor.id,
+                    expected=anchor.key_id,
+                    found="",
+                    reason=f"anchor_key_untrusted: {exc}",
+                )
+            )
+            continue
+        if anchor.algorithm != "Ed25519":
+            breaks.append(
+                ChainBreak(
+                    at_id=anchor.id,
+                    expected="Ed25519",
+                    found=anchor.algorithm,
+                    reason="anchor_algorithm_unsupported",
+                )
+            )
+            continue
+        if anchor.key_id != public_key_id(key):
+            breaks.append(
+                ChainBreak(
+                    at_id=anchor.id,
+                    expected=public_key_id(key),
+                    found=anchor.key_id,
+                    reason="anchor_key_fingerprint_mismatch",
+                )
+            )
+            continue
+        try:
+            sig = base64.b64decode(anchor.signature, validate=True)
+            key.verify(sig, canonical_bytes(anchor.payload or {}))
+        except (ValueError, TypeError, InvalidSignature) as exc:
+            breaks.append(
+                ChainBreak(
+                    at_id=anchor.id,
+                    expected="valid-signature",
+                    found=type(exc).__name__,
+                    reason="anchor_signature_invalid",
+                )
+            )
+            continue
+        payload_tip = (anchor.payload or {}).get("chain_tip_hash")
+        if payload_tip != anchor.chain_tip_hash:
+            breaks.append(
+                ChainBreak(
+                    at_id=anchor.id,
+                    expected=payload_tip or "",
+                    found=anchor.chain_tip_hash or "",
+                    reason="anchor_payload_tip_differs_from_column",
+                )
+            )
+            continue
+        expected_tip = (
+            GENESIS
+            if anchor.anchor_event_id is None
+            else tip_at_event.get(anchor.anchor_event_id)
+        )
+        if expected_tip is None:
+            breaks.append(
+                ChainBreak(
+                    at_id=anchor.id,
+                    expected=f"event:{anchor.anchor_event_id}",
+                    found="missing",
+                    reason="anchor_target_event_missing",
+                )
+            )
+            continue
+        if expected_tip != anchor.chain_tip_hash:
+            breaks.append(
+                ChainBreak(
+                    at_id=anchor.id,
+                    expected=expected_tip,
+                    found=anchor.chain_tip_hash,
+                    reason="anchor_chain_tip_mismatch",
+                )
+            )
+    return breaks
