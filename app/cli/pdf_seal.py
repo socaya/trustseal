@@ -2,57 +2,37 @@
 
 Generates a certificate-backed *platform seal*. It does not sign on behalf
 of each human participant. No HTTP endpoint can request finalization.
-"""
-import hashlib
-import io
 
+The actual sealing logic lives in :class:`app.services.envelopes.
+EnvelopeOrchestrator`. This CLI is a thin, auditable wrapper so the same
+flow runs identically whether invoked by an operator or (later) by an
+authorized server-side task.
+"""
 import click
 from flask import current_app
 from flask.cli import AppGroup, with_appcontext
-from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models.signing_envelope import SigningEnvelope, EnvelopeParticipant
-from app.models.signer_decision import SignerDecision
-from app.models.review_receipt import ReviewReceipt
-from app.models.documents.document_blob import DocumentBlob
 from app.models.pdf_finalization import FinalizedPdf
-from app.models.signer_cryptographic import SignerPublicKey, SignerEndorsement
-from app.services.signer_crypto import verify_detached, endorsement_payload
+from app.models.signing_envelope import SigningEnvelope
 from app.services.documents.private_storage import (
-    check_object_digest, store_scanned_pdf, cleanup_object, IngestionError,
+    check_object_digest, IngestionError,
 )
-from app.services.platform_pdf_seal import seal_pdf, inspect_signed_pdf, PdfFinalizationError
-from app.services.signing_receipts import resolve_trusted_public_key, verify_receipt, review_payload
-from app.services.event_delivery import enqueue
-from app.services.platform_review_evidence import canonical_evidence_bundle, evidence_digest
+from app.services.envelopes.orchestrator import (
+    EnvelopeOrchestrator, OrchestratorError,
+)
+from app.services.platform_pdf_seal import inspect_signed_pdf, PdfFinalizationError
 
 pdf_seal_cli = AppGroup("pdf-seal")
 
 
 def _operator(envelope):
-    """Require an active separate-duty operator configured by deployment.
+    """Kept for backwards-compatibility with the legacy test harness.
 
-    This stage is an OS-service identity assertion, not user MFA or an HSM
-    signing authorization. Deployment must protect this configuration.
+    New callers must invoke :class:`EnvelopeOrchestrator` directly.
     """
-    from app.models.user import User
-    from app.policies.api_access import is_admin
-
-    raw = current_app.config.get("PDF_SEAL_OPERATOR_ID")
-    if raw is None or not str(raw).isdecimal():
-        raise PdfFinalizationError("Platform seal operator identity is not configured")
-    operator = db.session.get(User, int(raw))
-    if (operator is None or not operator.is_active
-            or operator.organization_id != envelope.organization_id
-            or operator.id == envelope.created_by_id
-            or not is_admin(operator.id)):
-        raise PdfFinalizationError("Authorized, independent seal operator required")
-    if EnvelopeParticipant.query.filter_by(
-        envelope_id=envelope.id, user_id=operator.id
-    ).first() is not None:
-        raise PdfFinalizationError("A reviewing participant cannot self-seal")
-    return operator
+    orchestrator = EnvelopeOrchestrator()
+    return orchestrator._authorize_operator(envelope)  # noqa: SLF001
 
 
 def _complete_review(envelope):
@@ -129,73 +109,18 @@ def _complete_review(envelope):
 @with_appcontext
 def finalize(envelope_id):
     """Seal one reviewed PDF with the configured platform certificate."""
-    envelope = SigningEnvelope.query.filter_by(id=envelope_id).with_for_update().first()
-    if envelope is None:
-        raise click.ClickException("Envelope not found")
-    existing = FinalizedPdf.query.filter_by(envelope_id=envelope.id).first()
-    if existing is not None:
-        click.echo("Already finalized: %s" % existing.id)
-        db.session.rollback()
-        return
-    if envelope.state != "prepared":
-        db.session.rollback()
-        raise click.ClickException("Envelope is not prepared")
-    object_key = None
     try:
-        operator = _operator(envelope)
-        evidence_digest = _complete_review(envelope)
-        original = db.session.get(DocumentBlob, envelope.document_blob_id)
-        if (original is None or original.document_id != envelope.document_id
-                or original.sha256 != envelope.document_sha256):
-            raise PdfFinalizationError("Frozen source manifest mismatch")
-        source = check_object_digest(
-            original.object_key, original.sha256, current_app.config
-        ).read_bytes()
-        if hashlib.sha256(source).hexdigest() != envelope.document_sha256:
-            raise PdfFinalizationError("Source bytes do not match envelope")
-        signed, certificate_sha256, _status = seal_pdf(
-            source, current_app.config, evidence_digest
-        )
-        object_key, _name, size, output_digest, _scanner = store_scanned_pdf(
-            io.BytesIO(signed),
-            "TrustSeal-sealed-envelope-%s.pdf" % envelope.id,
-            current_app.config,
-        )
-        record = FinalizedPdf(
-            envelope_id=envelope.id,
-            organization_id=envelope.organization_id,
-            issued_by_id=operator.id,
-            source_blob_id=original.id,
-            source_sha256=original.sha256,
-            evidence_sha256=evidence_digest,
-            object_key=object_key,
-            output_sha256=output_digest,
-            output_size=size,
-            certificate_sha256=certificate_sha256,
-            signature_field="TrustSealPlatformSeal",
-            profile="platform_pades_b_b",
-        )
-        db.session.add(record)
-        db.session.flush()
-        enqueue(
-            event_type="platform.pdf.sealed",
-            aggregate_type="envelope",
-            aggregate_id=envelope.id,
-            organization_id=envelope.organization_id,
-            actor_id=operator.id,
-            action="platform.pdf.sealed.authorized_operator",
-            idempotency_key="platform-pdf-sealed:%s" % envelope.id,
-        )
-        db.session.commit()
-    except (PdfFinalizationError, IngestionError, ValueError, OSError, IntegrityError) as exc:
-        db.session.rollback()
-        if object_key:
-            try:
-                cleanup_object(object_key, current_app.config)
-            except Exception:
-                current_app.logger.exception("Signed PDF orphan cleanup failed")
-        raise click.ClickException("Finalization failed: %s" % type(exc).__name__) from None
-    click.echo("Finalized platform-sealed PDF: %s" % record.id)
+        result = EnvelopeOrchestrator().finalize(envelope_id)
+    except OrchestratorError as exc:
+        if exc.reason == "envelope_not_found":
+            raise click.ClickException("Envelope not found") from None
+        if exc.reason == "envelope_not_prepared":
+            raise click.ClickException("Envelope is not prepared") from None
+        raise click.ClickException(f"Finalization failed: {exc.reason}") from None
+    if result.already_finalized:
+        click.echo("Already finalized: %s" % result.finalized_pdf_id)
+    else:
+        click.echo("Finalized platform-sealed PDF: %s" % result.finalized_pdf_id)
 
 
 @pdf_seal_cli.command("verify")

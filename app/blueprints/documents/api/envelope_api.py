@@ -15,6 +15,7 @@ from app.models.signing_envelope import SigningEnvelope, EnvelopeParticipant
 from app.services.token_security import active_token_user
 from app.services.event_delivery import enqueue
 from app.services.documents.private_storage import check_object_digest, IngestionError
+from app.services.idempotency import idempotent
 
 envelope_api = Blueprint("envelope_api", __name__, url_prefix="/api/envelopes")
 
@@ -159,6 +160,7 @@ def valid_signing_order(orders):
 
 @envelope_api.route("/<int:envelope_id>/prepare", methods=["POST"])
 @jwt_required()
+@idempotent("envelopes.prepare")
 def prepare_envelope(envelope_id):
     user = _actor()
     envelope = _owned(envelope_id, user, lock=True)
@@ -203,6 +205,7 @@ def prepare_envelope(envelope_id):
 
 @envelope_api.route("/<int:envelope_id>/cancel", methods=["POST"])
 @jwt_required()
+@idempotent("envelopes.cancel")
 def cancel_envelope(envelope_id):
     user = _actor()
     envelope = _owned(envelope_id, user, lock=True)

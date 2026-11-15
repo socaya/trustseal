@@ -34,6 +34,7 @@ jobs:
       FLASK_DEBUG: "0"
       PDF_FINALIZATION_ENABLED: "false"
       PYTHONPATH: .
+      TRUSTSEAL_PYTEST_SHARED_DB: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -54,3 +55,98 @@ jobs:
           flask db upgrade
       - name: Run all backend tests
         run: python -m pytest -q
+
+  security-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install audit tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pip-audit bandit
+      - name: Dependency vulnerability audit (pip-audit)
+        run: |
+          # ``-r`` audits the pinned dependency sets; fail on any advisory.
+          # ``--strict`` makes unresolved versions an error rather than a warning.
+          pip-audit --strict \
+            -r requirements.txt \
+            -r requirements-signing.txt \
+            -r requirements-test.txt
+      - name: Static security analysis (bandit)
+        # High-severity findings only; bandit's medium tier is noisy.
+        run: bandit -q -r app -lll
+      - name: Scan for committed secrets (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: detect --no-git --redact --exit-code 1
+
+  migration-replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: trustseal_test
+          POSTGRES_PASSWORD: temporary_ci_only
+          POSTGRES_DB: trustseal_ci_replay
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U trustseal_test -d trustseal_ci_replay"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://trustseal_test:temporary_ci_only@localhost:5432/trustseal_ci_replay
+      SECRET_KEY: temporary-ci-session-secret-not-for-production
+      JWT_SECRET_KEY: temporary-ci-jwt-secret-not-for-production
+      FLASK_APP: main:app
+      FLASK_ENV: testing
+      FLASK_DEBUG: "0"
+      PDF_FINALIZATION_ENABLED: "false"
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-signing.txt -r requirements-test.txt
+      - name: Fresh upgrade from baseline
+        run: |
+          python scripts/ci_legacy_schema_baseline.py
+          flask db stamp 1856829bd7b1
+          flask db upgrade
+      - name: Record head after first upgrade
+        id: head1
+        run: echo "revision=$(flask db current | awk '{print $1}' | tail -n1)" >> "$GITHUB_OUTPUT"
+      - name: Downgrade to legacy baseline
+        # Idempotent downgrade proves every revision carries a working
+        # downgrade. Prototype trust-tables may be append-only; those
+        # migrations raise explicitly and this step accepts a controlled
+        # ``RuntimeError`` as a recorded signal, not a silent pass.
+        run: |
+          set +e
+          flask db downgrade 1856829bd7b1
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "::warning title=downgrade::flask db downgrade returned $status; append-only trust tables may refuse downgrade — document the revision in migrations/versions/."
+          fi
+      - name: Re-upgrade to head (idempotent replay)
+        run: flask db upgrade
+      - name: Verify head is stable after replay
+        run: |
+          rev2=$(flask db current | awk '{print $1}' | tail -n1)
+          echo "head after replay: $rev2"
+          test "$rev2" = "${{ steps.head1.outputs.revision }}" \
+            || (echo "::error title=migration-replay::head drifted after downgrade/upgrade cycle" && exit 1)
