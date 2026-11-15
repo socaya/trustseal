@@ -3,15 +3,14 @@
 {% block title %}Review envelope · TrustSeal{% endblock %}
 
 {% block login_content %}
-<div class="sign-shell" style="width: 100%; max-width: 760px;">
+<div class="sign-shell" style="width: 100%; max-width: 960px;">
   <header class="pb-3 mb-4" style="border-bottom: 1px solid #D6DADE;">
     <h1 class="h3 mb-1" style="color: #164C83; font-weight: 600;">
       Review and record your decision
     </h1>
     <p class="text-muted mb-0" style="font-size: 0.95rem;">
       You were invited to review envelope #{{ envelope.id }} as participant
-      #{{ participant.id }}. This page is bound to a single-use link and
-      expires at the time listed below.
+      #{{ participant.id }}. This page is bound to a single-use link.
     </p>
   </header>
 
@@ -24,13 +23,60 @@
       <dd class="col-sm-8" style="font-family: monospace; word-break: break-all;">
         {{ envelope.document_sha256 }}
       </dd>
-      <dt class="col-sm-4 text-muted">Document file</dt>
+      <dt class="col-sm-4 text-muted">Download</dt>
       <dd class="col-sm-8">
         <a href="{{ download_url }}" style="color: #164C83;">
-          Download the document to review
+          Save a local copy
         </a>
       </dd>
     </dl>
+  </section>
+
+  <section aria-labelledby="pdf-heading" class="mb-4"
+           style="border: 1px solid #D6DADE; background: #FFFFFF;">
+    <header class="d-flex align-items-center justify-content-between px-3 py-2"
+            style="background: #F6F7F8; border-bottom: 1px solid #D6DADE;">
+      <h2 id="pdf-heading" class="h6 mb-0"
+          style="color: #164C83; font-weight: 600;">
+        Document preview
+      </h2>
+      <div class="d-flex align-items-center gap-2">
+        <button type="button" id="zoom-out"
+                aria-label="Zoom out"
+                class="btn btn-sm"
+                style="border-radius: 0; border: 1px solid #D6DADE; background: #FFFFFF;">
+          <span aria-hidden="true">&minus;</span>
+        </button>
+        <span id="pdf-page" aria-live="polite"
+              style="font-size: 0.85rem; min-width: 56px; text-align: center;">
+          1 / ?
+        </span>
+        <button type="button" id="zoom-in"
+                aria-label="Zoom in"
+                class="btn btn-sm"
+                style="border-radius: 0; border: 1px solid #D6DADE; background: #FFFFFF;">
+          <span aria-hidden="true">+</span>
+        </button>
+      </div>
+    </header>
+    <div id="pdf-host"
+         role="document"
+         aria-label="Embedded PDF viewer"
+         tabindex="0"
+         style="max-height: 70vh; overflow: auto; padding: 12px;
+                background: #F0F2F4; outline: none;">
+      <noscript>
+        <p class="m-3">
+          Enable JavaScript to preview the document inline, or use the
+          download link above to review it locally before submitting
+          your decision.
+        </p>
+      </noscript>
+    </div>
+    <p id="pdf-status" class="px-3 py-2 mb-0"
+       style="font-size: 0.85rem; color: #164C83; border-top: 1px solid #D6DADE;">
+      Preparing viewer...
+    </p>
   </section>
 
   <section class="p-3 mb-4" style="border: 1px solid #D6DADE; background: #FFFFFF;">
@@ -65,5 +111,23 @@
       </button>
     </div>
   </form>
+
+  <script type="module">
+    import { mountViewer } from "{{ url_for('static', filename='vendor/pdfjs/trustseal-viewer.mjs') }}";
+    mountViewer({
+      url: "{{ download_url }}",
+      container: document.getElementById("pdf-host"),
+      statusLabel: document.getElementById("pdf-status"),
+      page: document.getElementById("pdf-page"),
+      zoomInc: document.getElementById("zoom-in"),
+      zoomDec: document.getElementById("zoom-out"),
+    }).catch((err) => {
+      const status = document.getElementById("pdf-status");
+      if (status) {
+        status.textContent = "Could not load the document. Use the download link to review it.";
+      }
+      console.error("trustseal viewer failed", err);
+    });
+  </script>
 </div>
 {% endblock %}
