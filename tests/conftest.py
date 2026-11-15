@@ -31,6 +31,10 @@ os.environ.setdefault(
 os.environ.setdefault(
     "JWT_SECRET_KEY", "test-jwt-secret-not-for-production-long-enough-also"
 )
+# Route every outbound email to the in-memory transport so tests can
+# inspect subject + body + recipient without running a real SMTP server.
+os.environ.setdefault("MAIL_TRANSPORT", "memory")
+os.environ.setdefault("PUBLIC_BASE_URL", "http://localhost.test")
 
 
 def _admin_url() -> str:
@@ -153,6 +157,22 @@ def _attach_probe_routes(app):
     @app.route("/api/_test/boom", methods=["POST"])
     def _problem_boom():
         raise RuntimeError("secret internals: SELECT * FROM users")
+
+    # ----- email-verification probe (tests/test_email_verification.py) ----
+    from app.policies.email_verified import require_verified_email
+
+    @app.route("/api/_test/verified-only", methods=["GET"])
+    @require_verified_email
+    def _verified_probe():
+        return jsonify(ok=True), 200
+
+    # ----- step-up MFA probe (tests/test_step_up_mfa.py) -------------
+    from app.policies.step_up_mfa import require_recent_mfa
+
+    @app.route("/api/_test/step-up-only", methods=["POST"])
+    @require_recent_mfa(max_age_seconds=300)
+    def _step_up_probe():
+        return jsonify(ok=True), 200
 
 
 @pytest.fixture(scope="session")

@@ -17,10 +17,14 @@ to be strong enough to derive the encryption key.
 """
 from __future__ import annotations
 
+import time
+from datetime import datetime, timezone
+
 from flask import Blueprint, abort, current_app, jsonify, request
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import create_access_token, get_jwt, jwt_required
 
 from app.extensions import db
+from app.models.revoked_token import RevokedToken
 from app.models.user import User
 from app.services import mfa as mfa_service
 from app.services.idempotency import idempotent
@@ -119,3 +123,46 @@ def disable():
         abort(400, description=str(exc))
     db.session.commit()
     return jsonify({"enrolled": False})
+
+
+@mfa_api.route("/step-up", methods=["POST"])
+@jwt_required()
+def step_up():
+    """Re-assert a recent MFA proof and refresh the access token.
+
+    The caller submits a current TOTP (or recovery) code; on success
+    this endpoint revokes the current access token and issues a new
+    one that carries ``mfa_verified_at`` set to now. The refresh token
+    is unchanged — the caller only needs a fresher access JWT with
+    the step-up claim.
+    """
+    user = _require_user()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or set(data) != {"code"}:
+        abort(400, description="code_required")
+    if not mfa_service.is_enrolled(user):
+        abort(412, description="mfa_enrollment_required")
+    try:
+        mfa_service.verify(
+            user, data["code"], app_secret=current_app.config["SECRET_KEY"]
+        )
+    except mfa_service.MfaError as exc:
+        abort(401, description=str(exc))
+    claims = get_jwt() or {}
+    jti = claims.get("jti")
+    exp = claims.get("exp")
+    if jti and exp and db.session.get(RevokedToken, jti) is None:
+        db.session.add(
+            RevokedToken(
+                jti=jti,
+                user_id=user.id,
+                expires_at=datetime.fromtimestamp(int(exp), tz=timezone.utc),
+            )
+        )
+    additional = {"mfa_verified_at": int(time.time())}
+    family = claims.get("fam")
+    if family is not None:
+        additional["fam"] = family
+    access = create_access_token(identity=str(user.id), additional_claims=additional)
+    db.session.commit()
+    return jsonify({"access_token": access, "mfa_verified_at": additional["mfa_verified_at"]})

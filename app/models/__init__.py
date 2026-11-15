@@ -38,6 +38,9 @@ from .signer_invitation import SignerInvitation
 from .audit_chain_anchor import AuditChainAnchor
 from .rate_limit_bucket import RateLimitBucket
 from .signer_appearance import SignerAppearance
+from .email_verification_token import EmailVerificationToken
+from .password_reset_token import PasswordResetToken
+from .user_session import UserSession
 from .signer_cryptographic import (SignerPublicKey, SignerKeyChallenge, SignerEndorsementChallenge, SignerEndorsement)
 from .esignature import (
     SignatureProfile,

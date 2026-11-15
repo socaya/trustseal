@@ -100,12 +100,22 @@ class Config:
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
 
     # === Email Configuration ===
+    MAIL_TRANSPORT = os.getenv('MAIL_TRANSPORT', 'smtp')
     MAIL_SERVER = os.getenv('MAIL_SERVER', 'smtp.trustseal.com')
     MAIL_PORT = int(os.getenv('MAIL_PORT', 587))
     MAIL_USE_TLS = os.getenv('MAIL_USE_TLS', 'true').lower() == 'true'
     MAIL_USERNAME = os.getenv('MAIL_USERNAME', 'noreply@trustseal.com')
     MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', '')
     MAIL_DEFAULT_SENDER = os.getenv('DEFAULT_MAIL_SENDER', 'TrustSeal <noreply@trustseal.com>')
+
+    # Base URL used to render absolute links in outbound emails. Must be
+    # the externally-reachable https URL in production.
+    PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL', 'http://localhost:5000')
+
+    # Email verification lifecycle windows.
+    EMAIL_VERIFICATION_TOKEN_TTL_HOURS = int(os.getenv('EMAIL_VERIFICATION_TOKEN_TTL_HOURS', '48'))
+    # Password reset lifecycle windows.
+    PASSWORD_RESET_TOKEN_TTL_MINUTES = int(os.getenv('PASSWORD_RESET_TOKEN_TTL_MINUTES', '30'))
 
     # # === Subscription Plan Config (static app-level override for dev/test use) ===
     # SUBSCRIPTION_PLANS = {

@@ -11,7 +11,17 @@ from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 from app.extensions import db
 from app.models.system import Role, UserRole
 
-PUBLIC_ENDPOINTS = frozenset(("/api/auth/login", "/api/auth/register"))
+PUBLIC_ENDPOINTS = frozenset((
+    "/api/auth/login",
+    "/api/auth/register",
+    "/api/auth/password-reset/request",
+))
+# Email-verification and password-reset consume routes authenticate
+# the caller by validating a one-shot token inside the handler.
+PUBLIC_PREFIXES = (
+    "/api/auth/verify-email/",
+    "/api/auth/password-reset/",
+)
 ADMIN_EXACT = frozenset((
     "/api/roles", "/api/permissions", "/api/settings", "/api/audit-logs",
     "/api/role-permissions", "/api/user-roles", "/api/invitations",
@@ -48,6 +58,8 @@ def enforce_legacy_api_security():
     if not _under(path, "/api"):
         return
     if path in PUBLIC_ENDPOINTS:
+        return
+    if any(path.startswith(prefix) for prefix in PUBLIC_PREFIXES):
         return
     # Upload-only verification is independent of private accounts and records.
     if path == "/api/public-verification/pdf" and request.method == "POST":

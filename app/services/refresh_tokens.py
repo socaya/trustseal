@@ -64,15 +64,27 @@ def issue_login_tokens(user_id: int) -> tuple[str, str]:
     """Issue a fresh access + refresh pair in a new family.
 
     Returns ``(access_token, refresh_token)``. The caller must commit
-    the surrounding transaction.
+    the surrounding transaction. Also opens a UserSession row so the
+    account page can show + revoke this login.
     """
+    from flask import has_request_context, request
+
+    from app.services import sessions
+
     family = _new_family(user_id)
-    access = create_access_token(identity=str(user_id))
+    access = create_access_token(
+        identity=str(user_id), additional_claims={"fam": family.id}
+    )
     refresh = create_refresh_token(
         identity=str(user_id), additional_claims={"fam": family.id}
     )
     jti = decode_token(refresh)["jti"]
     _record_jti(jti, family)
+    sessions.record_login(
+        user_id,
+        family.id,
+        request=request if has_request_context() else None,
+    )
     return access, refresh
 
 
@@ -123,6 +135,11 @@ def rotate(current_jwt: dict) -> tuple[str, str]:
     )
     new_jti = decode_token(refresh)["jti"]
     _record_jti(new_jti, family)
+    # Keep the UserSession's last_seen_at advanced so the account UI
+    # does not show a stale "last seen" timestamp.
+    from app.services import sessions
+
+    sessions.touch(family.id)
     return access, refresh
 
 
@@ -151,6 +168,11 @@ def revoke_family(family: RefreshTokenFamily, *, reason: str) -> None:
             )
         )
     db.session.flush()
+    # Reflect the revocation on the UserSession row so the account UI
+    # instantly marks the session dead.
+    from app.services import sessions
+
+    sessions.revoke_by_family(family.id, reason)
     _emit_security_event(family.user_id, reason)
 
 
