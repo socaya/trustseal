@@ -15,11 +15,36 @@ class SigningEnvelope(db.Model):
     document_sha256 = db.Column(db.String(64), nullable=False)
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     state = db.Column(db.String(24), nullable=False, default="draft")
+    routing_mode = db.Column(
+        db.String(20),
+        nullable=False,
+        default="sequential",
+        server_default="sequential",
+    )
+    quorum_required = db.Column(db.Integer, nullable=True)
+    preview_confirmed_at = db.Column(db.DateTime, nullable=True)
+    withdrawn_at = db.Column(db.DateTime, nullable=True)
+    withdrawn_by_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=True
+    )
+    withdraw_reason = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     prepared_at = db.Column(db.DateTime)
     cancelled_at = db.Column(db.DateTime)
     __table_args__ = (
-        db.CheckConstraint("state IN ('draft','prepared','cancelled')", name="ck_envelope_preparation_state"),
+        db.CheckConstraint(
+            "state IN ('draft','prepared','cancelled','withdrawn')",
+            name="ck_envelope_preparation_state",
+        ),
+        db.CheckConstraint(
+            "routing_mode IN ('sequential','parallel','quorum')",
+            name="ck_envelope_routing_mode",
+        ),
+        db.CheckConstraint(
+            "(routing_mode = 'quorum' AND quorum_required IS NOT NULL AND quorum_required > 0) "
+            "OR (routing_mode <> 'quorum' AND quorum_required IS NULL)",
+            name="ck_envelope_quorum_required",
+        ),
     )
 
 

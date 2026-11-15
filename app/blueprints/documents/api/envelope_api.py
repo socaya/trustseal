@@ -16,6 +16,9 @@ from app.services.token_security import active_token_user
 from app.services.event_delivery import enqueue
 from app.services.documents.private_storage import check_object_digest, IngestionError
 from app.services.idempotency import idempotent
+from app.services import envelope_fields as fields_service
+from app.services.envelope_fields import Rect
+from app.models.envelope_field import EnvelopeField
 
 envelope_api = Blueprint("envelope_api", __name__, url_prefix="/api/envelopes")
 
@@ -55,6 +58,16 @@ def _details(item):
         "document_blob_id": item.document_blob_id,
         "document_sha256": item.document_sha256,
         "state": item.state, "created_by_id": item.created_by_id,
+        "routing_mode": item.routing_mode,
+        "quorum_required": item.quorum_required,
+        "preview_confirmed_at": item.preview_confirmed_at.isoformat()
+        if item.preview_confirmed_at
+        else None,
+        "withdrawn_at": item.withdrawn_at.isoformat()
+        if item.withdrawn_at
+        else None,
+        "withdrawn_by_id": item.withdrawn_by_id,
+        "withdraw_reason": item.withdraw_reason,
         "participants": [
             {"id": p.id, "user_id": p.user_id, "role": p.role,
              "signing_order": p.signing_order} for p in people
@@ -71,11 +84,27 @@ def _details(item):
 def create_envelope():
     user = _actor()
     data = _payload()
-    if set(data) != {"document_id", "document_blob_id"}:
+    extra = set(data) - {
+        "document_id",
+        "document_blob_id",
+        "routing_mode",
+        "quorum_required",
+    }
+    if extra or "document_id" not in data or "document_blob_id" not in data:
         abort(400, description="document_id and document_blob_id required")
     document_id, blob_id = data["document_id"], data["document_blob_id"]
     if type(document_id) is not int or type(blob_id) is not int:
         abort(400)
+    routing_mode = data.get("routing_mode", "sequential")
+    if routing_mode not in ("sequential", "parallel", "quorum"):
+        abort(400, description="routing_mode must be sequential|parallel|quorum")
+    quorum_required = data.get("quorum_required")
+    if routing_mode == "quorum":
+        if not isinstance(quorum_required, int) or quorum_required < 1:
+            abort(400, description="quorum_required must be positive integer")
+    else:
+        if quorum_required is not None:
+            abort(400, description="quorum_required only valid for quorum mode")
     doc = Document.query.filter_by(
         id=document_id, created_by=user.id,
         organization_id=user.organization_id, deleted_at=None
@@ -95,6 +124,8 @@ def create_envelope():
         document_id=doc.id, document_blob_id=blob.id,
         document_sha256=blob.sha256, organization_id=user.organization_id,
         created_by_id=user.id, state="draft",
+        routing_mode=routing_mode,
+        quorum_required=quorum_required,
     )
     db.session.add(envelope)
     db.session.flush()
@@ -178,6 +209,29 @@ def prepare_envelope(envelope_id):
     ).count()
     if active_recipients != len(participants):
         abort(409, description="A recipient is no longer active in this organisation")
+    # Preview checkpoint: refuse to leave draft unless the creator
+    # has acknowledged the preview snapshot. The confirm endpoint
+    # stamps preview_confirmed_at; prepare rejects until it's set.
+    if envelope.preview_confirmed_at is None:
+        abort(
+            409,
+            description="preview_confirmation_required",
+        )
+    # Quorum-mode envelopes must demand at least one and at most N
+    # acknowledgements where N is the number of signer (non-witness)
+    # participants.
+    if envelope.routing_mode == "quorum":
+        signer_count = sum(1 for p in participants if p.role == "signer")
+        if (
+            envelope.quorum_required is None
+            or envelope.quorum_required < 1
+            or envelope.quorum_required > signer_count
+        ):
+            abort(409, description="quorum_required_out_of_range")
+    try:
+        fields_service.validate_assignment(envelope)
+    except fields_service.FieldAssignmentError as exc:
+        abort(409, description=str(exc))
     doc = Document.query.filter_by(
         id=envelope.document_id, created_by=user.id,
         organization_id=user.organization_id, deleted_at=None
@@ -226,3 +280,266 @@ def cancel_envelope(envelope_id):
     )
     db.session.commit()
     return jsonify(_details(envelope))
+
+
+# --------------------------------------------------------------- fields
+
+
+def _field_dict(row: EnvelopeField) -> dict:
+    return {
+        "id": row.id,
+        "participant_id": row.participant_id,
+        "field_type": row.field_type,
+        "label": row.label,
+        "page_number": row.page_number,
+        "x_pt": float(row.x_pt),
+        "y_pt": float(row.y_pt),
+        "width_pt": float(row.width_pt),
+        "height_pt": float(row.height_pt),
+        "required": row.required,
+        "value": row.value,
+        "submitted_at": row.submitted_at.isoformat() if row.submitted_at else None,
+    }
+
+
+# --------------------------------------------------------------- C4/C5 extras
+
+
+@envelope_api.route("/<int:envelope_id>/preview", methods=["GET"])
+@jwt_required()
+def preview_envelope(envelope_id):
+    """Return a creator-side snapshot used to confirm before prepare.
+
+    Includes participants, field count, routing mode + quorum info,
+    and the current preview-confirmed timestamp so the UI can render
+    a diff between confirmed and current state. The caller must still
+    hit ``/preview/confirm`` before ``/prepare`` will succeed.
+    """
+    user = _actor()
+    envelope = _owned(envelope_id, user)
+    participants = EnvelopeParticipant.query.filter_by(
+        envelope_id=envelope.id
+    ).order_by(EnvelopeParticipant.signing_order).all()
+    fields = EnvelopeField.query.filter_by(envelope_id=envelope.id).all()
+    return jsonify(
+        envelope=_details(envelope),
+        field_count=len(fields),
+        required_field_count=sum(1 for f in fields if f.required),
+        participants_by_role={
+            "signer": sum(1 for p in participants if p.role == "signer"),
+            "witness": sum(1 for p in participants if p.role == "witness"),
+        },
+    )
+
+
+@envelope_api.route("/<int:envelope_id>/preview/confirm", methods=["POST"])
+@jwt_required()
+@idempotent("envelopes.preview.confirm")
+def confirm_preview(envelope_id):
+    user = _actor()
+    envelope = _owned(envelope_id, user, lock=True)
+    if envelope.state != "draft":
+        abort(409, description="preview_only_from_draft")
+    envelope.preview_confirmed_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify(_details(envelope)), 200
+
+
+@envelope_api.route("/<int:envelope_id>/withdraw", methods=["POST"])
+@jwt_required()
+@idempotent("envelopes.withdraw")
+def withdraw_envelope(envelope_id):
+    """Withdraw a prepared envelope before any participant decides.
+
+    Once any participant has acknowledged, the envelope moves through
+    the regular finalization flow. Withdraw targets envelopes that
+    have not yet gathered any decisions.
+    """
+    from app.models.signer_decision import SignerDecision
+
+    user = _actor()
+    envelope = _owned(envelope_id, user, lock=True)
+    if envelope.state != "prepared":
+        abort(409, description="withdraw_requires_prepared_state")
+    existing = (
+        SignerDecision.query.filter_by(envelope_id=envelope.id).count()
+    )
+    if existing:
+        abort(409, description="withdraw_blocked_decisions_recorded")
+    data = _payload() if request.data else {}
+    reason = data.get("reason") if isinstance(data, dict) else None
+    envelope.state = "withdrawn"
+    envelope.withdrawn_at = datetime.utcnow()
+    envelope.withdrawn_by_id = user.id
+    envelope.withdraw_reason = (reason or None)
+    enqueue(
+        event_type="envelope.withdrawn", aggregate_type="envelope",
+        aggregate_id=envelope.id, organization_id=user.organization_id,
+        actor_id=user.id, action="envelope.withdrawn",
+        idempotency_key="envelope-withdrawn:%s" % envelope.id,
+    )
+    db.session.commit()
+    return jsonify(_details(envelope)), 200
+
+
+@envelope_api.route(
+    "/<int:envelope_id>/participants/<int:participant_id>/reminder",
+    methods=["POST"],
+)
+@jwt_required()
+def send_reminder(envelope_id, participant_id):
+    """Send a reminder email to an unacknowledged participant."""
+    from app.models.signer_decision import SignerDecision
+    from app.services import email as mailer
+
+    user = _actor()
+    envelope = _owned(envelope_id, user)
+    participant = db.session.get(EnvelopeParticipant, participant_id)
+    if participant is None or participant.envelope_id != envelope.id:
+        abort(404)
+    if envelope.state != "prepared":
+        abort(409, description="reminder_only_for_prepared")
+    decided = SignerDecision.query.filter_by(
+        envelope_id=envelope.id, participant_id=participant.id
+    ).count()
+    if decided:
+        abort(409, description="participant_already_decided")
+    recipient = db.session.get(User, participant.user_id)
+    if recipient is None or not recipient.is_active:
+        abort(404, description="recipient_inactive")
+    base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
+    sign_url = f"{base}/sign/envelope/{envelope.id}"
+    subject = "Reminder: a document is waiting for your review"
+    body = (
+        f"Hello {recipient.first_name or recipient.username},\n\n"
+        f"The envelope '{envelope.id}' is waiting for your review and "
+        f"acknowledgement. Please visit:\n\n{sign_url}\n\n"
+        "— The TrustSeal team"
+    )
+    mailer.send(
+        mailer.EmailMessage(
+            to=recipient.email, subject=subject, body_text=body
+        )
+    )
+    enqueue(
+        event_type="envelope.reminder.sent", aggregate_type="envelope",
+        aggregate_id=envelope.id, organization_id=user.organization_id,
+        actor_id=user.id, action="envelope.reminder.sent",
+        idempotency_key="envelope-reminder:%s:%s" % (envelope.id, participant.id),
+    )
+    db.session.commit()
+    return jsonify(message="reminder_sent"), 200
+
+
+@envelope_api.route(
+    "/<int:envelope_id>/participants/<int:participant_id>/resend-invitation",
+    methods=["POST"],
+)
+@jwt_required()
+def resend_invitation(envelope_id, participant_id):
+    """Revoke the outstanding signer invitation and issue a fresh one."""
+    from app.models.signer_invitation import SignerInvitation
+    from app.services import signer_invitations
+
+    user = _actor()
+    envelope = _owned(envelope_id, user)
+    participant = db.session.get(EnvelopeParticipant, participant_id)
+    if participant is None or participant.envelope_id != envelope.id:
+        abort(404)
+    if envelope.state != "prepared":
+        abort(409, description="resend_requires_prepared_state")
+    # Revoke any active invitation first.
+    active = SignerInvitation.query.filter_by(
+        envelope_id=envelope.id,
+        participant_id=participant.id,
+        revoked_at=None,
+        consumed_at=None,
+    ).all()
+    for row in active:
+        signer_invitations.revoke(row, reason="resend")
+    _row, token = signer_invitations.issue(
+        envelope=envelope,
+        participant=participant,
+        issued_by_id=user.id,
+    )
+    enqueue(
+        event_type="envelope.invitation.resent", aggregate_type="envelope",
+        aggregate_id=envelope.id, organization_id=user.organization_id,
+        actor_id=user.id, action="envelope.invitation.resent",
+        idempotency_key="envelope-invitation-resend:%s:%s" % (envelope.id, participant.id),
+    )
+    db.session.commit()
+    return jsonify(message="invitation_resent", token=token), 200
+
+
+@envelope_api.route("/<int:envelope_id>/fields", methods=["GET"])
+@jwt_required()
+def list_envelope_fields(envelope_id):
+    """Return every field on the envelope (creator-only view)."""
+    user = _actor()
+    envelope = _owned(envelope_id, user)
+    rows = fields_service.list_fields(envelope)
+    return jsonify(fields=[_field_dict(r) for r in rows])
+
+
+@envelope_api.route("/<int:envelope_id>/fields", methods=["POST"])
+@jwt_required()
+def add_envelope_field(envelope_id):
+    """Add a field to the envelope (draft state only)."""
+    user = _actor()
+    envelope = _owned(envelope_id, user, lock=True)
+    data = _payload()
+    required_keys = {
+        "participant_id",
+        "field_type",
+        "page_number",
+        "x_pt",
+        "y_pt",
+        "width_pt",
+        "height_pt",
+    }
+    if not required_keys.issubset(data.keys()):
+        abort(
+            400,
+            description="participant_id, field_type, page_number, x_pt, y_pt, width_pt, height_pt required",
+        )
+    participant = db.session.get(EnvelopeParticipant, data["participant_id"])
+    if participant is None or participant.envelope_id != envelope.id:
+        abort(404, description="participant_not_found")
+    try:
+        row = fields_service.create_field(
+            envelope,
+            participant,
+            field_type=str(data["field_type"]),
+            page_number=int(data["page_number"]),
+            rect=Rect(
+                x_pt=float(data["x_pt"]),
+                y_pt=float(data["y_pt"]),
+                width_pt=float(data["width_pt"]),
+                height_pt=float(data["height_pt"]),
+            ),
+            label=data.get("label"),
+            required=bool(data.get("required", True)),
+            created_by_id=user.id,
+        )
+    except fields_service.FieldError as exc:
+        db.session.rollback()
+        abort(400, description=str(exc))
+    db.session.commit()
+    return jsonify(_field_dict(row)), 201
+
+
+@envelope_api.route(
+    "/<int:envelope_id>/fields/<int:field_id>", methods=["DELETE"]
+)
+@jwt_required()
+def delete_envelope_field(envelope_id, field_id):
+    user = _actor()
+    envelope = _owned(envelope_id, user, lock=True)
+    try:
+        fields_service.delete_field(envelope, field_id)
+    except fields_service.FieldError as exc:
+        db.session.rollback()
+        abort(404, description=str(exc))
+    db.session.commit()
+    return jsonify(message="field_deleted"), 200

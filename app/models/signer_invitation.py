@@ -41,8 +41,16 @@ class SignerInvitation(db.Model):
     revoke_reason = db.Column(db.String(80))
 
     __table_args__ = (
-        db.UniqueConstraint(
-            "envelope_id", "participant_id",
-            name="uq_signer_invitation_participant",
+        # Only one *active* invitation per participant at a time, but
+        # history (revoked + consumed rows) persists so resend/withdraw
+        # flows keep an audit trail.
+        db.Index(
+            "uq_signer_invitation_participant_active",
+            "envelope_id",
+            "participant_id",
+            unique=True,
+            postgresql_where=db.text(
+                "revoked_at IS NULL AND consumed_at IS NULL"
+            ),
         ),
     )

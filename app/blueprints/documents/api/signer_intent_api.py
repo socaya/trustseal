@@ -21,6 +21,7 @@ from app.models.signer_decision import SignerChallenge, SignerDecision
 from app.services.token_security import active_token_user
 from app.services.event_delivery import enqueue
 from app.services.documents.private_storage import IngestionError, check_object_digest
+from app.services import envelope_fields as fields_service
 
 signer_intent_api = Blueprint(
     "signer_intent_api", __name__, url_prefix="/api/signer-intent"
@@ -71,18 +72,57 @@ def _participant(envelope_id, user, lock=False):
 def _eligible(envelope, participant):
     if envelope.state != "prepared":
         abort(409, description="Envelope is not prepared or was cancelled")
-    earlier = EnvelopeParticipant.query.filter(
-        EnvelopeParticipant.envelope_id == envelope.id,
-        EnvelopeParticipant.signing_order < participant.signing_order,
-    ).all()
     decisions = SignerDecision.query.filter_by(envelope_id=envelope.id).all()
     decided = {d.participant_id: d.decision for d in decisions}
     if participant.id in decided:
         abort(409, description="A decision has already been recorded")
+    # A single declined participant blocks the whole envelope
+    # regardless of mode. A withdraw/correction workflow must issue a
+    # new envelope.
     if any(d.decision == "declined" for d in decisions):
         abort(409, description="Envelope has a declined participant")
-    if any(decided.get(p.id) != "acknowledged" for p in earlier):
-        abort(409, description="Earlier signing-order participants have not acknowledged")
+    mode = envelope.routing_mode or "sequential"
+    if mode == "sequential":
+        # Witnesses sign AFTER every signer in sequential mode so the
+        # earlier-order gate naturally applies to them too.
+        earlier = EnvelopeParticipant.query.filter(
+            EnvelopeParticipant.envelope_id == envelope.id,
+            EnvelopeParticipant.signing_order < participant.signing_order,
+        ).all()
+        if any(decided.get(p.id) != "acknowledged" for p in earlier):
+            abort(
+                409,
+                description="Earlier signing-order participants have not acknowledged",
+            )
+    elif mode in ("parallel", "quorum"):
+        # Witnesses still sign last even in parallel/quorum modes:
+        # a witness participant must wait until every signer has
+        # either acknowledged or (for quorum) the quorum target is met.
+        if participant.role == "witness":
+            signers = EnvelopeParticipant.query.filter(
+                EnvelopeParticipant.envelope_id == envelope.id,
+                EnvelopeParticipant.role == "signer",
+            ).all()
+            if mode == "parallel" and any(
+                decided.get(p.id) != "acknowledged" for p in signers
+            ):
+                abort(
+                    409,
+                    description="witness_must_wait_for_signers",
+                )
+            if mode == "quorum":
+                acks = sum(
+                    1
+                    for p in signers
+                    if decided.get(p.id) == "acknowledged"
+                )
+                if acks < int(envelope.quorum_required or 0):
+                    abort(
+                        409,
+                        description="witness_must_wait_for_quorum",
+                    )
+    else:
+        abort(500, description="unknown_routing_mode")
 
 
 def _document_file(envelope):
@@ -140,6 +180,43 @@ def signer_envelope(envelope_id):
     })
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@signer_intent_api.route("/envelopes/<int:envelope_id>/fields", methods=["GET"])
+@jwt_required()
+def signer_fields(envelope_id):
+    """Return only the active participant's own fields.
+
+    A signer must never see fields assigned to other participants —
+    both for UX clarity and to prevent accidental disclosure through
+    a shared debugging fixture. The service layer already enforces
+    this at write time via :func:`envelope_fields.submit_values`.
+    """
+    user = _actor()
+    envelope, participant = _participant(envelope_id, user)
+    rows = fields_service.list_fields(
+        envelope, viewer_participant_id=participant.id
+    )
+    return jsonify(
+        fields=[
+            {
+                "id": r.id,
+                "field_type": r.field_type,
+                "label": r.label,
+                "page_number": r.page_number,
+                "x_pt": float(r.x_pt),
+                "y_pt": float(r.y_pt),
+                "width_pt": float(r.width_pt),
+                "height_pt": float(r.height_pt),
+                "required": r.required,
+                "value": r.value,
+                "submitted_at": r.submitted_at.isoformat()
+                if r.submitted_at
+                else None,
+            }
+            for r in rows
+        ]
+    )
 
 
 @signer_intent_api.route("/envelopes/<int:envelope_id>/document", methods=["GET"])
@@ -221,7 +298,19 @@ def issue_challenge(envelope_id):
 def record_decision(envelope_id):
     user = _actor()
     data = _payload()
-    if set(data) != {"challenge_id", "challenge", "decision", "document_sha256", "consent_version", "affirmed"}:
+    required_keys = {
+        "challenge_id",
+        "challenge",
+        "decision",
+        "document_sha256",
+        "consent_version",
+        "affirmed",
+    }
+    # ``field_values`` is optional: a dict of int field-id to submitted
+    # value. Omitting it is permitted so an envelope with no fields
+    # still records a review decision cleanly.
+    extra_keys = set(data) - required_keys
+    if not required_keys.issubset(data.keys()) or extra_keys - {"field_values"}:
         abort(400, description="Complete consent decision payload required")
     decision = data["decision"]
     if decision not in ("acknowledged", "declined") or type(decision) is not str:
@@ -264,6 +353,27 @@ def record_decision(envelope_id):
     )
     db.session.add(record)
     db.session.flush()
+    # Field values are only captured on an acknowledgement; a decline
+    # leaves fields untouched so the signer can revise later.
+    field_values = data.get("field_values") or {}
+    if decision == "acknowledged" and field_values:
+        if not isinstance(field_values, dict):
+            abort(400, description="field_values must be a mapping")
+        try:
+            fields_service.submit_values(
+                envelope, participant, field_values, now=now
+            )
+        except fields_service.FieldOwnershipError:
+            db.session.rollback()
+            abort(403, description="field_not_owned")
+        except fields_service.FieldError as exc:
+            db.session.rollback()
+            abort(400, description=str(exc))
+    # A required field left blank is a UX error, not a server-side
+    # one — the acknowledgement still records the review intent. The
+    # orchestrator rejects finalization for envelopes with missing
+    # required field values so unsigned rectangles can never land in
+    # the sealed PDF.
     enqueue(
         event_type="envelope.review." + decision,
         aggregate_type="envelope", aggregate_id=envelope.id,
