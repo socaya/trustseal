@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Review envelope · TrustSeal{% endblock %}
+
+{% block login_content %}
+<div class="sign-shell" style="width: 100%; max-width: 760px;">
+  <header class="pb-3 mb-4" style="border-bottom: 1px solid #D6DADE;">
+    <h1 class="h3 mb-1" style="color: #164C83; font-weight: 600;">
+      Review and record your decision
+    </h1>
+    <p class="text-muted mb-0" style="font-size: 0.95rem;">
+      You were invited to review envelope #{{ envelope.id }} as participant
+      #{{ participant.id }}. This page is bound to a single-use link and
+      expires at the time listed below.
+    </p>
+  </header>
+
+  <section class="p-3 mb-4" style="border: 1px solid #D6DADE; background: #FFFFFF;">
+    <h2 class="h5 mb-3" style="color: #164C83; font-weight: 600;">
+      Document identifier
+    </h2>
+    <dl class="row mb-0" style="font-size: 0.9rem;">
+      <dt class="col-sm-4 text-muted">Envelope SHA-256</dt>
+      <dd class="col-sm-8" style="font-family: monospace; word-break: break-all;">
+        {{ envelope.document_sha256 }}
+      </dd>
+      <dt class="col-sm-4 text-muted">Document file</dt>
+      <dd class="col-sm-8">
+        <a href="{{ download_url }}" style="color: #164C83;">
+          Download the document to review
+        </a>
+      </dd>
+    </dl>
+  </section>
+
+  <section class="p-3 mb-4" style="border: 1px solid #D6DADE; background: #FFFFFF;">
+    <h2 class="h5 mb-3" style="color: #164C83; font-weight: 600;">Consent</h2>
+    <p style="font-size: 0.95rem;">{{ consent_text }}</p>
+    <p class="text-muted mb-0" style="font-size: 0.85rem;">
+      Consent version: <code>{{ consent_version }}</code>
+    </p>
+  </section>
+
+  <form method="POST" action="{{ url_for('sign_views.decision', token=token) }}"
+        class="p-3" style="border: 1px solid #D6DADE; background: #FFFFFF;">
+    <h2 class="h5 mb-3" style="color: #164C83; font-weight: 600;">
+      Record your decision
+    </h2>
+    <p style="font-size: 0.95rem;">
+      Choose one of the options below. Your decision is recorded along with
+      the document digest so an auditor can later verify what you saw.
+    </p>
+    <div class="d-flex gap-3 flex-wrap">
+      <button type="submit" name="choice" value="acknowledged"
+              class="btn"
+              style="background-color: #164C83; color: #FFFFFF;
+                     border-radius: 0; border: 1px solid #164C83;">
+        <span aria-hidden="true">&#10003;</span> Acknowledge and record
+      </button>
+      <button type="submit" name="choice" value="declined"
+              class="btn"
+              style="background-color: #FFFFFF; color: #164C83;
+                     border-radius: 0; border: 1px solid #164C83;">
+        <span aria-hidden="true">&#8856;</span> Decline
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -53,6 +53,10 @@ def create_app(config_class=None):
     from .services.audit_chain import register_chain_hook
     register_chain_hook(app)
 
+    # --- OpenTelemetry tracing (opt-in via OTEL_ENABLED) ---
+    from .tracing import configure_tracing
+    configure_tracing(app)
+
     # --- Extension Initialization ---
     db.init_app(app)
     migrate.init_app(app, db)
@@ -125,6 +129,9 @@ def create_app(config_class=None):
             'auth_views.register',
             'verify_views.verify_form',
             'verify_views.verify_pdf',
+            'sign_views.landing',
+            'sign_views.decision',
+            'sign_views.download',
             # DO NOT list API endpoints here
         ]
         if request.endpoint in public_endpoints:
@@ -223,6 +230,8 @@ def create_app(config_class=None):
     blueprints.append(verify_views)
     from .blueprints.trust.views.evidence_views import evidence_views
     blueprints.append(evidence_views)
+    from .blueprints.envelopes.views.sign_views import sign_views
+    blueprints.append(sign_views)
 
     for bp in blueprints:
         app.register_blueprint(bp)

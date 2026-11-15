@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Invitation unavailable · TrustSeal{% endblock %}
+
+{% block login_content %}
+<div class="unavail-shell" style="width: 100%; max-width: 560px;">
+  <section class="p-3" style="border: 1px solid #D6DADE; background: #FFFFFF;">
+    <h1 class="h4 mb-3" style="color: #164C83; font-weight: 600;">
+      <span aria-hidden="true">&#8856;</span> Invitation unavailable
+    </h1>
+    <p class="mb-3" style="font-size: 0.95rem;">
+      This link is no longer valid. It may have expired, already been used,
+      or been revoked by the sender. Contact the party that invited you if
+      you believe this is in error.
+    </p>
+    <p class="mb-0">
+      <a href="{{ back_url }}" style="color: #164C83;">Back to verification</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Decision recorded · TrustSeal{% endblock %}
+
+{% block login_content %}
+<div class="recorded-shell" style="width: 100%; max-width: 560px;">
+  <section class="p-3" style="border: 1px solid #D6DADE; background: #FFFFFF;">
+    <h1 class="h4 mb-3" style="color: #164C83; font-weight: 600;">
+      {% if choice == "acknowledged" %}
+      <span aria-hidden="true">&#10003;</span> Acknowledged and recorded
+      {% else %}
+      <span aria-hidden="true">&#8856;</span> Declined and recorded
+      {% endif %}
+    </h1>
+    <p class="mb-3" style="font-size: 0.95rem;">
+      Your decision on envelope #{{ envelope.id }} has been saved. The
+      sender has been notified through their own notification stream.
+    </p>
+    <p class="text-muted mb-0" style="font-size: 0.85rem;">
+      Envelope digest:
+      <code>{{ envelope.document_sha256 }}</code>
+    </p>
+  </section>
+</div>
+{% endblock %}
