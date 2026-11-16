@@ -20,6 +20,9 @@ psycopg[binary]>=3.2,<4
 requests>=2.31,<3
 Faker>=25,<50
 cryptography>=43,<47
+# Pure-Python XML-DSig for SAML SP (Phase G). Does NOT require
+# libxmlsec1 — relies on lxml + cryptography only.
+signxml>=4,<5
 structlog>=24,<26
 boto3>=1.34,<2
 prometheus-client>=0.20,<1

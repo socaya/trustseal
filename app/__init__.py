@@ -133,6 +133,11 @@ def create_app(config_class=None):
             'sign_views.landing',
             'sign_views.decision',
             'sign_views.download',
+            # SAML SP endpoints are the entry point for SSO — the IdP
+            # posts the response here before the user has a session.
+            'saml_views.metadata',
+            'saml_views.login',
+            'saml_views.acs',
             # DO NOT list API endpoints here
         ]
         if request.endpoint in public_endpoints:
@@ -241,6 +246,8 @@ def create_app(config_class=None):
     blueprints.append(clauses_api)
     from .blueprints.subscriptions.routes.usage_api import usage_api
     blueprints.append(usage_api)
+    from .blueprints.auth.routes.saml_views import saml_views
+    blueprints.append(saml_views)
     from .blueprints.integrations.scim_api import scim_api
     blueprints.append(scim_api)
     from .blueprints.integrations.openapi_api import openapi_api
