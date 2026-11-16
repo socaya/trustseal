@@ -80,6 +80,10 @@ def _details(item):
         "supersedes_envelope_id": item.supersedes_envelope_id,
         "superseded_by_envelope_id": item.superseded_by_envelope_id,
         "expires_at": item.expires_at.isoformat() if item.expires_at else None,
+        "reminder_cooloff_hours": item.reminder_cooloff_hours,
+        "reminder_max_count": item.reminder_max_count,
+        "archived_at": item.archived_at.isoformat() if item.archived_at else None,
+        "archived_by_id": item.archived_by_id,
         "participants": [
             {"id": p.id, "user_id": p.user_id, "role": p.role,
              "signing_order": p.signing_order} for p in people
@@ -177,6 +181,8 @@ def list_envelopes():
             EnvelopeLabel,
             EnvelopeLabel.envelope_id == SigningEnvelope.id,
         ).filter(EnvelopeLabel.label == label_filter)
+    if request.args.get("include_archived") != "1":
+        query = query.filter(SigningEnvelope.archived_at.is_(None))
     items = query.order_by(SigningEnvelope.id.desc()).limit(100).all()
     return jsonify([_details(item) for item in items])
 
@@ -1165,3 +1171,89 @@ def list_envelope_labels(envelope_id):
         for row in EnvelopeLabel.query.filter_by(envelope_id=envelope.id).all()
     )
     return jsonify(envelope_id=envelope.id, labels=labels)
+
+
+# ============================================================ R1 cadence
+
+
+@envelope_api.route("/<int:envelope_id>/reminders", methods=["PATCH"])
+@jwt_required()
+def update_reminder_cadence(envelope_id):
+    """Set per-envelope reminder cadence overrides.
+
+    ``cooloff_hours`` (1..720) controls the minimum gap between
+    two reminders; ``max_count`` (1..50) caps the total number of
+    reminders per invitation. ``null`` clears the override and
+    reverts to the scanner's global default.
+    """
+    user = _actor()
+    envelope = _owned(envelope_id, user, lock=True)
+    data = _payload()
+    allowed = {"cooloff_hours", "max_count"}
+    extra = set(data) - allowed
+    if extra:
+        abort(400, description="unknown_fields")
+    if "cooloff_hours" in data:
+        cooloff = data["cooloff_hours"]
+        if cooloff is not None and (
+            type(cooloff) is not int or cooloff < 1 or cooloff > 720
+        ):
+            abort(400, description="cooloff_hours_out_of_range")
+        envelope.reminder_cooloff_hours = cooloff
+    if "max_count" in data:
+        max_count = data["max_count"]
+        if max_count is not None and (
+            type(max_count) is not int or max_count < 1 or max_count > 50
+        ):
+            abort(400, description="max_count_out_of_range")
+        envelope.reminder_max_count = max_count
+    db.session.commit()
+    return (
+        jsonify(
+            envelope_id=envelope.id,
+            cooloff_hours=envelope.reminder_cooloff_hours,
+            max_count=envelope.reminder_max_count,
+        ),
+        200,
+    )
+
+
+# ============================================================ R2 archival
+
+
+_ARCHIVABLE_STATES = {"withdrawn", "cancelled", "superseded"}
+
+
+@envelope_api.route("/<int:envelope_id>/archive", methods=["POST"])
+@jwt_required()
+def archive_envelope(envelope_id):
+    """Soft-archive a terminal envelope.
+
+    Archived envelopes are hidden from the default list but remain
+    fully readable and auditable. Only terminal states
+    (``withdrawn``, ``cancelled``, ``superseded``, ``completed``)
+    can be archived.
+    """
+    user = _actor()
+    envelope = _owned(envelope_id, user, lock=True)
+    if envelope.state not in _ARCHIVABLE_STATES:
+        abort(409, description="archive_requires_terminal_state")
+    if envelope.archived_at is not None:
+        return jsonify(_details(envelope)), 200
+    envelope.archived_at = datetime.utcnow()
+    envelope.archived_by_id = user.id
+    db.session.commit()
+    return jsonify(_details(envelope)), 200
+
+
+@envelope_api.route("/<int:envelope_id>/unarchive", methods=["POST"])
+@jwt_required()
+def unarchive_envelope(envelope_id):
+    user = _actor()
+    envelope = _owned(envelope_id, user, lock=True)
+    if envelope.archived_at is None:
+        return jsonify(_details(envelope)), 200
+    envelope.archived_at = None
+    envelope.archived_by_id = None
+    db.session.commit()
+    return jsonify(_details(envelope)), 200

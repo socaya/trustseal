@@ -94,13 +94,27 @@ def scan_reminders(
         )
         if decided is not None:
             continue
+        # Per-envelope reminder cadence override (Phase R1). NULL
+        # columns fall back to the scanner's global defaults.
+        effective_cooloff = (
+            envelope.reminder_cooloff_hours
+            if envelope.reminder_cooloff_hours is not None
+            else cooloff_hours
+        )
+        this_cutoff = moment - timedelta(hours=effective_cooloff)
         if (
             invitation.last_reminder_at is not None
-            and invitation.last_reminder_at > cooloff_before
+            and invitation.last_reminder_at > this_cutoff
+        ):
+            continue
+        if (
+            envelope.reminder_max_count is not None
+            and invitation.reminder_count >= envelope.reminder_max_count
         ):
             continue
         _send(envelope, recipient, invitation, base)
         invitation.last_reminder_at = moment
+        invitation.reminder_count = (invitation.reminder_count or 0) + 1
         db.session.add(
             SecurityEvent(
                 organization_id=envelope.organization_id,

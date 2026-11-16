@@ -43,6 +43,12 @@ class SignerInvitation(db.Model):
     # to avoid spamming a participant every time it runs — only one
     # reminder per invitation inside the configured cooloff window.
     last_reminder_at = db.Column(db.DateTime)
+    # Running total of reminders sent (Phase R1). The scanner caps
+    # this against the envelope's ``reminder_max_count`` override
+    # so a long-lived invitation doesn't get pinged forever.
+    reminder_count = db.Column(
+        db.Integer, nullable=False, default=0, server_default="0"
+    )
 
     __table_args__ = (
         # Only one *active* invitation per participant at a time, but

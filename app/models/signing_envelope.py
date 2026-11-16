@@ -35,6 +35,17 @@ class SigningEnvelope(db.Model):
     # ``cancel_expired_envelopes`` job auto-withdraws prepared
     # envelopes past this moment (if no participant has decided).
     expires_at = db.Column(db.DateTime, nullable=True)
+    # Per-envelope overrides for the reminder scanner (Phase R1). A
+    # NULL value falls back to the scanner's global default. Operators
+    # can tune these via ``PATCH /api/envelopes/<id>/reminders``.
+    reminder_cooloff_hours = db.Column(db.Integer, nullable=True)
+    reminder_max_count = db.Column(db.Integer, nullable=True)
+    # Soft archive — terminal envelopes get moved out of default
+    # listings without losing the audit chain (Phase R2).
+    archived_at = db.Column(db.DateTime, nullable=True)
+    archived_by_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=True
+    )
     supersedes_envelope_id = db.Column(
         db.Integer,
         db.ForeignKey("signing_envelopes.id"),
@@ -59,6 +70,14 @@ class SigningEnvelope(db.Model):
             "(routing_mode = 'quorum' AND quorum_required IS NOT NULL AND quorum_required > 0) "
             "OR (routing_mode <> 'quorum' AND quorum_required IS NULL)",
             name="ck_envelope_quorum_required",
+        ),
+        db.CheckConstraint(
+            "reminder_cooloff_hours IS NULL OR reminder_cooloff_hours BETWEEN 1 AND 720",
+            name="ck_envelope_reminder_cooloff_range",
+        ),
+        db.CheckConstraint(
+            "reminder_max_count IS NULL OR reminder_max_count BETWEEN 1 AND 50",
+            name="ck_envelope_reminder_max_count_range",
         ),
     )
 
