@@ -9,7 +9,7 @@ from .documents.document_section import DocumentSection
 from .documents.document_share import DocumentShare
 from .documents.document_signature import DocumentSignature
 from .documents.document_type import DocumentType
-from .documents.document_template import DocumentTemplate
+from .documents.document_template import DocumentTemplate, DocumentTemplateVersion
 from .documents.document_version import DocumentVersion
 from .documents.document_snapshot import DocumentSnapshot
 from .documents.document_blob import DocumentBlob
@@ -45,6 +45,7 @@ from .team import Team, TeamMembership
 from .delegation import Delegation
 from .envelope_field import EnvelopeField
 from .bulk_ingest import BulkIngestBatch, BulkIngestItem
+from .clause import Clause, ClauseVersion
 from .signer_cryptographic import (SignerPublicKey, SignerKeyChallenge, SignerEndorsementChallenge, SignerEndorsement)
 from .esignature import (
     SignatureProfile,

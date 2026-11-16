@@ -235,6 +235,10 @@ def create_app(config_class=None):
     blueprints.append(teams_api)
     from .blueprints.organizations.routes.delegations_api import delegations_api
     blueprints.append(delegations_api)
+    from .blueprints.documents.api.templates_api import templates_api
+    blueprints.append(templates_api)
+    from .blueprints.documents.api.clauses_api import clauses_api
+    blueprints.append(clauses_api)
     from .blueprints.integrations.scim_api import scim_api
     blueprints.append(scim_api)
     from .blueprints.integrations.openapi_api import openapi_api

@@ -342,6 +342,41 @@ def _blob_metadata(record):
     }
 
 
+@document_api.route("/search", methods=["GET"])
+@jwt_required()
+def search_documents():
+    """Tenant-scoped full-text search over title + description.
+
+    ``?q=`` — the query string. ``?limit=`` — optional result cap
+    (default 50, max 200). Results ranked by ``ts_rank`` and
+    always scoped to the caller's own organization.
+    """
+    from app.services.document_search import DEFAULT_LIMIT, search
+
+    user = actor()
+    q = request.args.get("q", "")
+    try:
+        limit = int(request.args.get("limit", DEFAULT_LIMIT))
+    except (TypeError, ValueError):
+        limit = DEFAULT_LIMIT
+    hits = search(user.organization_id, q, limit=limit)
+    return jsonify(
+        hits=[
+            {
+                "document_id": h.document_id,
+                "title": h.title,
+                "description": h.description,
+                "status": h.status,
+                "created_at": h.created_at,
+                "rank": h.rank,
+            }
+            for h in hits
+        ],
+        count=len(hits),
+        query=q,
+    )
+
+
 @document_api.route("/bulk", methods=["POST"])
 @jwt_required()
 def bulk_ingest_documents():
