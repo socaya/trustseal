@@ -270,6 +270,10 @@ def create_app(config_class=None):
     blueprints.append(audit_chain_export_api)
     from .blueprints.system.routes.health import health_bp
     blueprints.append(health_bp)
+    from .blueprints.system.routes.outbox_admin import outbox_admin_api
+    blueprints.append(outbox_admin_api)
+    from .blueprints.system.routes.admin_dashboard import admin_dashboard_api
+    blueprints.append(admin_dashboard_api)
     from .blueprints.integrations.scim_api import scim_api
     blueprints.append(scim_api)
     from .blueprints.integrations.openapi_api import openapi_api

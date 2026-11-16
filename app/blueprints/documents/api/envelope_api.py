@@ -198,6 +198,121 @@ def add_participant(envelope_id):
     return jsonify(_details(envelope)), 201
 
 
+@envelope_api.route(
+    "/<int:envelope_id>/participants/bulk", methods=["POST"]
+)
+@jwt_required()
+def bulk_add_participants(envelope_id):
+    """Atomically add a batch of participants to a draft envelope.
+
+    Payload: ``{"participants": [{"user_id": int, "signing_order": int,
+    "role": "signer"|"witness"}, ...]}``. Per-row failures are reported
+    in the response without touching successful rows — the service
+    runs a savepoint per row so one bad entry does not reject the
+    batch. Successful rows are only committed if the whole batch
+    produces at least one success (otherwise the envelope is left
+    untouched).
+    """
+    user = _actor()
+    envelope = _owned(envelope_id, user, lock=True)
+    if envelope.state != "draft":
+        abort(409, description="Recipient list is locked")
+    data = _payload()
+    rows = data.get("participants")
+    if not isinstance(rows, list) or not rows:
+        abort(400, description="participants_list_required")
+    if len(rows) > 100:
+        abort(413, description="bulk_participants_limit_100")
+
+    existing = EnvelopeParticipant.query.filter_by(
+        envelope_id=envelope.id
+    ).all()
+    seen_users = {p.user_id for p in existing}
+    seen_orders = {p.signing_order for p in existing}
+    results: list[dict] = []
+    added: list[EnvelopeParticipant] = []
+    for idx, row in enumerate(rows):
+        entry = {"index": idx}
+        if not isinstance(row, dict):
+            entry["status"] = "failed"
+            entry["error_code"] = "row_not_object"
+            results.append(entry)
+            continue
+        recipient_id = row.get("user_id")
+        order = row.get("signing_order")
+        role = row.get("role", "signer")
+        if type(recipient_id) is not int or type(order) is not int or order < 1:
+            entry["status"] = "failed"
+            entry["error_code"] = "fields_invalid"
+            results.append(entry)
+            continue
+        if role not in ("signer", "witness"):
+            entry["status"] = "failed"
+            entry["error_code"] = "role_invalid"
+            results.append(entry)
+            continue
+        if recipient_id in seen_users:
+            entry["status"] = "failed"
+            entry["error_code"] = "duplicate_user"
+            results.append(entry)
+            continue
+        if order in seen_orders:
+            entry["status"] = "failed"
+            entry["error_code"] = "duplicate_signing_order"
+            results.append(entry)
+            continue
+        recipient = db.session.get(User, recipient_id)
+        if (
+            recipient is None
+            or not recipient.is_active
+            or recipient.organization_id != user.organization_id
+        ):
+            entry["status"] = "failed"
+            entry["error_code"] = "recipient_not_found"
+            results.append(entry)
+            continue
+        new_row = EnvelopeParticipant(
+            envelope_id=envelope.id,
+            user_id=recipient_id,
+            signing_order=order,
+            role=role,
+        )
+        db.session.add(new_row)
+        db.session.flush()
+        added.append(new_row)
+        seen_users.add(recipient_id)
+        seen_orders.add(order)
+        entry["status"] = "succeeded"
+        entry["participant_id"] = new_row.id
+        entry["user_id"] = recipient_id
+        entry["signing_order"] = order
+        entry["role"] = role
+        results.append(entry)
+
+    if not added:
+        db.session.rollback()
+        return (
+            jsonify(
+                envelope_id=envelope.id,
+                added=0,
+                failed=len(rows),
+                results=results,
+            ),
+            400,
+        )
+    db.session.commit()
+    http_status = 207 if any(r["status"] == "failed" for r in results) else 201
+    return (
+        jsonify(
+            envelope_id=envelope.id,
+            added=len(added),
+            failed=len(rows) - len(added),
+            results=results,
+        ),
+        http_status,
+    )
+
+
 def valid_signing_order(orders):
     """Signing positions must be contiguous and unambiguous."""
     return bool(orders) and all(type(value) is int for value in orders) and (
