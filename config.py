@@ -68,6 +68,10 @@ class Config:
     # registering a new provider class.
     BILLING_PROVIDER = os.getenv('BILLING_PROVIDER', 'memory')
 
+    # Phase K — GDPR tenant export signing + break-glass TTL.
+    TENANT_EXPORT_SIGNING_KEY = os.getenv('TENANT_EXPORT_SIGNING_KEY')
+    BREAK_GLASS_TTL_MINUTES = int(os.getenv('BREAK_GLASS_TTL_MINUTES', '30'))
+
     # === Detached review attestation keys (operator issuance only) ===
     # Protected private key path, never a URL, static asset or checked-in secret.
     REVIEW_RECEIPT_PRIVATE_KEY = os.getenv('REVIEW_RECEIPT_PRIVATE_KEY')

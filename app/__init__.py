@@ -253,6 +253,12 @@ def create_app(config_class=None):
     blueprints.append(saml_views)
     from .blueprints.system.routes.slo_api import slo_api
     blueprints.append(slo_api)
+    from .blueprints.organizations.routes.tenant_export_api import tenant_export_api
+    blueprints.append(tenant_export_api)
+    from .blueprints.organizations.routes.tenant_erasure_api import tenant_erasure_api
+    blueprints.append(tenant_erasure_api)
+    from .blueprints.system.routes.break_glass_api import break_glass_api
+    blueprints.append(break_glass_api)
     from .blueprints.integrations.scim_api import scim_api
     blueprints.append(scim_api)
     from .blueprints.integrations.openapi_api import openapi_api
