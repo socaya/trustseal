@@ -71,6 +71,43 @@ class HttpResponse:  # pragma: no cover - interface documentation only
 # ---------------------------------------------------------------- helpers
 
 
+def _is_valid_event_pattern(pattern: str) -> bool:
+    """Validate a subscription pattern.
+
+    Accepted shapes:
+      * ``"*"``         — match every event type.
+      * ``"prefix.*"``  — match ``prefix.<something>`` (prefix non-empty,
+                           contains no inner ``*``).
+      * ``"x.y.z"``     — exact event-type string. Must contain only
+                           alnum, dot, underscore, or dash.
+    """
+    if pattern == "*":
+        return True
+    if pattern.endswith(".*"):
+        prefix = pattern[:-2]
+        if not prefix or "*" in prefix:
+            return False
+        return all(ch.isalnum() or ch in "._-" for ch in prefix)
+    if "*" in pattern:
+        return False
+    return all(ch.isalnum() or ch in "._-" for ch in pattern)
+
+
+def _event_matches(event_type: str, patterns: list[str]) -> bool:
+    """Return ``True`` if ``event_type`` satisfies any subscription pattern."""
+    for pattern in patterns:
+        if pattern == "*":
+            return True
+        if pattern.endswith(".*"):
+            prefix = pattern[:-2]
+            if event_type.startswith(prefix + "."):
+                return True
+            continue
+        if event_type == pattern:
+            return True
+    return False
+
+
 def _hash_secret(secret: str) -> str:
     """Return a hex digest of the secret for at-rest storage."""
     return hashlib.sha256(secret.encode("utf-8")).hexdigest()
@@ -151,6 +188,11 @@ def register_endpoint(
         raise WebhookError("at least one event type must be subscribed")
     if any(len(e) > 80 for e in event_list):
         raise WebhookError("event type exceeds 80 characters")
+    for pattern in event_list:
+        if not _is_valid_event_pattern(pattern):
+            raise WebhookError(
+                "event type must be an exact type, \"*\", or a \"prefix.*\" wildcard"
+            )
     if WebhookEndpoint.query.filter_by(
         organization_id=tenant_id, url=url
     ).first():
@@ -210,7 +252,7 @@ def fan_out_event(
     deliveries: list[WebhookDelivery] = []
     now = datetime.utcnow()
     for endpoint in endpoints:
-        if event_type not in (endpoint.events or []):
+        if not _event_matches(event_type, endpoint.events or []):
             continue
         # Idempotent per (endpoint, event_id) — a repeated fan-out does
         # not create a second delivery row.

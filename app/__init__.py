@@ -319,6 +319,10 @@ def create_app(config_class=None):
         envelope_template_api,
     )
     blueprints.append(envelope_template_api)
+    from .blueprints.system.routes.security_events_export import (
+        security_events_export_api,
+    )
+    blueprints.append(security_events_export_api)
     from .blueprints.integrations.scim_api import scim_api
     blueprints.append(scim_api)
     from .blueprints.integrations.openapi_api import openapi_api
