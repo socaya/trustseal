@@ -34,7 +34,13 @@ from app.models.signing_envelope import EnvelopeParticipant, SigningEnvelope
 
 MAX_APPEARANCE_BYTES = 256 * 1024
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+JPEG_MAGIC = b"\xff\xd8\xff"
 _DATA_URL_RE = re.compile(r"^data:image/png;base64,([A-Za-z0-9+/=\s]+)$")
+
+TYPED_PNG_WIDTH = 480
+TYPED_PNG_HEIGHT = 120
+TYPED_FONT_SIZE = 56
+MAX_TYPED_NAME_LEN = 80
 
 
 class AppearanceError(RuntimeError):
@@ -82,6 +88,8 @@ def store(
     participant: EnvelopeParticipant,
     payload: str | bytes,
     config: Any,
+    appearance_kind: str = "drawn",
+    source_label: str | None = None,
 ) -> SignerAppearance:
     """Validate ``payload``, persist it, and return the metadata row.
 
@@ -94,6 +102,8 @@ def store(
         raise AppearanceError("decision_envelope_mismatch")
     if decision.participant_id != participant.id:
         raise AppearanceError("decision_participant_mismatch")
+    if appearance_kind not in {"drawn", "typed", "uploaded"}:
+        raise AppearanceError("appearance_kind_invalid")
     data = decode(payload)
     sha256 = hashlib.sha256(data).hexdigest()
     object_name = sha256 + ".png"
@@ -121,10 +131,108 @@ def store(
         sha256=sha256,
         size_bytes=len(data),
         object_key=f"signer-appearances/{object_name}",
+        appearance_kind=appearance_kind,
+        source_label=source_label,
     )
     db.session.add(row)
     db.session.flush()
     return row
+
+
+# ---------------------------------------------------------------- I2 typed
+
+
+def render_typed(name: str, *, config: Any) -> bytes:
+    """Render ``name`` as a handwritten-style PNG for a typed signature.
+
+    The rendering is deliberately simple: a single centered line in a
+    handwriting-style font on a transparent background. The orchestrator
+    treats the resulting PNG identically to a drawn appearance when
+    stamping it into the sealed PDF.
+
+    Gated by ``TYPED_SIGNATURE_RENDERING_ENABLED`` so operators can
+    disable the typed path in jurisdictions that require a manuscript
+    signature appearance.
+    """
+    if not bool(config.get("TYPED_SIGNATURE_RENDERING_ENABLED")):
+        raise AppearanceError("typed_rendering_disabled")
+    if not isinstance(name, str):
+        raise AppearanceError("typed_name_type_invalid")
+    cleaned = name.strip()
+    if not 1 <= len(cleaned) <= MAX_TYPED_NAME_LEN:
+        raise AppearanceError("typed_name_invalid")
+    # Reject control characters so we never render newlines or backspaces.
+    if any(ord(ch) < 32 for ch in cleaned):
+        raise AppearanceError("typed_name_contains_control_chars")
+    from PIL import Image, ImageDraw, ImageFont
+
+    img = Image.new("RGBA", (TYPED_PNG_WIDTH, TYPED_PNG_HEIGHT), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    # Try a cursive-leaning TrueType; fall back to the Pillow default
+    # bitmap font if no system font is available.
+    font = None
+    for candidate in (
+        "/System/Library/Fonts/Supplemental/Snell Roundhand.ttc",
+        "/System/Library/Fonts/Supplemental/Apple Chancery.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf",
+    ):
+        try:
+            font = ImageFont.truetype(candidate, TYPED_FONT_SIZE)
+            break
+        except (OSError, ValueError):
+            continue
+    if font is None:
+        font = ImageFont.load_default()
+    # Centre the text horizontally, baseline roughly 2/3 down.
+    bbox = draw.textbbox((0, 0), cleaned, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    x = max(0, (TYPED_PNG_WIDTH - text_w) // 2)
+    y = max(0, (TYPED_PNG_HEIGHT - text_h) // 2 - 10)
+    draw.text((x, y), cleaned, fill=(0, 0, 0, 255), font=font)
+    import io
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
+# ---------------------------------------------------------------- I3 uploaded
+
+
+def normalise_uploaded(payload: bytes, *, max_bytes: int = MAX_APPEARANCE_BYTES) -> bytes:
+    """Validate an uploaded PNG/JPEG and return a normalised PNG byte-string.
+
+    JPEGs are decoded with Pillow and re-encoded to PNG so the sealed
+    PDF embed path is uniform. Oversized or non-image payloads raise.
+    """
+    if not isinstance(payload, (bytes, bytearray)):
+        raise AppearanceError("appearance_must_be_bytes")
+    if not payload:
+        raise AppearanceError("appearance_empty")
+    if len(payload) > max_bytes:
+        raise AppearanceError("appearance_too_large")
+    if payload.startswith(PNG_MAGIC):
+        return bytes(payload)
+    if payload.startswith(JPEG_MAGIC):
+        import io
+
+        from PIL import Image
+
+        try:
+            with Image.open(io.BytesIO(payload)) as source:
+                source.load()
+                if source.mode != "RGBA":
+                    source = source.convert("RGBA")
+                buf = io.BytesIO()
+                source.save(buf, format="PNG", optimize=True)
+                converted = buf.getvalue()
+        except (OSError, ValueError) as exc:
+            raise AppearanceError("appearance_unreadable") from exc
+        if len(converted) > max_bytes:
+            raise AppearanceError("appearance_too_large_after_normalise")
+        return converted
+    raise AppearanceError("appearance_format_unsupported")
 
 
 def cleanup(object_key: str, config: Any) -> None:

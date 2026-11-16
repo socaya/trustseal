@@ -195,6 +195,8 @@ def valid_signing_order(orders):
 @jwt_required()
 @idempotent("envelopes.prepare")
 def prepare_envelope(envelope_id):
+    from app.policies.step_up_enforcement import enforce as _enforce_step_up
+    _enforce_step_up()
     user = _actor()
     envelope = _owned(envelope_id, user, lock=True)
     if envelope.state != "draft":
@@ -330,6 +332,99 @@ def _field_dict(row: EnvelopeField) -> dict:
         "value": row.value,
         "submitted_at": row.submitted_at.isoformat() if row.submitted_at else None,
     }
+
+
+# --------------------------------------------------------------- I6 lineage
+
+
+@envelope_api.route("/<int:envelope_id>/lineage", methods=["GET"])
+@jwt_required()
+def envelope_lineage(envelope_id):
+    """Return the full supersession chain for the envelope.
+
+    Walks backwards along ``supersedes_envelope_id`` and forwards
+    along ``superseded_by_envelope_id`` so the verification UI can
+    render every related envelope in creation order with its state
+    + prepared_at + sealed_pdf_sha256 (when one exists).
+    """
+    user = _actor()
+    envelope = _owned(envelope_id, user)
+
+    seen: set[int] = set()
+
+    def _walk_back(start):
+        chain = []
+        current = start
+        while current is not None and current.id not in seen:
+            seen.add(current.id)
+            chain.append(current)
+            if current.supersedes_envelope_id is None:
+                break
+            current = db.session.get(
+                SigningEnvelope, current.supersedes_envelope_id
+            )
+            if current is None or current.organization_id != user.organization_id:
+                break
+        chain.reverse()
+        return chain
+
+    def _walk_forward(start):
+        chain = []
+        current = start
+        while current is not None:
+            if current.superseded_by_envelope_id is None:
+                break
+            nxt = db.session.get(
+                SigningEnvelope, current.superseded_by_envelope_id
+            )
+            if (
+                nxt is None
+                or nxt.organization_id != user.organization_id
+                or nxt.id in seen
+            ):
+                break
+            seen.add(nxt.id)
+            chain.append(nxt)
+            current = nxt
+        return chain
+
+    back = _walk_back(envelope)
+    forward = _walk_forward(envelope)
+    full = back + forward
+    from app.models.pdf_finalization import FinalizedPdf
+
+    def _sealed_sha(env_id):
+        row = (
+            FinalizedPdf.query.filter_by(envelope_id=env_id)
+            .order_by(FinalizedPdf.id.desc())
+            .first()
+        )
+        return row.output_sha256 if row is not None else None
+
+    return jsonify(
+        current_envelope_id=envelope.id,
+        chain=[
+            {
+                "id": item.id,
+                "state": item.state,
+                "routing_mode": item.routing_mode,
+                "prepared_at": item.prepared_at.isoformat()
+                if item.prepared_at
+                else None,
+                "withdrawn_at": item.withdrawn_at.isoformat()
+                if item.withdrawn_at
+                else None,
+                "cancelled_at": item.cancelled_at.isoformat()
+                if item.cancelled_at
+                else None,
+                "sealed_pdf_sha256": _sealed_sha(item.id),
+                "supersedes_envelope_id": item.supersedes_envelope_id,
+                "superseded_by_envelope_id": item.superseded_by_envelope_id,
+                "is_current": item.id == envelope.id,
+            }
+            for item in full
+        ],
+    )
 
 
 # --------------------------------------------------------------- H1 rules

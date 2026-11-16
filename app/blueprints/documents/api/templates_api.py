@@ -158,6 +158,8 @@ def start_revision(template_id):
 @templates_api.route("/<int:template_id>/publish", methods=["POST"])
 @jwt_required()
 def publish_template(template_id):
+    from app.policies.step_up_enforcement import enforce as _enforce_step_up
+    _enforce_step_up()
     user = _actor()
     template = _owned(template_id, user)
     # Separation of duties: the user publishing must not be the

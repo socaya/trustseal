@@ -140,6 +140,8 @@ def list_stamps():
 @stamp_custody_api.route("/<int:stamp_id>/approve", methods=["POST"])
 @jwt_required()
 def approve_registration(stamp_id):
+    from app.policies.step_up_enforcement import enforce as _enforce_step_up
+    _enforce_step_up()
     user = actor()
     _admin(user)
     item = _stamp(stamp_id, user, lock=True)

@@ -12,6 +12,8 @@ from ....services.token_security import active_token_user
 @system_bp.route('/api/users/<int:user_id>/roles', methods=['POST'])
 @jwt_required()
 def assign_role_to_user(user_id):
+    from ....policies.step_up_enforcement import enforce as _enforce_step_up
+    _enforce_step_up()
     actor = active_token_user()
     if actor is None or not actor.is_active:
         abort(401)

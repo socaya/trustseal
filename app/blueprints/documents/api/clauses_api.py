@@ -125,6 +125,8 @@ def reopen_clause(clause_id):
 @clauses_api.route("/<int:clause_id>/approve", methods=["POST"])
 @jwt_required()
 def approve_clause(clause_id):
+    from app.policies.step_up_enforcement import enforce as _enforce_step_up
+    _enforce_step_up()
     user = _actor()
     clause = _owned(clause_id, user)
     current_version = db.session.get(

@@ -5,7 +5,7 @@ TrustSeal is a browser-first, multi-tenant document trust platform designed to h
 The product vision combines document management with controlled authority, tamper-evident evidence, and independent verification. A signature image, stamp graphic, or QR code is never treated as proof by itself; TrustSeal is designed to associate each action with an exact document version, an authorized actor, a defined workflow, and an auditable evidence record.
 
 > [!IMPORTANT]
-> As of **2026-11-16**, Phases A–E of the code-addressable remediation plan are closed. The platform ships with: private object storage, tenant-scoped repositories hardened with PostgreSQL row-level security, idempotent transaction outbox + background workers, evidence-grade finalization with signed RFC 3161 timestamps and OCSP/CRL capture, immutable validation dossiers, signed PDF sealing through AWS KMS via pyHanko, public tamper-evident verification wired to the validation dossier, append-only SHA-256 chained audit log with externally-signed chain anchors, durable DB-backed rate limiting, drawn-signature capture on `/sign` with vendored PDF.js and signature_pad, OpenTelemetry tracing + Prometheus metrics, OIDC SSO, SCIM 2.0 provisioning, **email verification + password-reset lifecycle + session/device management + step-up MFA on high-risk actions** (Phase A), **separation-of-duties policy + teams + time-bound delegation** (Phase B), **multi-field placement with signer-scoped ownership + sequential/parallel/quorum routing + withdraw/reminder/resend + preview checkpoint** (Phase C), **Pillow image→PDF ingestion + pypdf-based safe preview + bulk document upload with per-item recovery** (Phase D), **template versioning with publication workflow + clause libraries + Postgres full-text search** (Phase E), and a **708-test pytest suite running against real PostgreSQL**. What remains is **process and governance** — external pen-test engagement, SLO/error-budget codification, SAML, cross-region replica topology — tracked in [`docs/REMAINING_GAPS_2026-11-15.md`](docs/REMAINING_GAPS_2026-11-15.md). Do not represent the current build as legally certified, universally binding, tamper-proof, or compliant with a specific jurisdiction until the external pen-test and jurisdictional-approval steps in that document complete.
+> As of **2026-11-16**, Phases A–I of the code-addressable remediation plan are closed. The platform ships with: private object storage, tenant-scoped repositories hardened with PostgreSQL row-level security, idempotent transaction outbox + background workers, evidence-grade finalization with signed RFC 3161 timestamps and OCSP/CRL capture, immutable validation dossiers, signed PDF sealing through AWS KMS via pyHanko, public tamper-evident verification wired to the validation dossier, append-only SHA-256 chained audit log with externally-signed chain anchors, durable DB-backed rate limiting, drawn/typed/uploaded signature capture on `/sign` with vendored PDF.js and signature_pad, OpenTelemetry tracing + Prometheus metrics, OIDC + **SAML 2.0 SSO (with SP-signed AuthnRequests)**, SCIM 2.0 provisioning, email verification, password-reset lifecycle, session/device management, step-up MFA enforced on high-risk routes, separation-of-duties policy, teams, time-bound delegation, multi-field placement with signer-scoped ownership, sequential/parallel/quorum **and conditional** routing (JSON predicate DSL), withdraw/reminder/resend, preview checkpoint, image→PDF + sandboxed DOCX→PDF ingestion, pypdf-based safe preview, bulk upload with per-item recovery, template versioning with publication workflow, clause libraries, Postgres full-text search, usage ledger + plan entitlement enforcement, envelope reissue lineage, provider-agnostic billing adapter, and a **787-test pytest suite running against real PostgreSQL**. What remains is **process and governance** — external pen-test engagement, SLO/error-budget codification, cross-region replica topology — tracked in [`docs/REMAINING_GAPS_2026-11-15.md`](docs/REMAINING_GAPS_2026-11-15.md). Do not represent the current build as legally certified, universally binding, tamper-proof, or compliant with a specific jurisdiction until the external pen-test and jurisdictional-approval steps in that document complete.
 
 ## Contents
 
@@ -72,9 +72,9 @@ Status legend:
 | Session and device management | Shipped (Phase A3) | `UserSession` per refresh family with UA/IP/last-seen; `GET /api/auth/sessions`, `DELETE /api/auth/sessions/<id>`, `DELETE /api/auth/sessions/others`. |
 | External participant access | Shipped | Hashed single-use `SignerInvitation` tokens (14-day TTL, recipient-bound, revocable) with partial-unique index supporting resend. `app/services/signer_invitations.py`. |
 | SSO (OIDC) | Shipped | OIDC provider configuration + JIT user provisioning. `app/models/oidc_provider.py`, `tests/test_oidc_sso.py`. |
-| SSO (SAML) | Deferred | Tracked in remaining-gaps doc. |
+| SSO (SAML) | Shipped (Phase G) | SP-initiated, HTTP-POST response binding, SP-signed AuthnRequests (Phase H3). `app/services/saml.py`, `app/blueprints/auth/routes/saml_views.py`. |
 | SCIM 2.0 provisioning | Shipped | `/scim/v2/` endpoints with service-account bearer auth. `app/blueprints/integrations/scim_api.py`. |
-| Identity assurance policies | Partial | `@require_recent_mfa` decorator ready; per-route gating of specific workflows is an operator rollout decision. |
+| Identity assurance policies | Shipped (Phase I1) | Step-up MFA applied inline on envelope prepare, stamp approve, template publish, clause approve, admin role grant. Operator flag `STEP_UP_MFA_REQUIRED` controls rollout. `app/policies/step_up_enforcement.py`. |
 
 ### Organisations, teams, and authorization
 
@@ -95,7 +95,7 @@ Status legend:
 | Document records | Shipped | CRUD + soft-delete + tenant-scoped repository. |
 | PDF ingestion | Shipped | Magic-check + ClamAV scan + atomic promotion to immutable private-storage object. `app/services/documents/private_storage.py`. |
 | Image (PNG/JPEG) ingestion | Shipped (Phase D1) | Pillow + reportlab single-page conversion with magic check, byte cap, pixel cap, RGBA flattening. Config gate `IMAGE_PDF_CONVERSION_ENABLED`. `app/services/documents/image_conversion.py`. |
-| DOCX ingestion | Deferred | Needs isolated subprocess conversion with resource limits. |
+| DOCX ingestion | Shipped (Phase I4) | Sandboxed `libreoffice --headless --convert-to pdf` subprocess with timeout + resource-limited temp dir + output validation. Config gate `DOCX_LIBREOFFICE_BINARY`. `app/services/documents/docx_conversion.py`. |
 | Drafts and sections | Shipped | Models + CRUD; immutable append-only snapshots via `DocumentSnapshot` + Postgres triggers. |
 | Document types and classification | Shipped | DocumentType + tags + ownership. |
 | Versions | Shipped | `DocumentBlob` revisions; SHA-256 manifests; append-only. |
@@ -113,8 +113,8 @@ Status legend:
 | Capability | Status | Behavior |
 | --- | --- | --- |
 | Rich-text + template composition | Shipped | `DocumentTemplate` + `DocumentTemplateVersion` state machine. |
-| Headings / tables / clauses / variables | Partial | Clause libraries shipped (below); rich-text UI primitives are a frontend milestone. |
-| Draft autosave + optimistic concurrency | Deferred | Needs frontend coordination. |
+| Headings / tables / clauses / variables | Partial | Clause libraries shipped (below); rich-text primitives are a frontend milestone. |
+| Draft autosave + optimistic concurrency | Shipped (Phase H2) | `version` column on `DocumentDraft`; `POST /api/document-drafts/<id>/autosave` requires `If-Match: <version>`; 412 returned on stale writes. |
 | Multi-field placement (signature, initials, date, text, checkbox) | Shipped (Phase C1) | `EnvelopeField` with per-participant assignment, page + coord rectangles, field_type enum. `POST/DELETE /api/envelopes/<id>/fields`. |
 | Page-accurate coordinates + preview | Shipped | PDF user-space (x_pt, y_pt, width_pt, height_pt); vendored PDF.js viewer on `/sign`. |
 | Required/optional fields + signer-scoped visibility | Shipped (Phase C2) | A signer only sees their own fields via `GET /api/signer-intent/envelopes/<id>/fields`; foreign field ids submitted on a decision get 403. |
@@ -130,18 +130,18 @@ Status legend:
 | Signature profiles | Shipped | SignatureProfile per user. |
 | Signature requests | Shipped | SignatureRequest + SignatureRequestActivity + routing through signer intent. |
 | Drawn appearance | Shipped (G10) | signature_pad canvas + `SignerAppearance` row persists 256 KB PNG into private storage; SHA-256 recorded. |
-| Typed and uploaded appearances | Partial | Stored but no first-party rendering pipeline yet. |
+| Typed and uploaded appearances | Shipped (Phase I2 + I3) | Server-side rendering of typed names via Pillow; uploaded PNG/JPEG normalised to PNG. `appearance_kind` column distinguishes `drawn` / `typed` / `uploaded`. `app/services/signer_appearances.py`. |
 | Secure signing invitations | Shipped | Hashed, recipient-bound, 14-day TTL, revocable; resend revokes + reissues via `POST /api/envelopes/<id>/participants/<pid>/resend-invitation`. |
 | Explicit electronic consent | Shipped | Versioned consent wording stored by hash; intent captured on SignerDecision with time + affirmation. |
 | Field ownership enforcement | Shipped (Phase C2) | Signer sees only own fields; `submit_values` raises `FieldOwnershipError` on cross-participant writes. |
 | Routing — sequential, parallel, quorum | Shipped (Phase C3) | `SigningEnvelope.routing_mode` + `quorum_required`; eligibility engine honours the mode. Witness role waits for every signer / until quorum met. |
 | Routing — witness | Shipped (Phase C3) | Witness participant signs last in every mode. |
-| Routing — conditional | Deferred | Needs rules DSL. |
+| Routing — conditional | Shipped (Phase H1) | `EnvelopeRoutingRule` with a safe JSON predicate DSL (and/or/not + six comparators + typed refs; depth-capped). Rules layer on top of sequential/parallel/quorum modes. `app/services/envelope_routing_rules.py`. |
 | Exceptions — decline, expiry, cancel | Shipped | Decline/expiry/cancel records on SignerDecision + SignerInvitation lifecycle. |
 | Exceptions — reminder | Shipped (Phase C4) | `POST /api/envelopes/<id>/participants/<pid>/reminder` sends an email via the mailer transport. |
 | Exceptions — resend | Shipped (Phase C4) | `POST /api/envelopes/<id>/participants/<pid>/resend-invitation` revokes + reissues. |
 | Exceptions — withdraw | Shipped (Phase C4) | `POST /api/envelopes/<id>/withdraw` for prepared envelopes before any decision lands. |
-| Exceptions — correction/reissue | Partial | Current workflow: withdraw + new envelope. First-class supersession lineage is a follow-up. |
+| Exceptions — correction/reissue | Shipped (Phase F3 + I6) | `POST /api/envelopes/<id>/reissue` clones participants + fields with `supersedes_envelope_id`/`superseded_by_envelope_id` links; `GET /api/envelopes/<id>/lineage` walks the full chain for verification. |
 | Idempotent finalization | Shipped | Orchestrator is idempotent via `IdempotencyRecord`. |
 | Evidence package | Shipped | Document digest + invitation + consent + events + timestamps + manifest exported from `ValidationDossier`. |
 | Certificate-backed signatures | Shipped | pyHanko external signer against AWS KMS; CMS/PAdES chain with TSA + OCSP evidence. `app/services/pdf_sealing.py`. |
@@ -481,14 +481,14 @@ Status legend:
 | Template versioning + publication | Shipped | `app/services/templates.py`, `DocumentTemplateVersion` |
 | Clause libraries | Shipped | `app/services/clauses.py`, `app/models/clause.py` |
 | Full-text document search | Shipped | `app/services/document_search.py` (Postgres tsvector) |
-| Subscription records + billing hooks | Partial | `app/models/subscription.py` (provider adapter deferred) |
+| Subscription records + billing hooks | Shipped (Phase I5) | Provider-agnostic `BillingProvider` interface + in-memory reference adapter + registry. Operator selects provider via `BILLING_PROVIDER`; real Stripe/Paddle adapters plug in by implementing the ABC. `app/services/billing.py`. |
 | Automated test suite | Shipped | **708 tests** against real PostgreSQL |
 | SBOM + supply-chain provenance | Deferred | Tooling-only policy decision |
 | SAST / dependency / secrets scanning | Deferred | Tooling-only policy decision |
 | Accessibility — static checks | Shipped | `tests/test_accessibility.py` |
 | Accessibility — axe-core / Playwright | Deferred | Tracked as G5 |
 | External penetration test | Deferred | Tracked as G6 |
-| SAML SSO | Deferred | Tracked separately |
+| SAML SSO | Shipped (Phase G + H3) | `app/services/saml.py`, `app/blueprints/auth/routes/saml_views.py`. SP-signed AuthnRequests supported. |
 | Cross-region idempotency topology | Deferred | Tracked as G3 |
 | Enterprise SLOs + error budgets | Deferred | Tracked in remaining-gaps doc |
 
@@ -645,7 +645,7 @@ The target test programme maps tests to the requirement IDs in the Master SRS:
 
 ### Current test suite
 
-The repository ships with a **708-test pytest suite** that runs against real PostgreSQL (no SQLite fallback). The suite covers:
+The repository ships with a **787-test pytest suite** that runs against real PostgreSQL (no SQLite fallback). The suite covers:
 
 - Audit chain integrity, forged event detection, signed-anchor verification.
 - PostgreSQL row-level security enforcement under a non-privileged role.

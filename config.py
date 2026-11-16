@@ -45,6 +45,29 @@ class Config:
         'SAFE_PREVIEW_ENABLED', 'false'
     ).lower() == 'true'
 
+    # Step-up MFA enforcement on high-risk routes (Phase I1). Defaults
+    # to false so operators can enable the rollout per deployment.
+    STEP_UP_MFA_REQUIRED = os.getenv(
+        'STEP_UP_MFA_REQUIRED', 'false'
+    ).lower() == 'true'
+
+    # Typed signature rendering (Phase I2).
+    TYPED_SIGNATURE_RENDERING_ENABLED = os.getenv(
+        'TYPED_SIGNATURE_RENDERING_ENABLED', 'false'
+    ).lower() == 'true'
+
+    # DOCX → PDF ingestion via LibreOffice (Phase I4).
+    DOCX_LIBREOFFICE_BINARY = os.getenv('DOCX_LIBREOFFICE_BINARY')
+    DOCX_CONVERSION_TIMEOUT = int(os.getenv('DOCX_CONVERSION_TIMEOUT', '60'))
+    DOCX_CONVERSION_MAX_BYTES = int(
+        os.getenv('DOCX_CONVERSION_MAX_BYTES', str(25 * 1024 * 1024))
+    )
+
+    # Billing provider selector (Phase I5). ``memory`` is the test /
+    # reference adapter; operators may plug in Stripe/Paddle later by
+    # registering a new provider class.
+    BILLING_PROVIDER = os.getenv('BILLING_PROVIDER', 'memory')
+
     # === Detached review attestation keys (operator issuance only) ===
     # Protected private key path, never a URL, static asset or checked-in secret.
     REVIEW_RECEIPT_PRIVATE_KEY = os.getenv('REVIEW_RECEIPT_PRIVATE_KEY')
