@@ -13,6 +13,7 @@ from .documents.document_template import DocumentTemplate, DocumentTemplateVersi
 from .documents.document_version import DocumentVersion
 from .documents.document_snapshot import DocumentSnapshot
 from .documents.document_blob import DocumentBlob
+from .documents.document_label import DocumentLabel
 from .revoked_token import RevokedToken
 from .event_delivery import SecurityEvent, OutboxEvent
 from .signing_envelope import SigningEnvelope, EnvelopeParticipant

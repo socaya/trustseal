@@ -1435,3 +1435,97 @@ def bulk_label_envelopes():
         ),
         http_status,
     )
+
+
+# ============================================================ Y2 bulk archive
+
+
+@envelope_api.route("/bulk/archive", methods=["POST"])
+@jwt_required()
+def bulk_archive_envelopes():
+    """Archive up to 100 terminal-state envelopes atomically.
+
+    Payload: ``{"envelope_ids": [int, ...]}``. Each row must be in
+    a terminal state (``withdrawn``, ``cancelled``, ``superseded``)
+    and already owned by the caller. Rows already archived report
+    ``succeeded`` with ``already_archived=True``.
+    """
+    user = _actor()
+    data = _payload()
+    ids = data.get("envelope_ids")
+    if not isinstance(ids, list) or not ids:
+        abort(400, description="envelope_ids_required")
+    if len(ids) > 100:
+        abort(413, description="bulk_archive_limit_100")
+
+    seen: set[int] = set()
+    results: list[dict] = []
+    archived_now = 0
+    moment = datetime.utcnow()
+    for env_id in ids:
+        entry = {"envelope_id": env_id}
+        if type(env_id) is not int:
+            entry["status"] = "failed"
+            entry["error_code"] = "envelope_id_invalid"
+            results.append(entry)
+            continue
+        if env_id in seen:
+            entry["status"] = "failed"
+            entry["error_code"] = "duplicate_id"
+            results.append(entry)
+            continue
+        seen.add(env_id)
+        envelope = (
+            SigningEnvelope.query.filter_by(
+                id=env_id,
+                organization_id=user.organization_id,
+                created_by_id=user.id,
+            )
+            .with_for_update()
+            .first()
+        )
+        if envelope is None:
+            entry["status"] = "failed"
+            entry["error_code"] = "envelope_not_found"
+            results.append(entry)
+            continue
+        if envelope.state not in _ARCHIVABLE_STATES:
+            entry["status"] = "failed"
+            entry["error_code"] = "state_not_archivable"
+            results.append(entry)
+            continue
+        if envelope.archived_at is not None:
+            entry["status"] = "succeeded"
+            entry["already_archived"] = True
+            results.append(entry)
+            continue
+        envelope.archived_at = moment
+        envelope.archived_by_id = user.id
+        archived_now += 1
+        entry["status"] = "succeeded"
+        entry["already_archived"] = False
+        results.append(entry)
+
+    succeeded = sum(1 for r in results if r["status"] == "succeeded")
+    failed = len(results) - succeeded
+    if succeeded == 0:
+        db.session.rollback()
+        return (
+            jsonify(
+                succeeded=0,
+                failed=failed,
+                results=results,
+            ),
+            400,
+        )
+    db.session.commit()
+    http_status = 207 if failed else 200
+    return (
+        jsonify(
+            succeeded=succeeded,
+            failed=failed,
+            archived=archived_now,
+            results=results,
+        ),
+        http_status,
+    )

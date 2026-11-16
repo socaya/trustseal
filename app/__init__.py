@@ -330,6 +330,10 @@ def create_app(config_class=None):
         operator_notifications_api,
     )
     blueprints.append(operator_notifications_api)
+    from .blueprints.documents.api.document_label_api import (
+        document_label_api,
+    )
+    blueprints.append(document_label_api)
     from .blueprints.integrations.scim_api import scim_api
     blueprints.append(scim_api)
     from .blueprints.integrations.openapi_api import openapi_api
