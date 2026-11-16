@@ -31,9 +31,20 @@ class SigningEnvelope(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     prepared_at = db.Column(db.DateTime)
     cancelled_at = db.Column(db.DateTime)
+    supersedes_envelope_id = db.Column(
+        db.Integer,
+        db.ForeignKey("signing_envelopes.id"),
+        nullable=True,
+    )
+    superseded_by_envelope_id = db.Column(
+        db.Integer,
+        db.ForeignKey("signing_envelopes.id"),
+        nullable=True,
+    )
+
     __table_args__ = (
         db.CheckConstraint(
-            "state IN ('draft','prepared','cancelled','withdrawn')",
+            "state IN ('draft','prepared','cancelled','withdrawn','superseded')",
             name="ck_envelope_preparation_state",
         ),
         db.CheckConstraint(

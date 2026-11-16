@@ -68,6 +68,8 @@ def _details(item):
         else None,
         "withdrawn_by_id": item.withdrawn_by_id,
         "withdraw_reason": item.withdraw_reason,
+        "supersedes_envelope_id": item.supersedes_envelope_id,
+        "superseded_by_envelope_id": item.superseded_by_envelope_id,
         "participants": [
             {"id": p.id, "user_id": p.user_id, "role": p.role,
              "signing_order": p.signing_order} for p in people
@@ -197,6 +199,24 @@ def prepare_envelope(envelope_id):
     envelope = _owned(envelope_id, user, lock=True)
     if envelope.state != "draft":
         abort(409, description="Envelope is no longer editable")
+    # Entitlement check: if the tenant's plan caps envelope.prepared
+    # hits for the period, refuse before locking the envelope state.
+    from app.services import entitlements as _entitlements
+
+    try:
+        _entitlements.check(user.organization_id, "envelope.prepared")
+    except _entitlements.EntitlementExceeded as exc:
+        return (
+            jsonify(
+                error=str(exc),
+                meter=exc.meter,
+                period=exc.period,
+                used=exc.used,
+                limit=exc.limit,
+                type="https://trustseal.dev/problems/entitlement-exceeded",
+            ),
+            402,
+        )
     participants = EnvelopeParticipant.query.filter_by(
         envelope_id=envelope.id
     ).order_by(EnvelopeParticipant.signing_order).all()
@@ -253,6 +273,16 @@ def prepare_envelope(envelope_id):
         actor_id=user.id, action="envelope.prepared",
         idempotency_key="envelope-prepared:%s" % envelope.id,
     )
+    # Meter the business event with the envelope id so retries
+    # (idempotent prepare) never double-count.
+    from app.services import usage_ledger as _usage
+
+    _usage.record(
+        user.organization_id,
+        "envelope.prepared",
+        f"envelope:{envelope.id}",
+        actor_id=user.id,
+    )
     db.session.commit()
     return jsonify(_details(envelope))
 
@@ -300,6 +330,94 @@ def _field_dict(row: EnvelopeField) -> dict:
         "value": row.value,
         "submitted_at": row.submitted_at.isoformat() if row.submitted_at else None,
     }
+
+
+# --------------------------------------------------------------- F3 reissue
+
+
+@envelope_api.route("/<int:envelope_id>/reissue", methods=["POST"])
+@jwt_required()
+@idempotent("envelopes.reissue")
+def reissue_envelope(envelope_id):
+    """Clone a prepared / withdrawn / cancelled envelope into a fresh draft.
+
+    Preserves lineage: the new envelope's ``supersedes_envelope_id``
+    points back at the original; the original's
+    ``superseded_by_envelope_id`` points forward at the new one and
+    its state flips to ``superseded`` (if not already terminal). All
+    participants + fields are copied so the caller can edit the new
+    draft before confirming its preview and preparing.
+    """
+    user = _actor()
+    original = _owned(envelope_id, user, lock=True)
+    if original.state not in ("prepared", "withdrawn", "cancelled"):
+        abort(409, description="reissue_requires_terminal_state")
+    if original.superseded_by_envelope_id is not None:
+        abort(409, description="envelope_already_superseded")
+
+    clone = SigningEnvelope(
+        organization_id=original.organization_id,
+        document_id=original.document_id,
+        document_blob_id=original.document_blob_id,
+        document_sha256=original.document_sha256,
+        created_by_id=user.id,
+        state="draft",
+        routing_mode=original.routing_mode,
+        quorum_required=original.quorum_required,
+        supersedes_envelope_id=original.id,
+    )
+    db.session.add(clone)
+    db.session.flush()
+
+    # Copy participants.
+    participants_old = EnvelopeParticipant.query.filter_by(
+        envelope_id=original.id
+    ).order_by(EnvelopeParticipant.signing_order.asc()).all()
+    old_to_new: dict[int, int] = {}
+    for p in participants_old:
+        new_p = EnvelopeParticipant(
+            envelope_id=clone.id,
+            user_id=p.user_id,
+            signing_order=p.signing_order,
+            role=p.role,
+        )
+        db.session.add(new_p)
+        db.session.flush()
+        old_to_new[p.id] = new_p.id
+
+    # Copy fields with freshly-mapped participant ids and no values.
+    for f in EnvelopeField.query.filter_by(envelope_id=original.id).all():
+        db.session.add(
+            EnvelopeField(
+                envelope_id=clone.id,
+                participant_id=old_to_new[f.participant_id],
+                field_type=f.field_type,
+                label=f.label,
+                page_number=f.page_number,
+                x_pt=f.x_pt,
+                y_pt=f.y_pt,
+                width_pt=f.width_pt,
+                height_pt=f.height_pt,
+                required=f.required,
+                created_by_id=user.id,
+            )
+        )
+
+    # Mark the original superseded (unless it's withdrawn/cancelled,
+    # which are terminal and keep their state but still record the
+    # forward pointer).
+    original.superseded_by_envelope_id = clone.id
+    if original.state == "prepared":
+        original.state = "superseded"
+
+    enqueue(
+        event_type="envelope.reissued", aggregate_type="envelope",
+        aggregate_id=clone.id, organization_id=user.organization_id,
+        actor_id=user.id, action="envelope.reissued",
+        idempotency_key="envelope-reissued:%s" % clone.id,
+    )
+    db.session.commit()
+    return jsonify(_details(clone)), 201
 
 
 # --------------------------------------------------------------- C4/C5 extras

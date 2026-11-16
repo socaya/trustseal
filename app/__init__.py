@@ -239,6 +239,8 @@ def create_app(config_class=None):
     blueprints.append(templates_api)
     from .blueprints.documents.api.clauses_api import clauses_api
     blueprints.append(clauses_api)
+    from .blueprints.subscriptions.routes.usage_api import usage_api
+    blueprints.append(usage_api)
     from .blueprints.integrations.scim_api import scim_api
     blueprints.append(scim_api)
     from .blueprints.integrations.openapi_api import openapi_api

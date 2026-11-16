@@ -527,6 +527,19 @@ def bulk_ingest_documents():
     batch.success_count = sum(1 for r in results if r.status == "succeeded")
     batch.failure_count = sum(1 for r in results if r.status == "failed")
     batch.completed_at = _dt.utcnow()
+    # Meter one hit per successful item, deduplicated by item id so
+    # the same batch cannot be re-metered on retry.
+    from app.services import usage_ledger as _usage
+
+    for r in results:
+        if r.status != "succeeded":
+            continue
+        _usage.record(
+            user.organization_id,
+            "document.bulk_ingested",
+            f"bulk_item:{r.id}",
+            actor_id=user.id,
+        )
     db.session.commit()
 
     def _item_payload(it):
