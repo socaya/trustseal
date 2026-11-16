@@ -179,11 +179,52 @@ def create_app(config_class=None):
         return login_manager.unauthorized()
 
 
+    @app.before_request
+    def _bind_request_id():
+        """Honour an incoming X-Request-Id or mint a fresh one.
+
+        Stored on ``g.request_id`` so downstream code (audit chain,
+        security events, structured logs) can correlate work for a
+        single request. Trimmed to a defensive max-length to prevent
+        header-smuggling / log-flooding.
+        """
+        from flask import g
+        import uuid as _uuid
+
+        incoming = request.headers.get("X-Request-Id", "").strip()
+        if incoming and len(incoming) <= 128 and all(
+            ch.isalnum() or ch in "-_" for ch in incoming
+        ):
+            g.request_id = incoming
+        else:
+            g.request_id = _uuid.uuid4().hex
+
+
     @app.after_request
     def after_request_handler(response):
         """Runs after each request, before sending the response."""
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+
+        # S2 — surface the request/trace correlation so clients and
+        # proxies can line up API responses with server-side logs.
+        from flask import g
+
+        request_id = getattr(g, "request_id", None)
+        if request_id:
+            response.headers["X-Request-Id"] = request_id
+
+        trace_id = None
+        try:
+            from opentelemetry import trace as _otel
+
+            span = _otel.get_current_span()
+            ctx = span.get_span_context() if span is not None else None
+            if ctx is not None and getattr(ctx, "trace_id", 0):
+                trace_id = format(ctx.trace_id, "032x")
+        except Exception:
+            trace_id = None
+        response.headers["X-Trace-Id"] = trace_id or request_id or ""
         return response
 
     # --- PostgreSQL row-level security tenant propagation ---
@@ -274,6 +315,10 @@ def create_app(config_class=None):
     blueprints.append(outbox_admin_api)
     from .blueprints.system.routes.admin_dashboard import admin_dashboard_api
     blueprints.append(admin_dashboard_api)
+    from .blueprints.documents.api.envelope_template_api import (
+        envelope_template_api,
+    )
+    blueprints.append(envelope_template_api)
     from .blueprints.integrations.scim_api import scim_api
     blueprints.append(scim_api)
     from .blueprints.integrations.openapi_api import openapi_api
