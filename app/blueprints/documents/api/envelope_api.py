@@ -1972,3 +1972,176 @@ def list_tenant_envelope_labels():
         organization_id=user.organization_id,
         labels=[{"label": label, "count": int(count)} for label, count in rows],
     )
+
+
+# ============================================================ AI1 ownership transfer
+
+
+@envelope_api.route("/<int:envelope_id>/transfer", methods=["POST"])
+@jwt_required()
+def transfer_envelope(envelope_id):
+    """Reassign an envelope to another active tenant member.
+
+    Payload: ``{"new_owner_id": <int>}``. Only draft or prepared
+    envelopes without any recorded decisions can be transferred —
+    once a signer has acted the audit trail must retain the
+    original issuer, so the endpoint refuses with 409.
+
+    The caller must be either the current owner or an admin in
+    the envelope's tenant. The target user must be active and
+    in the same organisation.
+    """
+    from app.models.signer_decision import SignerDecision
+    from app.policies.api_access import is_admin
+
+    user = _actor()
+    envelope = (
+        SigningEnvelope.query.filter_by(
+            id=envelope_id, organization_id=user.organization_id
+        )
+        .with_for_update()
+        .first()
+    )
+    if envelope is None:
+        abort(404)
+    if envelope.created_by_id != user.id and not is_admin(user.id):
+        abort(403, description="transfer_requires_owner_or_admin")
+    if envelope.state not in {"draft", "prepared"}:
+        abort(409, description="transfer_requires_pre_finalized_state")
+    if SignerDecision.query.filter_by(envelope_id=envelope.id).count():
+        abort(409, description="transfer_blocked_decisions_recorded")
+    data = _payload()
+    new_owner_id = data.get("new_owner_id")
+    if type(new_owner_id) is not int or new_owner_id <= 0:
+        abort(400, description="new_owner_id_invalid")
+    if new_owner_id == envelope.created_by_id:
+        return jsonify(
+            envelope_id=envelope.id,
+            owner_id=envelope.created_by_id,
+            changed=False,
+        ), 200
+    target = db.session.get(User, new_owner_id)
+    if (
+        target is None
+        or not target.is_active
+        or target.organization_id != envelope.organization_id
+    ):
+        abort(404, description="new_owner_not_in_tenant")
+    previous = envelope.created_by_id
+    envelope.created_by_id = target.id
+    enqueue(
+        event_type="envelope.ownership.transferred",
+        aggregate_type="envelope",
+        aggregate_id=envelope.id,
+        organization_id=envelope.organization_id,
+        actor_id=user.id,
+        action="envelope.ownership.transferred",
+        idempotency_key="envelope-transfer:%s:%s" % (envelope.id, target.id),
+    )
+    from app.services import operator_notifications
+
+    operator_notifications.publish(
+        organization_id=envelope.organization_id,
+        recipient_user_id=target.id,
+        kind="envelope.ownership.transferred",
+        subject_type="signing_envelope",
+        subject_id=envelope.id,
+        summary=(
+            f"Envelope #{envelope.id} was transferred to you "
+            f"by user #{user.id}."
+        ),
+    )
+    db.session.commit()
+    return jsonify(
+        envelope_id=envelope.id,
+        previous_owner_id=previous,
+        owner_id=target.id,
+        changed=True,
+    ), 200
+
+
+# ============================================================ AI2 bulk label remove
+
+
+@envelope_api.route("/bulk/label/remove", methods=["POST"])
+@jwt_required()
+def bulk_remove_envelope_label():
+    """Detach a label from up to 100 envelopes atomically.
+
+    Payload: ``{"envelope_ids": [int, ...], "label": "<str>"}``.
+    Rows without the label report ``succeeded`` with
+    ``already_removed=True``. The whole batch rolls back when
+    every row fails.
+    """
+    user = _actor()
+    data = _payload()
+    ids = data.get("envelope_ids")
+    label_raw = data.get("label")
+    if not isinstance(ids, list) or not ids:
+        abort(400, description="envelope_ids_required")
+    if len(ids) > 100:
+        abort(413, description="bulk_label_remove_limit_100")
+    label = _normalise_label(label_raw)
+    if label is None:
+        abort(400, description="label_invalid")
+
+    seen: set[int] = set()
+    results: list[dict] = []
+    removed_now = 0
+    for env_id in ids:
+        entry = {"envelope_id": env_id}
+        if type(env_id) is not int:
+            entry["status"] = "failed"
+            entry["error_code"] = "envelope_id_invalid"
+            results.append(entry)
+            continue
+        if env_id in seen:
+            entry["status"] = "failed"
+            entry["error_code"] = "duplicate_id"
+            results.append(entry)
+            continue
+        seen.add(env_id)
+        envelope = SigningEnvelope.query.filter_by(
+            id=env_id,
+            organization_id=user.organization_id,
+            created_by_id=user.id,
+        ).first()
+        if envelope is None:
+            entry["status"] = "failed"
+            entry["error_code"] = "envelope_not_found"
+            results.append(entry)
+            continue
+        row = EnvelopeLabel.query.filter_by(
+            envelope_id=envelope.id, label=label
+        ).first()
+        if row is None:
+            entry["status"] = "succeeded"
+            entry["already_removed"] = True
+            results.append(entry)
+            continue
+        db.session.delete(row)
+        removed_now += 1
+        entry["status"] = "succeeded"
+        entry["already_removed"] = False
+        results.append(entry)
+
+    succeeded = sum(1 for r in results if r["status"] == "succeeded")
+    failed = len(results) - succeeded
+    if succeeded == 0:
+        db.session.rollback()
+        return (
+            jsonify(label=label, succeeded=0, failed=failed, results=results),
+            400,
+        )
+    db.session.commit()
+    http_status = 207 if failed else 200
+    return (
+        jsonify(
+            label=label,
+            succeeded=succeeded,
+            failed=failed,
+            removed=removed_now,
+            results=results,
+        ),
+        http_status,
+    )
