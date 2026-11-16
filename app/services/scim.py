@@ -56,20 +56,90 @@ def mint_token(
     tenant_id: int,
     created_by_id: int,
     display_name: str,
+    expires_in_days: int | None = None,
+    rotated_from_id: int | None = None,
 ) -> tuple[ScimServiceAccount, str]:
     if not isinstance(display_name, str) or not 1 <= len(display_name) <= 120:
         raise ScimError("display_name required")
     token = "scim_" + secrets.token_urlsafe(32)
+    expires_at = None
+    if expires_in_days is not None:
+        if not isinstance(expires_in_days, int) or not 1 <= expires_in_days <= 3650:
+            raise ScimError("expires_in_days_out_of_range")
+        from datetime import timedelta
+
+        expires_at = datetime.utcnow() + timedelta(days=expires_in_days)
     account = ScimServiceAccount(
         organization_id=tenant_id,
         created_by_id=created_by_id,
         display_name=display_name,
         token_hash=_token_hash(token),
         active=True,
+        expires_at=expires_at,
+        rotated_from_id=rotated_from_id,
     )
     db.session.add(account)
     db.session.flush()
     return account, token
+
+
+def rotate_token(
+    account_id: int,
+    *,
+    tenant_id: int,
+    rotated_by_id: int,
+    expires_in_days: int | None = None,
+) -> tuple[ScimServiceAccount, str]:
+    """Issue a fresh token and revoke the current one atomically."""
+    current = ScimServiceAccount.query.filter_by(
+        id=account_id, organization_id=tenant_id
+    ).with_for_update().one_or_none()
+    if current is None:
+        raise ScimError("account_not_found", status=404)
+    if not current.active or current.revoked_at is not None:
+        raise ScimError("account_not_active")
+    now = datetime.utcnow()
+    current.active = False
+    current.revoked_at = now
+    current.revoked_by_id = rotated_by_id
+    current.revoke_reason = "rotated"
+    new_account, new_token = mint_token(
+        tenant_id=tenant_id,
+        created_by_id=rotated_by_id,
+        display_name=current.display_name,
+        expires_in_days=expires_in_days,
+        rotated_from_id=current.id,
+    )
+    return new_account, new_token
+
+
+def revoke_token(
+    account_id: int,
+    *,
+    tenant_id: int,
+    revoked_by_id: int,
+    reason: str | None = None,
+) -> ScimServiceAccount:
+    row = ScimServiceAccount.query.filter_by(
+        id=account_id, organization_id=tenant_id
+    ).with_for_update().one_or_none()
+    if row is None:
+        raise ScimError("account_not_found", status=404)
+    if row.revoked_at is not None:
+        return row
+    row.active = False
+    row.revoked_at = datetime.utcnow()
+    row.revoked_by_id = revoked_by_id
+    row.revoke_reason = (reason or "operator")[:200]
+    return row
+
+
+def list_accounts(tenant_id: int) -> list[ScimServiceAccount]:
+    return (
+        ScimServiceAccount.query.filter_by(organization_id=tenant_id)
+        .order_by(ScimServiceAccount.id.desc())
+        .all()
+    )
 
 
 def authenticate() -> ScimServiceAccount | None:
@@ -85,8 +155,12 @@ def authenticate() -> ScimServiceAccount | None:
     ).first()
     if account is None:
         return None
-    # Record last-used for observability — not security.
-    account.last_used_at = datetime.utcnow()
+    now = datetime.utcnow()
+    if account.revoked_at is not None:
+        return None
+    if account.expires_at is not None and account.expires_at <= now:
+        return None
+    account.last_used_at = now
     db.session.flush()
     return account
 

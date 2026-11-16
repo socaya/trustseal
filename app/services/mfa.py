@@ -98,14 +98,42 @@ def _encrypt(secret: str, app_secret: str) -> str:
 
 
 def _decrypt(cipher: str, app_secret: str) -> str:
+    """Decrypt an MFA seed.
+
+    Dual-key support (Phase L2): when the Flask app exposes a
+    ``MFA_PREVIOUS_SECRET_KEYS`` list, the service tries every
+    previous key after the active key fails. This lets operators
+    rotate ``SECRET_KEY`` without breaking the existing credentials
+    — the admin runs ``flask mfa rewrap`` afterwards to migrate
+    stored seeds under the new key.
+    """
+    candidates = [app_secret]
     try:
-        return (
-            Fernet(_fernet_key(app_secret))
-            .decrypt(cipher.encode("ascii"))
-            .decode("ascii")
-        )
-    except InvalidToken as exc:
-        raise MfaError("MFA secret unwrap failed") from exc
+        from flask import current_app
+
+        previous = current_app.config.get("MFA_PREVIOUS_SECRET_KEYS") or []
+        if isinstance(previous, str):
+            previous = [previous]
+        for prev in previous:
+            if isinstance(prev, str) and prev:
+                candidates.append(prev)
+    except Exception:
+        pass
+    last_exc: Exception | None = None
+    for candidate in candidates:
+        try:
+            return (
+                Fernet(_fernet_key(candidate))
+                .decrypt(cipher.encode("ascii"))
+                .decode("ascii")
+            )
+        except InvalidToken as exc:
+            last_exc = exc
+            continue
+        except MfaError as exc:
+            last_exc = exc
+            continue
+    raise MfaError("MFA secret unwrap failed") from last_exc
 
 
 # ----------------------------------------------------------------- recovery codes
@@ -285,6 +313,43 @@ def is_enrolled(user) -> bool:
         and credential.activated_at is not None
         and credential.disabled_at is None
     )
+
+
+def rewrap_all(*, current_secret: str) -> dict:
+    """Re-encrypt every ``secret_cipher`` under ``current_secret``.
+
+    Walks every :class:`MfaCredential`, decrypts with the dual-key
+    reader, and re-encrypts with the active key. Returns a summary
+    dict with ``rewrapped`` + ``already_current`` + ``failed`` counts.
+    Caller commits.
+
+    Used by the ``flask mfa rewrap`` CLI after an operator rotates
+    ``SECRET_KEY`` with the previous value moved to
+    ``MFA_PREVIOUS_SECRET_KEYS``.
+    """
+    rewrapped = 0
+    already_current = 0
+    failed = 0
+    rows = MfaCredential.query.all()
+    for credential in rows:
+        try:
+            seed = _decrypt(credential.secret_cipher, current_secret)
+        except MfaError:
+            failed += 1
+            continue
+        fresh_cipher = _encrypt(seed, current_secret)
+        if fresh_cipher == credential.secret_cipher:
+            already_current += 1
+            continue
+        credential.secret_cipher = fresh_cipher
+        credential.updated_at = datetime.utcnow()
+        rewrapped += 1
+    db.session.flush()
+    return {
+        "rewrapped": rewrapped,
+        "already_current": already_current,
+        "failed": failed,
+    }
 
 
 def unused_recovery_code_count(user) -> int:

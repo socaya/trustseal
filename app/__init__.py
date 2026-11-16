@@ -259,6 +259,10 @@ def create_app(config_class=None):
     blueprints.append(tenant_erasure_api)
     from .blueprints.system.routes.break_glass_api import break_glass_api
     blueprints.append(break_glass_api)
+    from .blueprints.integrations.scim_admin_api import scim_admin_api
+    blueprints.append(scim_admin_api)
+    from .blueprints.auth.routes.sso_logout import sso_logout_api
+    blueprints.append(sso_logout_api)
     from .blueprints.integrations.scim_api import scim_api
     blueprints.append(scim_api)
     from .blueprints.integrations.openapi_api import openapi_api
@@ -277,6 +281,8 @@ def create_app(config_class=None):
 
     # --- Register CLI Commands ---
     register_cli(app)
+    from .cli.mfa_rewrap import register_cli as _register_mfa_cli
+    _register_mfa_cli(app)
 
     # --- Register Error Handlers (RFC 7807 for /api/, Jinja for views) ---
     from .errors.problem import register_problem_handlers

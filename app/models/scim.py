@@ -23,3 +23,23 @@ class ScimServiceAccount(db.Model):
     active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     last_used_at = db.Column(db.DateTime)
+    # Lifecycle extensions (Phase L1). Nullable ``expires_at`` keeps
+    # the pre-rotation semantics (never expires) while allowing new
+    # tokens to carry a bounded lifetime.
+    expires_at = db.Column(db.DateTime, nullable=True)
+    revoked_at = db.Column(db.DateTime, nullable=True)
+    revoked_by_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=True
+    )
+    revoke_reason = db.Column(db.String(200), nullable=True)
+    # ``rotated_from_id`` links a freshly-rotated account to the
+    # superseded one. Rotation preserves history instead of deleting.
+    rotated_from_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey(
+            "scim_service_accounts.id",
+            use_alter=True,
+            name="fk_scim_rotated_from",
+        ),
+        nullable=True,
+    )
