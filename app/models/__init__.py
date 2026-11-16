@@ -44,6 +44,7 @@ from .user_session import UserSession
 from .team import Team, TeamMembership
 from .delegation import Delegation
 from .envelope_field import EnvelopeField
+from .bulk_ingest import BulkIngestBatch, BulkIngestItem
 from .signer_cryptographic import (SignerPublicKey, SignerKeyChallenge, SignerEndorsementChallenge, SignerEndorsement)
 from .esignature import (
     SignatureProfile,

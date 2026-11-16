@@ -4,6 +4,7 @@ The legacy document API contained placeholder CRUD methods. These endpoints
 intentionally manage draft metadata only; evidence and signed records must be
 handled by immutable document workflows, not generic CRUD.
 """
+import io
 from datetime import datetime
 
 from flask import Blueprint, abort, jsonify, request
@@ -339,6 +340,388 @@ def _blob_metadata(record):
         "created_at": record.created_at.isoformat() if record.created_at else None,
         "security_status": "scanned_private_object",
     }
+
+
+@document_api.route("/bulk", methods=["POST"])
+@jwt_required()
+def bulk_ingest_documents():
+    """Ingest up to 25 PDF files in a single request.
+
+    Each file lands as its own ``Document`` + ``DocumentBlob`` pair.
+    Per-file failures do not fail sibling files; the response reports
+    a ``succeeded`` / ``failed`` status per item plus an overall
+    batch summary. Failed items record a machine-readable ``error_code``
+    and a short human message.
+
+    Pre-existing per-file ingestion rules still apply — PDF header
+    check, scanner, size cap.
+    """
+    from datetime import datetime as _dt
+
+    from flask import current_app
+    from sqlalchemy import func
+
+    from app.models.bulk_ingest import BulkIngestBatch, BulkIngestItem
+    from app.models.documents.document import Document
+    from app.models.documents.document_activity import DocumentActivity
+    from app.models.documents.document_blob import DocumentBlob
+    from app.services.documents.private_storage import (
+        IngestionError, cleanup_object, store_scanned_pdf,
+    )
+    from app.services.event_delivery import enqueue
+
+    user = actor()
+    uploads = request.files.getlist("files")
+    if not uploads:
+        abort(400, description="multipart/form-data files field required")
+    if len(uploads) > 25:
+        abort(413, description="bulk_limit_exceeded_25_files")
+
+    batch = BulkIngestBatch(
+        organization_id=user.organization_id,
+        created_by_id=user.id,
+        item_count=len(uploads),
+    )
+    db.session.add(batch)
+    db.session.flush()
+    results = []
+    for upload in uploads:
+        source_name = (
+            upload.filename or "upload.pdf"
+        ).replace("\\", "/").split("/")[-1][:200]
+        item = BulkIngestItem(
+            batch_id=batch.id,
+            filename=source_name,
+            status="pending",
+        )
+        db.session.add(item)
+        db.session.flush()
+        doc = Document(
+            title=source_name,
+            status="draft",
+            created_by=user.id,
+            organization_id=user.organization_id,
+        )
+        db.session.add(doc)
+        try:
+            db.session.flush()
+        except Exception as exc:  # pragma: no cover - defensive
+            db.session.rollback()
+            db.session.add(item)
+            item.status = "failed"
+            item.error_code = "document_create_failed"
+            item.error_message = str(exc)[:400]
+            item.completed_at = _dt.utcnow()
+            db.session.flush()
+            results.append(item)
+            continue
+        key = None
+        try:
+            key, name, size, digest, scanner = store_scanned_pdf(
+                upload.stream, source_name, current_app.config
+            )
+            blob = DocumentBlob(
+                document_id=doc.id,
+                revision=1,
+                object_key=key,
+                file_name=name,
+                mime_type="application/pdf",
+                file_size=size,
+                sha256=digest,
+                scanner=scanner,
+                created_by_id=user.id,
+            )
+            db.session.add(blob)
+            db.session.flush()
+            db.session.add(
+                DocumentActivity(
+                    document_id=doc.id,
+                    user_id=user.id,
+                    activity_type="private_file_ingested",
+                    details="Bulk-ingest PDF revision 1, SHA-256 %s" % digest,
+                )
+            )
+            enqueue(
+                event_type="document.file.ingested",
+                aggregate_type="document",
+                aggregate_id=doc.id,
+                organization_id=doc.organization_id,
+                actor_id=user.id,
+                action="document.file.ingested",
+                idempotency_key="document-file:%s:1" % doc.id,
+            )
+            item.status = "succeeded"
+            item.document_id = doc.id
+            item.blob_id = blob.id
+            item.completed_at = _dt.utcnow()
+        except IngestionError as exc:
+            # The per-file failure must not poison the batch — the
+            # Document row rolls back along with the half-created blob,
+            # but the item + batch rows persist so the client has a
+            # durable record of the failure.
+            db.session.rollback()
+            if key:
+                try:
+                    cleanup_object(key, current_app.config)
+                except IngestionError:
+                    current_app.logger.exception(
+                        "Unable to clean orphaned bulk-ingest object"
+                    )
+            # Re-fetch the batch + item that just got rolled back along
+            # with the failed Document insert.
+            batch = db.session.get(BulkIngestBatch, batch.id) or BulkIngestBatch(
+                id=batch.id,
+                organization_id=user.organization_id,
+                created_by_id=user.id,
+                item_count=len(uploads),
+            )
+            if db.session.get(BulkIngestBatch, batch.id) is None:
+                db.session.add(batch)
+                db.session.flush()
+            item = BulkIngestItem(
+                batch_id=batch.id,
+                filename=source_name,
+                status="failed",
+                error_code="ingestion_error",
+                error_message=str(exc)[:400],
+                completed_at=_dt.utcnow(),
+            )
+            db.session.add(item)
+            db.session.flush()
+        results.append(item)
+    batch.success_count = sum(1 for r in results if r.status == "succeeded")
+    batch.failure_count = sum(1 for r in results if r.status == "failed")
+    batch.completed_at = _dt.utcnow()
+    db.session.commit()
+
+    def _item_payload(it):
+        return {
+            "id": it.id,
+            "filename": it.filename,
+            "status": it.status,
+            "document_id": it.document_id,
+            "blob_id": it.blob_id,
+            "error_code": it.error_code,
+            "error_message": it.error_message,
+        }
+
+    response = jsonify(
+        batch={
+            "id": batch.id,
+            "item_count": batch.item_count,
+            "success_count": batch.success_count,
+            "failure_count": batch.failure_count,
+            "created_at": batch.created_at.isoformat(),
+            "completed_at": batch.completed_at.isoformat(),
+        },
+        items=[_item_payload(it) for it in results],
+    )
+    response.status_code = 207 if batch.failure_count else 201
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@document_api.route("/bulk/<int:batch_id>", methods=["GET"])
+@jwt_required()
+def bulk_ingest_status(batch_id):
+    """Return the recorded batch and its items for polling retries."""
+    from app.models.bulk_ingest import BulkIngestBatch
+
+    user = actor()
+    batch = BulkIngestBatch.query.filter_by(
+        id=batch_id, organization_id=user.organization_id
+    ).first()
+    if batch is None:
+        abort(404)
+    return jsonify(
+        batch={
+            "id": batch.id,
+            "item_count": batch.item_count,
+            "success_count": batch.success_count,
+            "failure_count": batch.failure_count,
+            "created_at": batch.created_at.isoformat(),
+            "completed_at": batch.completed_at.isoformat()
+            if batch.completed_at
+            else None,
+        },
+        items=[
+            {
+                "id": it.id,
+                "filename": it.filename,
+                "status": it.status,
+                "document_id": it.document_id,
+                "blob_id": it.blob_id,
+                "error_code": it.error_code,
+                "error_message": it.error_message,
+            }
+            for it in batch.items
+        ],
+    )
+
+
+@document_api.route(
+    "/<int:document_id>/blobs/<int:blob_id>/preview", methods=["GET"]
+)
+@jwt_required()
+def preview_document_blob(document_id, blob_id):
+    """Return a sanitised copy of the stored PDF for in-browser preview.
+
+    The service strips document-level OpenAction + additional
+    actions, named /JS destinations, embedded files, and per-page /AA
+    before serving the bytes. The feature is gated by
+    ``SAFE_PREVIEW_ENABLED`` so an operator can keep the raw-download
+    pipeline authoritative until a jurisdictional review signs off on
+    the sanitiser's completeness.
+    """
+    from flask import current_app, send_file
+
+    from app.models.documents.document_blob import DocumentBlob
+    from app.services.documents.private_storage import (
+        IngestionError, object_path,
+    )
+    from app.services.documents.safe_preview import (
+        SafePreviewError, enabled, sanitize,
+    )
+
+    user = actor()
+    doc = Document.query.filter(
+        Document.id == document_id,
+        db.or_(
+            Document.created_by == user.id,
+            Document.organization_id == user.organization_id,
+        ),
+        Document.deleted_at.is_(None),
+    ).first()
+    if doc is None:
+        abort(404)
+    blob = DocumentBlob.query.filter_by(id=blob_id, document_id=doc.id).first()
+    if blob is None:
+        abort(404)
+    if not enabled(current_app.config):
+        abort(503, description="safe_preview_disabled")
+    try:
+        path = object_path(blob.object_key, current_app.config)
+    except IngestionError:
+        abort(503, description="preview_unavailable")
+    try:
+        sanitized = sanitize(path.read_bytes())
+    except SafePreviewError as exc:
+        abort(422, description=str(exc))
+    response = send_file(
+        io.BytesIO(sanitized),
+        mimetype="application/pdf",
+        as_attachment=False,
+        download_name=f"{blob.file_name.rsplit('.', 1)[0]}-preview.pdf",
+        conditional=False,
+        etag=False,
+        max_age=0,
+    )
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Content-Disposition"] = (
+        f'inline; filename="{blob.file_name.rsplit(".", 1)[0]}-preview.pdf"'
+    )
+    return response
+
+
+@document_api.route("/<int:document_id>/images", methods=["POST"])
+@jwt_required()
+def ingest_document_image(document_id):
+    """Owner-only; convert a PNG/JPEG upload to PDF and ingest it.
+
+    Reuses the same scanner + manifest invariants as PDF ingestion.
+    The feature is gated by ``IMAGE_PDF_CONVERSION_ENABLED`` so an
+    operator can keep it disabled until a jurisdiction-specific
+    acceptance test passes.
+    """
+    import io
+
+    from flask import current_app
+    from sqlalchemy import func
+    from app.models.documents.document_blob import DocumentBlob
+    from app.models.documents.document_activity import DocumentActivity
+    from app.services.documents.image_conversion import (
+        ImageConversionError,
+        convert_to_pdf,
+        detect_format,
+    )
+    from app.services.documents.private_storage import (
+        IngestionError, cleanup_object, store_scanned_pdf,
+    )
+
+    user = actor()
+    doc = Document.query.filter(
+        Document.id == document_id,
+        Document.created_by == user.id,
+        Document.deleted_at.is_(None),
+    ).with_for_update().first()
+    if doc is None:
+        abort(404)
+    if (doc.status or "").lower() != "draft":
+        abort(409, description="Only drafts accept uploaded documents")
+    incoming = request.files.get("file")
+    if incoming is None:
+        abort(400, description="multipart/form-data file field required")
+    if len(request.files) != 1:
+        abort(400, description="Exactly one file is required")
+    source_name = (incoming.filename or "image").replace("\\", "/").split("/")[-1]
+    image_bytes = incoming.stream.read()
+    try:
+        source_format = detect_format(image_bytes)
+        pdf_bytes = convert_to_pdf(image_bytes, config=current_app.config)
+    except ImageConversionError as exc:
+        abort(400, description=str(exc))
+    stem = source_name.rsplit(".", 1)[0] or "image"
+    pdf_name = f"{stem}.pdf"
+    key = None
+    try:
+        key, name, size, digest, scanner = store_scanned_pdf(
+            io.BytesIO(pdf_bytes), pdf_name, current_app.config
+        )
+        revision = (db.session.query(func.max(DocumentBlob.revision))
+                    .filter(DocumentBlob.document_id == doc.id).scalar() or 0) + 1
+        record = DocumentBlob(
+            document_id=doc.id,
+            revision=revision,
+            object_key=key,
+            file_name=name,
+            mime_type="application/pdf",
+            file_size=size,
+            sha256=digest,
+            scanner=scanner,
+            created_by_id=user.id,
+        )
+        db.session.add(record)
+        from app.services.event_delivery import enqueue
+        enqueue(
+            event_type="document.image.ingested", aggregate_type="document",
+            aggregate_id=doc.id, organization_id=doc.organization_id,
+            actor_id=user.id, action="document.image.ingested",
+            idempotency_key="document-image:%s:%s" % (doc.id, revision),
+        )
+        db.session.add(DocumentActivity(
+            document_id=doc.id, user_id=user.id,
+            activity_type="private_image_converted",
+            details=(
+                "Converted %s %s to PDF revision %s, SHA-256 %s"
+                % (source_format.upper(), source_name, revision, digest)
+            ),
+        ))
+        db.session.commit()
+    except IngestionError as exc:
+        db.session.rollback()
+        abort(422, description=str(exc))
+    except Exception:
+        db.session.rollback()
+        if key:
+            try:
+                cleanup_object(key, current_app.config)
+            except IngestionError:
+                current_app.logger.exception("Unable to clean orphaned converted image")
+        raise
+    response = jsonify(_blob_metadata(record))
+    response.headers["Cache-Control"] = "no-store"
+    return response, 201
 
 
 @document_api.route("/<int:document_id>/files", methods=["POST"])

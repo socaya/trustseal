@@ -29,6 +29,22 @@ class Config:
     DOCUMENT_CLAMSCAN_BINARY = os.getenv('DOCUMENT_CLAMSCAN_BINARY')
     DOCUMENT_SCAN_TIMEOUT = int(os.getenv('DOCUMENT_SCAN_TIMEOUT', '30'))
 
+    # Image → PDF conversion (Phase D1).
+    IMAGE_PDF_CONVERSION_ENABLED = os.getenv(
+        'IMAGE_PDF_CONVERSION_ENABLED', 'false'
+    ).lower() == 'true'
+    IMAGE_CONVERSION_MAX_BYTES = int(
+        os.getenv('IMAGE_CONVERSION_MAX_BYTES', str(25 * 1024 * 1024))
+    )
+    IMAGE_CONVERSION_MAX_PIXELS = int(
+        os.getenv('IMAGE_CONVERSION_MAX_PIXELS', '50000000')
+    )
+
+    # Safe PDF preview (Phase D2).
+    SAFE_PREVIEW_ENABLED = os.getenv(
+        'SAFE_PREVIEW_ENABLED', 'false'
+    ).lower() == 'true'
+
     # === Detached review attestation keys (operator issuance only) ===
     # Protected private key path, never a URL, static asset or checked-in secret.
     REVIEW_RECEIPT_PRIVATE_KEY = os.getenv('REVIEW_RECEIPT_PRIVATE_KEY')
