@@ -54,6 +54,11 @@ def _dict(row) -> dict:
 def list_notifications():
     user = _actor()
     unread_only = request.args.get("unread") == "1"
+    kind = request.args.get("kind")
+    if kind is not None and (
+        not isinstance(kind, str) or len(kind) > 60 or not kind.strip()
+    ):
+        abort(400, description="kind_invalid")
     limit_raw = request.args.get("limit")
     try:
         limit = int(limit_raw) if limit_raw else 100
@@ -65,11 +70,13 @@ def list_notifications():
         recipient_user_id=user.id,
         organization_id=user.organization_id,
         unread_only=unread_only,
+        kind=kind,
         limit=limit,
     )
     return jsonify(
         recipient_user_id=user.id,
         unread_only=unread_only,
+        kind=kind,
         notifications=[_dict(r) for r in rows],
     )
 

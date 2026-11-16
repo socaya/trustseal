@@ -58,6 +58,7 @@ def list_for(
     recipient_user_id: int,
     organization_id: int,
     unread_only: bool = False,
+    kind: str | None = None,
     limit: int = 100,
 ) -> list[OperatorNotification]:
     """Return up to ``limit`` notifications for an operator."""
@@ -67,6 +68,8 @@ def list_for(
     )
     if unread_only:
         query = query.filter(OperatorNotification.read_at.is_(None))
+    if kind:
+        query = query.filter(OperatorNotification.kind == kind)
     return (
         query.order_by(OperatorNotification.id.desc())
         .limit(min(max(limit, 1), 500))

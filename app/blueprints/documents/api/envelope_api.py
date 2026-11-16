@@ -1601,3 +1601,43 @@ def envelope_activity(envelope_id):
             for row in rows
         ],
     )
+
+
+# ============================================================ AA1 participant delete
+
+
+@envelope_api.route(
+    "/<int:envelope_id>/participants/<int:participant_id>", methods=["DELETE"]
+)
+@jwt_required()
+def remove_participant(envelope_id, participant_id):
+    """Remove a participant from a draft envelope.
+
+    Draft-only — once the envelope leaves draft the recipient list is
+    locked. Any outstanding :class:`SignerInvitation` for the removed
+    participant is revoked at the same time so a stale token cannot
+    be used after the fact.
+    """
+    from app.models.signer_invitation import SignerInvitation
+
+    user = _actor()
+    envelope = _owned(envelope_id, user, lock=True)
+    if envelope.state != "draft":
+        abort(409, description="recipient_list_locked")
+    participant = EnvelopeParticipant.query.filter_by(
+        id=participant_id, envelope_id=envelope.id
+    ).first()
+    if participant is None:
+        abort(404)
+    # Draft envelopes shouldn't have outstanding invitations
+    # (defence-in-depth). If one somehow exists, delete it before
+    # removing the participant row so the FK stays consistent. No
+    # audit obligation applies to a pre-prepared invitation that
+    # was never delivered to a signer.
+    SignerInvitation.query.filter_by(
+        envelope_id=envelope.id, participant_id=participant.id
+    ).delete(synchronize_session=False)
+    db.session.flush()
+    db.session.delete(participant)
+    db.session.commit()
+    return jsonify(message="participant_removed"), 200
