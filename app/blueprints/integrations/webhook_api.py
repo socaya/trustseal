@@ -182,6 +182,42 @@ def replay_webhook_delivery(delivery_id: int):
     return jsonify(_delivery_dict(replay)), 201
 
 
+@webhook_api.route(
+    "/deliveries/<int:delivery_id>/cancel", methods=["POST"]
+)
+@jwt_required()
+def cancel_webhook_delivery(delivery_id: int):
+    """Operator-initiated delivery cancellation (Phase AB2).
+
+    Marks a pending or failed delivery as ``dead`` so the dispatcher
+    stops retrying it. Succeeded deliveries, in-flight deliveries,
+    and already-dead rows return 409 — operators should either wait
+    for in-flight work to settle or skip rows that are already
+    finalised.
+    """
+    from datetime import datetime
+
+    actor = current_actor()
+    if actor.tenant_id is None:
+        abort(403)
+    delivery = (
+        WebhookDelivery.query.filter_by(
+            id=delivery_id, organization_id=actor.tenant_id
+        )
+        .with_for_update()
+        .one_or_none()
+    )
+    if delivery is None:
+        abort(404)
+    if delivery.status not in {"pending", "failed"}:
+        abort(409, description="delivery_not_cancellable")
+    delivery.status = "dead"
+    delivery.last_error = "operator_cancelled"
+    delivery.completed_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify(_delivery_dict(delivery)), 200
+
+
 @webhook_api.route("/<int:endpoint_id>/deliveries", methods=["GET"])
 @jwt_required()
 def list_deliveries(endpoint_id: int):

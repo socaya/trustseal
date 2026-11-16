@@ -1641,3 +1641,53 @@ def remove_participant(envelope_id, participant_id):
     db.session.delete(participant)
     db.session.commit()
     return jsonify(message="participant_removed"), 200
+
+
+# ============================================================ AB1 invitations
+
+
+@envelope_api.route("/<int:envelope_id>/invitations", methods=["GET"])
+@jwt_required()
+def list_envelope_invitations(envelope_id):
+    """List invitations issued for this envelope.
+
+    Returns metadata only — the raw tokens are not retained server-
+    side (only their SHA-256 hashes), so this endpoint never
+    discloses an active token. Each row carries lifecycle timestamps
+    (issued / expires / consumed / revoked), the reminder counter,
+    and the issuing operator id.
+    """
+    from app.models.signer_invitation import SignerInvitation
+
+    user = _actor()
+    envelope = _owned(envelope_id, user)
+    rows = (
+        SignerInvitation.query.filter_by(envelope_id=envelope.id)
+        .order_by(SignerInvitation.id.asc())
+        .all()
+    )
+    return jsonify(
+        envelope_id=envelope.id,
+        invitations=[
+            {
+                "id": row.id,
+                "participant_id": row.participant_id,
+                "user_id": row.user_id,
+                "issued_by_id": row.issued_by_id,
+                "created_at": row.created_at.isoformat(),
+                "expires_at": row.expires_at.isoformat(),
+                "consumed_at": row.consumed_at.isoformat()
+                if row.consumed_at
+                else None,
+                "revoked_at": row.revoked_at.isoformat()
+                if row.revoked_at
+                else None,
+                "revoke_reason": row.revoke_reason,
+                "last_reminder_at": row.last_reminder_at.isoformat()
+                if row.last_reminder_at
+                else None,
+                "reminder_count": row.reminder_count,
+            }
+            for row in rows
+        ],
+    )
