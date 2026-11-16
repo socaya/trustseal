@@ -64,6 +64,13 @@ idempotency_requests_total = Counter(
     registry=registry,
 )
 
+operator_notifications_published_total = Counter(
+    "trustseal_operator_notifications_published_total",
+    "In-app operator notifications published, labeled by kind.",
+    labelnames=("kind",),
+    registry=registry,
+)
+
 outbox_backlog = Gauge(
     "trustseal_outbox_backlog",
     "Count of outbox events in each state.",
@@ -190,3 +197,7 @@ def record_webhook_outcome(outcome: str) -> None:
 
 def record_idempotency_outcome(outcome: str) -> None:
     idempotency_requests_total.labels(outcome).inc()
+
+
+def record_operator_notification(kind: str) -> None:
+    operator_notifications_published_total.labels(kind).inc()

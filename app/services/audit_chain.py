@@ -109,6 +109,17 @@ def compute_hash(prev_hash: str, event: SecurityEvent) -> str:
     return hashlib.sha256(base).hexdigest()
 
 
+def canonical_payload_hash(event: SecurityEvent) -> str:
+    """SHA-256 of the canonical payload (no prev-hash prefix).
+
+    Used by the inclusion-proof endpoint so auditors can replay the
+    chained-hash rule over a slice they fetched themselves — the
+    chain rule is ``event_hash = SHA256(prev_hash + ":" + canonical_payload)``
+    and this helper exposes the payload half deterministically.
+    """
+    return hashlib.sha256(canonical_payload(event)).hexdigest()
+
+
 def _latest_hash(tenant_id: int, before_id: int | None = None) -> str:
     """Return the chain tip for ``tenant_id`` before ``before_id``.
 

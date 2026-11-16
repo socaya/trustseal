@@ -50,6 +50,14 @@ def publish(
     )
     db.session.add(row)
     db.session.flush()
+    # Phase AH2 — observe publish volume per kind. Best-effort: the
+    # metrics module is optional in some bootstrap paths.
+    try:
+        from app.metrics import record_operator_notification
+
+        record_operator_notification(kind)
+    except Exception:
+        pass
     return row
 
 
