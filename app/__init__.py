@@ -251,6 +251,8 @@ def create_app(config_class=None):
     blueprints.append(usage_api)
     from .blueprints.auth.routes.saml_views import saml_views
     blueprints.append(saml_views)
+    from .blueprints.system.routes.slo_api import slo_api
+    blueprints.append(slo_api)
     from .blueprints.integrations.scim_api import scim_api
     blueprints.append(scim_api)
     from .blueprints.integrations.openapi_api import openapi_api
