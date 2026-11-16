@@ -120,6 +120,68 @@ def list_document_labels(document_id: int):
     return jsonify(document_id=doc.id, labels=labels)
 
 
+@document_label_api.route("/<int:document_id>/activity", methods=["GET"])
+@jwt_required()
+def document_activity(document_id: int):
+    """Return a chronological SecurityEvent slice for one document (Phase Z2).
+
+    Query params: ``since`` / ``until`` ISO-8601 bounds, ``limit``
+    1..500 (default 100). Results are ordered oldest-first.
+    """
+    from datetime import datetime
+    from app.models.event_delivery import SecurityEvent
+
+    user = _actor()
+    doc = _owned(document_id, user)
+    since_raw = request.args.get("since")
+    until_raw = request.args.get("until")
+    limit_raw = request.args.get("limit")
+    since = None
+    until = None
+    if since_raw:
+        try:
+            since = datetime.fromisoformat(since_raw)
+        except ValueError:
+            abort(400, description="since_invalid_iso")
+    if until_raw:
+        try:
+            until = datetime.fromisoformat(until_raw)
+        except ValueError:
+            abort(400, description="until_invalid_iso")
+    try:
+        limit = int(limit_raw) if limit_raw else 100
+    except ValueError:
+        abort(400, description="limit_invalid")
+    if limit < 1 or limit > 500:
+        abort(400, description="limit_out_of_range")
+    query = SecurityEvent.query.filter(
+        SecurityEvent.organization_id == user.organization_id,
+        SecurityEvent.resource_type == "document",
+        SecurityEvent.resource_id == doc.id,
+    )
+    if since is not None:
+        query = query.filter(SecurityEvent.created_at >= since)
+    if until is not None:
+        query = query.filter(SecurityEvent.created_at <= until)
+    rows = query.order_by(SecurityEvent.id.asc()).limit(limit).all()
+    return jsonify(
+        document_id=doc.id,
+        events=[
+            {
+                "id": row.id,
+                "actor_id": row.actor_id,
+                "action": row.action,
+                "resource_type": row.resource_type,
+                "resource_id": row.resource_id,
+                "outcome": row.outcome,
+                "correlation_id": row.correlation_id,
+                "created_at": row.created_at.isoformat(),
+            }
+            for row in rows
+        ],
+    )
+
+
 @document_label_api.route("/by-label/<path:label>", methods=["GET"])
 @jwt_required()
 def list_documents_by_label(label: str):

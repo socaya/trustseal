@@ -1529,3 +1529,75 @@ def bulk_archive_envelopes():
         ),
         http_status,
     )
+
+
+# ============================================================ Z1 activity
+
+
+@envelope_api.route("/<int:envelope_id>/activity", methods=["GET"])
+@jwt_required()
+def envelope_activity(envelope_id):
+    """Return a chronological SecurityEvent slice for one envelope.
+
+    Query parameters:
+
+    * ``since`` / ``until`` — ISO-8601 bounds against ``created_at``.
+    * ``limit`` — 1..500 (default 100). Results are ordered oldest-first.
+
+    Events are the audit-chain SecurityEvent rows whose
+    ``resource_type`` is ``envelope`` or ``signing_envelope`` and
+    ``resource_id`` matches the envelope. Tenant scoping is enforced
+    through envelope ownership (``_owned``).
+    """
+    from app.models.event_delivery import SecurityEvent
+
+    user = _actor()
+    envelope = _owned(envelope_id, user)
+    since_raw = request.args.get("since")
+    until_raw = request.args.get("until")
+    limit_raw = request.args.get("limit")
+    since = None
+    until = None
+    if since_raw:
+        try:
+            since = datetime.fromisoformat(since_raw)
+        except ValueError:
+            abort(400, description="since_invalid_iso")
+    if until_raw:
+        try:
+            until = datetime.fromisoformat(until_raw)
+        except ValueError:
+            abort(400, description="until_invalid_iso")
+    try:
+        limit = int(limit_raw) if limit_raw else 100
+    except ValueError:
+        abort(400, description="limit_invalid")
+    if limit < 1 or limit > 500:
+        abort(400, description="limit_out_of_range")
+
+    query = SecurityEvent.query.filter(
+        SecurityEvent.organization_id == user.organization_id,
+        SecurityEvent.resource_type.in_(("envelope", "signing_envelope")),
+        SecurityEvent.resource_id == envelope.id,
+    )
+    if since is not None:
+        query = query.filter(SecurityEvent.created_at >= since)
+    if until is not None:
+        query = query.filter(SecurityEvent.created_at <= until)
+    rows = query.order_by(SecurityEvent.id.asc()).limit(limit).all()
+    return jsonify(
+        envelope_id=envelope.id,
+        events=[
+            {
+                "id": row.id,
+                "actor_id": row.actor_id,
+                "action": row.action,
+                "resource_type": row.resource_type,
+                "resource_id": row.resource_id,
+                "outcome": row.outcome,
+                "correlation_id": row.correlation_id,
+                "created_at": row.created_at.isoformat(),
+            }
+            for row in rows
+        ],
+    )
