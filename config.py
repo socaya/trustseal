@@ -29,6 +29,17 @@ class Config:
     DOCUMENT_CLAMSCAN_BINARY = os.getenv('DOCUMENT_CLAMSCAN_BINARY')
     DOCUMENT_SCAN_TIMEOUT = int(os.getenv('DOCUMENT_SCAN_TIMEOUT', '30'))
 
+    # Phase O — pluggable private storage backend.
+    PRIVATE_STORAGE_BACKEND = os.getenv(
+        'PRIVATE_STORAGE_BACKEND', 'filesystem'
+    ).lower()
+    PRIVATE_STORAGE_S3_BUCKET = os.getenv('PRIVATE_STORAGE_S3_BUCKET')
+    PRIVATE_STORAGE_S3_REGION = os.getenv('PRIVATE_STORAGE_S3_REGION')
+    PRIVATE_STORAGE_S3_ENDPOINT_URL = os.getenv(
+        'PRIVATE_STORAGE_S3_ENDPOINT_URL'
+    )
+    PRIVATE_STORAGE_S3_SSE = os.getenv('PRIVATE_STORAGE_S3_SSE')
+
     # Image → PDF conversion (Phase D1).
     IMAGE_PDF_CONVERSION_ENABLED = os.getenv(
         'IMAGE_PDF_CONVERSION_ENABLED', 'false'

@@ -95,36 +95,27 @@ def _migrations_check() -> dict:
 
 
 def _private_storage_check() -> dict:
-    root_raw = current_app.config.get("PRIVATE_DOCUMENT_ROOT")
-    if not root_raw:
-        return {"name": "private_storage", "status": "not_configured"}
-    root = Path(root_raw)
-    if not root.is_absolute():
+    """Delegate to the active storage adapter's probe (Phase O3)."""
+    try:
+        from app.services.documents.private_object_store import active_store
+
+        store = active_store()
+    except Exception as exc:
         return {
             "name": "private_storage",
             "status": "failed",
-            "detail": "path_not_absolute",
+            "detail": _redact(exc),
         }
-    if not root.is_dir():
+    try:
+        payload = dict(store.probe(config=current_app.config))
+    except Exception as exc:
         return {
             "name": "private_storage",
             "status": "failed",
-            "detail": "path_missing",
+            "detail": _redact(exc),
         }
-    mode = stat.S_IMODE(root.stat().st_mode)
-    if mode & 0o077:
-        return {
-            "name": "private_storage",
-            "status": "failed",
-            "detail": f"permissions_too_open:0o{mode:03o}",
-        }
-    if not os.access(root, os.R_OK | os.W_OK | os.X_OK):
-        return {
-            "name": "private_storage",
-            "status": "failed",
-            "detail": "permissions_not_rwx",
-        }
-    return {"name": "private_storage", "status": "ok"}
+    payload["name"] = "private_storage"
+    return payload
 
 
 def _mail_transport_check() -> dict:
