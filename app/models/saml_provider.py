@@ -31,6 +31,11 @@ class SamlProvider(db.Model):
     x509_cert_pem = db.Column(db.Text, nullable=False)
     audience = db.Column(db.String(255), nullable=False)
     attribute_mapping = db.Column(db.JSON, nullable=False, default=dict)
+    # Optional SP signing credentials. When both are set the service
+    # signs every outbound AuthnRequest per SAML HTTP-Redirect binding
+    # §3.4.4.1 so IdPs that require ``AuthnRequestsSigned`` accept us.
+    sp_signing_private_key_pem = db.Column(db.Text, nullable=True)
+    sp_signing_cert_pem = db.Column(db.Text, nullable=True)
     is_active = db.Column(
         db.Boolean, nullable=False, default=True, server_default=db.text("true")
     )

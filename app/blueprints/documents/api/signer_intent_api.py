@@ -124,6 +124,21 @@ def _eligible(envelope, participant):
     else:
         abort(500, description="unknown_routing_mode")
 
+    # Conditional routing rules layer on top of the mode. If the
+    # participant has rules attached and any evaluates False (or
+    # errors out), refuse with a structured breach payload.
+    from app.services import envelope_routing_rules as _rules
+
+    outcome = _rules.evaluate_rules(envelope, participant)
+    if not outcome.allowed:
+        abort(
+            409,
+            description=(
+                "routing_rule_blocked:"
+                + ",".join(outcome.failed_rule_names)
+            ),
+        )
+
 
 def _document_file(envelope):
     blob = db.session.get(DocumentBlob, envelope.document_blob_id)

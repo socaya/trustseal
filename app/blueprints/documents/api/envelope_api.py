@@ -332,6 +332,91 @@ def _field_dict(row: EnvelopeField) -> dict:
     }
 
 
+# --------------------------------------------------------------- H1 rules
+
+
+@envelope_api.route(
+    "/<int:envelope_id>/participants/<int:participant_id>/rules",
+    methods=["POST"],
+)
+@jwt_required()
+def add_participant_rule(envelope_id, participant_id):
+    """Attach a conditional routing rule to a participant (draft only)."""
+    from app.services import envelope_routing_rules
+
+    user = _actor()
+    envelope = _owned(envelope_id, user, lock=True)
+    participant = db.session.get(EnvelopeParticipant, participant_id)
+    if participant is None or participant.envelope_id != envelope.id:
+        abort(404)
+    data = _payload()
+    name = data.get("name")
+    predicate = data.get("predicate")
+    if not isinstance(name, str) or not isinstance(predicate, dict):
+        abort(400, description="name_and_predicate_required")
+    try:
+        row = envelope_routing_rules.add_rule(
+            envelope,
+            participant,
+            name=name,
+            predicate=predicate,
+            created_by_id=user.id,
+        )
+    except envelope_routing_rules.RuleError as exc:
+        db.session.rollback()
+        abort(400, description=str(exc))
+    db.session.commit()
+    return (
+        jsonify(
+            id=row.id,
+            envelope_id=row.envelope_id,
+            participant_id=row.participant_id,
+            name=row.name,
+            predicate=row.predicate,
+        ),
+        201,
+    )
+
+
+@envelope_api.route(
+    "/<int:envelope_id>/rules/<int:rule_id>", methods=["DELETE"]
+)
+@jwt_required()
+def delete_participant_rule(envelope_id, rule_id):
+    from app.services import envelope_routing_rules
+
+    user = _actor()
+    envelope = _owned(envelope_id, user, lock=True)
+    try:
+        envelope_routing_rules.delete_rule(envelope, rule_id)
+    except envelope_routing_rules.RuleError as exc:
+        db.session.rollback()
+        abort(404, description=str(exc))
+    db.session.commit()
+    return jsonify(message="rule_deleted"), 200
+
+
+@envelope_api.route("/<int:envelope_id>/rules", methods=["GET"])
+@jwt_required()
+def list_participant_rules(envelope_id):
+    from app.services import envelope_routing_rules
+
+    user = _actor()
+    envelope = _owned(envelope_id, user)
+    rows = envelope_routing_rules.list_rules(envelope)
+    return jsonify(
+        rules=[
+            {
+                "id": r.id,
+                "participant_id": r.participant_id,
+                "name": r.name,
+                "predicate": r.predicate,
+            }
+            for r in rows
+        ]
+    )
+
+
 # --------------------------------------------------------------- F3 reissue
 
 

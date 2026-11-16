@@ -12,10 +12,13 @@ Scope (deliberately narrow, security-first):
 
 Out of scope for this phase (tracked in the remaining-gaps doc):
 
-* SP-signed AuthnRequests.
 * Encrypted assertions.
 * Single Logout (SLO).
 * IdP-initiated flow (unsolicited responses).
+
+SP-signed AuthnRequests (HTTP-Redirect binding, SAMLBindings §3.4.4.1)
+are supported when ``provider.sp_signing_private_key_pem`` +
+``provider.sp_signing_cert_pem`` are configured.
 
 Signature verification uses ``signxml`` — a pure-Python XML-DSig
 implementation that depends on ``lxml`` + ``cryptography`` only, so
@@ -34,12 +37,16 @@ from typing import Mapping, Optional
 from urllib.parse import urlencode
 
 from cryptography import x509
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
 from lxml import etree
 from signxml import XMLVerifier
 
 from app.extensions import db
 from app.models.saml_provider import SamlConsumedAssertion, SamlProvider
+
+
+SIG_ALG_RSA_SHA256 = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
 
 
 NS = {
@@ -100,8 +107,44 @@ def build_authn_request(
     params = {"SAMLRequest": encoded}
     if relay_state:
         params["RelayState"] = relay_state
+
+    # If the SP has signing credentials, sign the query string per the
+    # HTTP-Redirect binding: concatenate SAMLRequest + RelayState +
+    # SigAlg (url-encoded, in that fixed order), sign with RSA-SHA256,
+    # then append SigAlg + Signature params.
+    if provider.sp_signing_private_key_pem and provider.sp_signing_cert_pem:
+        params["SigAlg"] = SIG_ALG_RSA_SHA256
+        signable_items = [("SAMLRequest", params["SAMLRequest"])]
+        if relay_state:
+            signable_items.append(("RelayState", relay_state))
+        signable_items.append(("SigAlg", params["SigAlg"]))
+        signable = urlencode(signable_items)
+        signature = _sign_redirect_binding(
+            signable.encode("ascii"),
+            provider.sp_signing_private_key_pem,
+        )
+        params["Signature"] = base64.b64encode(signature).decode("ascii")
+        # Preserve the fixed order so the IdP can recompute the same
+        # canonical string. We build the final URL manually instead of
+        # relying on dict iteration order.
+        final_items = [("SAMLRequest", params["SAMLRequest"])]
+        if relay_state:
+            final_items.append(("RelayState", relay_state))
+        final_items.append(("SigAlg", params["SigAlg"]))
+        final_items.append(("Signature", params["Signature"]))
+        separator = "&" if "?" in provider.sso_url else "?"
+        return f"{provider.sso_url}{separator}{urlencode(final_items)}", request_id
+
     separator = "&" if "?" in provider.sso_url else "?"
     return f"{provider.sso_url}{separator}{urlencode(params)}", request_id
+
+
+def _sign_redirect_binding(message: bytes, private_key_pem: str) -> bytes:
+    """RSA-SHA256 signature over the canonical query string."""
+    key = serialization.load_pem_private_key(
+        private_key_pem.encode("ascii"), password=None
+    )
+    return key.sign(message, padding.PKCS1v15(), hashes.SHA256())
 
 
 # ----------------------------------------------------------- Response
@@ -269,22 +312,42 @@ def consume_response(
 
 
 def build_sp_metadata(
-    audience: str, *, acs_url: str
+    audience: str, *, acs_url: str, sp_signing_cert_pem: Optional[str] = None,
 ) -> bytes:
-    """Return an SP metadata XML document for publication."""
+    """Return an SP metadata XML document for publication.
+
+    When ``sp_signing_cert_pem`` is provided, ``AuthnRequestsSigned``
+    is set to ``true`` and a ``<KeyDescriptor use='signing'>`` element
+    embeds the X.509 certificate so IdPs can validate signatures.
+    """
     md_ns = "urn:oasis:names:tc:SAML:2.0:metadata"
+    ds_ns = "http://www.w3.org/2000/09/xmldsig#"
     root = etree.Element(
         "{%s}EntityDescriptor" % md_ns,
-        nsmap={"md": md_ns},
+        nsmap={"md": md_ns, "ds": ds_ns},
         entityID=audience,
     )
     sp = etree.SubElement(
         root,
         "{%s}SPSSODescriptor" % md_ns,
-        AuthnRequestsSigned="false",
+        AuthnRequestsSigned="true" if sp_signing_cert_pem else "false",
         WantAssertionsSigned="true",
         protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol",
     )
+    if sp_signing_cert_pem:
+        kd = etree.SubElement(
+            sp, "{%s}KeyDescriptor" % md_ns, use="signing"
+        )
+        key_info = etree.SubElement(kd, "{%s}KeyInfo" % ds_ns)
+        x509_data = etree.SubElement(key_info, "{%s}X509Data" % ds_ns)
+        x509_cert = etree.SubElement(x509_data, "{%s}X509Certificate" % ds_ns)
+        # Strip PEM headers; metadata embeds base64 body only.
+        pem_lines = [
+            line
+            for line in sp_signing_cert_pem.strip().splitlines()
+            if line and not line.startswith("-----")
+        ]
+        x509_cert.text = "".join(pem_lines)
     etree.SubElement(
         sp,
         "{%s}AssertionConsumerService" % md_ns,

@@ -210,6 +210,9 @@ def create_app(config_class=None):
         document_version_api
     ]
 
+    # Document-draft API (autosave with optimistic concurrency, Phase H2).
+    from .blueprints.documents.api.document_draft_api import document_draft_api
+    blueprints.append(document_draft_api)
     # Authorized envelope preparation API; legacy signature writes remain blocked.
     from .blueprints.documents.api.envelope_api import envelope_api
     blueprints.append(envelope_api)

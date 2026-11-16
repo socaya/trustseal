@@ -49,6 +49,7 @@ from .clause import Clause, ClauseVersion
 from .usage_ledger import UsageLedgerEntry
 from .plan_entitlement import PlanEntitlement
 from .saml_provider import SamlConsumedAssertion, SamlProvider
+from .envelope_routing_rule import EnvelopeRoutingRule
 from .signer_cryptographic import (SignerPublicKey, SignerKeyChallenge, SignerEndorsementChallenge, SignerEndorsement)
 from .esignature import (
     SignatureProfile,

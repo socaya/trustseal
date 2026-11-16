@@ -22,6 +22,13 @@ class DocumentDraft(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'))
 
+    # Optimistic concurrency token. The autosave endpoint requires
+    # ``If-Match: <version>`` so two concurrent editors cannot
+    # silently clobber each other's work. Every mutation bumps this.
+    version = db.Column(
+        db.Integer, nullable=False, default=1, server_default=db.text("1")
+    )
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     deleted_at = db.Column(db.DateTime)
@@ -53,6 +60,7 @@ class DocumentDraft(db.Model):
             "file_path": self.file_path,
             "file_type": self.file_type,
             "file_size": self.file_size,
+            "version": self.version,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "deleted_at": self.deleted_at.isoformat() if self.deleted_at else None,

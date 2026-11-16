@@ -78,7 +78,9 @@ def _safe_relay_state(candidate: str | None) -> str:
 def metadata(provider_id: int):
     provider = _provider_or_404(provider_id)
     xml = saml_service.build_sp_metadata(
-        provider.audience, acs_url=_acs_url(provider.id)
+        provider.audience,
+        acs_url=_acs_url(provider.id),
+        sp_signing_cert_pem=provider.sp_signing_cert_pem,
     )
     return (xml, 200, {"Content-Type": "application/samlmetadata+xml"})
 
