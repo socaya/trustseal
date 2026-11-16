@@ -1257,3 +1257,82 @@ def unarchive_envelope(envelope_id):
     envelope.archived_by_id = None
     db.session.commit()
     return jsonify(_details(envelope)), 200
+
+
+# ============================================================ V1 attachments
+
+
+@envelope_api.route("/<int:envelope_id>/attachments", methods=["GET"])
+@jwt_required()
+def list_envelope_attachments(envelope_id):
+    """List signer attachments bound to decisions on this envelope."""
+    from app.models.signer_attachment import SignerAttachment
+    from app.models.signer_decision import SignerDecision
+
+    user = _actor()
+    envelope = _owned(envelope_id, user)
+    rows = (
+        SignerAttachment.query.join(
+            SignerDecision,
+            SignerAttachment.decision_id == SignerDecision.id,
+        )
+        .filter(SignerAttachment.envelope_id == envelope.id)
+        .order_by(SignerAttachment.id.asc())
+        .all()
+    )
+    return jsonify(
+        envelope_id=envelope.id,
+        attachments=[
+            {
+                "id": row.id,
+                "decision_id": row.decision_id,
+                "participant_id": row.participant_id,
+                "user_id": row.user_id,
+                "file_name": row.file_name,
+                "mime_type": row.mime_type,
+                "file_size": row.file_size,
+                "sha256": row.sha256,
+                "scanner": row.scanner,
+                "created_at": row.created_at.isoformat(),
+            }
+            for row in rows
+        ],
+    )
+
+
+@envelope_api.route(
+    "/<int:envelope_id>/attachments/<int:attachment_id>/download",
+    methods=["GET"],
+)
+@jwt_required()
+def download_envelope_attachment(envelope_id, attachment_id):
+    """Stream a bound attachment back to the envelope owner."""
+    from app.models.signer_attachment import SignerAttachment
+    from app.services.documents.private_object_store import active_store
+    from flask import Response
+
+    user = _actor()
+    envelope = _owned(envelope_id, user)
+    row = SignerAttachment.query.filter_by(
+        id=attachment_id,
+        envelope_id=envelope.id,
+        organization_id=user.organization_id,
+    ).first()
+    if row is None:
+        abort(404)
+    if row.decision_id is None:
+        # Staged rows are signer-scoped — the operator sees them
+        # only after the decision has been recorded.
+        abort(404)
+    payload = active_store(current_app.config).read(
+        row.object_key, config=current_app.config
+    )
+    headers = {
+        "Content-Type": row.mime_type,
+        "Content-Disposition": (
+            f"attachment; filename=\"{row.file_name}\""
+        ),
+        "Cache-Control": "no-store",
+        "X-TrustSeal-Attachment-SHA256": row.sha256,
+    }
+    return Response(payload, headers=headers)

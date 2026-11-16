@@ -324,6 +324,8 @@ def create_app(config_class=None):
         security_events_export_api,
     )
     blueprints.append(security_events_export_api)
+    from .blueprints.system.routes.usage_export import usage_export_api
+    blueprints.append(usage_export_api)
     from .blueprints.integrations.scim_api import scim_api
     blueprints.append(scim_api)
     from .blueprints.integrations.openapi_api import openapi_api
