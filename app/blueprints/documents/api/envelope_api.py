@@ -1854,3 +1854,42 @@ def revoke_invitation(envelope_id, invitation_id):
         ),
         200,
     )
+
+
+# ============================================================ AE2 receipt listing
+
+
+@envelope_api.route("/<int:envelope_id>/receipts", methods=["GET"])
+@jwt_required()
+def list_envelope_receipts(envelope_id):
+    """Return the Ed25519 ``ReviewReceipt`` rows for this envelope.
+
+    One row per recorded SignerDecision. The signed receipt payload
+    is returned verbatim so auditors can re-verify the signature
+    offline against a trusted public key — nothing about the row is
+    derived or redacted.
+    """
+    from app.models.review_receipt import ReviewReceipt
+
+    user = _actor()
+    envelope = _owned(envelope_id, user)
+    rows = (
+        ReviewReceipt.query.filter_by(envelope_id=envelope.id)
+        .order_by(ReviewReceipt.id.asc())
+        .all()
+    )
+    return jsonify(
+        envelope_id=envelope.id,
+        receipts=[
+            {
+                "id": row.id,
+                "decision_id": row.decision_id,
+                "algorithm": row.algorithm,
+                "key_id": row.key_id,
+                "payload": row.payload,
+                "signature": row.signature,
+                "created_at": row.created_at.isoformat(),
+            }
+            for row in rows
+        ],
+    )

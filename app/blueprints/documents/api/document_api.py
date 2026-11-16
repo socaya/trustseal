@@ -900,3 +900,106 @@ def download_document_file(document_id, file_id):
     response.headers["Cache-Control"] = "no-store, private"
     response.headers["X-Content-Type-Options"] = "nosniff"
     return response
+
+
+# ============================================================ AE1 bulk delete
+
+
+@document_api.route("/bulk/delete", methods=["POST"])
+@jwt_required()
+def bulk_delete_documents():
+    """Soft-delete up to 100 draft documents atomically.
+
+    Payload: ``{"document_ids": [int, ...]}``. Non-draft rows and
+    rows the caller does not own report per-row ``failed`` with
+    ``error_code``; already-deleted rows report ``succeeded`` with
+    ``already_deleted=True``. The whole batch rolls back if every
+    row fails so a bad request never half-applies.
+    """
+    from app.services.event_delivery import enqueue
+
+    user = actor()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        abort(400, description="JSON object required")
+    ids = data.get("document_ids")
+    if not isinstance(ids, list) or not ids:
+        abort(400, description="document_ids_required")
+    if len(ids) > 100:
+        abort(413, description="bulk_delete_limit_100")
+
+    seen: set[int] = set()
+    results: list[dict] = []
+    deleted_now = 0
+    moment = datetime.utcnow()
+    for doc_id in ids:
+        entry = {"document_id": doc_id}
+        if type(doc_id) is not int:
+            entry["status"] = "failed"
+            entry["error_code"] = "document_id_invalid"
+            results.append(entry)
+            continue
+        if doc_id in seen:
+            entry["status"] = "failed"
+            entry["error_code"] = "duplicate_id"
+            results.append(entry)
+            continue
+        seen.add(doc_id)
+        doc = (
+            Document.query.filter_by(
+                id=doc_id,
+                created_by=user.id,
+                organization_id=user.organization_id,
+            )
+            .with_for_update()
+            .first()
+        )
+        if doc is None:
+            entry["status"] = "failed"
+            entry["error_code"] = "document_not_found"
+            results.append(entry)
+            continue
+        if doc.deleted_at is not None:
+            entry["status"] = "succeeded"
+            entry["already_deleted"] = True
+            results.append(entry)
+            continue
+        if (doc.status or "").lower() != "draft":
+            entry["status"] = "failed"
+            entry["error_code"] = "state_not_draft"
+            results.append(entry)
+            continue
+        doc.deleted_at = moment
+        enqueue(
+            event_type="document.draft.deleted",
+            aggregate_type="document",
+            aggregate_id=doc.id,
+            organization_id=doc.organization_id,
+            actor_id=user.id,
+            action="document.draft.deleted",
+            idempotency_key="document-deleted:%s" % doc.id,
+        )
+        deleted_now += 1
+        entry["status"] = "succeeded"
+        entry["already_deleted"] = False
+        results.append(entry)
+
+    succeeded = sum(1 for r in results if r["status"] == "succeeded")
+    failed = len(results) - succeeded
+    if succeeded == 0:
+        db.session.rollback()
+        return (
+            jsonify(succeeded=0, failed=failed, results=results),
+            400,
+        )
+    db.session.commit()
+    http_status = 207 if failed else 200
+    return (
+        jsonify(
+            succeeded=succeeded,
+            failed=failed,
+            deleted=deleted_now,
+            results=results,
+        ),
+        http_status,
+    )
