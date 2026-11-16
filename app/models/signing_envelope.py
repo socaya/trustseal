@@ -63,6 +63,51 @@ class SigningEnvelope(db.Model):
     )
 
 
+class EnvelopeLabel(db.Model):
+    """Operator-defined label attached to a signing envelope.
+
+    Labels are free-form tags that are scoped to an organisation
+    and intended for operator filtering (e.g. ``quarterly``,
+    ``hr``, ``vendor``). Each label is unique per envelope; the
+    organisation column is duplicated so RLS can keep the row
+    tenant-scoped without joining back to ``signing_envelopes``.
+    """
+
+    __tablename__ = "envelope_labels"
+
+    id = db.Column(db.Integer, primary_key=True)
+    envelope_id = db.Column(
+        db.Integer,
+        db.ForeignKey("signing_envelopes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id"),
+        nullable=False,
+        index=True,
+    )
+    label = db.Column(db.String(60), nullable=False)
+    created_by_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False
+    )
+    created_at = db.Column(
+        db.DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "envelope_id", "label", name="uq_envelope_label"
+        ),
+        db.CheckConstraint(
+            "char_length(label) >= 1 AND char_length(label) <= 60",
+            name="ck_envelope_label_length",
+        ),
+        db.Index("ix_envelope_labels_org_label", "organization_id", "label"),
+    )
+
+
 class EnvelopeParticipant(db.Model):
     __tablename__ = "envelope_participants"
     id = db.Column(db.Integer, primary_key=True)

@@ -11,7 +11,11 @@ from app.extensions import db
 from app.models.user import User
 from app.models.documents.document import Document
 from app.models.documents.document_blob import DocumentBlob
-from app.models.signing_envelope import SigningEnvelope, EnvelopeParticipant
+from app.models.signing_envelope import (
+    EnvelopeLabel,
+    EnvelopeParticipant,
+    SigningEnvelope,
+)
 from app.services.token_security import active_token_user
 from app.services.event_delivery import enqueue
 from app.services.documents.private_storage import check_object_digest, IngestionError
@@ -53,7 +57,12 @@ def _details(item):
     people = EnvelopeParticipant.query.filter_by(envelope_id=item.id).order_by(
         EnvelopeParticipant.signing_order
     ).all()
+    labels = sorted(
+        row.label
+        for row in EnvelopeLabel.query.filter_by(envelope_id=item.id).all()
+    )
     return {
+        "labels": labels,
         "id": item.id, "document_id": item.document_id,
         "document_blob_id": item.document_blob_id,
         "document_sha256": item.document_sha256,
@@ -159,9 +168,16 @@ def create_envelope():
 @jwt_required()
 def list_envelopes():
     user = _actor()
-    items = SigningEnvelope.query.filter_by(
+    query = SigningEnvelope.query.filter_by(
         created_by_id=user.id, organization_id=user.organization_id
-    ).order_by(SigningEnvelope.id.desc()).limit(100).all()
+    )
+    label_filter = request.args.get("label")
+    if label_filter:
+        query = query.join(
+            EnvelopeLabel,
+            EnvelopeLabel.envelope_id == SigningEnvelope.id,
+        ).filter(EnvelopeLabel.label == label_filter)
+    items = query.order_by(SigningEnvelope.id.desc()).limit(100).all()
     return jsonify([_details(item) for item in items])
 
 
@@ -809,6 +825,112 @@ def withdraw_envelope(envelope_id):
     return jsonify(_details(envelope)), 200
 
 
+@envelope_api.route("/bulk/withdraw", methods=["POST"])
+@jwt_required()
+def bulk_withdraw_envelopes():
+    """Withdraw a batch of prepared envelopes in one call.
+
+    Payload: ``{"envelope_ids": [int, ...], "reason": "..."}``.
+    Each envelope is evaluated independently with the same guards
+    as the single-envelope withdraw: the caller must own the row,
+    the row must be in ``prepared`` state, and no participant
+    decision may have been recorded. A row-level failure reports
+    an ``error_code`` but does not reject the batch — successful
+    rows are committed together. If **every** row fails the whole
+    transaction rolls back.
+    """
+    from app.models.signer_decision import SignerDecision
+
+    user = _actor()
+    data = _payload()
+    ids = data.get("envelope_ids")
+    reason = data.get("reason")
+    if not isinstance(ids, list) or not ids:
+        abort(400, description="envelope_ids_required")
+    if len(ids) > 100:
+        abort(413, description="bulk_withdraw_limit_100")
+    if reason is not None and not isinstance(reason, str):
+        abort(400, description="reason_must_be_string")
+    if reason is not None and len(reason) > 255:
+        abort(400, description="reason_too_long")
+    seen: set[int] = set()
+    results: list[dict] = []
+    withdrawn_count = 0
+    for env_id in ids:
+        entry = {"envelope_id": env_id}
+        if type(env_id) is not int:
+            entry["status"] = "failed"
+            entry["error_code"] = "envelope_id_invalid"
+            results.append(entry)
+            continue
+        if env_id in seen:
+            entry["status"] = "failed"
+            entry["error_code"] = "duplicate_id"
+            results.append(entry)
+            continue
+        seen.add(env_id)
+        envelope = (
+            SigningEnvelope.query.filter_by(
+                id=env_id,
+                organization_id=user.organization_id,
+                created_by_id=user.id,
+            )
+            .with_for_update()
+            .first()
+        )
+        if envelope is None:
+            entry["status"] = "failed"
+            entry["error_code"] = "envelope_not_found"
+            results.append(entry)
+            continue
+        if envelope.state != "prepared":
+            entry["status"] = "failed"
+            entry["error_code"] = "state_not_prepared"
+            results.append(entry)
+            continue
+        if SignerDecision.query.filter_by(envelope_id=envelope.id).count():
+            entry["status"] = "failed"
+            entry["error_code"] = "decisions_recorded"
+            results.append(entry)
+            continue
+        envelope.state = "withdrawn"
+        envelope.withdrawn_at = datetime.utcnow()
+        envelope.withdrawn_by_id = user.id
+        envelope.withdraw_reason = reason or None
+        enqueue(
+            event_type="envelope.withdrawn",
+            aggregate_type="envelope",
+            aggregate_id=envelope.id,
+            organization_id=user.organization_id,
+            actor_id=user.id,
+            action="envelope.withdrawn",
+            idempotency_key="envelope-withdrawn:%s" % envelope.id,
+        )
+        withdrawn_count += 1
+        entry["status"] = "succeeded"
+        results.append(entry)
+    if withdrawn_count == 0:
+        db.session.rollback()
+        return (
+            jsonify(
+                withdrawn=0,
+                failed=len(results),
+                results=results,
+            ),
+            400,
+        )
+    db.session.commit()
+    http_status = 207 if withdrawn_count != len(results) else 200
+    return (
+        jsonify(
+            withdrawn=withdrawn_count,
+            failed=len(results) - withdrawn_count,
+            results=results,
+        ),
+        http_status,
+    )
+
+
 @envelope_api.route(
     "/<int:envelope_id>/participants/<int:participant_id>/reminder",
     methods=["POST"],
@@ -970,3 +1092,76 @@ def delete_envelope_field(envelope_id, field_id):
         abort(404, description=str(exc))
     db.session.commit()
     return jsonify(message="field_deleted"), 200
+
+
+# ============================================================ Q1 labels
+
+
+def _normalise_label(value):
+    if not isinstance(value, str):
+        return None
+    value = value.strip().lower()
+    if not value or len(value) > 60:
+        return None
+    for ch in value:
+        if not (ch.isalnum() or ch in ("-", "_", ":")):
+            return None
+    return value
+
+
+@envelope_api.route("/<int:envelope_id>/labels", methods=["POST"])
+@jwt_required()
+def add_envelope_label(envelope_id):
+    """Attach a tenant-scoped label to an envelope."""
+    user = _actor()
+    envelope = _owned(envelope_id, user)
+    data = _payload()
+    label = _normalise_label(data.get("label"))
+    if label is None:
+        abort(400, description="label_invalid")
+    existing = EnvelopeLabel.query.filter_by(
+        envelope_id=envelope.id, label=label
+    ).first()
+    if existing is not None:
+        return jsonify(label=label, created=False), 200
+    row = EnvelopeLabel(
+        envelope_id=envelope.id,
+        organization_id=envelope.organization_id,
+        label=label,
+        created_by_id=user.id,
+    )
+    db.session.add(row)
+    db.session.commit()
+    return jsonify(label=label, created=True), 201
+
+
+@envelope_api.route(
+    "/<int:envelope_id>/labels/<path:label>", methods=["DELETE"]
+)
+@jwt_required()
+def remove_envelope_label(envelope_id, label):
+    user = _actor()
+    envelope = _owned(envelope_id, user)
+    normalised = _normalise_label(label)
+    if normalised is None:
+        abort(400, description="label_invalid")
+    row = EnvelopeLabel.query.filter_by(
+        envelope_id=envelope.id, label=normalised
+    ).first()
+    if row is None:
+        abort(404)
+    db.session.delete(row)
+    db.session.commit()
+    return jsonify(message="label_removed"), 200
+
+
+@envelope_api.route("/<int:envelope_id>/labels", methods=["GET"])
+@jwt_required()
+def list_envelope_labels(envelope_id):
+    user = _actor()
+    envelope = _owned(envelope_id, user)
+    labels = sorted(
+        row.label
+        for row in EnvelopeLabel.query.filter_by(envelope_id=envelope.id).all()
+    )
+    return jsonify(envelope_id=envelope.id, labels=labels)
