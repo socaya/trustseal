@@ -127,7 +127,7 @@ def review_payload(envelope, participant, decision):
         raise ValueError("Inconsistent review evidence")
     if not decision.recorded_at:
         raise ValueError("Review timestamp required")
-    return {
+    payload = {
         "schema": SCHEMA,
         "assurance": "platform_attestation_of_review_only",
         "envelope_id": envelope.id,
@@ -142,3 +142,12 @@ def review_payload(envelope, participant, decision):
         "consent_sha256": decision.consent_sha256,
         "recorded_at": decision.recorded_at.isoformat(timespec="microseconds") + "Z",
     }
+    # Supporting attachments (Phase U2). Deterministic sorted order
+    # — the field is present only when the signer actually attached
+    # files so pre-U2 receipts stay byte-for-byte identical.
+    from app.services import signer_attachments
+
+    manifest = signer_attachments.receipt_manifest(decision)
+    if manifest:
+        payload["attachments"] = manifest
+    return payload

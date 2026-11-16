@@ -133,6 +133,7 @@ def create_app(config_class=None):
             'sign_views.landing',
             'sign_views.decision',
             'sign_views.download',
+            'sign_views.upload_attachment',
             # SAML SP endpoints are the entry point for SSO — the IdP
             # posts the response here before the user has a session.
             'saml_views.metadata',

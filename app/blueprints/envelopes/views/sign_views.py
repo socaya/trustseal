@@ -188,6 +188,57 @@ def download(token: str):
     )
 
 
+@sign_views.route("/<token>/attachments", methods=["POST"])
+def upload_attachment(token: str):
+    """Signer uploads a supporting attachment (Phase U1).
+
+    Accepts a single ``file`` multipart field. The attachment is
+    persisted in a staged state (``decision_id IS NULL``) and the
+    returned id is referenced in the subsequent decision form so
+    the recorded SignerDecision owns the attachment set.
+    """
+    from flask import jsonify
+    from app.services import signer_attachments
+
+    if _rate_limited():
+        return (
+            jsonify(error="rate_limited"),
+            429,
+        )
+    try:
+        resolved = signer_invitations.resolve(token)
+    except signer_invitations.InvitationError:
+        return jsonify(error="unavailable"), 404
+    uploaded = request.files.get("file")
+    if uploaded is None or not uploaded.filename:
+        return jsonify(error="file_required"), 400
+    payload = uploaded.read()
+    mime = (uploaded.mimetype or "").split(";", 1)[0].strip().lower()
+    try:
+        result = signer_attachments.store(
+            envelope=resolved.envelope,
+            participant=resolved.participant,
+            file_name=uploaded.filename,
+            mime_type=mime,
+            payload=payload,
+            config=current_app.config,
+        )
+    except signer_attachments.AttachmentError as exc:
+        db.session.rollback()
+        return jsonify(error=str(exc)), 400
+    db.session.commit()
+    return (
+        jsonify(
+            id=result.attachment.id,
+            sha256=result.sha256,
+            file_name=result.attachment.file_name,
+            mime_type=result.attachment.mime_type,
+            file_size=result.attachment.file_size,
+        ),
+        201,
+    )
+
+
 @sign_views.route("/<token>/decision", methods=["POST"])
 def decision(token: str):
     if _rate_limited():
@@ -267,6 +318,44 @@ def decision(token: str):
             )
             return redirect(url_for("sign_views.landing", token=token))
 
+    # Optional staged supporting attachments (Phase U2). The form
+    # carries attachment ids chosen by the signer; each must belong
+    # to this envelope + participant and not yet be bound to another
+    # decision. A rejection here rolls the whole decision back so
+    # the recorded consent never lies about the attached evidence.
+    attachment_ids_raw = (request.form.get("attachment_ids") or "").strip()
+    attachments_bound = 0
+    if attachment_ids_raw:
+        from app.services import signer_attachments
+
+        try:
+            parsed = [
+                int(part)
+                for part in attachment_ids_raw.split(",")
+                if part.strip()
+            ]
+        except ValueError:
+            db.session.rollback()
+            flash("Attachment list was malformed. Please try again.", "danger")
+            return redirect(url_for("sign_views.landing", token=token))
+        try:
+            claimed = signer_attachments.claim_staged(
+                decision=decision_row, attachment_ids=parsed
+            )
+        except signer_attachments.AttachmentError as exc:
+            db.session.rollback()
+            current_app.logger.info(
+                "signer_attachment_rejected",
+                extra={"reason": str(exc)},
+            )
+            flash(
+                "We could not attach the uploaded files. "
+                "Please re-upload and try again.",
+                "danger",
+            )
+            return redirect(url_for("sign_views.landing", token=token))
+        attachments_bound = len(claimed)
+
     signer_invitations.consume(resolved.invitation)
     db.session.commit()
     return render_template(
@@ -274,4 +363,5 @@ def decision(token: str):
         choice=choice,
         envelope=envelope,
         appearance_stored=appearance_stored,
+        attachments_bound=attachments_bound,
     )
