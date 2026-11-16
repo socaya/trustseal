@@ -5,8 +5,7 @@ TrustSeal is a browser-first, multi-tenant document trust platform designed to h
 The product vision combines document management with controlled authority, tamper-evident evidence, and independent verification. A signature image, stamp graphic, or QR code is never treated as proof by itself; TrustSeal is designed to associate each action with an exact document version, an authorized actor, a defined workflow, and an auditable evidence record.
 
 > [!IMPORTANT]
-> As of **2026-11-15**, all code-addressable gaps from the 2026-11-14 remediation plan are closed. The platform ships with:
-> private object storage, tenant-scoped repositories hardened with PostgreSQL row-level security, idempotent transaction outbox + background workers, evidence-grade finalization with signed RFC 3161 timestamps and OCSP/CRL capture, immutable validation dossiers, signed PDF sealing through AWS KMS via pyHanko, public tamper-evident verification wired to the validation dossier, append-only SHA-256 chained audit log with externally-signed chain anchors, durable DB-backed rate limiting, drawn-signature capture on `/sign` with vendored PDF.js and signature_pad, OpenTelemetry tracing + Prometheus metrics, OIDC SSO, SCIM 2.0 provisioning, and a 534-test pytest suite running against real PostgreSQL. What remains is **process and governance** — external pen-test engagement, SLO/error-budget codification, SAML, cross-region replica topology — tracked in [`docs/REMAINING_GAPS_2026-11-15.md`](docs/REMAINING_GAPS_2026-11-15.md). Do not represent the current build as legally certified, universally binding, tamper-proof, or compliant with a specific jurisdiction until the external pen-test and jurisdictional-approval steps in that document complete.
+> As of **2026-11-16**, Phases A–E of the code-addressable remediation plan are closed. The platform ships with: private object storage, tenant-scoped repositories hardened with PostgreSQL row-level security, idempotent transaction outbox + background workers, evidence-grade finalization with signed RFC 3161 timestamps and OCSP/CRL capture, immutable validation dossiers, signed PDF sealing through AWS KMS via pyHanko, public tamper-evident verification wired to the validation dossier, append-only SHA-256 chained audit log with externally-signed chain anchors, durable DB-backed rate limiting, drawn-signature capture on `/sign` with vendored PDF.js and signature_pad, OpenTelemetry tracing + Prometheus metrics, OIDC SSO, SCIM 2.0 provisioning, **email verification + password-reset lifecycle + session/device management + step-up MFA on high-risk actions** (Phase A), **separation-of-duties policy + teams + time-bound delegation** (Phase B), **multi-field placement with signer-scoped ownership + sequential/parallel/quorum routing + withdraw/reminder/resend + preview checkpoint** (Phase C), **Pillow image→PDF ingestion + pypdf-based safe preview + bulk document upload with per-item recovery** (Phase D), **template versioning with publication workflow + clause libraries + Postgres full-text search** (Phase E), and a **708-test pytest suite running against real PostgreSQL**. What remains is **process and governance** — external pen-test engagement, SLO/error-budget codification, SAML, cross-region replica topology — tracked in [`docs/REMAINING_GAPS_2026-11-15.md`](docs/REMAINING_GAPS_2026-11-15.md). Do not represent the current build as legally certified, universally binding, tamper-proof, or compliant with a specific jurisdiction until the external pen-test and jurisdictional-approval steps in that document complete.
 
 ## Contents
 
@@ -56,83 +55,98 @@ Create / Upload
 
 Status legend:
 
-- **Prototype** — code, models, routes, or UI scaffolding currently exists.
-- **Partial** — some structure exists, but the documented security and workflow contract is incomplete.
-- **Planned** — specified in the product documentation and implementation plan, but not yet delivered end to end.
+- **Shipped** — implemented, test-covered against real PostgreSQL, and documented.
+- **Partial** — core behavior shipped, named extensions tracked as residual gaps.
+- **Deferred** — governance, UI, or third-party-integration work tracked in [`docs/REMAINING_GAPS_2026-11-15.md`](docs/REMAINING_GAPS_2026-11-15.md).
 
 ### Identity and access management
 
-| Capability | Status | Intended behavior |
+| Capability | Status | Behavior |
 | --- | --- | --- |
-| Registration, login, and logout | Prototype | Browser and API authentication using Flask-Login and JWT-based routes. |
-| Password management | Partial | Password hashing exists; verified email, secure reset lifecycle, and complete session invalidation remain to be implemented. |
-| Multi-factor authentication | Planned | TOTP and/or passkeys for privileged users and higher-assurance workflows. |
-| Session and device management | Planned | Session history, revocation, token-family rotation, and security-event visibility. |
-| External participant access | Partial | Invitations and sharing models exist; recipient-bound, expiring, least-privilege execution access is planned. |
-| SSO and provisioning | Planned | OIDC/SAML, just-in-time role mapping, and optional SCIM lifecycle management. |
-| Identity assurance policies | Planned | Workflow-specific authentication and identity-proofing requirements. |
+| Registration, login, logout | Shipped | Flask-Login session + JWT access/refresh family with reuse detection. `app/blueprints/auth/`, `app/services/refresh_tokens.py`. |
+| Password management | Shipped | 12-char minimum; change-password revokes every refresh family; `last_password_change_at` tracked on the user row. `app/blueprints/auth/routes/auth_api.py`. |
+| Email verification | Shipped (Phase A1) | Hashed single-use token, 48-hour TTL, rate-limited resend. `EmailVerificationToken`, `app/services/email_verification.py`, `@require_verified_email` decorator. |
+| Password reset lifecycle | Shipped (Phase A2) | Enumeration-safe 202 request, IP-rate-limited, token consume sets new password + revokes every refresh family. `PasswordResetToken`, `app/services/password_reset.py`. |
+| Multi-factor authentication | Shipped | TOTP with 10 one-shot scrypt-hashed recovery codes; Fernet-wrapped seed derived from SECRET_KEY. `app/services/mfa.py`. |
+| Step-up MFA on high-risk actions | Shipped (Phase A4) | `@require_recent_mfa(max_age_seconds=300)` decorator + `POST /api/auth/mfa/step-up` issues a fresh access JWT with `mfa_verified_at` claim and revokes the previous one. Available for routes to apply. |
+| Session and device management | Shipped (Phase A3) | `UserSession` per refresh family with UA/IP/last-seen; `GET /api/auth/sessions`, `DELETE /api/auth/sessions/<id>`, `DELETE /api/auth/sessions/others`. |
+| External participant access | Shipped | Hashed single-use `SignerInvitation` tokens (14-day TTL, recipient-bound, revocable) with partial-unique index supporting resend. `app/services/signer_invitations.py`. |
+| SSO (OIDC) | Shipped | OIDC provider configuration + JIT user provisioning. `app/models/oidc_provider.py`, `tests/test_oidc_sso.py`. |
+| SSO (SAML) | Deferred | Tracked in remaining-gaps doc. |
+| SCIM 2.0 provisioning | Shipped | `/scim/v2/` endpoints with service-account bearer auth. `app/blueprints/integrations/scim_api.py`. |
+| Identity assurance policies | Partial | `@require_recent_mfa` decorator ready; per-route gating of specific workflows is an operator rollout decision. |
 
 ### Organisations, teams, and authorization
 
-| Capability | Status | Intended behavior |
+| Capability | Status | Behavior |
 | --- | --- | --- |
-| Organisation workspaces | Prototype | Organisation and client models with administrative views and APIs. |
-| Members and invitations | Prototype | User and invitation scaffolding for organisation membership. |
-| Roles and permissions | Partial | Role, permission, role-permission, and user-role models exist; complete tenant/object policy enforcement is planned. |
-| Teams and departmental scope | Planned | Team membership, folder/resource scope, and ownership assignment. |
-| Delegation | Planned | Time-bound, approved, scope-limited delegation with an attributable authority chain. |
-| Separation of duties | Planned | Controls such as preventing a restricted-stamp requester from self-approving. |
-| Tenant isolation | Planned hardening | Deny-by-default checks on every server-side read, write, file, export, and background action. |
+| Organisation workspaces | Shipped | `Organization` + membership model; full admin + member APIs. |
+| Members and invitations | Shipped | `UserInvitation` for joining an org; `SignerInvitation` for recipient-bound signing access. |
+| Roles and permissions | Shipped | Role / Permission / RolePermission / UserRole; deny-by-default guard in `app/policies/api_access.py`. |
+| Teams and departmental scope | Shipped (Phase B2) | `Team` + `TeamMembership` (org-scoped, soft-deleted); `/api/teams` admin CRUD + `/api/teams/me`. |
+| Delegation | Shipped (Phase B3) | `Delegation` model with windowed, scope-limited, resource-bounded authority transfer; `*` wildcard for out-of-office; `/api/delegations` grant / revoke / outgoing / incoming. Refuses self-delegation, cross-org, past/empty windows. |
+| Separation of duties | Shipped (Phase B1) | `assert_distinct` / `enforce` / `@require_separation_of_duties`; emits a `SecurityEvent` on denial. Applied to stamp approval, admin role grants, template publish, clause approve. |
+| Tenant isolation | Shipped | Application-layer `TenantScopedRepository` plus PostgreSQL row-level security (defence-in-depth) on 11 trust-critical tables. `app/services/tenant_rls.py`. |
 
 ### Document management
 
-| Capability | Status | Intended behavior |
+| Capability | Status | Behavior |
 | --- | --- | --- |
-| Document records | Prototype | Create, list, view, edit, and organize document metadata. |
-| PDF, DOCX, and image ingestion | Partial | Basic upload configuration exists; scanning, structural inspection, and isolated conversion are planned. |
-| Drafts and sections | Prototype | Draft and section models, forms, and route scaffolding. |
-| Document types and classification | Prototype | Types, tags, ownership, organisation, and client associations. |
-| Versions | Partial | Version records exist; immutable object-backed revisions and canonical digests are planned. |
-| Parties and participants | Prototype | Document-party records and associated UI/API scaffolding. |
-| Comments and activity | Prototype | Comment, activity, and document audit-log records. |
-| Shares and reminders | Prototype | Sharing and reminder records with views and APIs. |
-| Private object storage | Planned | Encrypted, non-public storage for originals, execution inputs, final documents, and evidence. |
-| Safe preview pipeline | Planned | Script-free rendering, page navigation, sandboxed conversion, and authorized delivery. |
-| Search and bulk operations | Planned | Tenant-scoped filtering, full-text search, bulk upload, and per-file failure recovery. |
-| Retention and legal hold | Planned | Retention classes, archive, adjudicated deletion, legal hold, and secure destruction. |
+| Document records | Shipped | CRUD + soft-delete + tenant-scoped repository. |
+| PDF ingestion | Shipped | Magic-check + ClamAV scan + atomic promotion to immutable private-storage object. `app/services/documents/private_storage.py`. |
+| Image (PNG/JPEG) ingestion | Shipped (Phase D1) | Pillow + reportlab single-page conversion with magic check, byte cap, pixel cap, RGBA flattening. Config gate `IMAGE_PDF_CONVERSION_ENABLED`. `app/services/documents/image_conversion.py`. |
+| DOCX ingestion | Deferred | Needs isolated subprocess conversion with resource limits. |
+| Drafts and sections | Shipped | Models + CRUD; immutable append-only snapshots via `DocumentSnapshot` + Postgres triggers. |
+| Document types and classification | Shipped | DocumentType + tags + ownership. |
+| Versions | Shipped | `DocumentBlob` revisions; SHA-256 manifests; append-only. |
+| Parties and participants | Shipped | DocumentParty + EnvelopeParticipant. |
+| Comments and activity | Shipped | DocumentComment + DocumentActivity + append-only DocumentAuditLog. |
+| Shares and reminders | Shipped | DocumentShare + DocumentReminder. |
+| Private object storage | Shipped | Encrypted non-public storage; `PRIVATE_DOCUMENT_ROOT` isolated from Flask static; mode-0400 objects. |
+| Safe preview pipeline | Shipped (Phase D2) | pypdf-based sanitiser strips `/OpenAction`, `/AA`, `/JS`, `/JavaScript`, `/Names`, `/EmbeddedFiles`, `/AcroForm` from catalog; per-page `/AA`; per-annotation `/A`/`/AA`/`/JS`. `GET /api/documents/<id>/blobs/<bid>/preview`. Config gate `SAFE_PREVIEW_ENABLED`. |
+| Full-text search | Shipped (Phase E3) | Postgres `to_tsvector('english', title ‖ description)` with `plainto_tsquery`, `ts_rank` ordering, tenant isolation, soft-delete exclusion. `GET /api/documents/search?q=`. |
+| Bulk upload | Shipped (Phase D3) | `POST /api/documents/bulk` accepts up to 25 files; per-item `succeeded`/`failed` status; durable `BulkIngestBatch` + `BulkIngestItem`; 207 Multi-Status for partial failure. |
+| Retention and legal hold | Shipped | EvidenceRetention + EvidenceLegalHold + EvidenceCheckpoint with release-reason tracking. `app/services/evidence_preservation.py`. |
 
 ### Document preparation and authoring
 
-- Rich-text document and template composition.
-- Headings, tables, clauses, numbering, and typed variables.
-- Draft autosave and optimistic concurrency control.
-- Signature, initials, date, text, checkbox, and stamp field placement.
-- Page-accurate coordinates, scaling, rotation, and preview.
-- Required/optional fields with validation and participant assignment.
-- Template revision history, ownership, publication, and archival.
-- Controlled clause libraries and approval policies.
-- Explicit preview and confirmation before issuing a transaction.
-- Optional, tenant-controlled AI suggestions with human approval and privacy safeguards.
-
-The current repository contains document-template, draft, section, and form scaffolding. The transactional preparation experience and exact PDF-coordinate pipeline are planned.
+| Capability | Status | Behavior |
+| --- | --- | --- |
+| Rich-text + template composition | Shipped | `DocumentTemplate` + `DocumentTemplateVersion` state machine. |
+| Headings / tables / clauses / variables | Partial | Clause libraries shipped (below); rich-text UI primitives are a frontend milestone. |
+| Draft autosave + optimistic concurrency | Deferred | Needs frontend coordination. |
+| Multi-field placement (signature, initials, date, text, checkbox) | Shipped (Phase C1) | `EnvelopeField` with per-participant assignment, page + coord rectangles, field_type enum. `POST/DELETE /api/envelopes/<id>/fields`. |
+| Page-accurate coordinates + preview | Shipped | PDF user-space (x_pt, y_pt, width_pt, height_pt); vendored PDF.js viewer on `/sign`. |
+| Required/optional fields + signer-scoped visibility | Shipped (Phase C2) | A signer only sees their own fields via `GET /api/signer-intent/envelopes/<id>/fields`; foreign field ids submitted on a decision get 403. |
+| Template revision history, publication, archival | Shipped (Phase E1) | State machine `draft` → `published` → `archived`; publish requires separation of duties (caller ≠ current version author). `/api/document-templates`. |
+| Clause libraries + approval policies | Shipped (Phase E2) | `Clause` + `ClauseVersion` with draft → approved → archived; SoD on approval. `/api/clauses`. |
+| Explicit preview + confirmation before issuing | Shipped (Phase C5) | `preview_confirmed_at` timestamp on the envelope; `/prepare` refuses until `POST /api/envelopes/<id>/preview/confirm` has been called. |
+| Tenant-controlled AI suggestions | Deferred | Product decision pending. |
 
 ### Electronic signatures and consent
 
-| Capability | Status | Intended behavior |
+| Capability | Status | Behavior |
 | --- | --- | --- |
-| Signature profiles | Prototype | Store user signature appearance profiles. |
-| Signature requests | Prototype | Request and activity records with basic CRUD routes. |
-| Drawn, typed, and uploaded appearances | Partial | Appearance data is modeled; complete policy, storage, and evidence controls are planned. |
-| Secure signing invitations | Planned | Hashed, recipient-specific, expiring, revocable tokens. |
-| Explicit electronic consent | Planned | Versioned consent wording, intent, time, and assurance evidence. |
-| Field ownership | Planned | Signers can complete only their assigned fields. |
-| Routing | Planned | Sequential, parallel, witness, quorum, and conditional workflows. |
-| Exceptions | Planned | Decline, expiry, reminder, resend, cancel, withdraw, and correction/reissue. |
-| Idempotent finalization | Planned | Repeated requests produce exactly one final artifact and completion record. |
-| Evidence package | Planned | Document digest, invitation, authentication, consent, events, timestamps, and manifest. |
-| Certificate-backed signatures | Future assurance phase | Protected-key and standards-conformant PDF signatures through approved providers. |
+| Signature profiles | Shipped | SignatureProfile per user. |
+| Signature requests | Shipped | SignatureRequest + SignatureRequestActivity + routing through signer intent. |
+| Drawn appearance | Shipped (G10) | signature_pad canvas + `SignerAppearance` row persists 256 KB PNG into private storage; SHA-256 recorded. |
+| Typed and uploaded appearances | Partial | Stored but no first-party rendering pipeline yet. |
+| Secure signing invitations | Shipped | Hashed, recipient-bound, 14-day TTL, revocable; resend revokes + reissues via `POST /api/envelopes/<id>/participants/<pid>/resend-invitation`. |
+| Explicit electronic consent | Shipped | Versioned consent wording stored by hash; intent captured on SignerDecision with time + affirmation. |
+| Field ownership enforcement | Shipped (Phase C2) | Signer sees only own fields; `submit_values` raises `FieldOwnershipError` on cross-participant writes. |
+| Routing — sequential, parallel, quorum | Shipped (Phase C3) | `SigningEnvelope.routing_mode` + `quorum_required`; eligibility engine honours the mode. Witness role waits for every signer / until quorum met. |
+| Routing — witness | Shipped (Phase C3) | Witness participant signs last in every mode. |
+| Routing — conditional | Deferred | Needs rules DSL. |
+| Exceptions — decline, expiry, cancel | Shipped | Decline/expiry/cancel records on SignerDecision + SignerInvitation lifecycle. |
+| Exceptions — reminder | Shipped (Phase C4) | `POST /api/envelopes/<id>/participants/<pid>/reminder` sends an email via the mailer transport. |
+| Exceptions — resend | Shipped (Phase C4) | `POST /api/envelopes/<id>/participants/<pid>/resend-invitation` revokes + reissues. |
+| Exceptions — withdraw | Shipped (Phase C4) | `POST /api/envelopes/<id>/withdraw` for prepared envelopes before any decision lands. |
+| Exceptions — correction/reissue | Partial | Current workflow: withdraw + new envelope. First-class supersession lineage is a follow-up. |
+| Idempotent finalization | Shipped | Orchestrator is idempotent via `IdempotencyRecord`. |
+| Evidence package | Shipped | Document digest + invitation + consent + events + timestamps + manifest exported from `ValidationDossier`. |
+| Certificate-backed signatures | Shipped | pyHanko external signer against AWS KMS; CMS/PAdES chain with TSA + OCSP evidence. `app/services/pdf_sealing.py`. |
 
-TrustSeal distinguishes a graphical signature appearance from a cryptographic digital signature. The interface and verification record must state the assurance actually delivered.
+TrustSeal distinguishes a graphical signature appearance from a cryptographic digital signature. The interface and verification record state the assurance actually delivered.
 
 ### Digital stamps and official seals
 
@@ -150,7 +164,7 @@ The intended stamp system includes:
 - preservation of historical impressions after an asset is suspended, retired, expired, or revoked;
 - explicit distinction between a visual stamp and a legally or cryptographically assured seal.
 
-The prototype currently provides digital-stamp, stamp-template, and stamp-usage models, forms, views, and APIs. Custody, approval, immutable revisioning, and hash-bound application remain planned.
+Custody, dual-control approval with separation-of-duties, immutable stamp-attestation evidence, and hash-bound application are **shipped**. See `app/services/stamp_custody.py`, `app/services/stamped_pdf.py`, and `app/services/stamp_attestation.py`.
 
 ### Independent verification and evidence
 
@@ -168,7 +182,7 @@ Planned verification capabilities include:
 - machine-readable manifests and optional signed attestations;
 - certificate chain, timestamp, and revocation checks for supported higher-assurance documents.
 
-Independent verification is a target capability and is not complete in the current prototype.
+Independent verification is **shipped**: public tamper-evident verification is wired to the immutable `ValidationDossier` and refuses records whose chain or digest no longer matches. See `app/blueprints/trust/views/verify_views.py` and `app/services/validation_dossier.py`. Rate limiting, correlation-ID audit, and privacy-minimised disclosure are in place; the detailed-evidence export is operator-gated.
 
 ### Contract lifecycle management
 
@@ -196,7 +210,7 @@ Planned contract features include:
 - Branded notification templates and clear sender identity.
 - Policy controls for external links, previews, and downloads.
 
-Basic comments, shares, reminders, activities, and invitations are scaffolded. Durable delivery processing is planned.
+Comments, shares, document reminders, activities, and invitations are shipped. Signing reminders + invitation resends ship via the transactional email service (`app/services/email.py`). Durable at-least-once delivery runs through the transaction outbox + background worker (`app/services/outbox.py`, `app/workers/`); signed-and-replay-protected webhook delivery with retry + dead-letter is in `app/services/webhooks.py`.
 
 ### Plans, subscriptions, and billing
 
@@ -212,7 +226,7 @@ The intended commercial layer supports:
 - preservation and policy-controlled read access for completed evidence after downgrade;
 - annual contracts, custom limits, purchase orders, and manual enterprise entitlements.
 
-Subscription-plan and subscription models and routes exist in the prototype. Provider integration, metering, reconciliation, and complete entitlement enforcement remain planned.
+Subscription-plan, subscription, and payment models + CRUD routes are shipped. A provider-agnostic billing integration (Stripe / Paddle adapter), metered usage ledger, reconciliation, and complete entitlement enforcement remain **deferred** — product decision pending which commercial adapter to bind.
 
 ### Administration, audit, and operations
 
@@ -227,7 +241,7 @@ Subscription-plan and subscription models and routes exist in the prototype. Pro
 - Metrics, structured logs, distributed correlation, and privacy-aware support tools.
 - Encrypted backups, restore rehearsals, disaster recovery, and post-recovery reconciliation.
 
-The current project has system settings, RBAC records, and basic audit-log scaffolding. Tamper evidence and production operations are planned.
+System settings, RBAC, SecurityEvent audit log with **SHA-256 chained integrity + externally-signed chain anchors**, OpenTelemetry tracing, Prometheus metrics, structured logging with correlation IDs, encrypted-at-rest private object storage, durable JWT blocklist, and CLI operators for outbox drain + OCSP + CRL + TSA + evidence preservation are **shipped**. Backup/restore drills, disaster-recovery rehearsals, and operator break-glass are tracked as governance items.
 
 ### APIs and integrations
 
@@ -244,7 +258,7 @@ The target API platform includes:
 - replaceable object storage, email, SMS, payment, timestamp, and certificate adapters;
 - optional document-suite, institutional registry, SDK, and tenant-sandbox integrations.
 
-The prototype exposes multiple Flask JSON endpoints and an internal API client, but they should not yet be treated as a stable public API contract.
+The API platform is shipped: versioned REST endpoints, RFC 7807-style problem-details errors, correlation IDs, idempotency keys for trust-critical mutations, durable JWT revocation, published OpenAPI 3 document (`GET /api/openapi.json`), signed webhooks with replay-protected delivery history, and the transaction-outbox job pipeline. Public API contract stability requires one more external review cycle before 1.0 is declared.
 
 ### Security, privacy, and legal assurance
 
@@ -450,8 +464,25 @@ Status legend:
 | OpenTelemetry tracing + Prometheus metrics | Shipped | `app/tracing.py`, `app/services/observability.py` |
 | Durable JWT blocklist + refresh rotation | Shipped | `app/services/token_security.py` |
 | OpenAPI 3 + published SDKs | Shipped | `app/blueprints/openapi/` |
-| Subscription records + billing hooks | Partial | `app/models/subscription.py` (Stripe integration gated) |
-| Automated test suite | Shipped | 534 tests against real PostgreSQL |
+| Email verification | Shipped | `app/services/email_verification.py`, migration `i9a428c3e2f9` |
+| Password reset lifecycle | Shipped | `app/services/password_reset.py`, migration `j0b539d4f3a0` |
+| Session / device management | Shipped | `app/services/sessions.py`, `app/models/user_session.py`, migration `k1c640e5a4b1` |
+| Step-up MFA policy decorator + endpoint | Shipped | `app/policies/step_up_mfa.py`, `POST /api/auth/mfa/step-up` |
+| Separation-of-duties policy | Shipped | `app/policies/separation_of_duties.py` |
+| Teams + team membership | Shipped | `app/services/teams.py`, migration `l2d751f6b5c2` |
+| Time-bound delegation | Shipped | `app/services/delegations.py`, migration `m3e862a7c6d3` |
+| Multi-field placement + ownership | Shipped | `app/services/envelope_fields.py`, `app/models/envelope_field.py` |
+| Routing modes (sequential/parallel/quorum) | Shipped | `SigningEnvelope.routing_mode`, migration `o5a084c9e8f5` |
+| Envelope withdraw / reminder / resend | Shipped | `app/blueprints/documents/api/envelope_api.py` |
+| Envelope preview checkpoint | Shipped | `/api/envelopes/<id>/preview` + `/preview/confirm` |
+| Image → PDF ingestion | Shipped | `app/services/documents/image_conversion.py` (Pillow + reportlab) |
+| Safe PDF preview | Shipped | `app/services/documents/safe_preview.py` (pypdf sanitiser) |
+| Bulk document ingestion | Shipped | `app/blueprints/documents/api/document_api.py` + `BulkIngestBatch` |
+| Template versioning + publication | Shipped | `app/services/templates.py`, `DocumentTemplateVersion` |
+| Clause libraries | Shipped | `app/services/clauses.py`, `app/models/clause.py` |
+| Full-text document search | Shipped | `app/services/document_search.py` (Postgres tsvector) |
+| Subscription records + billing hooks | Partial | `app/models/subscription.py` (provider adapter deferred) |
+| Automated test suite | Shipped | **708 tests** against real PostgreSQL |
 | SBOM + supply-chain provenance | Deferred | Tooling-only policy decision |
 | SAST / dependency / secrets scanning | Deferred | Tooling-only policy decision |
 | Accessibility — static checks | Shipped | `tests/test_accessibility.py` |
@@ -614,7 +645,7 @@ The target test programme maps tests to the requirement IDs in the Master SRS:
 
 ### Current test suite
 
-The repository ships with a 534-test pytest suite that runs against real PostgreSQL (no SQLite fallback). The suite covers:
+The repository ships with a **708-test pytest suite** that runs against real PostgreSQL (no SQLite fallback). The suite covers:
 
 - Audit chain integrity, forged event detection, signed-anchor verification.
 - PostgreSQL row-level security enforcement under a non-privileged role.
@@ -627,6 +658,11 @@ The repository ships with a 534-test pytest suite that runs against real Postgre
 - Idempotency under concurrent retry.
 - Webhook signing + replay resistance.
 - OIDC SSO flow, SCIM provisioning lifecycle.
+- Email verification, password reset, session/device management, step-up MFA.
+- Separation-of-duties enforcement; teams; time-bound scope-limited delegation.
+- Multi-field placement with signer-scoped visibility; parallel/quorum routing; withdraw/reminder/resend; preview checkpoint.
+- Image→PDF conversion; PDF /OpenAction & /JS sanitisation; bulk ingest with per-item failure recovery.
+- Template versioning with publication + separation-of-duties; clause-library lifecycle; Postgres full-text search with stemming + tenant isolation.
 
 Run the suite with:
 
