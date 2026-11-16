@@ -1691,3 +1691,166 @@ def list_envelope_invitations(envelope_id):
             for row in rows
         ],
     )
+
+
+# ============================================================ AC1 reminder-all
+
+
+@envelope_api.route("/<int:envelope_id>/reminders/send-all", methods=["POST"])
+@jwt_required()
+def send_all_reminders(envelope_id):
+    """Send a reminder to every unacknowledged participant at once.
+
+    Per-row outcomes:
+    * ``succeeded`` — email dispatched.
+    * ``skipped`` — participant has already recorded a decision or
+      has no active (unrevoked / unconsumed) invitation.
+    * ``failed`` — participant user is deactivated or unknown.
+    """
+    from app.models.signer_decision import SignerDecision
+    from app.models.signer_invitation import SignerInvitation
+    from app.services import email as mailer
+
+    user = _actor()
+    envelope = _owned(envelope_id, user)
+    if envelope.state != "prepared":
+        abort(409, description="reminders_only_for_prepared")
+    participants = (
+        EnvelopeParticipant.query.filter_by(envelope_id=envelope.id)
+        .order_by(EnvelopeParticipant.signing_order)
+        .all()
+    )
+    base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
+    results: list[dict] = []
+    sent = 0
+    for participant in participants:
+        entry = {
+            "participant_id": participant.id,
+            "user_id": participant.user_id,
+        }
+        decided = SignerDecision.query.filter_by(
+            envelope_id=envelope.id, participant_id=participant.id
+        ).count()
+        if decided:
+            entry["status"] = "skipped"
+            entry["reason"] = "already_decided"
+            results.append(entry)
+            continue
+        active = (
+            SignerInvitation.query.filter_by(
+                envelope_id=envelope.id, participant_id=participant.id
+            )
+            .filter(SignerInvitation.revoked_at.is_(None))
+            .filter(SignerInvitation.consumed_at.is_(None))
+            .first()
+        )
+        if active is None:
+            entry["status"] = "skipped"
+            entry["reason"] = "no_active_invitation"
+            results.append(entry)
+            continue
+        recipient = db.session.get(User, participant.user_id)
+        if recipient is None or not recipient.is_active:
+            entry["status"] = "failed"
+            entry["error_code"] = "recipient_inactive"
+            results.append(entry)
+            continue
+        sign_url = f"{base}/sign/envelope/{envelope.id}"
+        subject = "Reminder: a document is waiting for your review"
+        body = (
+            f"Hello {recipient.first_name or recipient.username},\n\n"
+            f"The envelope '{envelope.id}' is waiting for your review and "
+            f"acknowledgement. Please visit:\n\n{sign_url}\n\n"
+            "— The TrustSeal team"
+        )
+        mailer.send(
+            mailer.EmailMessage(
+                to=recipient.email, subject=subject, body_text=body
+            )
+        )
+        active.last_reminder_at = datetime.utcnow()
+        active.reminder_count = (active.reminder_count or 0) + 1
+        enqueue(
+            event_type="envelope.reminder.sent", aggregate_type="envelope",
+            aggregate_id=envelope.id, organization_id=user.organization_id,
+            actor_id=user.id, action="envelope.reminder.sent",
+            idempotency_key=(
+                "envelope-reminder-all:%s:%s:%s"
+                % (envelope.id, participant.id, active.reminder_count)
+            ),
+        )
+        sent += 1
+        entry["status"] = "succeeded"
+        results.append(entry)
+    db.session.commit()
+    return (
+        jsonify(
+            envelope_id=envelope.id,
+            sent=sent,
+            total=len(results),
+            results=results,
+        ),
+        200,
+    )
+
+
+# ============================================================ AC2 revoke invitation
+
+
+@envelope_api.route(
+    "/<int:envelope_id>/invitations/<int:invitation_id>/revoke",
+    methods=["POST"],
+)
+@jwt_required()
+def revoke_invitation(envelope_id, invitation_id):
+    """Operator revokes a specific outstanding signer invitation.
+
+    Payload (optional): ``{"reason": "<short string>"}``. Already-
+    consumed or already-revoked invitations return 409. The hashed
+    token stays in the row so the audit trail is preserved — only
+    the ``revoked_at`` and ``revoke_reason`` fields change.
+    """
+    from app.models.signer_invitation import SignerInvitation
+
+    user = _actor()
+    envelope = _owned(envelope_id, user)
+    row = (
+        SignerInvitation.query.filter_by(
+            id=invitation_id, envelope_id=envelope.id
+        )
+        .with_for_update()
+        .first()
+    )
+    if row is None:
+        abort(404)
+    if row.revoked_at is not None:
+        abort(409, description="invitation_already_revoked")
+    if row.consumed_at is not None:
+        abort(409, description="invitation_already_consumed")
+    reason = None
+    if request.data:
+        data = _payload()
+        reason = data.get("reason")
+        if reason is not None:
+            if not isinstance(reason, str) or len(reason) > 80:
+                abort(400, description="reason_invalid")
+    row.revoked_at = datetime.utcnow()
+    row.revoke_reason = (reason or "operator_revoked")[:80]
+    enqueue(
+        event_type="envelope.invitation.revoked",
+        aggregate_type="envelope",
+        aggregate_id=envelope.id,
+        organization_id=user.organization_id,
+        actor_id=user.id,
+        action="envelope.invitation.revoked",
+        idempotency_key="envelope-invitation-revoked:%s" % row.id,
+    )
+    db.session.commit()
+    return (
+        jsonify(
+            id=row.id,
+            revoked_at=row.revoked_at.isoformat(),
+            revoke_reason=row.revoke_reason,
+        ),
+        200,
+    )
