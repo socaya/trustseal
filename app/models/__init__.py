@@ -40,6 +40,7 @@ from .rate_limit_bucket import RateLimitBucket
 from .signer_appearance import SignerAppearance
 from .signer_attachment import SignerAttachment
 from .envelope_template import EnvelopeTemplate, EnvelopeTemplateParticipant
+from .operator_notification import OperatorNotification
 from .email_verification_token import EmailVerificationToken
 from .password_reset_token import PasswordResetToken
 from .user_session import UserSession

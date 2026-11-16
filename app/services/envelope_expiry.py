@@ -23,6 +23,7 @@ from app.extensions import db
 from app.models.event_delivery import SecurityEvent
 from app.models.signer_decision import SignerDecision
 from app.models.signing_envelope import SigningEnvelope
+from app.services import operator_notifications
 
 
 @dataclass(frozen=True)
@@ -74,6 +75,20 @@ def cancel_expired_envelopes(
                 outcome="ok",
                 correlation_id=uuid.uuid4().hex,
             )
+        )
+        # Phase W2 — notify the envelope owner that their envelope
+        # was auto-withdrawn so they don't have to monitor the
+        # expiry CLI output to find out.
+        operator_notifications.publish(
+            organization_id=envelope.organization_id,
+            recipient_user_id=envelope.created_by_id,
+            kind="envelope.auto_withdrawn.expired",
+            subject_type="signing_envelope",
+            subject_id=envelope.id,
+            summary=(
+                f"Envelope #{envelope.id} was auto-withdrawn because "
+                "its expiry passed without any recorded decision."
+            ),
         )
         outcomes.append(
             ExpiryOutcome(envelope_id=envelope.id, expired_at=moment)
