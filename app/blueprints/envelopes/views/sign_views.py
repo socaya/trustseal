@@ -188,6 +188,47 @@ def download(token: str):
     )
 
 
+@sign_views.route("/<token>/status", methods=["GET"])
+def status(token: str):
+    """Signer-facing status probe (Phase AD2).
+
+    Returns the minimum envelope + decision state a signer app
+    needs to know whether a review is still pending — without
+    consuming the invitation. 404 on bad / revoked / expired
+    tokens, and the response never carries any PII beyond the
+    document digest and the participant's signing_order.
+    """
+    from flask import jsonify
+    from app.models.signer_decision import SignerDecision
+
+    if _rate_limited():
+        return jsonify(error="rate_limited"), 429
+    try:
+        resolved = signer_invitations.resolve(token)
+    except signer_invitations.InvitationError:
+        return jsonify(error="unavailable"), 404
+    decision = (
+        SignerDecision.query.filter_by(
+            envelope_id=resolved.envelope.id,
+            participant_id=resolved.participant.id,
+        )
+        .first()
+    )
+    return jsonify(
+        envelope_id=resolved.envelope.id,
+        envelope_state=resolved.envelope.state,
+        document_sha256=resolved.envelope.document_sha256,
+        signing_order=resolved.participant.signing_order,
+        role=resolved.participant.role,
+        decision_recorded=decision is not None,
+        decision=decision.decision if decision else None,
+        decision_recorded_at=(
+            decision.recorded_at.isoformat() if decision else None
+        ),
+        invitation_expires_at=resolved.invitation.expires_at.isoformat(),
+    )
+
+
 @sign_views.route("/<token>/attachments", methods=["POST"])
 def upload_attachment(token: str):
     """Signer uploads a supporting attachment (Phase U1).

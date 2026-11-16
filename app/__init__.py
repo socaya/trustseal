@@ -134,6 +134,7 @@ def create_app(config_class=None):
             'sign_views.decision',
             'sign_views.download',
             'sign_views.upload_attachment',
+            'sign_views.status',
             # SAML SP endpoints are the entry point for SSO — the IdP
             # posts the response here before the user has a session.
             'saml_views.metadata',
@@ -334,6 +335,10 @@ def create_app(config_class=None):
         document_label_api,
     )
     blueprints.append(document_label_api)
+    from .blueprints.documents.api.signer_attachment_api import (
+        signer_attachment_api,
+    )
+    blueprints.append(signer_attachment_api)
     from .blueprints.integrations.scim_api import scim_api
     blueprints.append(scim_api)
     from .blueprints.integrations.openapi_api import openapi_api
