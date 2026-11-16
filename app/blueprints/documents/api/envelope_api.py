@@ -1893,3 +1893,82 @@ def list_envelope_receipts(envelope_id):
             for row in rows
         ],
     )
+
+
+# ============================================================ AF1 participant reorder
+
+
+@envelope_api.route(
+    "/<int:envelope_id>/participants/<int:participant_id>",
+    methods=["PATCH"],
+)
+@jwt_required()
+def update_participant(envelope_id, participant_id):
+    """Change a participant's ``signing_order`` on a draft envelope.
+
+    Payload: ``{"signing_order": <int>}``. Reorders are only
+    allowed while the recipient list is still unlocked (envelope
+    state is ``draft``). The new order must be unique within the
+    envelope; a collision returns 409.
+    """
+    user = _actor()
+    envelope = _owned(envelope_id, user, lock=True)
+    if envelope.state != "draft":
+        abort(409, description="recipient_list_locked")
+    participant = EnvelopeParticipant.query.filter_by(
+        id=participant_id, envelope_id=envelope.id
+    ).first()
+    if participant is None:
+        abort(404)
+    data = _payload()
+    allowed = {"signing_order"}
+    if set(data) - allowed:
+        abort(400, description="unknown_fields")
+    new_order = data.get("signing_order")
+    if type(new_order) is not int or new_order < 1:
+        abort(400, description="signing_order_invalid")
+    if new_order == participant.signing_order:
+        return jsonify(
+            id=participant.id,
+            signing_order=participant.signing_order,
+            changed=False,
+        ), 200
+    conflict = EnvelopeParticipant.query.filter(
+        EnvelopeParticipant.envelope_id == envelope.id,
+        EnvelopeParticipant.signing_order == new_order,
+        EnvelopeParticipant.id != participant.id,
+    ).first()
+    if conflict is not None:
+        abort(409, description="duplicate_signing_order")
+    participant.signing_order = new_order
+    db.session.commit()
+    return jsonify(
+        id=participant.id,
+        signing_order=participant.signing_order,
+        changed=True,
+    ), 200
+
+
+# ============================================================ AF2 tenant labels
+
+
+@envelope_api.route("/labels", methods=["GET"])
+@jwt_required()
+def list_tenant_envelope_labels():
+    """Return the unique envelope labels used in the caller's tenant."""
+    from sqlalchemy import func
+
+    user = _actor()
+    rows = (
+        db.session.query(
+            EnvelopeLabel.label, func.count(EnvelopeLabel.id)
+        )
+        .filter(EnvelopeLabel.organization_id == user.organization_id)
+        .group_by(EnvelopeLabel.label)
+        .order_by(EnvelopeLabel.label.asc())
+        .all()
+    )
+    return jsonify(
+        organization_id=user.organization_id,
+        labels=[{"label": label, "count": int(count)} for label, count in rows],
+    )
