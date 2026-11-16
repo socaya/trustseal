@@ -1336,3 +1336,102 @@ def download_envelope_attachment(envelope_id, attachment_id):
         "X-TrustSeal-Attachment-SHA256": row.sha256,
     }
     return Response(payload, headers=headers)
+
+
+# ============================================================ X2 bulk label
+
+
+@envelope_api.route("/bulk/label", methods=["POST"])
+@jwt_required()
+def bulk_label_envelopes():
+    """Attach a single label to many envelopes atomically.
+
+    Payload: ``{"envelope_ids": [int, ...], "label": "<str>"}``.
+    Idempotent per row — a row that already carries the label is
+    reported with ``status="succeeded"`` and ``already_tagged=True``.
+    Rows the caller does not own return ``envelope_not_found``.
+    """
+    user = _actor()
+    data = _payload()
+    ids = data.get("envelope_ids")
+    label_raw = data.get("label")
+    if not isinstance(ids, list) or not ids:
+        abort(400, description="envelope_ids_required")
+    if len(ids) > 100:
+        abort(413, description="bulk_label_limit_100")
+    label = _normalise_label(label_raw)
+    if label is None:
+        abort(400, description="label_invalid")
+
+    seen: set[int] = set()
+    results: list[dict] = []
+    added = 0
+    for env_id in ids:
+        entry = {"envelope_id": env_id}
+        if type(env_id) is not int:
+            entry["status"] = "failed"
+            entry["error_code"] = "envelope_id_invalid"
+            results.append(entry)
+            continue
+        if env_id in seen:
+            entry["status"] = "failed"
+            entry["error_code"] = "duplicate_id"
+            results.append(entry)
+            continue
+        seen.add(env_id)
+        envelope = SigningEnvelope.query.filter_by(
+            id=env_id,
+            organization_id=user.organization_id,
+            created_by_id=user.id,
+        ).first()
+        if envelope is None:
+            entry["status"] = "failed"
+            entry["error_code"] = "envelope_not_found"
+            results.append(entry)
+            continue
+        existing = EnvelopeLabel.query.filter_by(
+            envelope_id=envelope.id, label=label
+        ).first()
+        if existing is not None:
+            entry["status"] = "succeeded"
+            entry["already_tagged"] = True
+            results.append(entry)
+            continue
+        db.session.add(
+            EnvelopeLabel(
+                envelope_id=envelope.id,
+                organization_id=envelope.organization_id,
+                label=label,
+                created_by_id=user.id,
+            )
+        )
+        added += 1
+        entry["status"] = "succeeded"
+        entry["already_tagged"] = False
+        results.append(entry)
+
+    succeeded = sum(1 for r in results if r["status"] == "succeeded")
+    failed = len(results) - succeeded
+    if succeeded == 0:
+        db.session.rollback()
+        return (
+            jsonify(
+                label=label,
+                succeeded=0,
+                failed=failed,
+                results=results,
+            ),
+            400,
+        )
+    db.session.commit()
+    http_status = 207 if failed else 200
+    return (
+        jsonify(
+            label=label,
+            succeeded=succeeded,
+            failed=failed,
+            added=added,
+            results=results,
+        ),
+        http_status,
+    )

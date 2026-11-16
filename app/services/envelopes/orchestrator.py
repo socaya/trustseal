@@ -167,6 +167,20 @@ class EnvelopeOrchestrator:
             )
             db.session.add(record)
             db.session.flush()
+            # Phase X1 — in-app notification to the envelope owner.
+            from app.services import operator_notifications
+
+            operator_notifications.publish(
+                organization_id=envelope.organization_id,
+                recipient_user_id=envelope.created_by_id,
+                kind="envelope.sealed",
+                subject_type="signing_envelope",
+                subject_id=envelope.id,
+                summary=(
+                    f"Envelope #{envelope.id} has been sealed. Finalized PDF "
+                    f"digest: {output_digest[:16]}…"
+                ),
+            )
             enqueue(
                 event_type="platform.pdf.sealed",
                 aggregate_type="envelope",

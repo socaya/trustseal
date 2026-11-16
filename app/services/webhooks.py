@@ -71,6 +71,36 @@ class HttpResponse:  # pragma: no cover - interface documentation only
 # ---------------------------------------------------------------- helpers
 
 
+def _notify_dead(delivery: WebhookDelivery, endpoint: WebhookEndpoint | None) -> None:
+    """Emit an in-app notification when a delivery goes dead (Phase X1).
+
+    Best-effort — a notification-service failure must not prevent the
+    delivery row from settling to its final state. The caller holds
+    the transaction; we flush but let the caller commit.
+    """
+    if endpoint is None:
+        return
+    try:
+        from app.services import operator_notifications
+
+        operator_notifications.publish(
+            organization_id=delivery.organization_id,
+            recipient_user_id=endpoint.created_by_id,
+            kind="webhook.delivery.dead",
+            subject_type="webhook_delivery",
+            subject_id=delivery.id,
+            summary=(
+                f"Webhook delivery #{delivery.id} to {endpoint.url} "
+                f"({delivery.event_type}) went dead after "
+                f"{delivery.retry_count} retries."
+            ),
+        )
+    except Exception:
+        # Notification is advisory — swallow so the dispatcher can
+        # still settle the delivery.
+        pass
+
+
 def _is_valid_event_pattern(pattern: str) -> bool:
     """Validate a subscription pattern.
 
@@ -400,6 +430,7 @@ def dispatch_due(
             delivery.status = "dead"
             delivery.last_error = "endpoint missing or deactivated"
             delivery.completed_at = datetime.utcnow()
+            _notify_dead(delivery, endpoint)
             db.session.commit()
             continue
         try:
@@ -412,6 +443,7 @@ def dispatch_due(
             if delivery.retry_count >= MAX_RETRIES:
                 delivery.status = "dead"
                 delivery.completed_at = datetime.utcnow()
+                _notify_dead(delivery, endpoint)
             db.session.commit()
             continue
         body_text = json.dumps(delivery.payload, sort_keys=True, separators=(",", ":"))
@@ -440,6 +472,7 @@ def dispatch_due(
             if delivery.retry_count >= MAX_RETRIES:
                 delivery.status = "dead"
                 delivery.completed_at = datetime.utcnow()
+                _notify_dead(delivery, endpoint)
             else:
                 delivery.status = "failed"
                 delivery.next_retry_at = datetime.utcnow() + _backoff(
