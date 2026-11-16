@@ -182,6 +182,26 @@ def document_activity(document_id: int):
     )
 
 
+@document_label_api.route("/labels", methods=["GET"])
+@jwt_required()
+def list_tenant_document_labels():
+    """Return the unique document labels used in the caller's tenant (Phase AG2)."""
+    from sqlalchemy import func
+
+    user = _actor()
+    rows = (
+        db.session.query(DocumentLabel.label, func.count(DocumentLabel.id))
+        .filter(DocumentLabel.organization_id == user.organization_id)
+        .group_by(DocumentLabel.label)
+        .order_by(DocumentLabel.label.asc())
+        .all()
+    )
+    return jsonify(
+        organization_id=user.organization_id,
+        labels=[{"label": label, "count": int(count)} for label, count in rows],
+    )
+
+
 @document_label_api.route("/by-label/<path:label>", methods=["GET"])
 @jwt_required()
 def list_documents_by_label(label: str):

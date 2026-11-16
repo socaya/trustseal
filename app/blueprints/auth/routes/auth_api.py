@@ -167,6 +167,62 @@ def me_api():
     ), 200
 
 
+@auth_api.route("/me", methods=["PATCH"])
+@jwt_required()
+def update_me_api():
+    """Operator self-service profile update (Phase AG1).
+
+    Updatable fields: ``first_name``, ``last_name``, ``phone``.
+    Email, username, and password have dedicated flows with
+    stronger verification; they are explicitly rejected here so a
+    stolen access token cannot silently rebind the account.
+    """
+    user = db.session.get(User, int(get_jwt_identity()))
+    if user is None or not user.is_active:
+        return jsonify(error="User not found"), 404
+    data = _data()
+    allowed = {"first_name", "last_name", "phone"}
+    extra = set(data) - allowed
+    if extra:
+        abort(400, description="unknown_fields")
+    changed = {}
+    if "first_name" in data:
+        value = data["first_name"]
+        if value is not None and (
+            not isinstance(value, str) or len(value) > 80
+        ):
+            abort(400, description="first_name_invalid")
+        user.first_name = value.strip() if isinstance(value, str) else None
+        changed["first_name"] = user.first_name
+    if "last_name" in data:
+        value = data["last_name"]
+        if value is not None and (
+            not isinstance(value, str) or len(value) > 80
+        ):
+            abort(400, description="last_name_invalid")
+        user.last_name = value.strip() if isinstance(value, str) else None
+        changed["last_name"] = user.last_name
+    if "phone" in data:
+        value = data["phone"]
+        if value is not None and (
+            not isinstance(value, str) or len(value) > 40
+        ):
+            abort(400, description="phone_invalid")
+        user.phone = value.strip() if isinstance(value, str) else None
+        changed["phone"] = user.phone
+    db.session.commit()
+    return (
+        jsonify(
+            id=user.id,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            phone=user.phone,
+            changed=changed,
+        ),
+        200,
+    )
+
+
 @auth_api.route("/change-password", methods=["POST"])
 @jwt_required()
 def change_password():
