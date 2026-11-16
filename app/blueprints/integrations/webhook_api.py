@@ -147,6 +147,41 @@ def rotate_endpoint_secret(endpoint_id: int):
     return jsonify(body)
 
 
+@webhook_api.route("/<int:endpoint_id>/ping", methods=["POST"])
+@jwt_required()
+@idempotent("webhooks.ping")
+def ping_endpoint(endpoint_id: int):
+    """Enqueue a synthetic ``trustseal.ping`` for the endpoint."""
+    from app.services.webhooks import enqueue_ping
+
+    endpoint = _tenant_endpoint(endpoint_id)
+    delivery = enqueue_ping(endpoint)
+    db.session.commit()
+    return jsonify(_delivery_dict(delivery)), 201
+
+
+@webhook_api.route(
+    "/deliveries/<int:delivery_id>/replay", methods=["POST"]
+)
+@jwt_required()
+@idempotent("webhooks.deliveries.replay")
+def replay_webhook_delivery(delivery_id: int):
+    """Re-fire a specific delivery (any status, including dead)."""
+    from app.services.webhooks import replay_delivery
+
+    actor = current_actor()
+    if actor.tenant_id is None:
+        abort(403)
+    original = WebhookDelivery.query.filter_by(
+        id=delivery_id, organization_id=actor.tenant_id
+    ).one_or_none()
+    if original is None:
+        abort(404)
+    replay = replay_delivery(original)
+    db.session.commit()
+    return jsonify(_delivery_dict(replay)), 201
+
+
 @webhook_api.route("/<int:endpoint_id>/deliveries", methods=["GET"])
 @jwt_required()
 def list_deliveries(endpoint_id: int):

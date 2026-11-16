@@ -263,6 +263,8 @@ def create_app(config_class=None):
     blueprints.append(scim_admin_api)
     from .blueprints.auth.routes.sso_logout import sso_logout_api
     blueprints.append(sso_logout_api)
+    from .blueprints.system.routes.audit_chain_export_api import audit_chain_export_api
+    blueprints.append(audit_chain_export_api)
     from .blueprints.integrations.scim_api import scim_api
     blueprints.append(scim_api)
     from .blueprints.integrations.openapi_api import openapi_api

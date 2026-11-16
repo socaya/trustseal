@@ -237,6 +237,66 @@ def fan_out_event(
     return deliveries
 
 
+def enqueue_ping(endpoint: WebhookEndpoint) -> WebhookDelivery:
+    """Create a synthetic ``trustseal.ping`` delivery for one endpoint.
+
+    Bypasses event-type subscription so operators can test an endpoint
+    they just registered before any real event fires.
+    """
+    import uuid as _uuid
+
+    now = datetime.utcnow()
+    event_id = "ping-" + _uuid.uuid4().hex[:24]
+    delivery = WebhookDelivery(
+        endpoint_id=endpoint.id,
+        organization_id=endpoint.organization_id,
+        event_id=event_id,
+        event_type="trustseal.ping",
+        payload={
+            "message": "TrustSeal webhook connectivity probe.",
+            "endpoint_id": endpoint.id,
+            "sent_at": now.isoformat(),
+        },
+        status="pending",
+        retry_count=0,
+        next_retry_at=now,
+        created_at=now,
+    )
+    db.session.add(delivery)
+    db.session.flush()
+    return delivery
+
+
+def replay_delivery(original: WebhookDelivery) -> WebhookDelivery:
+    """Create a fresh delivery that mirrors ``original``.
+
+    Operator-triggered — used to re-fire after the target receiver has
+    been fixed. The original row is preserved for audit; the replay
+    gets a new ``event_id`` so the dispatcher treats it as a
+    first-time attempt.
+    """
+    import uuid as _uuid
+
+    now = datetime.utcnow()
+    delivery = WebhookDelivery(
+        endpoint_id=original.endpoint_id,
+        organization_id=original.organization_id,
+        event_id=f"replay:{original.id}:{_uuid.uuid4().hex[:16]}",
+        event_type=original.event_type,
+        payload={
+            **(original.payload or {}),
+            "trustseal_replay_of_delivery_id": original.id,
+        },
+        status="pending",
+        retry_count=0,
+        next_retry_at=now,
+        created_at=now,
+    )
+    db.session.add(delivery)
+    db.session.flush()
+    return delivery
+
+
 def _backoff(retry_count: int) -> timedelta:
     delay = INITIAL_BACKOFF * (2 ** max(0, retry_count))
     return min(delay, MAX_BACKOFF)
