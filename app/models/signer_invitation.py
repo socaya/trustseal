@@ -39,6 +39,10 @@ class SignerInvitation(db.Model):
     consumed_at = db.Column(db.DateTime)
     revoked_at = db.Column(db.DateTime)
     revoke_reason = db.Column(db.String(80))
+    # Last automatic reminder sent (Phase N2). The scanner uses this
+    # to avoid spamming a participant every time it runs — only one
+    # reminder per invitation inside the configured cooloff window.
+    last_reminder_at = db.Column(db.DateTime)
 
     __table_args__ = (
         # Only one *active* invitation per participant at a time, but

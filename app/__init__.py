@@ -138,6 +138,9 @@ def create_app(config_class=None):
             'saml_views.metadata',
             'saml_views.login',
             'saml_views.acs',
+            # Liveness / readiness probes for k8s + load balancers.
+            'health_bp.health',
+            'health_bp.ready',
             # DO NOT list API endpoints here
         ]
         if request.endpoint in public_endpoints:
@@ -265,6 +268,8 @@ def create_app(config_class=None):
     blueprints.append(sso_logout_api)
     from .blueprints.system.routes.audit_chain_export_api import audit_chain_export_api
     blueprints.append(audit_chain_export_api)
+    from .blueprints.system.routes.health import health_bp
+    blueprints.append(health_bp)
     from .blueprints.integrations.scim_api import scim_api
     blueprints.append(scim_api)
     from .blueprints.integrations.openapi_api import openapi_api
@@ -285,6 +290,10 @@ def create_app(config_class=None):
     register_cli(app)
     from .cli.mfa_rewrap import register_cli as _register_mfa_cli
     _register_mfa_cli(app)
+    from .cli.envelope_ops import register_cli as _register_envelope_cli
+    _register_envelope_cli(app)
+    from .cli.reminders import register_cli as _register_reminders_cli
+    _register_reminders_cli(app)
 
     # --- Register Error Handlers (RFC 7807 for /api/, Jinja for views) ---
     from .errors.problem import register_problem_handlers

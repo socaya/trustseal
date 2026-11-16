@@ -70,6 +70,7 @@ def _details(item):
         "withdraw_reason": item.withdraw_reason,
         "supersedes_envelope_id": item.supersedes_envelope_id,
         "superseded_by_envelope_id": item.superseded_by_envelope_id,
+        "expires_at": item.expires_at.isoformat() if item.expires_at else None,
         "participants": [
             {"id": p.id, "user_id": p.user_id, "role": p.role,
              "signing_order": p.signing_order} for p in people
@@ -91,6 +92,7 @@ def create_envelope():
         "document_blob_id",
         "routing_mode",
         "quorum_required",
+        "expires_at",
     }
     if extra or "document_id" not in data or "document_blob_id" not in data:
         abort(400, description="document_id and document_blob_id required")
@@ -122,12 +124,24 @@ def create_envelope():
         check_object_digest(blob.object_key, blob.sha256, current_app.config)
     except IngestionError:
         abort(503, description="Stored document integrity unavailable")
+    expires_at_raw = data.get("expires_at")
+    expires_at = None
+    if expires_at_raw is not None:
+        if not isinstance(expires_at_raw, str):
+            abort(400, description="expires_at_must_be_iso_string")
+        try:
+            expires_at = datetime.fromisoformat(expires_at_raw)
+        except ValueError:
+            abort(400, description="expires_at_invalid_iso")
+        if expires_at <= datetime.utcnow():
+            abort(400, description="expires_at_must_be_future")
     envelope = SigningEnvelope(
         document_id=doc.id, document_blob_id=blob.id,
         document_sha256=blob.sha256, organization_id=user.organization_id,
         created_by_id=user.id, state="draft",
         routing_mode=routing_mode,
         quorum_required=quorum_required,
+        expires_at=expires_at,
     )
     db.session.add(envelope)
     db.session.flush()

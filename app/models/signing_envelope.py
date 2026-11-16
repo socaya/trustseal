@@ -31,6 +31,10 @@ class SigningEnvelope(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     prepared_at = db.Column(db.DateTime)
     cancelled_at = db.Column(db.DateTime)
+    # Optional operator-chosen expiry. When set, the scheduled
+    # ``cancel_expired_envelopes`` job auto-withdraws prepared
+    # envelopes past this moment (if no participant has decided).
+    expires_at = db.Column(db.DateTime, nullable=True)
     supersedes_envelope_id = db.Column(
         db.Integer,
         db.ForeignKey("signing_envelopes.id"),
