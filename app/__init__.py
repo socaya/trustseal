@@ -149,6 +149,10 @@ def create_app(config_class=None):
             'sign_views.download',
             'sign_views.upload_attachment',
             'sign_views.status',
+            # Public landing + root hit are explicitly anonymous.
+            # The endpoint is nested under the parent 'system' blueprint.
+            'system.main_views.home',
+            'system.main_views.welcome',
             'design_gallery_bp.gallery',
             # SAML SP endpoints are the entry point for SSO — the IdP
             # posts the response here before the user has a session.

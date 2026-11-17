@@ -1,0 +1,109 @@
+{% extends "layouts/public.html" %}
+
+{% block title %}TRUSTSEAL — Verified Integrity{% endblock %}
+
+{% block content %}
+<section class="ts-hero">
+  <span class="ts-hero__eyebrow">Verified integrity</span>
+  <h1 class="ts-hero__title">
+    Sign, stamp, seal and verify your business documents — with evidence you can prove.
+  </h1>
+  <p class="ts-hero__lede">
+    TRUSTSEAL is a disciplined workbench for preparing documents, collecting
+    reviews and signatures, applying authorized organizational stamps, sealing
+    the final PDFs and providing independent verification of the evidence.
+    Each action records what happened, who did it and which cryptographic
+    assurances were observed — nothing more, nothing less.
+  </p>
+  <div class="ts-hero__actions">
+    <a class="ts-btn ts-btn--primary ts-btn--lg" href="/verify">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 3l8 3v6c0 4-3.5 7.5-8 9-4.5-1.5-8-5-8-9V6l8-3z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+        <path d="M8.5 12l2.5 2.5L15.5 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Verify a document
+    </a>
+    <a class="ts-btn ts-btn--secondary ts-btn--lg" href="/auth/login">Sign in</a>
+    <a class="ts-btn ts-btn--text" href="/auth/register">Create an account →</a>
+  </div>
+</section>
+
+<section class="ts-section">
+  <h2 class="ts-section__title">What you can do</h2>
+  <div class="ts-feature-grid">
+    <article class="ts-feature">
+      <div class="ts-feature__title">Prepare signing envelopes</div>
+      <p class="ts-feature__body">
+        Upload a PDF, add participants, pick sequential or parallel routing,
+        set reminders and send. Every action records an immutable event.
+      </p>
+    </article>
+    <article class="ts-feature">
+      <div class="ts-feature__title">Collect reviews &amp; decisions</div>
+      <p class="ts-feature__body">
+        Signers review through a token-scoped page. Acknowledgements are
+        bound to a specific document digest; declines are first-class
+        outcomes, not errors.
+      </p>
+    </article>
+    <article class="ts-feature">
+      <div class="ts-feature__title">Apply organizational stamps</div>
+      <p class="ts-feature__body">
+        Design, approve, assign custody and apply stamps on authorized
+        documents. Each application links to the evidence record.
+      </p>
+    </article>
+    <article class="ts-feature">
+      <div class="ts-feature__title">Seal the final PDF</div>
+      <p class="ts-feature__body">
+        A platform PAdES seal is applied through an AWS KMS-backed key with
+        a trusted timestamp and captured revocation status. The sealed
+        bytes are stored, hashed and anchored into a chained audit log.
+      </p>
+    </article>
+    <article class="ts-feature">
+      <div class="ts-feature__title">Verify evidence publicly</div>
+      <p class="ts-feature__body">
+        Anyone can upload a sealed PDF plus its evidence digest and receive
+        a clearly classified verdict — document integrity, certificate
+        trust, revocation state and any checks we could not complete.
+      </p>
+    </article>
+    <article class="ts-feature">
+      <div class="ts-feature__title">Export the audit trail</div>
+      <p class="ts-feature__body">
+        Chained-hash SecurityEvents, signed anchors and validation dossiers
+        are retained per policy and exportable for auditors.
+      </p>
+    </article>
+  </div>
+</section>
+
+<section class="ts-section">
+  <h2 class="ts-section__title">What TRUSTSEAL does <em>not</em> claim</h2>
+  <div class="ts-inline ts-inline--info" style="margin-top: var(--ts-space-3);">
+    <div class="ts-inline__body">
+      <div class="ts-inline__title">Honest assurance scope</div>
+      <p style="margin-top: 4px;">
+        A platform-signed PDF demonstrates that a TRUSTSEAL certificate sealed
+        the bytes with a configured key — it does not automatically prove
+        that every displayed human signatory separately produced a
+        cryptographic signature, nor that the document is legally binding
+        under any specific jurisdiction. A drawn signature appearance is
+        evidence of appearance under a documented process, not a PKI-grade
+        individual signature. A visual organizational stamp is a workflow
+        record, not a cryptographic seal. Where a check could not run, we
+        say so explicitly.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="ts-section">
+  <h2 class="ts-section__title">Ready when you are</h2>
+  <div class="ts-hero__actions">
+    <a class="ts-btn ts-btn--primary" href="/auth/register">Create an account</a>
+    <a class="ts-btn ts-btn--secondary" href="/trust">Read our trust &amp; security notes</a>
+  </div>
+</section>
+{% endblock %}
