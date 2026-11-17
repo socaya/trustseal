@@ -33,6 +33,9 @@ export FLASK_ENV="${FLASK_ENV:-development}"
 # same origin — register / login views otherwise POST to :5000 and
 # get a connection-refused (or 403 from a stale backend).
 export API_BASE_URL="http://127.0.0.1:${PORT}/api"
+# Do not try to reach a real SMTP server during local dev — the
+# welcome-email send would DNS-fail and roll back the registration.
+export MAIL_TRANSPORT="${MAIL_TRANSPORT:-memory}"
 
 echo "[dev-server] Seeding demo tenant + admin user (idempotent)…"
 "$PY" scripts/seed_dev.py
