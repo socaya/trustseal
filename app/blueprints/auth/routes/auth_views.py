@@ -65,7 +65,7 @@ def login():
                 login_user(user)
 
             # Redirect to next or home
-            next_url = request.args.get("next") or session.pop("next_url", None) or url_for("system_bp.home")
+            next_url = request.args.get("next") or session.pop("next_url", None) or url_for("system.main_views.home")
             current_app.logger.debug(f"✅ Redirecting to: {next_url}")
             return redirect(next_url)
 
@@ -104,4 +104,4 @@ def profile():
         return render_template("auth/profile.html", user_data=user_data)
 
     flash("Could not fetch your profile details.", "warning")
-    return redirect(url_for("system_bp.index"))
+    return redirect(url_for("system.main_views.home"))
