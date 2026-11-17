@@ -83,6 +83,17 @@
       {% endfor %}
     </div>
 
+    <div class="ts-field">
+      <label class="ts-field__label" data-required="true" for="confirm_password">
+        {{ form.confirm_password.label.text }}
+      </label>
+      {{ form.confirm_password(class="ts-input", id="confirm_password", autocomplete="new-password") }}
+      <span class="ts-field__hint">Re-enter the password exactly. Both fields must match.</span>
+      {% for error in form.confirm_password.errors %}
+        <span class="ts-field__error" role="alert">{{ error }}</span>
+      {% endfor %}
+    </div>
+
     <button type="submit" class="ts-btn ts-btn--primary ts-btn--lg" style="width: 100%;">
       Create account
     </button>

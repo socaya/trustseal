@@ -3,107 +3,185 @@
 {% block title %}TRUSTSEAL — Verified Integrity{% endblock %}
 
 {% block content %}
-<section class="ts-hero">
-  <span class="ts-hero__eyebrow">Verified integrity</span>
-  <h1 class="ts-hero__title">
-    Sign, stamp, seal and verify your business documents — with evidence you can prove.
-  </h1>
-  <p class="ts-hero__lede">
-    TRUSTSEAL is a disciplined workbench for preparing documents, collecting
-    reviews and signatures, applying authorized organizational stamps, sealing
-    the final PDFs and providing independent verification of the evidence.
-    Each action records what happened, who did it and which cryptographic
-    assurances were observed — nothing more, nothing less.
-  </p>
-  <div class="ts-hero__actions">
-    <a class="ts-btn ts-btn--primary ts-btn--lg" href="/verify">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M12 3l8 3v6c0 4-3.5 7.5-8 9-4.5-1.5-8-5-8-9V6l8-3z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
-        <path d="M8.5 12l2.5 2.5L15.5 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      Verify a document
-    </a>
-    <a class="ts-btn ts-btn--secondary ts-btn--lg" href="/auth/login">Sign in</a>
-    <a class="ts-btn ts-btn--text" href="/auth/register">Create an account →</a>
+<!-- Hero ---------------------------------------------------- -->
+<section class="ts-landing-hero" aria-labelledby="hero-heading">
+  <div class="ts-landing-hero__visual">
+    <img src="{{ url_for('static', filename='brand/trustseal/trustseal-stacked-tagline.png') }}"
+         alt="TRUSTSEAL · Verified Integrity"
+         width="220" height="220">
   </div>
-</section>
-
-<section class="ts-section">
-  <h2 class="ts-section__title">What you can do</h2>
-  <div class="ts-feature-grid">
-    <article class="ts-feature">
-      <div class="ts-feature__title">Prepare signing envelopes</div>
-      <p class="ts-feature__body">
-        Upload a PDF, add participants, pick sequential or parallel routing,
-        set reminders and send. Every action records an immutable event.
-      </p>
-    </article>
-    <article class="ts-feature">
-      <div class="ts-feature__title">Collect reviews &amp; decisions</div>
-      <p class="ts-feature__body">
-        Signers review through a token-scoped page. Acknowledgements are
-        bound to a specific document digest; declines are first-class
-        outcomes, not errors.
-      </p>
-    </article>
-    <article class="ts-feature">
-      <div class="ts-feature__title">Apply organizational stamps</div>
-      <p class="ts-feature__body">
-        Design, approve, assign custody and apply stamps on authorized
-        documents. Each application links to the evidence record.
-      </p>
-    </article>
-    <article class="ts-feature">
-      <div class="ts-feature__title">Seal the final PDF</div>
-      <p class="ts-feature__body">
-        A platform PAdES seal is applied through an AWS KMS-backed key with
-        a trusted timestamp and captured revocation status. The sealed
-        bytes are stored, hashed and anchored into a chained audit log.
-      </p>
-    </article>
-    <article class="ts-feature">
-      <div class="ts-feature__title">Verify evidence publicly</div>
-      <p class="ts-feature__body">
-        Anyone can upload a sealed PDF plus its evidence digest and receive
-        a clearly classified verdict — document integrity, certificate
-        trust, revocation state and any checks we could not complete.
-      </p>
-    </article>
-    <article class="ts-feature">
-      <div class="ts-feature__title">Export the audit trail</div>
-      <p class="ts-feature__body">
-        Chained-hash SecurityEvents, signed anchors and validation dossiers
-        are retained per policy and exportable for auditors.
-      </p>
-    </article>
-  </div>
-</section>
-
-<section class="ts-section">
-  <h2 class="ts-section__title">What TRUSTSEAL does <em>not</em> claim</h2>
-  <div class="ts-inline ts-inline--info" style="margin-top: var(--ts-space-3);">
-    <div class="ts-inline__body">
-      <div class="ts-inline__title">Honest assurance scope</div>
-      <p style="margin-top: 4px;">
-        A platform-signed PDF demonstrates that a TRUSTSEAL certificate sealed
-        the bytes with a configured key — it does not automatically prove
-        that every displayed human signatory separately produced a
-        cryptographic signature, nor that the document is legally binding
-        under any specific jurisdiction. A drawn signature appearance is
-        evidence of appearance under a documented process, not a PKI-grade
-        individual signature. A visual organizational stamp is a workflow
-        record, not a cryptographic seal. Where a check could not run, we
-        say so explicitly.
-      </p>
+  <div class="ts-landing-hero__copy">
+    <h1 id="hero-heading" class="ts-landing-hero__title">
+      Prepare, sign, seal and verify documents with evidence you can prove.
+    </h1>
+    <p class="ts-landing-hero__lede">
+      TRUSTSEAL is a disciplined workbench for routing documents through
+      review, signature and organizational stamps — then sealing the
+      final PDF and providing independent verification. Every action is
+      recorded; nothing is overstated.
+    </p>
+    <div class="ts-landing-hero__cta">
+      <a class="ts-btn ts-btn--primary ts-btn--lg" href="/verify">Verify a document</a>
+      <a class="ts-btn ts-btn--secondary ts-btn--lg" href="/auth/login">Sign in</a>
+      <a class="ts-btn ts-btn--text" href="/auth/register">Create an account →</a>
     </div>
   </div>
 </section>
 
-<section class="ts-section">
-  <h2 class="ts-section__title">Ready when you are</h2>
-  <div class="ts-hero__actions">
-    <a class="ts-btn ts-btn--primary" href="/auth/register">Create an account</a>
-    <a class="ts-btn ts-btn--secondary" href="/trust">Read our trust &amp; security notes</a>
-  </div>
+<!-- Process steps (no cards) ------------------------------- -->
+<section class="ts-landing-steps" aria-labelledby="how-heading">
+  <h2 id="how-heading" class="ts-landing-steps__title">How it works</h2>
+  <ol class="ts-landing-steps__list">
+    <li>
+      <span class="ts-landing-steps__num">1</span>
+      <div>
+        <h3>Prepare</h3>
+        <p>Upload a PDF, add participants, pick sequential or parallel routing and set reminders.</p>
+      </div>
+    </li>
+    <li>
+      <span class="ts-landing-steps__num">2</span>
+      <div>
+        <h3>Sign, stamp &amp; seal</h3>
+        <p>Signers review via a token-scoped page. Authorised custodians apply organizational stamps. The final PDF is sealed with a platform PAdES signature backed by AWS KMS and anchored into the chained audit log.</p>
+      </div>
+    </li>
+    <li>
+      <span class="ts-landing-steps__num">3</span>
+      <div>
+        <h3>Verify independently</h3>
+        <p>Anyone can upload a sealed PDF plus its evidence digest and receive a verdict that separates document integrity, certificate trust, revocation state — and checks that were not possible.</p>
+      </div>
+    </li>
+  </ol>
 </section>
+
+<!-- Honest-scope strip (inline, not a card) --------------- -->
+<aside class="ts-landing-scope" aria-label="Assurance scope">
+  <h2>What we don’t claim</h2>
+  <p>
+    A platform-sealed PDF proves the TRUSTSEAL key signed these bytes.
+    It does <em>not</em> automatically prove every named signatory produced
+    an individual cryptographic signature, nor that the document is
+    legally binding under any specific jurisdiction. A drawn signature
+    is visual evidence of appearance, not PKI proof. We say so on every
+    result page. Read the full
+    <a href="/trust">trust &amp; security notes</a>.
+  </p>
+</aside>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  .ts-landing-hero {
+    display: grid;
+    grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+    gap: var(--ts-space-7);
+    align-items: center;
+    padding: var(--ts-space-7) 0 var(--ts-space-6);
+    border-bottom: 1px solid var(--ts-border);
+  }
+  .ts-landing-hero__visual { display: flex; justify-content: center; }
+  .ts-landing-hero__visual img { max-width: 100%; height: auto; }
+  .ts-landing-hero__title {
+    margin: 0 0 var(--ts-space-3);
+    font-size: 36px;
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--ts-text);
+    max-width: 22ch;
+  }
+  .ts-landing-hero__lede {
+    margin: 0 0 var(--ts-space-5);
+    color: var(--ts-text-muted);
+    font-size: 16px;
+    max-width: 56ch;
+    line-height: 1.55;
+  }
+  .ts-landing-hero__cta {
+    display: flex;
+    gap: var(--ts-space-3);
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .ts-landing-steps { padding: var(--ts-space-6) 0; }
+  .ts-landing-steps__title {
+    margin: 0 0 var(--ts-space-5);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--ts-text);
+  }
+  .ts-landing-steps__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 0;
+  }
+  .ts-landing-steps__list li {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: var(--ts-space-4);
+    align-items: start;
+    padding: var(--ts-space-4) 0;
+    border-top: 1px solid var(--ts-border);
+  }
+  .ts-landing-steps__list li:first-child { border-top: 0; padding-top: 0; }
+  .ts-landing-steps__num {
+    display: inline-flex;
+    width: 32px; height: 32px;
+    align-items: center;
+    justify-content: center;
+    background: var(--ts-brand-primary);
+    color: var(--ts-text-inverse);
+    font-weight: 600;
+    font-size: 15px;
+    border-radius: 50%;
+  }
+  .ts-landing-steps__list h3 {
+    margin: 0 0 4px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ts-text);
+  }
+  .ts-landing-steps__list p {
+    margin: 0;
+    color: var(--ts-text-muted);
+    max-width: 68ch;
+    line-height: 1.55;
+  }
+
+  .ts-landing-scope {
+    margin-top: var(--ts-space-6);
+    padding: var(--ts-space-4) var(--ts-space-5);
+    border-left: 3px solid var(--ts-brand-green);
+    background: transparent;
+  }
+  .ts-landing-scope h2 {
+    margin: 0 0 var(--ts-space-2);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ts-brand-green);
+  }
+  .ts-landing-scope p {
+    margin: 0;
+    color: var(--ts-text);
+    max-width: 68ch;
+    line-height: 1.55;
+  }
+
+  @media (max-width: 767px) {
+    .ts-landing-hero {
+      grid-template-columns: 1fr;
+      gap: var(--ts-space-5);
+      padding: var(--ts-space-5) 0;
+    }
+    .ts-landing-hero__visual img { width: 160px; }
+    .ts-landing-hero__title { font-size: 26px; }
+  }
+</style>
 {% endblock %}

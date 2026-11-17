@@ -25,7 +25,7 @@
   gap: var(--ts-space-3);
   text-decoration: none;
 }
-.ts-public-nav__brand img { height: 36px; width: auto; }
+.ts-public-nav__brand img { height: 44px; width: auto; }
 
 .ts-public-nav__links {
   display: flex;
