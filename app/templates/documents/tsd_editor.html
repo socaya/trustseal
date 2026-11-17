@@ -4,439 +4,245 @@
 {% block title %}
   {% if doc %}{{ doc.title }}{% else %}New document{% endif %} · TRUSTSEAL
 {% endblock %}
-{# The editor owns the full page — suppress the generic page header. #}
 {% block page_header %}{% endblock %}
 {% block page_title %}{% endblock %}
 {% block page_description %}{% endblock %}
 {% block page_actions %}{% endblock %}
-
 {% block breadcrumbs %}{% endblock %}
 
 {% block extra_head %}
 <style>
-  /* The editor hugs the content area — no extra page gutter. */
+  /* Editor runs edge-to-edge inside the main content area. */
   .ts-page { padding: 0 !important; max-width: none !important; }
 </style>
 {% endblock %}
 
 {% block content %}
-
+{% set _status = (doc.status if doc else 'draft') %}
 <div id="tsd-shell"
+     class="ts-ed"
      data-tsd-id="{{ doc.id if doc else '' }}"
      data-tsd-version="{{ doc.version if doc else '' }}">
 
-  {# ======================= Document title bar ======================= #}
-  <div class="ts-editor__titlebar">
-    <div class="ts-editor__titlebar-left">
-      <input type="text" id="tsd-title" class="ts-editor__titleinput"
-             value="{{ doc.title if doc else '' }}"
-             placeholder="Untitled document"
-             aria-label="Document title">
-      <span class="ts-tsd-badge" title="Encrypted at rest with per-tenant key">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="4" y="11" width="16" height="10" stroke="currentColor" stroke-width="1.75" rx="1"/>
-          <path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" stroke-width="1.75"/>
-        </svg>
-        .tsd
-      </span>
+  {# ======================= 1. APPLICATION BAR (38px) ======================= #}
+  <header class="ts-ed__appbar">
+    <div class="ts-ed__brand">
+      <strong>TRUSTSEAL</strong><small>DOCUMENTS</small>
     </div>
-    <div class="ts-editor__titlebar-right">
-      <span id="tsd-save-state" class="ts-panel__meta">New draft — not saved yet</span>
-    </div>
-  </div>
+    <span class="ts-ed__divider" aria-hidden="true"></span>
+    <input type="text" id="tsd-title" class="ts-ed__filename"
+           value="{{ doc.title if doc else '' }}"
+           placeholder="Untitled document"
+           aria-label="Document title">
+    <span id="tsd-save-state" class="ts-ed__savestate">● New draft — not saved yet</span>
+    <div class="ts-ed__spacer"></div>
+    <span class="ts-ed__class-mark">Classification: <b id="tsd-class-top">Internal</b></span>
+    <button type="button" class="ts-ed__btn ts-ed__btn--ghost" id="tsd-security-open" aria-expanded="false" aria-controls="tsd-security-panel">
+      ◈ Security
+    </button>
+    {% if doc %}
+    <button type="button" class="ts-ed__btn" id="tsd-history-btn">Version history</button>
+    <button type="button" class="ts-ed__btn" id="tsd-cmdk-btn" title="Command palette (⌘K)">⌘K</button>
+    <a class="ts-ed__btn" href="/api/tsd/{{ doc.id }}/download" title="Download encrypted .tsd">Download</a>
+    {% endif %}
+    <button type="button" class="ts-ed__btn ts-ed__btn--primary" id="tsd-share-btn">Share</button>
+  </header>
 
-  {# ======================= Ribbon tab strip ======================= #}
-  <nav class="ts-ribbon-tabs" role="tablist" aria-label="Editor ribbon">
-    <button type="button" role="tab" class="ts-ribbon-tab ts-ribbon-tab--active" data-ribbon-tab="format"   aria-selected="true">Format</button>
-    <button type="button" role="tab" class="ts-ribbon-tab"                       data-ribbon-tab="insert"   aria-selected="false">Insert</button>
-    <button type="button" role="tab" class="ts-ribbon-tab"                       data-ribbon-tab="layout"   aria-selected="false">Layout</button>
-    <button type="button" role="tab" class="ts-ribbon-tab"                       data-ribbon-tab="security" aria-selected="false">Security</button>
-    <button type="button" role="tab" class="ts-ribbon-tab"                       data-ribbon-tab="review"   aria-selected="false">Review</button>
-    <button type="button" role="tab" class="ts-ribbon-tab"                       data-ribbon-tab="view"     aria-selected="false">View</button>
-    <div class="ts-ribbon-tabs__spacer"></div>
+  {# ======================= 2. RIBBON TABS (30px) ======================= #}
+  <nav class="ts-ed__tabs" role="tablist" aria-label="Editor tabs">
+    <button type="button" role="tab" class="ts-ed__tab"            data-ribbon-tab="file">File</button>
+    <button type="button" role="tab" class="ts-ed__tab ts-is-active" data-ribbon-tab="home" aria-selected="true">Home</button>
+    <button type="button" role="tab" class="ts-ed__tab"            data-ribbon-tab="insert">Insert</button>
+    <button type="button" role="tab" class="ts-ed__tab"            data-ribbon-tab="layout">Layout</button>
+    <button type="button" role="tab" class="ts-ed__tab"            data-ribbon-tab="references">References</button>
+    <button type="button" role="tab" class="ts-ed__tab"            data-ribbon-tab="review">Review</button>
+    <button type="button" role="tab" class="ts-ed__tab"            data-ribbon-tab="view">View</button>
+    <button type="button" role="tab" class="ts-ed__tab"            data-ribbon-tab="security">Security</button>
   </nav>
 
-  {# ======================= Format ribbon ======================= #}
-  <div class="ts-ribbon" data-ribbon="format" role="tabpanel">
-    <div class="ts-ribbon__group">
-      <select class="ts-editor__select" data-cmd="fontName" aria-label="Font family">
-        <option value="Arial, sans-serif">Arial</option>
-        <option value="Georgia, serif">Georgia</option>
-        <option value="'Times New Roman', Times, serif">Times New Roman</option>
-        <option value="'Courier New', Courier, monospace">Courier New</option>
-        <option value="Verdana, sans-serif">Verdana</option>
-        <option value="Tahoma, sans-serif">Tahoma</option>
+  {# ======================= 3. RIBBON BODY (70px) ======================= #}
+  <div class="ts-ed__ribbon" id="tsd-ribbon" role="toolbar" aria-label="Document commands"></div>
+
+  {# ======================= 4. MEASUREMENT CONTROLS (27px) ======================= #}
+  <div class="ts-ed__rulercontrols">
+    <span class="ts-ed__rulernote">Rulers</span>
+    <label><input type="checkbox" id="tsd-rulers-toggle" checked> Show rulers</label>
+    <label><input type="checkbox" id="tsd-guides-toggle"> Margin guides</label>
+    <label>
+      Units
+      <select id="tsd-units">
+        <option value="cm">Centimeters (cm)</option>
+        <option value="in">Inches (in)</option>
       </select>
-      <select class="ts-editor__select ts-editor__select--sm" data-cmd="fontSize" aria-label="Font size">
-        <option value="2">10</option><option value="3" selected>12</option>
-        <option value="4">14</option><option value="5">18</option>
-        <option value="6">24</option><option value="7">36</option>
-      </select>
+    </label>
+    <div class="ts-ed__spacer"></div>
+    <div class="ts-ed__zoom">
+      <label for="tsd-zoom-range">Zoom</label>
+      <input type="range" id="tsd-zoom-range" min="60" max="200" step="5" value="100">
+      <span id="tsd-zoom-value">100%</span>
     </div>
-    <div class="ts-ribbon__group">
-      <button type="button" class="ts-editor__btn" data-cmd="bold" title="Bold"><strong>B</strong></button>
-      <button type="button" class="ts-editor__btn" data-cmd="italic" title="Italic"><em>I</em></button>
-      <button type="button" class="ts-editor__btn" data-cmd="underline" title="Underline"><span style="text-decoration: underline;">U</span></button>
-      <button type="button" class="ts-editor__btn" data-cmd="strikeThrough" title="Strikethrough"><span style="text-decoration: line-through;">S</span></button>
-      <label class="ts-editor__color" title="Text color">
-        <span style="border-bottom: 3px solid #d14343;">A</span>
-        <input type="color" data-cmd="foreColor" value="#121a26">
-      </label>
-      <label class="ts-editor__color" title="Highlight">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M4 20h16M7 17l6-9 4 3-6 9H5l2-3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-        </svg>
-        <input type="color" data-cmd="hiliteColor" value="#fff3b0">
-      </label>
-    </div>
-    <div class="ts-ribbon__group">
-      <select class="ts-editor__select ts-editor__select--sm" data-block-select aria-label="Paragraph style">
-        <option value="P">Normal</option>
-        <option value="H1">Title</option>
-        <option value="H2">Heading 1</option>
-        <option value="H3">Heading 2</option>
-        <option value="H4">Heading 3</option>
-        <option value="BLOCKQUOTE">Quote</option>
-        <option value="PRE">Code</option>
-      </select>
-    </div>
-    <div class="ts-ribbon__group">
-      <button type="button" class="ts-editor__btn" data-cmd="justifyLeft" title="Align left">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 10h10M4 14h16M4 18h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-      </button>
-      <button type="button" class="ts-editor__btn" data-cmd="justifyCenter" title="Center">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M7 10h10M4 14h16M7 18h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-      </button>
-      <button type="button" class="ts-editor__btn" data-cmd="justifyRight" title="Align right">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M10 10h10M4 14h16M10 18h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-      </button>
-      <button type="button" class="ts-editor__btn" data-cmd="justifyFull" title="Justify">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 10h16M4 14h16M4 18h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-      </button>
-    </div>
-    <div class="ts-ribbon__group">
-      <button type="button" class="ts-editor__btn" data-cmd="insertUnorderedList" title="Bullet list">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="5" cy="7" r="1.3" fill="currentColor"/><circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="5" cy="17" r="1.3" fill="currentColor"/>
-          <path d="M10 7h10M10 12h10M10 17h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-      </button>
-      <button type="button" class="ts-editor__btn" data-cmd="insertOrderedList" title="Numbered list">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <text x="2" y="9" font-size="7" fill="currentColor">1</text><text x="2" y="14" font-size="7" fill="currentColor">2</text><text x="2" y="19" font-size="7" fill="currentColor">3</text>
-          <path d="M10 7h10M10 12h10M10 17h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-      </button>
-      <button type="button" class="ts-editor__btn" data-cmd="outdent" title="Outdent">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M10 10h10M10 14h10M4 18h16M8 10l-3 2 3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <button type="button" class="ts-editor__btn" data-cmd="indent" title="Indent">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M10 10h10M10 14h10M4 18h16M4 10l3 2-3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-    </div>
-    <div class="ts-ribbon__group">
-      <button type="button" class="ts-editor__btn" data-cmd="subscript" title="Subscript"><span>X<sub>₂</sub></span></button>
-      <button type="button" class="ts-editor__btn" data-cmd="superscript" title="Superscript"><span>X<sup>²</sup></span></button>
-      <button type="button" class="ts-editor__btn" data-case="UPPER" title="UPPERCASE"><span style="font-size: 10px;">AA</span></button>
-      <button type="button" class="ts-editor__btn" data-case="lower" title="lowercase"><span style="font-size: 10px;">aa</span></button>
-      <button type="button" class="ts-editor__btn" data-case="Title" title="Title Case"><span style="font-size: 10px;">Aa</span></button>
-    </div>
-    <div class="ts-ribbon__group">
-      <button type="button" class="ts-editor__btn" data-cmd="createLink" title="Link">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10 14l4-4M9 7h3a4 4 0 010 8h-1M15 17h-3a4 4 0 010-8h1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-      </button>
-      <button type="button" class="ts-editor__btn" data-cmd="unlink" title="Remove link">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 8l8 8M10 14l4-4M9 7h3a4 4 0 014 4M15 17h-3a4 4 0 01-4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-      </button>
-      <button type="button" class="ts-editor__btn" data-cmd="removeFormat" title="Clear formatting">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 4l-4 16M14 4l4 16M4 10h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-      </button>
-    </div>
+    <span class="ts-ed__page-badge" id="tsd-page-badge">A4 · Portrait · Margins: 2 cm</span>
   </div>
 
-  {# ======================= Insert ribbon ======================= #}
-  <div class="ts-ribbon" data-ribbon="insert" role="tabpanel" hidden>
-    <div class="ts-ribbon__group ts-ribbon__group--actions">
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-ins-table">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="3" y="4" width="18" height="16" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M3 10h18M3 15h18M9 4v16M15 4v16" stroke="currentColor" stroke-width="1.3"/>
-        </svg>
-        Table
-      </button>
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-ins-image">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="3" y="5" width="18" height="14" stroke="currentColor" stroke-width="1.5"/>
-          <circle cx="9" cy="10" r="1.5" fill="currentColor"/>
-          <path d="M3 17l5-5 4 4 3-3 6 6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-        </svg>
-        Image
-      </button>
-      <input type="file" id="tsd-ins-image-input" accept="image/*" hidden>
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-ins-hr" title="Horizontal rule">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M3 12h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        Divider
-      </button>
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-ins-pagebreak">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M6 3h8l4 4v4H6V3zM6 13h12v8H6v-8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-        </svg>
-        Page break
-      </button>
+  {# ======================= 5. WORKSPACE: rulers + page + outline ======================= #}
+  <main class="ts-ed__workspace" id="tsd-workspace">
+    <div class="ts-ed__editorwrap" id="tsd-editorwrap">
+      <div class="ts-ed__hruler" id="tsd-hruler" aria-hidden="true"></div>
+      <div class="ts-ed__vruler" id="tsd-vruler" aria-hidden="true"></div>
+      <div class="ts-ed__page" id="tsd-page" data-watermark="">
+        <div class="ts-ed__printable" id="tsd-printable">
+          <div id="tsd-surface" class="ts-ed__editable"
+               contenteditable="true"
+               spellcheck="true"
+               role="textbox"
+               aria-label="Document body"
+               aria-multiline="true"
+               data-placeholder="Start drafting your document. Type / for the command menu."></div>
+        </div>
+        <div class="ts-ed__pagefooter">
+          <span>VITALWORKS LIMITED · TrustSeal Documents</span>
+          <span>Page 1 of 1</span>
+        </div>
+      </div>
     </div>
-    <div class="ts-ribbon__group ts-ribbon__group--actions">
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-ins-date">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="4" y="5" width="16" height="15" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        Date
-      </button>
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-ins-signature">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M4 18c3-6 6-6 7-4s4 6 9 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          <path d="M4 21h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        Signature line
-      </button>
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-ins-field" title="Insert contract variable like {{client_name}}">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M8 4h8M8 20h8M10 4v16M14 4v16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        Field
-      </button>
-    </div>
-  </div>
+    <aside class="ts-ed__outline" id="tsd-outline" aria-label="Document outline">
+      <header class="ts-ed__outline-head">
+        <span>OUTLINE</span>
+        <button type="button" class="ts-ed__btn ts-ed__btn--ghost" id="tsd-outline-refresh">Refresh</button>
+      </header>
+      <nav id="tsd-outline-body" class="ts-ed__outline-body">
+        <p class="ts-ed__outline-empty">Add a heading (H1–H4) to build the outline.</p>
+      </nav>
+    </aside>
+  </main>
 
-  {# ======================= Layout ribbon ======================= #}
-  <div class="ts-ribbon" data-ribbon="layout" role="tabpanel" hidden>
-    <div class="ts-ribbon__group ts-ribbon__group--labeled">
-      <label class="ts-ribbon__label">Page size</label>
-      <select id="tsd-page-size" class="ts-ribbon__select">
-        <option value="letter" selected>Letter (8.5 × 11 in)</option>
-        <option value="a4">A4 (210 × 297 mm)</option>
-        <option value="legal">Legal (8.5 × 14 in)</option>
-      </select>
+  {# ======================= 6. STATUS BAR (24px) ======================= #}
+  <footer class="ts-ed__statusbar">
+    <div>
+      <span>Page 1 of 1</span>
+      <span>A4 (21 × 29.7 cm)</span>
+      <span id="tsd-wordcount">0 words</span>
     </div>
-    <div class="ts-ribbon__group ts-ribbon__group--labeled">
-      <label class="ts-ribbon__label">Orientation</label>
-      <select id="tsd-page-orient" class="ts-ribbon__select">
-        <option value="portrait" selected>Portrait</option>
-        <option value="landscape">Landscape</option>
-      </select>
+    <div>
+      <span id="tsd-viewmode">Print layout</span>
+      <span>·</span>
+      <span class="ts-status-chip ts-status-chip--{{ _status }}" id="tsd-status-chip">{{ _status|capitalize }}</span>
+      <span>·</span>
+      <span id="tsd-ciphertext-hint">
+        {% if doc %}ciphertext {{ doc.ciphertext_sha256[:12] }}…{% else %}encrypted autosave{% endif %}
+      </span>
     </div>
-    <div class="ts-ribbon__group ts-ribbon__group--labeled">
-      <label class="ts-ribbon__label">Margins</label>
-      <select id="tsd-page-margin" class="ts-ribbon__select">
-        <option value="normal" selected>Normal (1 in)</option>
-        <option value="narrow">Narrow (0.5 in)</option>
-        <option value="wide">Wide (1.5 in)</option>
-        <option value="moderate">Moderate (0.75 in)</option>
-      </select>
-    </div>
-    <div class="ts-ribbon__group ts-ribbon__group--labeled">
-      <label class="ts-ribbon__label">Line spacing</label>
-      <select id="tsd-line-spacing" class="ts-ribbon__select">
-        <option value="1.2">Single</option>
-        <option value="1.5">1.5</option>
-        <option value="1.6" selected>1.6 (default)</option>
-        <option value="2">Double</option>
-      </select>
-    </div>
-  </div>
+  </footer>
 
-  {# ======================= Security ribbon ======================= #}
-  <div class="ts-ribbon" data-ribbon="security" role="tabpanel" hidden>
-    <div class="ts-ribbon__group ts-ribbon__group--labeled">
-      <label class="ts-ribbon__label">Export policy</label>
-      <select id="tsd-export" class="ts-ribbon__select">
-        <option value="pdf_allowed"    {% if not doc or doc.export_policy == 'pdf_allowed' %}selected{% endif %}>
-          PDF export allowed
-        </option>
-        <option value="encrypted_only" {% if doc and doc.export_policy == 'encrypted_only' %}selected{% endif %}>
-          Encrypted only — no PDF
-        </option>
-      </select>
-    </div>
-    <div class="ts-ribbon__group ts-ribbon__group--labeled">
-      <label class="ts-ribbon__label">Confidentiality</label>
-      <select id="tsd-confidentiality" class="ts-ribbon__select">
-        <option value="internal" selected>Internal</option>
-        <option value="confidential">Confidential</option>
-        <option value="restricted">Restricted</option>
-        <option value="public">Public</option>
-      </select>
-    </div>
-    <div class="ts-ribbon__group ts-ribbon__group--labeled">
-      <label class="ts-ribbon__label">Watermark</label>
-      <input type="text" id="tsd-watermark" class="ts-ribbon__input"
-             placeholder="DRAFT" value="{% if doc %}{% else %}DRAFT{% endif %}"
-             maxlength="20"
-             aria-label="Watermark text">
-    </div>
-    <div class="ts-ribbon__group ts-ribbon__group--labeled">
-      <label class="ts-ribbon__label">Tags</label>
-      <input type="text" id="tsd-tags" class="ts-ribbon__input"
-             value="{{ doc.tags if doc else '' }}"
-             placeholder="legal, finance"
-             aria-label="Tags">
-    </div>
-    {% if doc and doc.export_policy == 'pdf_allowed' %}
-    <div class="ts-ribbon__group ts-ribbon__group--actions">
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-export-pdf-btn">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M6 3h8l4 4v14H6V3z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
-          <path d="M14 3v4h4" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
-          <path d="M9 14h6M9 17h4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-        </svg>
-        Export PDF
-      </button>
-    </div>
-    {% endif %}
-  </div>
-
-  {# ======================= Review ribbon ======================= #}
-  <div class="ts-ribbon" data-ribbon="review" role="tabpanel" hidden>
-    {% if doc %}
-    <div class="ts-ribbon__group ts-ribbon__group--actions">
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-history-btn">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.75"/>
-          <path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-        </svg>
-        Version history
-      </button>
-      <a class="ts-btn ts-btn--secondary ts-btn--sm" href="/api/tsd/{{ doc.id }}/download">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M12 4v12M6 11l6 6 6-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M4 20h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-        </svg>
-        Download .tsd
-      </a>
-    </div>
-    <div class="ts-ribbon__group ts-ribbon__group--labeled">
-      <label class="ts-ribbon__label">Status</label>
-      <select id="tsd-status" class="ts-ribbon__select">
-        <option value="draft"      {% if doc.status == 'draft' %}selected{% endif %}>Draft</option>
-        <option value="finalized"  {% if doc.status == 'finalized' %}selected{% endif %}>Finalized</option>
-        <option value="archived"   {% if doc.status == 'archived' %}selected{% endif %}>Archived</option>
-      </select>
-    </div>
-    {% else %}
-    <div class="ts-ribbon__group">
-      <span class="ts-panel__meta">Save the document first to unlock version history and signing-flow actions.</span>
-    </div>
-    {% endif %}
-    <div class="ts-ribbon__group ts-ribbon__group--actions">
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-spellcheck-toggle" aria-pressed="true" title="Toggle spell check">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M4 18l5-12 5 12M6 14h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M15 14l3 3 5-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        Spell check
-      </button>
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-lock-toggle" aria-pressed="false" title="Lock editing">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="4" y="11" width="16" height="10" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" stroke-width="1.5"/>
-        </svg>
-        Lock editing
-      </button>
-    </div>
-  </div>
-
-  {# ======================= View ribbon ======================= #}
-  <div class="ts-ribbon" data-ribbon="view" role="tabpanel" hidden>
-    <div class="ts-ribbon__group ts-ribbon__group--labeled">
-      <label class="ts-ribbon__label">Zoom</label>
-      <select id="tsd-zoom" class="ts-ribbon__select">
-        <option value="0.5">50%</option>
-        <option value="0.75">75%</option>
-        <option value="0.9">90%</option>
-        <option value="1" selected>100%</option>
-        <option value="1.25">125%</option>
-        <option value="1.5">150%</option>
-        <option value="2">200%</option>
-      </select>
-    </div>
-    <div class="ts-ribbon__group ts-ribbon__group--actions">
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-zoom-fit="width" title="Fit page width to the canvas">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M4 12h16M4 12l4-4M4 12l4 4M20 12l-4-4M20 12l-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        Fit width
-      </button>
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-zoom-reset title="Reset zoom to 100%">
-        100%
-      </button>
-    </div>
-    <div class="ts-ribbon__group ts-ribbon__group--actions">
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-toggle-watermark" aria-pressed="true" title="Show / hide watermark overlay">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M3 12s3-6 9-6 9 6 9 6-3 6-9 6-9-6-9-6z" stroke="currentColor" stroke-width="1.5"/>
-          <circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.5"/>
-        </svg>
-        Watermark
-      </button>
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-print" title="Open print dialog">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M6 9V3h12v6M6 14H4v7h16v-7h-2M6 14v7h12v-7H6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-        </svg>
-        Print
-      </button>
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-fullscreen" title="Toggle full-screen editor">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
-        </svg>
-        Full screen
-      </button>
-    </div>
-  </div>
-
-  {# ======================= Paper canvas ======================= #}
-  <div class="ts-editor__canvas" id="tsd-canvas">
-    <div id="tsd-surface" class="ts-editor__page"
-         contenteditable="true"
-         data-placeholder="Start drafting your document. Autosave runs on every keystroke; the server encrypts before writing.">{{ doc.title if doc else '' }}</div>
-  </div>
-
-  <div class="ts-editor__statusbar">
-    <span id="tsd-stats">0 words · 0 characters</span>
-    <span>
-      {% if doc %}
-        <code>v{{ doc.version }}</code> · ciphertext <code>{{ doc.ciphertext_sha256[:12] }}…</code>
-      {% else %}
-        Autosaves encrypt before writing.
-      {% endif %}
-    </span>
-  </div>
-
-  {# ======================= Version history drawer ======================= #}
-  <aside id="tsd-history-panel" class="ts-history-panel" hidden aria-label="Version history">
-    <header class="ts-history-panel__head">
-      <h3>Version history</h3>
-      <button type="button" class="ts-btn ts-btn--text ts-btn--sm" id="tsd-history-close">Close</button>
+  {# ======================= Security side panel ======================= #}
+  <aside class="ts-ed__secpanel" id="tsd-security-panel" role="dialog" aria-modal="false" aria-label="Document security">
+    <header>
+      <h2>Document security</h2>
+      <button type="button" class="ts-ed__btn ts-ed__btn--ghost" id="tsd-security-close" aria-label="Close">✕</button>
     </header>
-    <div id="tsd-history-body">
-      <p class="ts-panel__meta" style="padding: var(--ts-space-4);">Loading…</p>
+    <p>Backend enforces every policy. These controls persist to the encrypted TSD on next save.</p>
+
+    <label>Information classification</label>
+    <select id="tsd-class-select">
+      <option>Public</option>
+      <option selected>Internal</option>
+      <option>Confidential</option>
+      <option>Restricted</option>
+    </select>
+
+    <label style="margin-top: 10px;">Export policy</label>
+    <select id="tsd-export">
+      <option value="pdf_allowed"    {% if not doc or doc.export_policy == 'pdf_allowed' %}selected{% endif %}>PDF export allowed</option>
+      <option value="encrypted_only" {% if doc and doc.export_policy == 'encrypted_only' %}selected{% endif %}>Encrypted only — no PDF</option>
+    </select>
+
+    <label style="margin-top: 10px;">Watermark text</label>
+    <input type="text" id="tsd-watermark" class="ts-ed__input" placeholder="DRAFT" maxlength="20"
+           value="{% if doc %}{% else %}DRAFT{% endif %}">
+
+    <label style="margin-top: 10px;">Tags</label>
+    <input type="text" id="tsd-tags" class="ts-ed__input" placeholder="legal, finance"
+           value="{{ doc.tags if doc else '' }}">
+
+    <div class="ts-ed__secrow">
+      <span><strong>Edit protection</strong><br>Make the document read-only</span>
+      <button type="button" id="tsd-lock-toggle" aria-pressed="false">Protect</button>
+    </div>
+    <div class="ts-ed__secrow">
+      <span><strong>Privacy screen</strong><br>Conceal on-screen content locally</span>
+      <button type="button" id="tsd-privacy-toggle" aria-pressed="false">Conceal</button>
+    </div>
+    <div class="ts-ed__secrow">
+      <span><strong>Export as PDF</strong><br>Optionally password-protected</span>
+      <button type="button" id="tsd-export-pdf-btn">Export…</button>
+    </div>
+    <div class="ts-ed__secmeta">
+      Server-enforced in production: MFA, RBAC/ABAC, AES-256 at rest, tamper-evident audit, malware scanning, key custody.
     </div>
   </aside>
 
+  {# ======================= Floating selection bubble ======================= #}
+  <div id="tsd-bubble" class="ts-ed__bubble" hidden role="toolbar" aria-label="Selection tools">
+    <button type="button" data-bubble-cmd="bold" title="Bold"><strong>B</strong></button>
+    <button type="button" data-bubble-cmd="italic" title="Italic"><em>I</em></button>
+    <button type="button" data-bubble-cmd="underline" title="Underline"><span style="text-decoration:underline">U</span></button>
+    <button type="button" data-bubble-cmd="strikeThrough" title="Strikethrough"><span style="text-decoration:line-through">S</span></button>
+    <span class="ts-ed__bubble-sep"></span>
+    <button type="button" data-bubble-block="H1" title="Heading 1">H1</button>
+    <button type="button" data-bubble-block="H2" title="Heading 2">H2</button>
+    <button type="button" data-bubble-block="BLOCKQUOTE" title="Quote">❝</button>
+    <span class="ts-ed__bubble-sep"></span>
+    <button type="button" id="tsd-bubble-link" title="Link">🔗</button>
+    <button type="button" id="tsd-bubble-comment" title="Comment">💬</button>
+  </div>
+
+  {# ======================= Slash command menu ======================= #}
+  <div id="tsd-slash" class="ts-ed__slash" hidden role="listbox" aria-label="Insert menu">
+    <input type="text" id="tsd-slash-input" placeholder="Search blocks…">
+    <ul id="tsd-slash-list"></ul>
+  </div>
+
+  {# ======================= Find & replace ======================= #}
+  <div id="tsd-find" class="ts-ed__find" hidden role="dialog" aria-label="Find and replace">
+    <div class="ts-ed__find-row">
+      <input type="text" id="tsd-find-q" placeholder="Find" aria-label="Find text">
+      <span class="ts-ed__find-count" id="tsd-find-count">0 / 0</span>
+      <button type="button" id="tsd-find-prev" title="Previous">↑</button>
+      <button type="button" id="tsd-find-next" title="Next">↓</button>
+      <button type="button" id="tsd-find-close" title="Close (Esc)">✕</button>
+    </div>
+    <div class="ts-ed__find-row">
+      <input type="text" id="tsd-find-r" placeholder="Replace with" aria-label="Replace text">
+      <button type="button" id="tsd-find-replace">Replace</button>
+      <button type="button" id="tsd-find-replace-all">Replace all</button>
+    </div>
+  </div>
+
+  {# ======================= Command palette (⌘K) ======================= #}
+  <div id="tsd-cmdk" class="ts-overlay" hidden role="dialog" aria-modal="true">
+    <div class="ts-ed__cmdk">
+      <input type="text" id="tsd-cmdk-input" placeholder="Search commands…">
+      <ul id="tsd-cmdk-list"></ul>
+      <div class="ts-ed__cmdk-footer"><span>⏎ run</span><span>↑↓ move</span><span>Esc close</span></div>
+    </div>
+  </div>
+
+  {# ======================= Version history drawer ======================= #}
+  <aside id="tsd-history-panel" class="ts-ed__hist" hidden aria-label="Version history">
+    <header><h3>Version history</h3><button type="button" class="ts-ed__btn ts-ed__btn--ghost" id="tsd-history-close">Close</button></header>
+    <div id="tsd-history-body"><p>Loading…</p></div>
+  </aside>
+
   {# ======================= Export-PDF dialog ======================= #}
-  <div id="tsd-pdf-overlay" class="ts-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="tsd-pdf-title">
+  <div id="tsd-pdf-overlay" class="ts-overlay" hidden role="dialog" aria-modal="true">
     <div class="ts-modal" style="max-width: 460px;">
-      <h2 class="ts-modal__title" id="tsd-pdf-title">Export as PDF</h2>
+      <h2 class="ts-modal__title">Export as PDF</h2>
       <p class="ts-panel__meta" style="margin-bottom: var(--ts-space-4);">
-        Optionally protect the exported PDF with a password. Viewers
-        must enter the password to open the file. Leave blank to export
-        an unprotected PDF.
+        Optionally protect the PDF with a password.
       </p>
       <div class="ts-field">
         <label class="ts-field__label" for="tsd-pdf-password">Password (optional, 4–128 chars)</label>
-        <input type="password" id="tsd-pdf-password" class="ts-input" autocomplete="new-password" placeholder="Leave blank for no password">
-        <span class="ts-field__hint">AES-encrypted. We do not store exported passwords — losing it means re-exporting from the editor.</span>
+        <input type="password" id="tsd-pdf-password" class="ts-input" autocomplete="new-password">
       </div>
       <div class="ts-modal__actions">
         <button type="button" class="ts-btn ts-btn--ghost" id="tsd-pdf-cancel">Cancel</button>
@@ -445,321 +251,590 @@
       <p class="ts-panel__meta" id="tsd-pdf-status" style="margin-top: var(--ts-space-3); display: none;"></p>
     </div>
   </div>
+
+  <div id="tsd-security-toast" class="ts-ed__toast" hidden role="status"></div>
 </div>
 
 <style>
-  /* ====================================================== Editor shell
-     The title bar, ribbon tabs, ribbon body, canvas and status bar
-     form one outlined container. Child rows carry only their inner
-     separators — a single outer border frames the whole editor. */
-  #tsd-shell {
-    background: var(--ts-surface);
-    border: 1px solid var(--ts-border);
-    border-radius: var(--ts-radius-none);
-  }
+/* ===================================================================== *
+ * TrustSeal Documents Editor — compact corporate shell
+ * Six-region layout per Ribbon & Rulers design spec.
+ * Chrome stack: 38 + 30 + 70 + 27 + ~ workspace + 24 = ~189 px above canvas.
+ * ===================================================================== */
+.ts-ed {
+  --ed-ink: #121a26;
+  --ed-muted: #5a6676;
+  --ed-subtle: #7a8494;
+  --ed-line: var(--ts-border);
+  --ed-subline: var(--ts-surface-alt);
+  --ed-bg: var(--ts-surface-sunken);
+  --ed-white: #fff;
+  --ed-brand: var(--ts-brand-primary);
+  --ed-brand-soft: var(--ts-brand-primary-soft);
+  --ed-active: var(--ts-brand-primary-soft);
+  --ed-pagew: 794px;
+  --ed-pageh: 1123px;
+  --ed-margx: 76px;
+  --ed-margy: 94px;
+  --ed-rulerH: 19px;
+  --ed-visualzoom: 1;
+  display: flex; flex-direction: column;
+  background: var(--ed-bg);
+  min-height: calc(100vh - var(--ts-topbar-h));
+  font-family: Arial, "Helvetica Neue", sans-serif;
+  color: var(--ed-ink);
+  font-size: 13px;
+}
 
-  .ts-editor__titlebar {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: var(--ts-space-3);
-    padding: var(--ts-space-2) var(--ts-space-4);
-    background: var(--ts-surface);
-    border-bottom: 1px solid var(--ts-border);
-  }
-  .ts-editor__titlebar-right {
-    flex: 0 0 auto;
-    min-width: 200px;
-    text-align: right;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--ts-fs-meta);
-  }
-  .ts-editor__titlebar-left { display: inline-flex; align-items: center; gap: var(--ts-space-2); flex: 1 1 auto; min-width: 0; }
-  .ts-editor__titleinput {
-    flex: 1 1 auto;
-    min-width: 0;
-    font-size: var(--ts-fs-section);
-    font-weight: var(--ts-fw-semibold);
-    letter-spacing: -0.005em;
-    color: var(--ts-text);
-    background: transparent;
-    border: 0;
-    outline: none;
-    padding: 2px 4px;
-    line-height: 1.3;
-  }
-  .ts-editor__titleinput:focus {
-    background: var(--ts-surface-alt);
-  }
-  .ts-tsd-badge {
-    display: inline-flex; align-items: center; gap: 4px;
-    padding: 2px 8px;
-    font-size: var(--ts-fs-micro);
-    font-weight: var(--ts-fw-semibold);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--ts-brand-primary);
-    background: var(--ts-brand-primary-soft);
-    border: 1px solid var(--ts-brand-primary-soft);
-    border-radius: var(--ts-radius-sm);
-    flex: 0 0 auto;
-  }
+/* ---------- 1. Application bar ---------- */
+.ts-ed__appbar {
+  height: 38px; flex: 0 0 auto;
+  background: #fff;
+  border-bottom: 1px solid var(--ed-line);
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 14px;
+}
+.ts-ed__brand {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  color: var(--ed-brand);
+  white-space: nowrap;
+}
+.ts-ed__brand strong { font-size: 13px; font-weight: 800; letter-spacing: -0.2px; }
+.ts-ed__brand small  { font-size: 10px; color: var(--ed-muted); font-weight: 500; }
+.ts-ed__divider { width: 1px; height: 17px; background: var(--ed-line); }
+.ts-ed__filename {
+  flex: 0 1 300px;
+  font-size: 12px; font-weight: 600;
+  background: transparent; border: 1px solid transparent;
+  padding: 3px 6px;
+  color: var(--ed-ink); outline: none;
+  border-radius: var(--ts-radius-sm);
+}
+.ts-ed__filename:hover { border-color: var(--ed-line); }
+.ts-ed__filename:focus { border-color: var(--ed-brand); box-shadow: 0 0 0 2px rgba(55,120,212,.15); }
+.ts-ed__savestate { font-size: 10px; color: var(--ed-muted); white-space: nowrap; }
+.ts-ed__spacer { flex: 1 1 auto; }
+.ts-ed__class-mark {
+  font-size: 10px; color: var(--ed-muted);
+  border-left: 1px solid var(--ed-line);
+  padding-left: 10px;
+  white-space: nowrap;
+}
+.ts-ed__class-mark b { color: var(--ed-brand); }
+.ts-ed__btn {
+  background: #fff; border: 1px solid var(--ed-line);
+  padding: 4px 10px; height: 26px;
+  font-size: 11px; color: var(--ed-ink);
+  border-radius: var(--ts-radius-sm);
+  cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px;
+  white-space: nowrap;
+}
+.ts-ed__btn:hover { background: var(--ed-subline); border-color: var(--ts-border-strong); color: var(--ed-ink); text-decoration: none; }
+.ts-ed__btn--ghost { background: transparent; border-color: transparent; }
+.ts-ed__btn--ghost:hover { background: var(--ed-subline); border-color: var(--ed-line); }
+.ts-ed__btn--primary { background: var(--ed-brand); color: #fff; border-color: var(--ed-brand); }
+.ts-ed__btn--primary:hover { background: var(--ts-brand-primary-hover); border-color: var(--ts-brand-primary-hover); color: #fff; }
 
-  /* ====================================================== Ribbon tabs */
-  .ts-ribbon-tabs {
-    display: flex;
-    align-items: stretch;
-    gap: 0;
-    background: var(--ts-surface);
-    border-bottom: 1px solid var(--ts-border);
-    padding: 0 var(--ts-space-3);
-  }
-  .ts-ribbon-tab {
-    padding: 10px 18px;
-    font-size: var(--ts-fs-label);
-    font-weight: var(--ts-fw-medium);
-    color: var(--ts-text-muted);
-    background: transparent;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    cursor: pointer;
-    transition: color var(--ts-dur-fast) var(--ts-ease),
-                border-color var(--ts-dur-fast) var(--ts-ease);
-  }
-  .ts-ribbon-tab:hover { color: var(--ts-text); }
-  .ts-ribbon-tab--active {
-    color: var(--ts-brand-primary);
-    border-bottom-color: var(--ts-brand-primary);
-  }
-  .ts-ribbon-tabs__spacer { flex: 1 1 auto; }
+/* ---------- 2. Ribbon tabs ---------- */
+.ts-ed__tabs {
+  flex: 0 0 auto; height: 30px;
+  background: #fff;
+  border-bottom: 1px solid var(--ed-line);
+  display: flex; align-items: stretch;
+  padding: 0 10px;
+}
+.ts-ed__tab {
+  background: transparent; border: 0;
+  padding: 6px 12px 5px;
+  font-size: 11.5px; color: var(--ed-muted);
+  cursor: pointer; position: relative;
+}
+.ts-ed__tab:hover { color: var(--ed-ink); }
+.ts-ed__tab.ts-is-active { font-weight: 700; color: var(--ed-brand); }
+.ts-ed__tab.ts-is-active::after {
+  position: absolute; content: '';
+  left: 10px; right: 10px; bottom: 0;
+  height: 2px; background: var(--ed-brand);
+}
 
-  /* ====================================================== Ribbon body */
-  .ts-ribbon {
-    display: flex; align-items: center; gap: 0;
-    padding: var(--ts-space-3) var(--ts-space-3);
-    background: var(--ts-surface-alt);
-    border-bottom: 1px solid var(--ts-border);
-    flex-wrap: wrap;
-  }
-  .ts-ribbon__group {
-    display: inline-flex; align-items: center; gap: 2px;
-    padding: 0 var(--ts-space-3);
-    border-right: 1px solid var(--ts-border);
-    min-height: 34px;
-  }
-  .ts-ribbon__group:first-child { padding-left: var(--ts-space-2); }
-  .ts-ribbon__group:last-child { border-right: 0; }
-  .ts-ribbon__group--labeled { flex-direction: column; align-items: stretch; gap: 2px; padding: 0 var(--ts-space-4); }
-  .ts-ribbon__group--actions { gap: var(--ts-space-2); }
-  .ts-ribbon__label {
-    font-size: var(--ts-fs-micro);
-    font-weight: var(--ts-fw-semibold);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--ts-text-subtle);
-  }
-  .ts-ribbon__select, .ts-ribbon__input {
-    min-width: 160px;
-    height: 30px;
-    padding: 0 var(--ts-space-3);
-    font-size: var(--ts-fs-label);
-    background: var(--ts-surface);
-    border: 1px solid var(--ts-border);
-    border-radius: var(--ts-radius);
-    color: var(--ts-text);
-  }
-  .ts-ribbon__select:focus, .ts-ribbon__input:focus {
-    outline: none;
-    border-color: var(--ts-brand-primary);
-    box-shadow: 0 0 0 3px rgba(55, 120, 212, 0.18);
-  }
+/* ---------- 3. Ribbon body ---------- */
+.ts-ed__ribbon {
+  flex: 0 0 auto; height: 70px;
+  background: #fff;
+  border-bottom: 1px solid #cdd6df;
+  padding: 4px 10px 3px;
+  display: flex; align-items: stretch;
+  overflow-x: auto; overflow-y: hidden;
+  white-space: nowrap;
+  gap: 0;
+}
+.ts-ed__grp {
+  display: flex; align-items: center; gap: 3px;
+  padding: 0 10px 13px;
+  border-right: 1px solid #e2e7ed;
+  position: relative;
+  min-width: max-content;
+}
+.ts-ed__grp:last-child { border-right: 0; }
+.ts-ed__grp-label {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  text-align: center;
+  font-size: 9px;
+  color: var(--ed-subtle);
+  letter-spacing: 0.02em;
+}
+.ts-ed__tool {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px;
+  height: 40px; min-width: 37px;
+  padding: 2px 5px;
+  background: transparent; border: 1px solid transparent;
+  color: #34495a; font-size: 9px; line-height: 1.05;
+  border-radius: var(--ts-radius-sm);
+  cursor: pointer;
+}
+.ts-ed__tool:hover, .ts-ed__tool.ts-is-active {
+  background: var(--ed-subline); border-color: var(--ed-line);
+}
+.ts-ed__tool svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.ts-ed__tool--square {
+  height: 23px; min-width: 25px; padding: 3px 5px;
+  font-size: 12px; font-weight: 700;
+  flex-direction: row;
+}
+.ts-ed__tool--square svg { width: 13px; height: 13px; }
+.ts-ed__tools2 { display: flex; align-items: center; gap: 2px; }
+.ts-ed__stack  { display: flex; flex-direction: column; gap: 3px; }
+.ts-ed__combo {
+  height: 22px; min-width: 110px;
+  border: 1px solid #cdd6e0; background: #fff;
+  padding: 2px 6px; font-size: 11px; color: var(--ed-ink);
+  border-radius: var(--ts-radius-sm);
+}
+.ts-ed__combo--sm { min-width: 55px; }
 
-  /* Format-tab helpers (reused from previous editor). */
-  .ts-editor__btn {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-width: 30px; height: 30px; padding: 0 6px;
-    border: 1px solid transparent; background: transparent;
-    color: var(--ts-text); border-radius: var(--ts-radius-sm);
-    cursor: pointer; font-weight: var(--ts-fw-medium);
-    font-size: var(--ts-fs-label);
-    transition: background var(--ts-dur-fast) var(--ts-ease),
-                border-color var(--ts-dur-fast) var(--ts-ease);
-  }
-  .ts-editor__btn:hover { background: var(--ts-surface); border-color: var(--ts-border); }
-  .ts-editor__btn[aria-pressed="true"] {
-    background: var(--ts-surface); border-color: var(--ts-border-strong);
-    color: var(--ts-brand-primary);
-  }
-  .ts-editor__select {
-    height: 30px; padding: 0 22px 0 8px;
-    border: 1px solid transparent; background: transparent;
-    color: var(--ts-text); font-size: var(--ts-fs-label);
-    border-radius: var(--ts-radius-sm);
-    appearance: none;
-    background-image:
-      linear-gradient(45deg, transparent 50%, var(--ts-text-muted) 50%),
-      linear-gradient(135deg, var(--ts-text-muted) 50%, transparent 50%);
-    background-position: calc(100% - 12px) 50%, calc(100% - 8px) 50%;
-    background-size: 4px 4px;
-    background-repeat: no-repeat;
-    cursor: pointer; min-width: 110px;
-  }
-  .ts-editor__select--sm { min-width: 70px; }
-  .ts-editor__select:hover { background-color: var(--ts-surface); border-color: var(--ts-border); }
-  .ts-editor__color {
-    display: inline-flex; position: relative; align-items: center; justify-content: center;
-    width: 30px; height: 30px;
-    border: 1px solid transparent; border-radius: var(--ts-radius-sm);
-    cursor: pointer;
-  }
-  .ts-editor__color:hover { background: var(--ts-surface); border-color: var(--ts-border); }
-  .ts-editor__color input[type="color"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+/* ---------- 4. Measurement controls ---------- */
+.ts-ed__rulercontrols {
+  flex: 0 0 auto; height: 27px;
+  background: var(--ed-bg);
+  border-bottom: 1px solid var(--ed-line);
+  display: flex; align-items: center;
+  gap: 12px; padding-left: 12px; padding-right: 12px;
+}
+.ts-ed__rulercontrols label { font-size: 10px; color: #536477; display: inline-flex; gap: 4px; align-items: center; }
+.ts-ed__rulercontrols select {
+  border: 1px solid #cbd4dd;
+  font-size: 10px; padding: 2px;
+  background: #fff; color: var(--ed-ink);
+  border-radius: var(--ts-radius-sm);
+}
+.ts-ed__rulercontrols input[type="checkbox"] { accent-color: var(--ed-brand); }
+.ts-ed__rulernote { font-size: 10px; color: var(--ed-subtle); text-transform: uppercase; letter-spacing: 0.06em; }
+.ts-ed__page-badge { font-size: 10px; color: #6b7f8f; }
+.ts-ed__zoom { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--ed-muted); }
+.ts-ed__zoom input { width: 110px; accent-color: var(--ed-brand); }
+.ts-ed__zoom #tsd-zoom-value { font-variant-numeric: tabular-nums; font-size: 10px; min-width: 32px; }
 
-  /* ====================================================== Canvas + page */
-  .ts-editor__canvas {
-    background: var(--ts-surface-sunken);
-    padding: var(--ts-space-7) var(--ts-space-5);
-    min-height: 62vh;
-    overflow-x: auto;
-  }
-  .ts-editor__page {
-    position: relative;
-    background: #ffffff;
-    width: 816px; min-height: 1056px; margin: 0 auto;
-    padding: 96px;
-    border: 1px solid var(--ts-border);
-    box-shadow: 0 1px 3px rgba(18, 26, 38, 0.06), 0 8px 24px rgba(18, 26, 38, 0.06);
-    color: #121a26;
-    font-family: Arial, "Helvetica Neue", sans-serif;
-    font-size: 12pt; line-height: 1.6;
-    outline: none; text-align: left;
-    overflow: hidden;
-    transition: width var(--ts-dur-base) var(--ts-ease),
-                min-height var(--ts-dur-base) var(--ts-ease),
-                padding var(--ts-dur-base) var(--ts-ease);
-  }
-  /* Page-size + orientation variants (assumes 96dpi). */
-  .ts-editor__page.ts-page--letter    { width: 816px;  min-height: 1056px; }
-  .ts-editor__page.ts-page--a4        { width: 794px;  min-height: 1123px; }
-  .ts-editor__page.ts-page--legal     { width: 816px;  min-height: 1344px; }
-  .ts-editor__page.ts-page--letter.ts-page--landscape { width: 1056px; min-height: 816px; }
-  .ts-editor__page.ts-page--a4.ts-page--landscape     { width: 1123px; min-height: 794px; }
-  .ts-editor__page.ts-page--legal.ts-page--landscape  { width: 1344px; min-height: 816px; }
-  /* Margins. */
-  .ts-editor__page.ts-page--m-normal   { padding: 96px; }
-  .ts-editor__page.ts-page--m-narrow   { padding: 48px; }
-  .ts-editor__page.ts-page--m-moderate { padding: 72px; }
-  .ts-editor__page.ts-page--m-wide     { padding: 144px; }
-  /* Watermark visibility toggle (View ▸ Watermark button). */
-  .ts-editor__page.ts-page--no-wm::before { content: none; }
-  /* Watermark lives on the PAGE now, diagonal, behind content. */
-  .ts-editor__page::before {
-    content: attr(data-watermark);
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%,-50%) rotate(-30deg);
-    font-size: 110pt;
-    font-weight: 700;
-    color: rgba(18, 26, 38, 0.06);
-    letter-spacing: 0.08em;
-    pointer-events: none;
-    white-space: nowrap;
-    z-index: 0;
-    text-transform: uppercase;
-  }
-  .ts-editor__page[data-watermark=""]::before { content: none; }
-  .ts-editor__page > * { position: relative; z-index: 1; }
+/* ---------- 5. Workspace ---------- */
+.ts-ed__workspace {
+  flex: 1 1 auto;
+  overflow: auto;
+  position: relative;
+  padding: 22px 28px 50px;
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  gap: 20px;
+}
+.ts-ed__workspace--no-outline { grid-template-columns: 1fr; }
+.ts-ed__workspace--no-outline .ts-ed__outline { display: none; }
 
-  @media (max-width: 1023px) {
-    .ts-editor__canvas { padding: var(--ts-space-4); }
-    .ts-editor__page { width: 100%; padding: var(--ts-space-5); min-height: 80vh; box-shadow: none; }
-  }
-  .ts-editor__page:empty::before { content: attr(data-placeholder); color: var(--ts-text-subtle); pointer-events: none; font-size: 12pt; font-weight: 400; letter-spacing: 0; text-transform: none; transform: translate(-50%,-50%); }
-  .ts-editor__page h1 { font-size: 22pt; font-weight: 600; margin: 0 0 12pt; letter-spacing: -0.01em; }
-  .ts-editor__page h2 { font-size: 16pt; font-weight: 600; margin: 18pt 0 10pt; }
-  .ts-editor__page h3 { font-size: 13pt; font-weight: 600; margin: 14pt 0 8pt; }
-  .ts-editor__page h4 { font-size: 12pt; font-weight: 600; margin: 12pt 0 6pt; }
-  .ts-editor__page p  { margin: 0 0 11pt; }
-  .ts-editor__page ul, .ts-editor__page ol { padding-left: 32pt; margin: 0 0 11pt; list-style: revert; }
-  .ts-editor__page a  { color: var(--ts-brand-primary); text-decoration: underline; }
-  .ts-editor__page blockquote { margin: 0 0 11pt; padding: 6pt 18pt; border-left: 3px solid var(--ts-border-strong); color: var(--ts-text-muted); font-style: italic; }
-  .ts-editor__page pre { margin: 0 0 11pt; padding: 10pt 14pt; background: var(--ts-surface-alt); border: 1px solid var(--ts-border); font-family: var(--ts-font-mono); font-size: 10pt; white-space: pre-wrap; }
+.ts-ed__editorwrap {
+  width: calc(var(--ed-pagew) + 28px);
+  margin: 0 auto;
+  position: relative;
+  transform: scale(var(--ed-visualzoom));
+  transform-origin: top center;
+}
 
-  /* ====================================================== Status bar */
-  .ts-editor__statusbar {
-    display: flex; justify-content: space-between; gap: var(--ts-space-3);
-    padding: var(--ts-space-2) var(--ts-space-4);
-    background: var(--ts-surface);
-    border-top: 1px solid var(--ts-border);
-    color: var(--ts-text-muted);
-    font-size: var(--ts-fs-meta);
-    flex-wrap: wrap;
-  }
+.ts-ed__hruler {
+  margin-left: 28px;
+  width: var(--ed-pagew);
+  height: var(--ed-rulerH);
+  background: #fff;
+  border: 1px solid var(--ed-line);
+  border-bottom: 0;
+}
+.ts-ed__hruler svg { display: block; width: 100%; height: calc(var(--ed-rulerH) - 1px); }
+.ts-ed__vruler {
+  position: absolute;
+  left: 9px; top: var(--ed-rulerH);
+  width: var(--ed-rulerH);
+  height: var(--ed-pageh);
+  background: #fff;
+  border: 1px solid var(--ed-line);
+  border-right: 0;
+}
+.ts-ed__vruler svg { width: calc(var(--ed-rulerH) - 1px); height: 100%; }
 
-  /* Save-state coloring. */
-  .ts-save-state--saving  { color: var(--ts-text-muted); }
-  .ts-save-state--saved   { color: var(--ts-brand-green); }
-  .ts-save-state--error   { color: var(--ts-danger); }
+.ts-ed__page {
+  background: #fff;
+  box-shadow: 0 2px 9px rgba(20,35,50,.08);
+  width: var(--ed-pagew);
+  min-height: var(--ed-pageh);
+  margin-left: 28px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #d2d9e1;
+}
+.ts-ed__printable {
+  position: absolute;
+  left: var(--ed-margx); right: var(--ed-margx);
+  top: var(--ed-margy); bottom: var(--ed-margy);
+  outline: 1px dashed transparent;
+  transition: outline .15s;
+}
+.ts-ed__page.ts-is-guides .ts-ed__printable { outline-color: #c5d9e7; }
+.ts-ed__page.ts-is-privacy .ts-ed__printable { filter: blur(7px); }
+.ts-ed__page.ts-is-privacy::before {
+  content: 'Preview concealed locally';
+  position: absolute; z-index: 2;
+  top: 40%; left: 30%;
+  font-size: 14px; background: #fff;
+  padding: 10px 14px; border: 1px solid var(--ed-line);
+}
+.ts-ed__editable { outline: 0; min-height: 250px; font-size: 13px; line-height: 1.7; color: var(--ed-ink); }
+.ts-ed__editable:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ed-subtle);
+  pointer-events: none;
+}
+.ts-ed__editable h1 { font-size: 20px; font-weight: 700; margin: 6px 0 20px; line-height: 1.3; }
+.ts-ed__editable h2 { font-size: 14px; font-weight: 700; color: var(--ed-brand); margin-top: 20px; }
+.ts-ed__editable h3 { font-size: 12.5px; font-weight: 700; margin-top: 16px; }
+.ts-ed__editable p  { margin: 10px 0; }
+.ts-ed__editable blockquote { margin: 10px 0; padding: 4pt 12pt; border-left: 2pt solid var(--ts-border-strong); color: var(--ed-muted); font-style: italic; }
+.ts-ed__editable pre { margin: 10px 0; padding: 8pt 12pt; background: var(--ed-subline); border: 1px solid var(--ed-line); font-family: var(--ts-font-mono); font-size: 10pt; white-space: pre-wrap; }
+.ts-ed__editable h4 { font-size: 11.5px; font-weight: 700; margin-top: 14px; color: var(--ed-ink); }
+.ts-ed__editable h5 { font-size: 11px;   font-weight: 700; margin-top: 12px; color: var(--ed-ink); text-transform: uppercase; letter-spacing: 0.04em; }
+.ts-ed__editable ul, .ts-ed__editable ol { padding-left: 28pt; list-style: revert; }
+.ts-ed__editable a { color: var(--ed-brand); text-decoration: underline; }
+/* Semantic paragraph presets. */
+.ts-ed__editable .ts-para--lead {
+  font-size: 15px; line-height: 1.55; color: var(--ed-ink); font-weight: 400;
+  margin: 10px 0 14px;
+}
+.ts-ed__editable .ts-para--caption {
+  font-size: 10.5px; color: var(--ed-muted); font-style: italic;
+  margin: 4px 0 10px; line-height: 1.4;
+}
+.ts-ed__editable .ts-para--clause {
+  font-size: 12px; line-height: 1.6; text-indent: 24pt;
+  margin: 10px 0; text-align: justify;
+}
+.ts-ed__editable .ts-para--small {
+  font-size: 10px; color: var(--ed-muted); line-height: 1.4; margin: 6px 0;
+}
 
-  /* ====================================================== History drawer */
-  .ts-history-panel {
-    position: fixed;
-    top: var(--ts-topbar-h);
-    right: 0;
-    width: 380px;
-    max-width: 90vw;
-    height: calc(100vh - var(--ts-topbar-h));
-    background: var(--ts-surface);
-    border-left: 1px solid var(--ts-border);
-    box-shadow: var(--ts-shadow-overlay);
-    z-index: 30;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .ts-history-panel__head {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: var(--ts-space-4) var(--ts-space-5);
-    border-bottom: 1px solid var(--ts-border);
-  }
-  .ts-history-panel__head h3 {
-    font-size: var(--ts-fs-section); font-weight: var(--ts-fw-semibold); margin: 0;
-  }
-  #tsd-history-body { overflow-y: auto; flex: 1 1 auto; }
-  .ts-history-row {
-    padding: var(--ts-space-4) var(--ts-space-5);
-    border-bottom: 1px solid var(--ts-border);
-  }
-  .ts-history-row:last-child { border-bottom: 0; }
-  .ts-history-row__head {
-    display: flex; align-items: baseline; justify-content: space-between;
-    gap: var(--ts-space-3); margin-bottom: var(--ts-space-2);
-  }
-  .ts-history-row__version {
-    font-weight: var(--ts-fw-semibold);
-    font-family: var(--ts-font-mono);
-    color: var(--ts-brand-primary);
-  }
-  .ts-history-row__meta { color: var(--ts-text-muted); font-size: var(--ts-fs-meta); }
-  .ts-history-row__actions { display: flex; gap: var(--ts-space-2); margin-top: var(--ts-space-2); }
+/* Watermark on the paper page. */
+.ts-ed__page::after {
+  content: attr(data-watermark);
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%) rotate(-30deg);
+  font-size: 110pt; font-weight: 700;
+  color: rgba(18,26,38,.055);
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.ts-ed__page[data-watermark=""]::after { content: none; }
+
+.ts-ed__pagefooter {
+  position: absolute; bottom: 30px;
+  left: var(--ed-margx); right: var(--ed-margx);
+  font-size: 10px; color: #8a97a3;
+  border-top: 1px solid #e5e9ed;
+  padding-top: 8px;
+  display: flex; justify-content: space-between;
+}
+
+/* Page size + orientation presets (overrides --ed-pagew / --ed-pageh). */
+.ts-ed__page--letter    { --ed-pagew: 816px;  --ed-pageh: 1056px; }
+.ts-ed__page--a4        { --ed-pagew: 794px;  --ed-pageh: 1123px; }
+.ts-ed__page--legal     { --ed-pagew: 816px;  --ed-pageh: 1344px; }
+.ts-ed__page--letter.ts-ed__page--landscape { --ed-pagew: 1056px; --ed-pageh: 816px; }
+.ts-ed__page--a4.ts-ed__page--landscape     { --ed-pagew: 1123px; --ed-pageh: 794px; }
+.ts-ed__page--legal.ts-ed__page--landscape  { --ed-pagew: 1344px; --ed-pageh: 816px; }
+
+/* Rulers hidden. */
+.ts-ed__editorwrap.ts-is-rulers-hidden .ts-ed__hruler,
+.ts-ed__editorwrap.ts-is-rulers-hidden .ts-ed__vruler { visibility: hidden; }
+.ts-ed__editorwrap.ts-is-rulers-hidden .ts-ed__page { margin-top: calc(-1 * var(--ed-rulerH)); }
+
+/* ---------- Outline rail ---------- */
+.ts-ed__outline {
+  background: #fff;
+  border: 1px solid var(--ed-line);
+  max-height: 72vh;
+  overflow-y: auto;
+  position: sticky; top: 0;
+}
+.ts-ed__outline-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ed-line);
+  font-size: 10px; letter-spacing: 0.08em;
+  color: var(--ed-subtle); font-weight: 600;
+}
+.ts-ed__outline-body { padding: 6px 0; }
+.ts-ed__outline-item {
+  display: block;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--ed-ink);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+}
+.ts-ed__outline-item:hover { background: var(--ed-subline); color: var(--ed-brand); border-left-color: var(--ed-brand); }
+.ts-ed__outline-item--h1 { font-weight: 600; }
+.ts-ed__outline-item--h2 { padding-left: 24px; }
+.ts-ed__outline-item--h3 { padding-left: 36px; color: var(--ed-muted); }
+.ts-ed__outline-item--h4 { padding-left: 48px; color: var(--ed-muted); font-size: 11px; }
+.ts-ed__outline-empty { padding: 12px; color: var(--ed-muted); font-size: 11px; line-height: 1.6; }
+
+@media (max-width: 1199px) {
+  .ts-ed__workspace { grid-template-columns: 1fr; }
+  .ts-ed__outline { display: none; }
+}
+
+/* ---------- 6. Status bar ---------- */
+.ts-ed__statusbar {
+  flex: 0 0 auto; height: 24px;
+  background: #fff;
+  border-top: 1px solid var(--ed-line);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px;
+  color: #667788;
+  font-size: 10px;
+}
+.ts-ed__statusbar > div { display: inline-flex; gap: 10px; align-items: center; }
+
+/* ---------- Status chip ---------- */
+.ts-status-chip {
+  display: inline-flex; align-items: center;
+  padding: 1px 8px;
+  font-size: 9px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  border-radius: var(--ts-radius-pill);
+  border: 1px solid transparent;
+}
+.ts-status-chip--draft     { color: var(--ts-warning);     background: var(--ts-warning-soft);   border-color: #e8d7a9; }
+.ts-status-chip--finalized { color: var(--ts-brand-green); background: var(--ts-green-soft);     border-color: #c6dfd1; }
+.ts-status-chip--archived  { color: var(--ed-muted);       background: var(--ed-subline);        border-color: var(--ed-line); }
+
+/* ---------- Save state coloring ---------- */
+.ts-ed__savestate--saving { color: var(--ed-muted); }
+.ts-ed__savestate--saved  { color: var(--ts-brand-green); }
+.ts-ed__savestate--error  { color: var(--ts-danger); }
+
+/* ---------- Security side panel ---------- */
+.ts-ed__secpanel {
+  position: fixed;
+  right: 14px;
+  top: calc(var(--ts-topbar-h) + 46px);
+  width: min(355px, calc(100vw - 28px));
+  background: #fff;
+  border: 1px solid var(--ed-line);
+  box-shadow: 0 11px 26px rgba(18,38,54,.17);
+  z-index: 40;
+  padding: 16px;
+  display: none;
+}
+.ts-ed__secpanel.ts-is-open { display: block; }
+.ts-ed__secpanel header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.ts-ed__secpanel h2 { font-size: 14px; margin: 0; }
+.ts-ed__secpanel p  { font-size: 11px; color: var(--ed-muted); line-height: 1.5; margin: 0 0 12px; }
+.ts-ed__secpanel label { font-size: 11px; color: #3d5368; display: block; margin: 8px 0 4px; }
+.ts-ed__secpanel select,
+.ts-ed__secpanel .ts-ed__input {
+  width: 100%; height: 29px;
+  border: 1px solid var(--ts-border-strong);
+  background: #fff;
+  padding: 4px 8px;
+  color: var(--ed-ink);
+  font: inherit; font-size: 12px;
+  border-radius: var(--ts-radius-sm);
+}
+.ts-ed__secrow {
+  display: flex; align-items: center; justify-content: space-between;
+  border-top: 1px solid #eef0f3;
+  padding: 10px 0; gap: 12px;
+}
+.ts-ed__secrow span { font-size: 11px; color: #4b5c6b; line-height: 1.5; }
+.ts-ed__secrow button {
+  font: inherit; font-size: 11px;
+  border: 1px solid var(--ts-border-strong);
+  background: #fff;
+  padding: 4px 9px;
+  cursor: pointer;
+  border-radius: var(--ts-radius-sm);
+  white-space: nowrap;
+}
+.ts-ed__secrow button:hover { background: var(--ed-subline); }
+.ts-ed__secmeta { font-size: 10px; color: var(--ed-subtle); margin-top: 10px; line-height: 1.6; border-top: 1px solid var(--ed-line); padding-top: 10px; }
+
+.ts-ed__toast {
+  position: fixed; bottom: 38px; right: 17px;
+  background: var(--ed-ink); color: #fff;
+  padding: 10px 14px; font-size: 11px;
+  z-index: 60; max-width: 350px;
+  box-shadow: 0 4px 13px rgba(0,0,0,0.12);
+  border-radius: var(--ts-radius-sm);
+}
+.ts-ed__toast[hidden] { display: none; }
+
+/* ---------- Bubble, slash, find, cmdk ---------- */
+.ts-ed__bubble {
+  position: absolute; z-index: 45;
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 4px;
+  background: var(--ed-ink); color: #fff;
+  border-radius: var(--ts-radius);
+  box-shadow: 0 6px 20px rgba(18,26,38,.22);
+}
+.ts-ed__bubble button {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; height: 28px; padding: 0 6px;
+  color: #fff; background: transparent; border: 0;
+  border-radius: var(--ts-radius-sm);
+  cursor: pointer; font-size: 12px;
+}
+.ts-ed__bubble button:hover { background: rgba(255,255,255,0.14); }
+.ts-ed__bubble-sep { display: inline-block; width: 1px; height: 18px; background: rgba(255,255,255,.2); margin: 0 2px; }
+
+.ts-ed__slash {
+  position: absolute; z-index: 50;
+  min-width: 280px; max-height: 340px;
+  display: flex; flex-direction: column;
+  background: #fff; border: 1px solid var(--ed-line);
+  border-radius: var(--ts-radius);
+  box-shadow: 0 8px 24px rgba(18,26,38,.12);
+  overflow: hidden;
+}
+.ts-ed__slash input { padding: 10px 12px; font-size: 12px; border: 0; border-bottom: 1px solid var(--ed-line); outline: none; }
+.ts-ed__slash ul { overflow-y: auto; padding: 4px 0; margin: 0; list-style: none; }
+.ts-ed__slash li { display: flex; align-items: center; gap: 10px; padding: 7px 12px; font-size: 12px; cursor: pointer; color: var(--ed-ink); }
+.ts-ed__slash li:hover, .ts-ed__slash li.ts-is-active { background: var(--ed-active); color: var(--ed-brand); }
+.ts-ed__slash li .ts-ed__slash-icon { width: 20px; display: inline-flex; justify-content: center; color: var(--ed-muted); }
+.ts-ed__slash li .ts-ed__slash-kbd { margin-left: auto; color: var(--ed-subtle); font-size: 10px; font-family: var(--ts-font-mono); }
+
+.ts-ed__find {
+  position: sticky; top: 0; z-index: 15;
+  background: #fff; border-bottom: 1px solid var(--ed-line);
+  padding: 6px 12px; display: flex; flex-direction: column; gap: 4px;
+}
+.ts-ed__find-row { display: flex; align-items: center; gap: 6px; }
+.ts-ed__find-row input {
+  flex: 1 1 auto;
+  height: 28px; padding: 0 10px;
+  font-size: 12px;
+  border: 1px solid var(--ts-border-strong); border-radius: var(--ts-radius-sm);
+  background: #fff;
+}
+.ts-ed__find-row input:focus { outline: none; border-color: var(--ed-brand); box-shadow: 0 0 0 2px rgba(55,120,212,.15); }
+.ts-ed__find-row button {
+  background: #fff; border: 1px solid var(--ed-line); border-radius: var(--ts-radius-sm);
+  padding: 2px 8px; font-size: 11px; height: 26px; cursor: pointer;
+}
+.ts-ed__find-row button:hover { background: var(--ed-subline); }
+.ts-ed__find-count { font-size: 10px; color: var(--ed-muted); padding: 0 6px; font-variant-numeric: tabular-nums; }
+.ts-editor__find-hit, .ts-ed__find-hit { background: #fff3b0; border-radius: 2px; }
+.ts-editor__find-hit--current, .ts-ed__find-hit--current { background: #ffb86c; outline: 2px solid var(--ts-warning); }
+
+.ts-ed__cmdk {
+  background: #fff; border: 1px solid var(--ed-line);
+  border-radius: var(--ts-radius);
+  box-shadow: 0 10px 30px rgba(18,26,38,.2);
+  width: 560px; max-width: 90vw; max-height: 70vh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.ts-ed__cmdk input { padding: 14px 18px; border: 0; border-bottom: 1px solid var(--ed-line); outline: none; font-size: 14px; }
+.ts-ed__cmdk ul { overflow-y: auto; padding: 6px 0; margin: 0; list-style: none; flex: 1 1 auto; }
+.ts-ed__cmdk li { display: flex; align-items: center; gap: 10px; padding: 8px 18px; font-size: 12.5px; cursor: pointer; color: var(--ed-ink); }
+.ts-ed__cmdk li:hover, .ts-ed__cmdk li.ts-is-active { background: var(--ed-active); color: var(--ed-brand); }
+.ts-ed__cmdk-footer { display: flex; gap: 14px; padding: 8px 18px; background: var(--ed-subline); border-top: 1px solid var(--ed-line); color: var(--ed-subtle); font-size: 10px; }
+
+.ts-ed__hist {
+  position: fixed;
+  top: var(--ts-topbar-h);
+  right: 0;
+  width: 380px; max-width: 90vw;
+  height: calc(100vh - var(--ts-topbar-h));
+  background: #fff;
+  border-left: 1px solid var(--ed-line);
+  box-shadow: 0 11px 26px rgba(18,38,54,.17);
+  z-index: 40;
+  display: flex; flex-direction: column;
+}
+.ts-ed__hist header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--ed-line); }
+.ts-ed__hist header h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.ts-ed__hist > div { overflow-y: auto; }
+.ts-ed__hist-row { padding: 12px 16px; border-bottom: 1px solid var(--ed-line); }
+.ts-ed__hist-row:last-child { border-bottom: 0; }
+.ts-ed__hist-ver { font-family: var(--ts-font-mono); color: var(--ed-brand); font-weight: 600; }
+.ts-ed__hist-meta { color: var(--ed-muted); font-size: 11px; margin-top: 2px; }
+.ts-ed__hist-acts { display: flex; gap: 6px; margin-top: 6px; }
+
+/* Lock editing state (disables input cursor cues). */
+.ts-ed__editorwrap.ts-is-locked .ts-ed__editable { cursor: default; background: repeating-linear-gradient(135deg, transparent 0 8px, rgba(0,0,0,.015) 8px 9px); }
+
+@media print {
+  .ts-ed__appbar, .ts-ed__tabs, .ts-ed__ribbon, .ts-ed__rulercontrols,
+  .ts-ed__hruler, .ts-ed__vruler, .ts-ed__statusbar,
+  .ts-ed__outline, .ts-ed__secpanel, .ts-ed__toast,
+  .ts-ed__bubble, .ts-ed__slash, .ts-ed__find, .ts-ed__cmdk,
+  .ts-ed__hist { display: none !important; }
+  .ts-ed__workspace { padding: 0; height: auto; overflow: visible; grid-template-columns: 1fr; }
+  .ts-ed__page { margin: 0; box-shadow: none; border: 0; }
+  body { background: #fff; }
+}
 </style>
 
 <script>
 (function () {
-  var shell = document.getElementById('tsd-shell');
-  var editor = document.getElementById('tsd-surface');
-  var titleInput = document.getElementById('tsd-title');
-  var tagsInput = document.getElementById('tsd-tags');
-  var exportSelect = document.getElementById('tsd-export');
-  var statusSelect = document.getElementById('tsd-status');
-  var watermarkInput = document.getElementById('tsd-watermark');
-  var stats = document.getElementById('tsd-stats');
-  var state = document.getElementById('tsd-save-state');
-  var page = document.getElementById('tsd-surface');
+  var NS = 'http://www.w3.org/2000/svg';
+  var shell       = document.getElementById('tsd-shell');
+  var editor      = document.getElementById('tsd-surface');
+  var titleInput  = document.getElementById('tsd-title');
+  var tagsInput   = document.getElementById('tsd-tags');
+  var exportSel   = document.getElementById('tsd-export');
+  var watermark   = document.getElementById('tsd-watermark');
+  var saveStateEl = document.getElementById('tsd-save-state');
+  var wordCountEl = document.getElementById('tsd-wordcount');
+  var page        = document.getElementById('tsd-page');
+  var printable   = document.getElementById('tsd-printable');
+  var editorWrap  = document.getElementById('tsd-editorwrap');
+  var hruler      = document.getElementById('tsd-hruler');
+  var vruler      = document.getElementById('tsd-vruler');
+  var ribbon      = document.getElementById('tsd-ribbon');
+  var badge       = document.getElementById('tsd-page-badge');
+  var zoomRange   = document.getElementById('tsd-zoom-range');
+  var zoomValue   = document.getElementById('tsd-zoom-value');
+  var unitsSel    = document.getElementById('tsd-units');
 
-  var tsdId = shell.dataset.tsdId ? parseInt(shell.dataset.tsdId, 10) : null;
+  var tsdId   = shell.dataset.tsdId ? parseInt(shell.dataset.tsdId, 10) : null;
   var version = shell.dataset.tsdVersion ? parseInt(shell.dataset.tsdVersion, 10) : null;
 
+  var pageSize    = 'a4';
+  var pageOrient  = 'portrait';
+  var pageMargin  = 2;      // cm, each side
+  var pageMarginY = 2.5;    // cm, top/bottom
+  var unit        = 'cm';
+  var zoom        = 1;
+
+  // ===================================================================== HELPERS
   function csrfToken() {
     var m = document.cookie.match(/(?:^|; )csrf_token=([^;]+)/);
     return m ? decodeURIComponent(m[1]) : null;
@@ -771,493 +846,1048 @@
     if (version) h['If-Match'] = String(version);
     return h;
   }
-  function stat(msg, cls) {
-    state.textContent = msg;
-    state.className = 'ts-panel__meta ts-save-state--' + (cls || 'saving');
+  function setSave(msg, cls) {
+    saveStateEl.textContent = msg;
+    saveStateEl.className = 'ts-ed__savestate ts-ed__savestate--' + (cls || 'saving');
   }
-  function wordstats() {
+  function updateWords() {
     var text = editor.innerText || '';
     var words = text.trim().split(/\s+/).filter(Boolean).length;
-    stats.textContent = words + ' word' + (words === 1 ? '' : 's') +
-                        ' · ' + text.length + ' character' + (text.length === 1 ? '' : 's');
+    wordCountEl.textContent = words + ' word' + (words === 1 ? '' : 's');
   }
 
-  // Watermark text on the page element (CSS reads attr(data-watermark)).
-  function applyWatermark() {
-    var txt = (watermarkInput && watermarkInput.value || '').trim();
-    page.setAttribute('data-watermark', txt);
+  // ===================================================================== RIBBON
+  var ICONS = {
+    paste: '<path d="M7 4h3l1-2h4l1 2h3v17H7z"/><path d="M10 8h6M10 12h6M10 16h4"/>',
+    copy: '<rect x="8" y="8" width="12" height="12"/><path d="M5 16H4V4h12v1"/>',
+    cut: '<circle cx="6" cy="17" r="2"/><circle cx="6" cy="7" r="2"/><path d="m8 8 10 10M8 16 18 6"/>',
+    image: '<rect x="3" y="4" width="18" height="16"/><circle cx="8" cy="9" r="2"/><path d="m3 17 6-6 4 4 3-3 5 5"/>',
+    table: '<rect x="3" y="4" width="18" height="16"/><path d="M3 9h18M3 14h18M9 4v16M15 4v16"/>',
+    link: '<path d="M9 15l6-6M10 7H8a5 5 0 0 0 0 10h3M14 7h2a5 5 0 0 1 0 10h-3"/>',
+    align: '<path d="M4 6h16M4 10h10M4 14h16M4 18h10"/>',
+    justify: '<path d="M4 6h16M4 10h16M4 14h16M4 18h16"/>',
+    list: '<circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/><path d="M8 6h12M8 12h12M8 18h12"/>',
+    sort: '<path d="M7 4v16m-3-3 3 3 3-3M13 6h8M13 11h6M13 16h4"/>',
+    undo: '<path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12"/>',
+    redo: '<path d="m15 14 5-5-5-5M20 9H10a6 6 0 0 0 0 12"/>',
+    comment: '<path d="M4 5h16v12H9l-5 4z"/><path d="M8 9h8M8 13h5"/>',
+    check: '<path d="m4 12 5 5L20 6"/>',
+    page: '<path d="M6 2h9l4 4v16H6zM15 2v5h4"/>',
+    columns: '<rect x="3" y="3" width="18" height="18"/><path d="M12 3v18M6 6h3M6 10h3M15 6h3M15 10h3"/>',
+    ruler: '<path d="M3 7h18v10H3zM7 7v5M11 7v3M15 7v5M19 7v3"/>',
+    search: '<circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/>',
+    lock: '<rect x="5" y="10" width="14" height="11" rx="1"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+    print: '<path d="M6 8V3h12v5M6 17H4V9h16v8h-2"/><rect x="6" y="14" width="12" height="7"/>',
+    save: '<path d="M4 3h14l3 3v15H4zM8 3v6h9V3M8 21v-8h9v8"/>',
+    'export': '<path d="M12 3v12m-4-4 4 4 4-4M5 18v3h14v-3"/>',
+    'import': '<path d="M12 21V9m-4 4 4-4 4 4M5 3v3h14V3"/>',
+    zoom: '<circle cx="10" cy="10" r="6"/><path d="m15 15 6 6M7 10h6"/>',
+    signature: '<path d="M3 18c4-9 5-4 7-2s4-7 7-6 0 5 4 4M3 22h18"/>',
+    fit: '<path d="M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6"/>',
+    'break': '<path d="M6 3h8l4 4v4H6V3zM6 13h12v8H6v-8z"/>',
+    pagenum: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
+    date: '<rect x="4" y="5" width="16" height="15"/><path d="M4 9h16M8 3v4M16 3v4"/>',
+    footnote: '<path d="M4 4h12v14H4z"/><path d="M8 8h4M8 12h4"/><text x="14" y="18" font-size="8" fill="currentColor">1</text>',
+    toc: '<path d="M4 6h8M4 12h8M4 18h8M16 6h4M16 12h4M16 18h4"/>'
+  };
+  function svgIcon(name) {
+    var g = ICONS[name] || ICONS.page;
+    return '<svg viewBox="0 0 24 24" aria-hidden="true">' + g + '</svg>';
   }
-  if (watermarkInput) {
-    watermarkInput.addEventListener('input', applyWatermark);
-    applyWatermark();
+  function makeTool(name, icon, fn, squareText) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ts-ed__tool' + (squareText ? ' ts-ed__tool--square' : '');
+    b.title = name;
+    if (squareText) {
+      b.textContent = squareText;
+    } else {
+      b.innerHTML = svgIcon(icon) + '<span>' + name + '</span>';
+    }
+    b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    b.addEventListener('click', function () { try { fn && fn(b); } catch (e) { console.error(e); } });
+    return b;
   }
-
-  // ---- Ribbon tab switching ----
-  var ribbonTabs = document.querySelectorAll('.ts-ribbon-tab');
-  var ribbonPanels = document.querySelectorAll('[data-ribbon]');
-  ribbonTabs.forEach(function (tab) {
-    tab.addEventListener('click', function () {
-      var key = tab.getAttribute('data-ribbon-tab');
-      ribbonTabs.forEach(function (t) {
-        t.classList.remove('ts-ribbon-tab--active');
-        t.setAttribute('aria-selected', 'false');
-      });
-      tab.classList.add('ts-ribbon-tab--active');
-      tab.setAttribute('aria-selected', 'true');
-      ribbonPanels.forEach(function (p) {
-        if (p.getAttribute('data-ribbon') === key) p.removeAttribute('hidden');
-        else p.setAttribute('hidden', '');
-      });
+  function makeGroup(label, items) {
+    var g = document.createElement('div');
+    g.className = 'ts-ed__grp';
+    items.forEach(function (it) {
+      if (it instanceof HTMLElement) g.appendChild(it);
+      else g.appendChild(makeTool(it.name, it.icon, it.fn, it.square));
     });
-  });
-
-  // ---- Load existing content ----
-  if (tsdId) {
-    stat('Loading encrypted content…', 'saving');
-    fetch('/api/tsd/' + tsdId + '/content', { credentials: 'same-origin' })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(function (data) {
-        editor.innerHTML = (data.content && data.content.html) || '';
-        wordstats();
-        stat('Loaded · v' + data.version + ' · ' + data.plaintext_bytes + ' B plaintext', 'saved');
-      })
-      .catch(function (e) { stat('Load failed: ' + e.message, 'error'); });
-  } else {
-    stat('New draft — not saved yet', 'saving');
+    var lbl = document.createElement('span');
+    lbl.className = 'ts-ed__grp-label';
+    lbl.textContent = label;
+    g.appendChild(lbl);
+    return g;
+  }
+  function makeCombo(values, onChange, extraClass) {
+    var s = document.createElement('select');
+    s.className = 'ts-ed__combo' + (extraClass ? ' ' + extraClass : '');
+    values.forEach(function (v) {
+      var o = document.createElement('option');
+      if (typeof v === 'string') { o.value = v; o.textContent = v; }
+      else { o.value = v.value; o.textContent = v.label; if (v.selected) o.selected = true; }
+      s.appendChild(o);
+    });
+    s.addEventListener('mousedown', function () { editor.focus(); });
+    s.addEventListener('change', function () { onChange(s.value); });
+    return s;
+  }
+  function exec(cmd, value) {
+    editor.focus();
+    document.execCommand(cmd, false, value || null);
+    scheduleSave();
   }
 
-  // ---- Toolbar buttons ----
-  document.querySelectorAll('.ts-editor__btn').forEach(function (btn) {
-    btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
-    btn.addEventListener('click', function () {
-      editor.focus();
-      var cmd = btn.getAttribute('data-cmd');
-      var caseKind = btn.getAttribute('data-case');
-      if (cmd === 'createLink') {
-        var url = window.prompt('Link URL', 'https://');
-        if (url) document.execCommand('createLink', false, url);
-      } else if (caseKind) {
-        applyCase(caseKind);
-      } else if (cmd) {
-        document.execCommand(cmd, false, null);
-      }
-      scheduleSave();
-    });
-  });
-
-  function applyCase(kind) {
+  // Wrap the current selection (or caret word) in a <span> with the chosen
+  // font-size in points, and bump the editor's base size when nothing is
+  // selected so subsequent typing follows the chosen size.
+  function applyFontSize(pt) {
+    editor.focus();
     var sel = window.getSelection();
-    if (!sel.rangeCount) return;
-    var range = sel.getRangeAt(0);
-    var text = sel.toString();
-    if (!text) return;
-    var transformed;
-    if (kind === 'UPPER') transformed = text.toUpperCase();
-    else if (kind === 'lower') transformed = text.toLowerCase();
-    else transformed = text.replace(/\w\S*/g,
-      function (w) { return w[0].toUpperCase() + w.substr(1).toLowerCase(); });
-    range.deleteContents();
-    range.insertNode(document.createTextNode(transformed));
-    sel.removeAllRanges();
-  }
-  document.querySelectorAll('.ts-editor__select[data-cmd], .ts-editor__color input[data-cmd]').forEach(function (el) {
-    el.addEventListener('mousedown', function () { editor.focus(); });
-    el.addEventListener('change', function () {
-      editor.focus();
-      document.execCommand(el.getAttribute('data-cmd'), false, el.value);
+    if (!sel.rangeCount || sel.isCollapsed) {
+      editor.style.fontSize = pt + 'pt';
       scheduleSave();
-    });
-  });
-  var blockSelect = document.querySelector('[data-block-select]');
-  if (blockSelect) {
-    blockSelect.addEventListener('mousedown', function () { editor.focus(); });
-    blockSelect.addEventListener('change', function () {
-      editor.focus();
-      document.execCommand('formatBlock', false, blockSelect.value);
-      scheduleSave();
-    });
-  }
-
-  // ---- Autosave ----
-  var saveTimer = null;
-  function scheduleSave() {
-    wordstats();
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(save, 900);
-  }
-  editor.addEventListener('input', scheduleSave);
-  titleInput.addEventListener('input', scheduleSave);
-  if (tagsInput)   tagsInput.addEventListener('input', scheduleSave);
-  if (exportSelect) exportSelect.addEventListener('change', scheduleSave);
-  if (statusSelect) statusSelect.addEventListener('change', scheduleSave);
-
-  function save() {
-    var title = (titleInput.value || '').trim();
-    if (!title) {
-      stat('Title required before autosave', 'error');
       return;
     }
-    stat('Encrypting & saving…', 'saving');
-    var payload = {
-      title: title,
-      tags: (tagsInput && tagsInput.value) || '',
-      export_policy: (exportSelect && exportSelect.value) || 'pdf_allowed',
-      content_html: editor.innerHTML || '',
+    // Use a sentinel size (7) then rewrite the generated <font> wrapper
+    // into a semantic <span style="font-size:Xpt"> — execCommand's
+    // numeric sizes are too coarse to cover 8–72 pt directly.
+    document.execCommand('fontSize', false, '7');
+    editor.querySelectorAll('font[size="7"]').forEach(function (f) {
+      var s = document.createElement('span');
+      s.style.fontSize = pt + 'pt';
+      while (f.firstChild) s.appendChild(f.firstChild);
+      f.parentNode.replaceChild(s, f);
+    });
+    scheduleSave();
+  }
+
+  // Semantic paragraph presets. Browser-native block tags cover H1–H6/P/
+  // BLOCKQUOTE/PRE; the extended semantic classes (lead, caption, clause,
+  // small) format via the page-scoped CSS below so re-opening the TSD
+  // renders the same styling.
+  function applyParagraphStyle(value) {
+    editor.focus();
+    var customClassMap = {
+      LEAD:    { tag: 'P', cls: 'ts-para--lead' },
+      CAPTION: { tag: 'P', cls: 'ts-para--caption' },
+      CLAUSE:  { tag: 'P', cls: 'ts-para--clause' },
+      SMALL:   { tag: 'P', cls: 'ts-para--small' },
     };
-    if (statusSelect) payload.status = statusSelect.value;
-
-    var url = tsdId ? '/api/tsd/' + tsdId : '/api/tsd/';
-    var method = tsdId ? 'PUT' : 'POST';
-    fetch(url, { method: method, credentials: 'same-origin', headers: headers(), body: JSON.stringify(payload) })
-      .then(function (r) {
-        if (r.status === 412) throw new Error('Someone else just saved a newer version. Reload to merge.');
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      })
-      .then(function (data) {
-        tsdId = data.id;
-        version = data.version;
-        if (!shell.dataset.tsdId) {
-          shell.dataset.tsdId = tsdId;
-          history.replaceState({}, '', '/documents/library/' + tsdId);
+    var map = customClassMap[value];
+    if (map) {
+      document.execCommand('formatBlock', false, map.tag);
+      // Apply the class to the enclosing block.
+      var sel = window.getSelection();
+      if (sel.rangeCount) {
+        var node = sel.getRangeAt(0).startContainer;
+        while (node && node !== editor && !/^(P|DIV|LI|H[1-6])$/.test(node.nodeName)) node = node.parentNode;
+        if (node && node !== editor) {
+          // Drop any other preset class, then add the chosen one.
+          node.classList.remove('ts-para--lead', 'ts-para--caption', 'ts-para--clause', 'ts-para--small');
+          node.classList.add(map.cls);
         }
-        stat('Saved · v' + data.version + ' · ciphertext ' + data.ciphertext_sha256.substring(0,12) + '…', 'saved');
-      })
-      .catch(function (e) { stat('Save failed: ' + e.message, 'error'); });
-  }
-  wordstats();
-
-  // ============================================================ History
-  var historyBtn   = document.getElementById('tsd-history-btn');
-  var historyPanel = document.getElementById('tsd-history-panel');
-  var historyClose = document.getElementById('tsd-history-close');
-  var historyBody  = document.getElementById('tsd-history-body');
-
-  function renderHistory(items) {
-    if (!items || !items.length) {
-      historyBody.innerHTML = '<p class="ts-panel__meta" style="padding: var(--ts-space-4);">No prior versions yet. Autosave creates one on every content change.</p>';
-      return;
+      }
+    } else {
+      document.execCommand('formatBlock', false, value);
+      // When switching to a stock block, strip preset classes.
+      var sel2 = window.getSelection();
+      if (sel2.rangeCount) {
+        var n2 = sel2.getRangeAt(0).startContainer;
+        while (n2 && n2 !== editor && !/^(P|DIV|LI|H[1-6])$/.test(n2.nodeName)) n2 = n2.parentNode;
+        if (n2 && n2.classList) n2.classList.remove('ts-para--lead', 'ts-para--caption', 'ts-para--clause', 'ts-para--small');
+      }
     }
-    historyBody.innerHTML = items.map(function (v) {
-      return (
-        '<div class="ts-history-row" data-version="' + v.version + '">' +
-        '  <div class="ts-history-row__head">' +
-        '    <span class="ts-history-row__version">v' + v.version + '</span>' +
-        '    <span class="ts-history-row__meta">' + (v.created_at || '—').replace('T', ' ').substring(0, 16) + '</span>' +
-        '  </div>' +
-        '  <div class="ts-history-row__meta">' +
-        '    ' + v.plaintext_bytes + ' B · ciphertext ' + (v.ciphertext_sha256 || '').substring(0, 12) + '…' +
-        (v.change_note ? ' · ' + v.change_note : '') +
-        '  </div>' +
-        '  <div class="ts-history-row__actions">' +
-        '    <button type="button" class="ts-btn ts-btn--text ts-btn--sm" data-preview="' + v.version + '">Preview</button>' +
-        '    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-restore="' + v.version + '">Restore</button>' +
-        '  </div>' +
-        '</div>'
-      );
-    }).join('');
+    scheduleSave();
+    rebuildOutline();
+  }
 
-    historyBody.querySelectorAll('[data-preview]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var v = btn.getAttribute('data-preview');
-        fetch('/api/tsd/' + tsdId + '/versions/' + v + '/content', { credentials: 'same-origin' })
-          .then(function (r) { return r.json(); })
-          .then(function (data) {
-            var html = (data.content && data.content.html) || '';
-            var w = window.open('', '_blank', 'width=720,height=900');
-            w.document.write('<html><head><title>v' + v + '</title><style>body{font:14px Arial;padding:40px;max-width:720px;margin:auto}</style></head><body>' + html + '</body></html>');
-            w.document.close();
-          });
-      });
+  // --- Ribbon tab layouts ---
+  function tabHome() {
+    // Comprehensive font stack — 20 families grouped by category.
+    // Each option's label carries a title attribute hint so operators
+    // know the semantic category at a glance.
+    var fontCombo = makeCombo([
+      { value: 'Inter, system-ui, sans-serif',                       label: 'Inter — Modern sans' },
+      { value: 'Arial, Helvetica, sans-serif',                       label: 'Arial — Standard sans' },
+      { value: '"Helvetica Neue", Helvetica, sans-serif',            label: 'Helvetica Neue' },
+      { value: 'Calibri, Carlito, sans-serif',                       label: 'Calibri — Office sans' },
+      { value: 'Verdana, sans-serif',                                label: 'Verdana — Legible sans' },
+      { value: 'Tahoma, Geneva, sans-serif',                         label: 'Tahoma' },
+      { value: '"Trebuchet MS", sans-serif',                         label: 'Trebuchet MS' },
+      { value: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif', label: 'System UI (native)' },
+      { value: 'Georgia, "Times New Roman", serif',                  label: 'Georgia — Elegant serif' },
+      { value: '"Times New Roman", Times, serif',                    label: 'Times New Roman — Classic serif' },
+      { value: '"Palatino Linotype", "Book Antiqua", Palatino, serif', label: 'Palatino — Editorial serif' },
+      { value: '"Cambria", Georgia, serif',                          label: 'Cambria — Legal serif' },
+      { value: '"Garamond", "EB Garamond", serif',                   label: 'Garamond — Literary serif' },
+      { value: '"Bookman Old Style", serif',                         label: 'Bookman — Report serif' },
+      { value: 'Consolas, "Courier New", monospace',                 label: 'Consolas — Code' },
+      { value: '"Courier New", Courier, monospace',                  label: 'Courier New — Typewriter' },
+      { value: '"Comic Sans MS", cursive',                           label: 'Comic Sans — Casual' },
+      { value: '"Brush Script MT", cursive',                         label: 'Brush Script — Handwritten' },
+      { value: 'Impact, Haettenschweiler, sans-serif',               label: 'Impact — Display' },
+      { value: '"Arial Narrow", sans-serif',                         label: 'Arial Narrow — Condensed' },
+    ], function (v) { exec('fontName', v); });
+
+    // Font-size options align with the real pt values we apply via inline CSS
+    // so operators see the actual point size, not the opaque execCommand 1–7.
+    var sizeCombo = makeCombo([
+      '8', '9', '10', '11', '12', '13', '14', '16', '18',
+      '20', '22', '24', '28', '32', '36', '42', '48', '56', '72',
+    ], function (v) { applyFontSize(v); }, 'ts-ed__combo--sm');
+    sizeCombo.value = '12';
+
+    // Paragraph-style preset dropdown — Title, Heading 1–4, Normal, Quote,
+    // Code, Caption, Small, Lead paragraph, Legal clause.
+    var styleCombo = makeCombo([
+      { value: 'P',          label: 'Normal' },
+      { value: 'LEAD',       label: 'Lead paragraph' },
+      { value: 'H1',         label: 'Title' },
+      { value: 'H2',         label: 'Heading 1' },
+      { value: 'H3',         label: 'Heading 2' },
+      { value: 'H4',         label: 'Heading 3' },
+      { value: 'H5',         label: 'Heading 4' },
+      { value: 'BLOCKQUOTE', label: 'Quote' },
+      { value: 'PRE',        label: 'Code block' },
+      { value: 'CAPTION',    label: 'Caption' },
+      { value: 'CLAUSE',     label: 'Legal clause' },
+      { value: 'SMALL',      label: 'Small print' },
+    ], function (v) { applyParagraphStyle(v); });
+
+    var fontGroup = document.createElement('div');
+    fontGroup.className = 'ts-ed__grp';
+    var stack = document.createElement('div'); stack.className = 'ts-ed__stack';
+    var r1 = document.createElement('div'); r1.className = 'ts-ed__tools2';
+    r1.append(fontCombo, sizeCombo); stack.appendChild(r1);
+    var r2 = document.createElement('div'); r2.className = 'ts-ed__tools2';
+    r2.appendChild(makeTool('Bold',      '', function () { exec('bold'); },      'B'));
+    r2.appendChild(makeTool('Italic',    '', function () { exec('italic'); },    'I'));
+    r2.appendChild(makeTool('Underline', '', function () { exec('underline'); }, 'U'));
+    r2.appendChild(makeTool('Strike',    '', function () { exec('strikeThrough'); }, 'S'));
+    var color = document.createElement('input');
+    color.type = 'color'; color.value = '#121a26';
+    color.title = 'Text color';
+    color.style.cssText = 'width:23px;height:23px;border:1px solid #d6e0e8;padding:1px;background:white;cursor:pointer';
+    color.addEventListener('input', function () { exec('foreColor', color.value); });
+    r2.appendChild(color);
+    stack.appendChild(r2);
+    fontGroup.appendChild(stack);
+    var lbl = document.createElement('span'); lbl.className = 'ts-ed__grp-label'; lbl.textContent = 'Font';
+    fontGroup.appendChild(lbl);
+
+    return [
+      makeGroup('Clipboard', [
+        { name: 'Paste', icon: 'paste', fn: function () { showToast('Use ⌘/Ctrl+V to paste.'); } },
+        { name: 'Copy',  icon: 'copy',  fn: function () { document.execCommand('copy'); } },
+        { name: 'Cut',   icon: 'cut',   fn: function () { document.execCommand('cut'); scheduleSave(); } },
+      ]),
+      fontGroup,
+      makeGroup('Paragraph', [
+        { name: 'Bullets',    icon: 'list',     fn: function () { exec('insertUnorderedList'); } },
+        { name: 'Numbering',  icon: 'sort',     fn: function () { exec('insertOrderedList'); } },
+        { name: 'Align left', icon: 'align',    fn: function () { exec('justifyLeft'); } },
+        { name: 'Center',     icon: 'align',    fn: function () { exec('justifyCenter'); } },
+        { name: 'Justify',    icon: 'justify',  fn: function () { exec('justifyFull'); } },
+      ]),
+      makeGroup('Styles', [styleCombo]),
+      makeGroup('Editing', [
+        { name: 'Find',    icon: 'search', fn: openFind },
+        { name: 'Undo',    icon: 'undo',   fn: function () { exec('undo'); } },
+        { name: 'Redo',    icon: 'redo',   fn: function () { exec('redo'); } },
+      ]),
+    ];
+  }
+  function tabFile() {
+    return [
+      makeGroup('Document', [
+        { name: 'Save',    icon: 'save',    fn: save },
+        { name: 'Print',   icon: 'print',   fn: function () { window.print(); } },
+        { name: 'Export',  icon: 'export',  fn: function () { showPdfDialog(); } },
+        { name: 'Import',  icon: 'import',  fn: function () { showToast('Import a file via Documents library → Import file.'); } },
+      ]),
+      makeGroup('History', [
+        { name: 'Versions', icon: 'page', fn: openHistory },
+      ]),
+      makeGroup('Share', [
+        { name: 'Share…',   icon: 'link', fn: function () { showToast('Sharing routes through the TrustSeal document-shares API.'); } },
+        { name: 'Download .tsd', icon: 'save', fn: function () { if (tsdId) window.location = '/api/tsd/' + tsdId + '/download'; } },
+      ]),
+    ];
+  }
+  function tabInsert() {
+    return [
+      makeGroup('Content', [
+        { name: 'Table',     icon: 'table',     fn: insertTable },
+        { name: 'Image',     icon: 'image',     fn: insertImage },
+        { name: 'Link',      icon: 'link',      fn: function () { var u = prompt('Link URL', 'https://'); if (u) exec('createLink', u); } },
+      ]),
+      makeGroup('Pages', [
+        { name: 'Page break', icon: 'break',  fn: function () { insertHTML('<div style="page-break-after: always; border-top: 1px dashed #c7ced6; margin: 18pt 0;"></div>'); } },
+        { name: 'Divider',    icon: 'ruler',  fn: function () { insertHTML('<hr style="border:0; border-top:1px solid #c7ced6; margin:12pt 0;">'); } },
+        { name: 'Page number',icon: 'pagenum',fn: function () { insertHTML('<span style="color:#5a6676">[Page #]</span>'); } },
+      ]),
+      makeGroup('Structure', [
+        { name: 'Date',       icon: 'date',     fn: function () { insertHTML(new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' })); } },
+        { name: 'Footnote',   icon: 'footnote', fn: function () { showToast('Footnotes are tracked in the References tab.'); } },
+      ]),
+      makeGroup('Trust', [
+        { name: 'Signature',  icon: 'signature', fn: insertSignature },
+        { name: 'Stamp field',icon: 'lock',      fn: function () { insertHTML('<span style="background:#eef3fa;color:#0f3b82;border:1px solid #cfdcef;padding:1px 6px;border-radius:3px;font-family:monospace;font-size:10pt;">[STAMP]</span>'); } },
+        { name: 'Field',      icon: 'page',      fn: insertFieldVar },
+      ]),
+    ];
+  }
+  function tabLayout() {
+    var sizeCombo = makeCombo([
+      { value: 'a4',     label: 'A4 (210 × 297 mm)',   selected: true },
+      { value: 'letter', label: 'Letter (8.5 × 11 in)' },
+      { value: 'legal',  label: 'Legal (8.5 × 14 in)' },
+    ], function (v) { pageSize = v; applyPageSize(); });
+
+    var orient = makeCombo([
+      { value: 'portrait',  label: 'Portrait', selected: true },
+      { value: 'landscape', label: 'Landscape' },
+    ], function (v) { pageOrient = v; applyPageSize(); }, 'ts-ed__combo--sm');
+
+    var margins = makeCombo([
+      { value: '1',   label: 'Narrow (1 cm)' },
+      { value: '2',   label: 'Normal (2 cm)', selected: true },
+      { value: '2.5', label: 'Moderate (2.5 cm)' },
+      { value: '3.5', label: 'Wide (3.5 cm)' },
+    ], function (v) { pageMargin = parseFloat(v); applyMargins(); });
+
+    return [
+      makeGroup('Page setup', [sizeCombo, orient, margins]),
+      makeGroup('Paragraph', [
+        { name: 'Indent +', icon: 'align', fn: function () { exec('indent'); } },
+        { name: 'Indent −', icon: 'align', fn: function () { exec('outdent'); } },
+      ]),
+      makeGroup('Arrange', [
+        { name: 'Columns',  icon: 'columns', fn: function () { showToast('Multi-column layout coming in next phase.'); } },
+      ]),
+    ];
+  }
+  function tabReferences() {
+    return [
+      makeGroup('Contents', [
+        { name: 'TOC', icon: 'toc', fn: insertTOC },
+      ]),
+      makeGroup('Notes', [
+        { name: 'Footnote', icon: 'footnote', fn: function () { showToast('Footnotes tracked in an upcoming phase.'); } },
+      ]),
+      makeGroup('Citations', [
+        { name: 'Citation', icon: 'link', fn: function () { showToast('Citations tracked in an upcoming phase.'); } },
+        { name: 'Caption',  icon: 'page', fn: function () { showToast('Captions tracked in an upcoming phase.'); } },
+      ]),
+    ];
+  }
+  function tabReview() {
+    return [
+      makeGroup('Comments', [
+        { name: 'Comment',  icon: 'comment', fn: insertComment },
+      ]),
+      makeGroup('Changes', [
+        { name: 'Track',    icon: 'page', fn: function () { showToast('Track-changes ships with suggestions mode.'); } },
+        { name: 'Compare',  icon: 'copy', fn: openHistory },
+      ]),
+      makeGroup('Approvals', [
+        { name: 'Request review', icon: 'check', fn: function () { showToast('Review routing wires to the workflow engine.'); } },
+        { name: 'Lock version',   icon: 'lock',  fn: function () { showToast('Lock a version to prepare it for signature.'); } },
+      ]),
+    ];
+  }
+  function tabView() {
+    return [
+      makeGroup('Show', [
+        { name: 'Rulers',      icon: 'ruler', fn: function () {
+            var el = document.getElementById('tsd-rulers-toggle');
+            el.checked = !el.checked; el.dispatchEvent(new Event('change'));
+          } },
+        { name: 'Guides',      icon: 'fit', fn: function () {
+            var el = document.getElementById('tsd-guides-toggle');
+            el.checked = !el.checked; el.dispatchEvent(new Event('change'));
+          } },
+        { name: 'Watermark',   icon: 'fit', fn: function () { page.classList.toggle('ts-is-nowm'); } },
+        { name: 'Outline',     icon: 'list', fn: function () { document.getElementById('tsd-workspace').classList.toggle('ts-ed__workspace--no-outline'); } },
+      ]),
+      makeGroup('View', [
+        { name: 'Print layout', icon: 'page', fn: function () { /* already default */ } },
+        { name: 'Full screen',  icon: 'fit',  fn: function () {
+            if (!document.fullscreenElement) (shell.requestFullscreen || shell.webkitRequestFullscreen || function () {}).call(shell);
+            else (document.exitFullscreen || document.webkitExitFullscreen || function () {}).call(document);
+          } },
+      ]),
+      makeGroup('Zoom', [
+        { name: 'Fit width', icon: 'fit',  fn: function () { fitZoomToWidth(); } },
+        { name: 'Zoom −',    icon: 'zoom', fn: function () { setZoom(Math.max(0.6, zoom - 0.1)); } },
+        { name: '100%',      icon: 'zoom', fn: function () { setZoom(1); } },
+        { name: 'Zoom +',    icon: 'zoom', fn: function () { setZoom(Math.min(2, zoom + 0.1)); } },
+      ]),
+    ];
+  }
+  function tabSecurity() {
+    return [
+      makeGroup('Protection', [
+        { name: 'Classification', icon: 'lock', fn: openSecurity },
+        { name: 'Protect edit',   icon: 'lock', fn: toggleLock },
+        { name: 'Privacy',        icon: 'fit',  fn: togglePrivacy },
+      ]),
+      makeGroup('Access', [
+        { name: 'Permissions', icon: 'check',     fn: function () { openSecurity(); showToast('Backend enforces tenant-scoped RBAC/ABAC per document.'); } },
+        { name: 'Audit',       icon: 'page',      fn: function () { openSecurity(); showToast('All TSD mutations append SecurityEvents to the chained-hash log.'); } },
+        { name: 'Integrity',   icon: 'signature', fn: function () { openSecurity(); showToast('SHA-256 ciphertext fingerprint recorded with every save.'); } },
+      ]),
+      makeGroup('Export', [
+        { name: 'Export PDF', icon: 'export', fn: showPdfDialog },
+      ]),
+    ];
+  }
+
+  var TAB_LAYOUTS = {
+    file: tabFile, home: tabHome, insert: tabInsert, layout: tabLayout,
+    references: tabReferences, review: tabReview, view: tabView, security: tabSecurity
+  };
+
+  function renderRibbon(tab) {
+    ribbon.innerHTML = '';
+    var fn = TAB_LAYOUTS[tab] || tabHome;
+    var groups = fn();
+    groups.forEach(function (g) { ribbon.appendChild(g); });
+    document.querySelectorAll('.ts-ed__tab').forEach(function (t) {
+      var on = t.getAttribute('data-ribbon-tab') === tab;
+      t.classList.toggle('ts-is-active', on);
+      t.setAttribute('aria-selected', String(on));
     });
-
-    historyBody.querySelectorAll('[data-restore]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var v = btn.getAttribute('data-restore');
-        if (!window.confirm('Restore v' + v + ' as current? Current content will be snapshotted so you can undo.')) return;
-        fetch('/api/tsd/' + tsdId + '/versions/' + v + '/restore', {
-          method: 'POST', credentials: 'same-origin',
-          headers: { 'X-Requested-With': 'fetch' },
-        }).then(function (r) {
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.json();
-        }).then(function (data) {
-          version = data.version;
-          return fetch('/api/tsd/' + tsdId + '/content', { credentials: 'same-origin' })
-            .then(function (r2) { return r2.json(); })
-            .then(function (c) {
-              editor.innerHTML = (c.content && c.content.html) || '';
-              wordstats();
-              stat('Restored v' + v + ' as v' + data.version, 'saved');
-              loadHistory();
-            });
-        }).catch(function (e) { stat('Restore failed: ' + e.message, 'error'); });
-      });
-    });
   }
+  document.querySelectorAll('.ts-ed__tab').forEach(function (t) {
+    t.addEventListener('click', function () { renderRibbon(t.getAttribute('data-ribbon-tab')); });
+  });
+  renderRibbon('home');
 
-  function loadHistory() {
-    if (!tsdId) return;
-    historyBody.innerHTML = '<p class="ts-panel__meta" style="padding: var(--ts-space-4);">Loading…</p>';
-    fetch('/api/tsd/' + tsdId + '/versions', { credentials: 'same-origin' })
-      .then(function (r) { return r.json(); })
-      .then(renderHistory)
-      .catch(function (e) {
-        historyBody.innerHTML = '<p class="ts-panel__meta" style="padding: var(--ts-space-4); color: var(--ts-danger);">Failed: ' + e.message + '</p>';
-      });
-  }
-
-  if (historyBtn) {
-    historyBtn.addEventListener('click', function () {
-      historyPanel.removeAttribute('hidden'); loadHistory();
-    });
-  }
-  if (historyClose) {
-    historyClose.addEventListener('click', function () { historyPanel.setAttribute('hidden', ''); });
-  }
-
-  // ============================================================ Insert tab
+  // ===================================================================== INSERT HELPERS
   function insertHTML(html) {
     editor.focus();
     document.execCommand('insertHTML', false, html);
     scheduleSave();
   }
-
-  var insTable = document.getElementById('tsd-ins-table');
-  if (insTable) insTable.addEventListener('click', function () {
-    var rows = parseInt(window.prompt('Rows', '3'), 10);
-    var cols = parseInt(window.prompt('Columns', '3'), 10);
+  function insertTable() {
+    var rows = parseInt(prompt('Rows', '3'), 10);
+    var cols = parseInt(prompt('Columns', '3'), 10);
     if (!(rows > 0 && cols > 0 && rows <= 50 && cols <= 20)) return;
-    var html = '<table style="border-collapse: collapse; width: 100%; margin: 12pt 0;">';
+    var h = '<table style="border-collapse:collapse;width:100%;margin:12pt 0;">';
     for (var r = 0; r < rows; r++) {
-      html += '<tr>';
+      h += '<tr>';
       for (var c = 0; c < cols; c++) {
         var tag = r === 0 ? 'th' : 'td';
-        html += '<' + tag + ' style="border: 1px solid #c7ced6; padding: 6pt 8pt; text-align: left;">&nbsp;</' + tag + '>';
+        h += '<' + tag + ' style="border:1px solid #c7ced6;padding:6pt 8pt;text-align:left;">&nbsp;</' + tag + '>';
       }
-      html += '</tr>';
+      h += '</tr>';
     }
-    html += '</table><p>&nbsp;</p>';
-    insertHTML(html);
-  });
-
-  var insImgBtn = document.getElementById('tsd-ins-image');
-  var insImgInput = document.getElementById('tsd-ins-image-input');
-  if (insImgBtn && insImgInput) {
-    insImgBtn.addEventListener('click', function () { insImgInput.click(); });
-    insImgInput.addEventListener('change', function () {
-      var f = insImgInput.files && insImgInput.files[0];
-      if (!f) return;
-      if (f.size > 4 * 1024 * 1024) {
-        alert('Image too large (max 4 MB). Upload bigger images via the Documents library import.');
-        return;
-      }
-      var reader = new FileReader();
-      reader.onload = function () {
-        insertHTML('<img src="' + reader.result + '" alt="' + (f.name || 'image') + '" style="max-width: 100%; height: auto; margin: 6pt 0;">');
-      };
-      reader.readAsDataURL(f);
-      insImgInput.value = '';
-    });
+    h += '</table><p>&nbsp;</p>';
+    insertHTML(h);
   }
-
-  var insHr = document.getElementById('tsd-ins-hr');
-  if (insHr) insHr.addEventListener('click', function () {
-    insertHTML('<hr style="border: 0; border-top: 1px solid #c7ced6; margin: 12pt 0;">');
-  });
-
-  var insPb = document.getElementById('tsd-ins-pagebreak');
-  if (insPb) insPb.addEventListener('click', function () {
-    insertHTML('<div style="page-break-after: always; border-top: 1px dashed #c7ced6; margin: 18pt 0; padding-top: 6pt; color: #7a8494; font-size: 9pt; text-align: center;">— Page break —</div>');
-  });
-
-  var insDate = document.getElementById('tsd-ins-date');
-  if (insDate) insDate.addEventListener('click', function () {
-    var d = new Date();
-    var m = ['January','February','March','April','May','June','July','August','September','October','November','December'][d.getMonth()];
-    insertHTML(m + ' ' + d.getDate() + ', ' + d.getFullYear());
-  });
-
-  var insSig = document.getElementById('tsd-ins-signature');
-  if (insSig) insSig.addEventListener('click', function () {
-    var name = window.prompt('Signer name (or label)', 'Signer');
+  function insertImage() {
+    var inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*';
+    inp.addEventListener('change', function () {
+      var f = inp.files && inp.files[0]; if (!f) return;
+      if (f.size > 4 * 1024 * 1024) { alert('Image too large (max 4 MB).'); return; }
+      var reader = new FileReader();
+      reader.onload = function () { insertHTML('<img src="' + reader.result + '" alt="' + (f.name || 'image') + '" style="max-width:100%;margin:6pt 0;">'); };
+      reader.readAsDataURL(f);
+    });
+    inp.click();
+  }
+  function insertSignature() {
+    var name = prompt('Signer name or label', 'Signer');
     if (name === null) return;
     insertHTML(
-      '<div style="margin: 24pt 0 6pt; display: inline-block;">' +
-      '<div style="border-bottom: 1px solid #121a26; width: 240pt; height: 36pt;"></div>' +
-      '<div style="font-size: 9pt; color: #5a6676;">' + (name || 'Signer') + ' · signature</div>' +
+      '<div style="margin:24pt 0 6pt;display:inline-block;">' +
+      '<div style="border-bottom:1px solid #121a26;width:240pt;height:36pt;"></div>' +
+      '<div style="font-size:9pt;color:#5a6676;">' + (name || 'Signer') + ' · signature</div>' +
       '</div>'
     );
-  });
+  }
+  function insertFieldVar() {
+    var n = prompt('Variable name', 'client_name'); if (!n) return;
+    var safe = String(n).replace(/[^\w]/g, '_');
+    insertHTML('<span style="background:#eef3fa;color:#0f3b82;border:1px solid #cfdcef;padding:1px 6px;border-radius:3px;font-family:monospace;font-size:10pt;">{' + '{' + safe + '}' + '}</span>');
+  }
+  function insertComment() {
+    var sel = window.getSelection(); if (!sel.rangeCount || sel.isCollapsed) { showToast('Select text to comment on first.'); return; }
+    var note = prompt('Comment'); if (!note) return;
+    insertHTML('<span style="background:#fff3b0;border-bottom:2px dotted #835a0c;" title="' + note.replace(/"/g,'&quot;') + '">' + sel.toString() + '</span>');
+  }
+  function insertTOC() {
+    var h = editor.querySelectorAll('h1, h2, h3');
+    if (!h.length) { showToast('Add headings first — TOC builds from H1–H3.'); return; }
+    var items = []; h.forEach(function (el) {
+      items.push('<li style="margin-left:' + ((parseInt(el.tagName[1], 10) - 1) * 16) + 'pt">' + (el.innerText || '').trim() + '</li>');
+    });
+    insertHTML('<div style="border:1px solid #c7ced6;padding:10pt 14pt;margin:12pt 0;background:#fafbfc"><strong>Table of contents</strong><ol style="margin:6pt 0 0 20pt;">' + items.join('') + '</ol></div>');
+  }
 
-  var insField = document.getElementById('tsd-ins-field');
-  if (insField) insField.addEventListener('click', function () {
-    var name = window.prompt('Variable name (letters, digits, underscore)', 'client_name');
-    if (!name) return;
-    var safe = String(name).replace(/[^\w]/g, '_');
-    insertHTML('<span style="background: #eef3fa; color: #0f3b82; border: 1px solid #cfdcef; padding: 1px 6px; border-radius: 3px; font-family: monospace; font-size: 10pt;">{{' + safe + '}}</span>');
-  });
-
-  // ============================================================ Layout tab
+  // ===================================================================== PAGE LAYOUT
   function applyPageSize() {
-    var size = (document.getElementById('tsd-page-size') || {}).value || 'letter';
-    var orient = (document.getElementById('tsd-page-orient') || {}).value || 'portrait';
-    page.classList.remove('ts-page--letter','ts-page--a4','ts-page--legal','ts-page--landscape');
-    page.classList.add('ts-page--' + size);
-    if (orient === 'landscape') page.classList.add('ts-page--landscape');
+    page.className = 'ts-ed__page ts-ed__page--' + pageSize + (pageOrient === 'landscape' ? ' ts-ed__page--landscape' : '');
+    updateBadge();
+    drawRulers();
   }
   function applyMargins() {
-    var m = (document.getElementById('tsd-page-margin') || {}).value || 'normal';
-    page.classList.remove('ts-page--m-normal','ts-page--m-narrow','ts-page--m-wide','ts-page--m-moderate');
-    page.classList.add('ts-page--m-' + m);
+    var px = Math.round(pageMargin * 37.8);     // 1 cm = 37.8 px at 96dpi
+    var py = Math.round(pageMarginY * 37.8);
+    shell.style.setProperty('--ed-margx', px + 'px');
+    shell.style.setProperty('--ed-margy', py + 'px');
+    updateBadge();
+    drawRulers();
   }
-  function applyLineSpacing() {
-    var s = (document.getElementById('tsd-line-spacing') || {}).value || '1.6';
-    page.style.lineHeight = s;
+  function updateBadge() {
+    var sz = pageSize.toUpperCase().replace('A4', 'A4').replace('LETTER', 'Letter').replace('LEGAL', 'Legal');
+    var or = pageOrient.charAt(0).toUpperCase() + pageOrient.slice(1);
+    var u = unit === 'cm' ? ' cm' : ' in';
+    var m = unit === 'cm' ? pageMargin.toFixed(1).replace(/\.0$/, '') : (pageMargin / 2.54).toFixed(2);
+    badge.textContent = sz + ' · ' + or + ' · Margins: ' + m + u;
   }
-  var pageSize   = document.getElementById('tsd-page-size');
-  var pageOrient = document.getElementById('tsd-page-orient');
-  var pageMargin = document.getElementById('tsd-page-margin');
-  var lineSpc    = document.getElementById('tsd-line-spacing');
-  if (pageSize)   pageSize.addEventListener('change', applyPageSize);
-  if (pageOrient) pageOrient.addEventListener('change', applyPageSize);
-  if (pageMargin) pageMargin.addEventListener('change', applyMargins);
-  if (lineSpc)    lineSpc.addEventListener('change', applyLineSpacing);
-  applyPageSize(); applyMargins(); applyLineSpacing();
 
-  // ============================================================ View tab
-  var canvas = document.getElementById('tsd-canvas');
-  var zoomSel = document.getElementById('tsd-zoom');
-  function applyZoom(scale) {
-    page.style.transformOrigin = 'top center';
-    page.style.transform = scale === 1 ? '' : 'scale(' + scale + ')';
-    // When zoomed, the canvas grows to avoid clipped content.
-    if (scale !== 1) {
-      page.style.marginBottom = ((scale - 1) * 1056) + 'px';
-    } else {
-      page.style.marginBottom = '';
+  // ===================================================================== RULERS
+  function drawRulers() {
+    hruler.innerHTML = ''; vruler.innerHTML = '';
+    var rect = page.getBoundingClientRect();
+    var w = rect.width, h = rect.height;
+    if (w === 0 || h === 0) return;
+    var mPx = parseFloat(getComputedStyle(shell).getPropertyValue('--ed-margx')) || 76;
+    var myPx = parseFloat(getComputedStyle(shell).getPropertyValue('--ed-margy')) || 94;
+
+    var hs = document.createElementNS(NS, 'svg');
+    hs.setAttribute('viewBox', '0 0 ' + w + ' 18');
+    hs.setAttribute('preserveAspectRatio', 'none');
+    hruler.appendChild(hs);
+
+    var vs = document.createElementNS(NS, 'svg');
+    vs.setAttribute('viewBox', '0 0 18 ' + h);
+    vs.setAttribute('preserveAspectRatio', 'none');
+    vruler.appendChild(vs);
+
+    function el(parent, type, attrs, text) {
+      var n = document.createElementNS(NS, type);
+      Object.keys(attrs).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+      if (text !== undefined) n.textContent = text;
+      parent.appendChild(n);
+      return n;
     }
-  }
-  if (zoomSel) zoomSel.addEventListener('change', function () { applyZoom(parseFloat(zoomSel.value)); });
-  document.querySelectorAll('[data-zoom-reset]').forEach(function (b) {
-    b.addEventListener('click', function () { if (zoomSel) zoomSel.value = '1'; applyZoom(1); });
-  });
-  document.querySelectorAll('[data-zoom-fit]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      var pad = 80; // 2× canvas side padding
-      var scale = Math.max(0.5, Math.min(2, (canvas.clientWidth - pad) / 816));
-      scale = Math.round(scale * 100) / 100;
-      if (zoomSel) {
-        var opt = [0.5, 0.75, 0.9, 1, 1.25, 1.5, 2].reduce(function (best, v) {
-          return Math.abs(v - scale) < Math.abs(best - scale) ? v : best;
-        });
-        zoomSel.value = String(opt);
-        scale = opt;
+
+    el(hs, 'rect', { x: 0, y: 0, width: mPx, height: 18, fill: '#e4eaf0' });
+    el(hs, 'rect', { x: w - mPx, y: 0, width: mPx, height: 18, fill: '#e4eaf0' });
+    el(vs, 'rect', { x: 0, y: 0, width: 18, height: myPx, fill: '#e4eaf0' });
+    el(vs, 'rect', { x: 0, y: h - myPx, width: 18, height: myPx, fill: '#e4eaf0' });
+
+    var horCountCm  = unit === 'cm' ? (w / 37.8) : (w / 96);
+    var vertCountCm = unit === 'cm' ? (h / 37.8) : (h / 96);
+    var step = unit === 'cm' ? 0.25 : 0.125;
+
+    for (var n = 0; n <= horCountCm + 1e-7; n += step) {
+      var x = (n / horCountCm) * w;
+      var major = Math.abs(n - Math.round(n)) < 0.01;
+      var half  = Math.abs(n * 2 - Math.round(n * 2)) < 0.01;
+      var len = major ? 7 : half ? 5 : 3;
+      el(hs, 'line', { x1: x, y1: 18 - len, x2: x, y2: 18, stroke: major ? '#667889' : '#9daab6', 'stroke-width': major ? 0.9 : 0.6 });
+      if (major && n > 0 && n < horCountCm) {
+        el(hs, 'text', { x: x, y: 7, 'text-anchor': 'middle', 'font-size': 7, fill: '#667889', 'font-family': 'Arial' }, String(Math.round(n)));
       }
-      applyZoom(scale);
-    });
-  });
-
-  var wmToggle = document.getElementById('tsd-toggle-watermark');
-  if (wmToggle) wmToggle.addEventListener('click', function () {
-    var on = wmToggle.getAttribute('aria-pressed') !== 'true';
-    wmToggle.setAttribute('aria-pressed', on ? 'true' : 'false');
-    page.style.setProperty('--tsd-watermark-visible', on ? '1' : '0');
-    page.classList.toggle('ts-page--no-wm', !on);
-  });
-
-  var spellBtn = document.getElementById('tsd-spellcheck-toggle');
-  if (spellBtn) spellBtn.addEventListener('click', function () {
-    var on = spellBtn.getAttribute('aria-pressed') !== 'true';
-    spellBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    editor.setAttribute('spellcheck', on ? 'true' : 'false');
-  });
-
-  var lockBtn = document.getElementById('tsd-lock-toggle');
-  if (lockBtn) lockBtn.addEventListener('click', function () {
-    var on = lockBtn.getAttribute('aria-pressed') !== 'true';
-    lockBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    editor.setAttribute('contenteditable', on ? 'false' : 'true');
-    lockBtn.textContent = '';
-    lockBtn.innerHTML = (on
-      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="11" width="16" height="10" stroke="currentColor" stroke-width="1.5"/><path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" stroke-width="1.5" fill="currentColor"/></svg> Unlock'
-      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="11" width="16" height="10" stroke="currentColor" stroke-width="1.5"/><path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" stroke-width="1.5"/></svg> Lock editing');
-    stat(on ? 'Editing locked' : 'Editing unlocked', 'saved');
-  });
-
-  var printBtn = document.getElementById('tsd-print');
-  if (printBtn) printBtn.addEventListener('click', function () { window.print(); });
-
-  var fsBtn = document.getElementById('tsd-fullscreen');
-  if (fsBtn) fsBtn.addEventListener('click', function () {
-    var target = document.getElementById('tsd-shell');
-    if (!document.fullscreenElement) {
-      (target.requestFullscreen || target.webkitRequestFullscreen || function () {}).call(target);
-    } else {
-      (document.exitFullscreen || document.webkitExitFullscreen || function () {}).call(document);
     }
+    for (var m = 0; m <= vertCountCm + 1e-7; m += step) {
+      var y = (m / vertCountCm) * h;
+      var majorV = Math.abs(m - Math.round(m)) < 0.01;
+      var halfV  = Math.abs(m * 2 - Math.round(m * 2)) < 0.01;
+      var lenV = majorV ? 7 : halfV ? 5 : 3;
+      el(vs, 'line', { x1: 18 - lenV, y1: y, x2: 18, y2: y, stroke: majorV ? '#667889' : '#9daab6', 'stroke-width': majorV ? 0.9 : 0.6 });
+      if (majorV && m > 0 && m < vertCountCm) {
+        el(vs, 'text', { x: 6, y: y + 2, 'text-anchor': 'middle', 'font-size': 7, fill: '#667889', 'font-family': 'Arial' }, String(Math.round(m)));
+      }
+    }
+    // Margin markers.
+    el(hs, 'path', { d: 'M ' + (mPx - 5) + ' 0 L ' + (mPx + 5) + ' 0 L ' + mPx + ' 6 Z', fill: 'var(--ed-brand)' });
+    el(hs, 'path', { d: 'M ' + (w - mPx - 5) + ' 0 L ' + (w - mPx + 5) + ' 0 L ' + (w - mPx) + ' 6 Z', fill: 'var(--ed-brand)' });
+    el(vs, 'path', { d: 'M 0 ' + (myPx - 5) + ' L 0 ' + (myPx + 5) + ' L 6 ' + myPx + ' Z', fill: 'var(--ed-brand)' });
+    el(vs, 'path', { d: 'M 0 ' + (h - myPx - 5) + ' L 0 ' + (h - myPx + 5) + ' L 6 ' + (h - myPx) + ' Z', fill: 'var(--ed-brand)' });
+  }
+
+  // ===================================================================== ZOOM
+  function setZoom(z) {
+    zoom = Math.max(0.6, Math.min(2, z));
+    zoomRange.value = Math.round(zoom * 100);
+    zoomValue.textContent = Math.round(zoom * 100) + '%';
+    shell.style.setProperty('--ed-visualzoom', zoom);
+    drawRulers();
+  }
+  function fitZoomToWidth() {
+    var ws = document.getElementById('tsd-workspace');
+    var avail = ws.clientWidth - 280; // outline column + padding
+    var scale = Math.max(0.6, Math.min(2, avail / (parseFloat(getComputedStyle(page).width) || 794)));
+    setZoom(Math.round(scale * 20) / 20);
+  }
+  zoomRange.addEventListener('input', function () { setZoom(parseInt(zoomRange.value, 10) / 100); });
+  unitsSel.addEventListener('change', function () { unit = unitsSel.value; drawRulers(); updateBadge(); });
+
+  document.getElementById('tsd-rulers-toggle').addEventListener('change', function (e) {
+    editorWrap.classList.toggle('ts-is-rulers-hidden', !e.target.checked);
+  });
+  document.getElementById('tsd-guides-toggle').addEventListener('change', function (e) {
+    page.classList.toggle('ts-is-guides', e.target.checked);
   });
 
-  // ============================================================ PDF export
-  var pdfBtn     = document.getElementById('tsd-export-pdf-btn');
-  var pdfOverlay = document.getElementById('tsd-pdf-overlay');
-  var pdfCancel  = document.getElementById('tsd-pdf-cancel');
-  var pdfSubmit  = document.getElementById('tsd-pdf-submit');
-  var pdfPwd     = document.getElementById('tsd-pdf-password');
-  var pdfStatus  = document.getElementById('tsd-pdf-status');
+  // ===================================================================== WATERMARK
+  function applyWatermark() {
+    page.setAttribute('data-watermark', (watermark && watermark.value || '').trim());
+  }
+  if (watermark) watermark.addEventListener('input', applyWatermark);
+  applyWatermark();
 
-  function showPdf() {
-    if (!pdfOverlay) return;
+  // ===================================================================== LOAD / SAVE
+  if (tsdId) {
+    setSave('● Loading encrypted content…', 'saving');
+    fetch('/api/tsd/' + tsdId + '/content', { credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (data) {
+        editor.innerHTML = (data.content && data.content.html) || '';
+        updateWords(); rebuildOutline();
+        setSave('● Saved · v' + data.version, 'saved');
+      }).catch(function (e) { setSave('Load failed: ' + e.message, 'error'); });
+  }
+
+  var saveTimer = null;
+  function scheduleSave() {
+    updateWords();
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(save, 900);
+  }
+  function save() {
+    var title = (titleInput.value || '').trim();
+    if (!title) { setSave('Title required', 'error'); return; }
+    setSave('● Encrypting & saving…', 'saving');
+    var payload = {
+      title: title,
+      tags: (tagsInput && tagsInput.value) || '',
+      export_policy: (exportSel && exportSel.value) || 'pdf_allowed',
+      content_html: editor.innerHTML || '',
+    };
+    var url = tsdId ? '/api/tsd/' + tsdId : '/api/tsd/';
+    var method = tsdId ? 'PUT' : 'POST';
+    fetch(url, { method: method, credentials: 'same-origin', headers: headers(), body: JSON.stringify(payload) })
+      .then(function (r) {
+        if (r.status === 412) throw new Error('Someone else saved a newer version. Reload to merge.');
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (data) {
+        tsdId = data.id; version = data.version;
+        if (!shell.dataset.tsdId) { shell.dataset.tsdId = tsdId; history.replaceState({}, '', '/documents/library/' + tsdId); }
+        setSave('● Saved · v' + data.version + ' · ' + data.ciphertext_sha256.substring(0, 12) + '…', 'saved');
+      })
+      .catch(function (e) { setSave('Save failed: ' + e.message, 'error'); });
+  }
+  editor.addEventListener('input', scheduleSave);
+  titleInput.addEventListener('input', scheduleSave);
+
+  // ===================================================================== OUTLINE
+  var outlineBody = document.getElementById('tsd-outline-body');
+  function rebuildOutline() {
+    var heads = editor.querySelectorAll('h1, h2, h3, h4');
+    if (!heads.length) { outlineBody.innerHTML = '<p class="ts-ed__outline-empty">Add a heading (H1–H4) to build the outline.</p>'; return; }
+    var html = ''; heads.forEach(function (h, i) {
+      var id = h.id || ('tsd-h-' + i); h.id = id;
+      var level = h.tagName.toLowerCase();
+      var text = (h.innerText || '').trim() || '(untitled)';
+      html += '<a class="ts-ed__outline-item ts-ed__outline-item--' + level + '" data-anchor="' + id + '">' + text.replace(/</g, '&lt;') + '</a>';
+    });
+    outlineBody.innerHTML = html;
+    outlineBody.querySelectorAll('[data-anchor]').forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        e.preventDefault();
+        var el = document.getElementById(a.getAttribute('data-anchor'));
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+  }
+  document.getElementById('tsd-outline-refresh').addEventListener('click', rebuildOutline);
+  editor.addEventListener('input', function () { clearTimeout(window._tsdOutlineT); window._tsdOutlineT = setTimeout(rebuildOutline, 300); });
+
+  // ===================================================================== BUBBLE
+  var bubble = document.getElementById('tsd-bubble');
+  function positionBubble() {
+    var sel = window.getSelection();
+    if (!sel.rangeCount) { bubble.setAttribute('hidden', ''); return; }
+    var range = sel.getRangeAt(0);
+    if (range.collapsed || !editor.contains(range.startContainer)) { bubble.setAttribute('hidden', ''); return; }
+    var rect = range.getBoundingClientRect();
+    if (!rect || rect.width === 0) { bubble.setAttribute('hidden', ''); return; }
+    bubble.removeAttribute('hidden');
+    var top = window.scrollY + rect.top - bubble.offsetHeight - 8;
+    var left = window.scrollX + rect.left + rect.width / 2 - bubble.offsetWidth / 2;
+    bubble.style.top = Math.max(4, top) + 'px';
+    bubble.style.left = Math.max(4, left) + 'px';
+  }
+  document.addEventListener('selectionchange', function () {
+    if (document.activeElement !== editor) { bubble.setAttribute('hidden', ''); return; }
+    positionBubble();
+  });
+  bubble.querySelectorAll('[data-bubble-cmd]').forEach(function (b) {
+    b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    b.addEventListener('click', function () { exec(b.getAttribute('data-bubble-cmd')); });
+  });
+  bubble.querySelectorAll('[data-bubble-block]').forEach(function (b) {
+    b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    b.addEventListener('click', function () { exec('formatBlock', b.getAttribute('data-bubble-block')); rebuildOutline(); });
+  });
+  document.getElementById('tsd-bubble-link').addEventListener('mousedown', function (e) { e.preventDefault(); });
+  document.getElementById('tsd-bubble-link').addEventListener('click', function () { var u = prompt('Link URL', 'https://'); if (u) exec('createLink', u); });
+  document.getElementById('tsd-bubble-comment').addEventListener('mousedown', function (e) { e.preventDefault(); });
+  document.getElementById('tsd-bubble-comment').addEventListener('click', insertComment);
+
+  // ===================================================================== SLASH
+  var SLASH_COMMANDS = [
+    { label: 'Heading 1',    kbd: '# ',  icon: 'H1',  run: function () { exec('formatBlock', 'H1'); } },
+    { label: 'Heading 2',    kbd: '## ', icon: 'H2',  run: function () { exec('formatBlock', 'H2'); } },
+    { label: 'Heading 3',    kbd: '### ',icon: 'H3',  run: function () { exec('formatBlock', 'H3'); } },
+    { label: 'Paragraph',    kbd: '',    icon: '¶',   run: function () { exec('formatBlock', 'P'); } },
+    { label: 'Quote',        kbd: '> ',  icon: '❝',   run: function () { exec('formatBlock', 'BLOCKQUOTE'); } },
+    { label: 'Code block',   kbd: '```', icon: '</>', run: function () { exec('formatBlock', 'PRE'); } },
+    { label: 'Bulleted list',kbd: '- ',  icon: '•',   run: function () { exec('insertUnorderedList'); } },
+    { label: 'Numbered list',kbd: '1. ', icon: '1.',  run: function () { exec('insertOrderedList'); } },
+    { label: 'Divider',      kbd: '---', icon: '—',   run: function () { insertHTML('<hr style="border:0;border-top:1px solid #c7ced6;margin:12pt 0;">'); } },
+    { label: 'Table',        kbd: '',    icon: '⊞',  run: insertTable },
+    { label: 'Image',        kbd: '',    icon: '🖼',  run: insertImage },
+    { label: 'Signature',    kbd: '',    icon: '✒',  run: insertSignature },
+    { label: 'Field',        kbd: '{' + '{', icon: '{ }', run: insertFieldVar },
+    { label: 'Today',        kbd: '',    icon: '📅',  run: function () { insertHTML(new Date().toLocaleDateString()); } },
+    { label: 'TOC',          kbd: '',    icon: '≡',   run: insertTOC },
+    { label: 'Page break',   kbd: '',    icon: '⇵',   run: function () { insertHTML('<div style="page-break-after:always;border-top:1px dashed #c7ced6;margin:18pt 0;"></div>'); } },
+  ];
+  var slash = document.getElementById('tsd-slash');
+  var slashInput = document.getElementById('tsd-slash-input');
+  var slashList  = document.getElementById('tsd-slash-list');
+  var slashActive = 0, slashOpenPos = null;
+  function openSlash() {
+    var sel = window.getSelection(); if (!sel.rangeCount) return;
+    var range = sel.getRangeAt(0), rect = range.getBoundingClientRect();
+    slash.style.top = (window.scrollY + rect.bottom + 4) + 'px';
+    slash.style.left = (window.scrollX + rect.left) + 'px';
+    slash.removeAttribute('hidden');
+    slashInput.value = ''; slashActive = 0; renderSlash('');
+    setTimeout(function () { slashInput.focus(); }, 0);
+    slashOpenPos = { node: range.startContainer, offset: range.startOffset };
+  }
+  function closeSlash() { slash.setAttribute('hidden', ''); slashOpenPos = null; editor.focus(); }
+  function renderSlash(q) {
+    var query = (q || '').toLowerCase();
+    var items = SLASH_COMMANDS.filter(function (c) { return !query || c.label.toLowerCase().indexOf(query) >= 0; });
+    slashList.innerHTML = items.map(function (c, i) {
+      return '<li class="' + (i === slashActive ? 'ts-is-active' : '') + '" data-idx="' + i + '">' +
+        '<span class="ts-ed__slash-icon">' + c.icon + '</span>' +
+        '<span>' + c.label + '</span>' +
+        (c.kbd ? '<span class="ts-ed__slash-kbd">' + c.kbd + '</span>' : '') +
+        '</li>';
+    }).join('');
+    slashList.querySelectorAll('[data-idx]').forEach(function (el) {
+      el.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      el.addEventListener('click', function () { slashActive = parseInt(el.getAttribute('data-idx'), 10); runSlash(items); });
+    });
+    slash._filtered = items;
+  }
+  function runSlash(items) {
+    items = items || slash._filtered || SLASH_COMMANDS;
+    var cmd = items[slashActive]; closeSlash(); if (!cmd) return;
+    if (slashOpenPos && slashOpenPos.node && slashOpenPos.node.nodeType === 3) {
+      try {
+        var t = slashOpenPos.node.nodeValue || ''; var cut = slashOpenPos.offset - 1;
+        if (cut >= 0 && t.charAt(cut) === '/') {
+          slashOpenPos.node.nodeValue = t.substring(0, cut) + t.substring(slashOpenPos.offset);
+          var range = document.createRange(); range.setStart(slashOpenPos.node, cut); range.collapse(true);
+          var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+        }
+      } catch (e) {}
+    }
+    editor.focus(); cmd.run();
+  }
+  editor.addEventListener('keyup', function (e) { if (e.key === '/' && !slashOpenPos) openSlash(); });
+  slashInput.addEventListener('input', function () { slashActive = 0; renderSlash(slashInput.value); });
+  slashInput.addEventListener('keydown', function (e) {
+    var items = slash._filtered || SLASH_COMMANDS;
+    if (e.key === 'ArrowDown') { slashActive = Math.min(items.length - 1, slashActive + 1); renderSlash(slashInput.value); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { slashActive = Math.max(0, slashActive - 1); renderSlash(slashInput.value); e.preventDefault(); }
+    else if (e.key === 'Enter') { runSlash(items); e.preventDefault(); }
+    else if (e.key === 'Escape') { closeSlash(); e.preventDefault(); }
+  });
+
+  // ===================================================================== FIND & REPLACE
+  var findEl = document.getElementById('tsd-find'), findQ = document.getElementById('tsd-find-q'),
+      findR = document.getElementById('tsd-find-r'), findCnt = document.getElementById('tsd-find-count');
+  var findHits = [], findIdx = -1;
+  function clearHits() {
+    editor.querySelectorAll('.ts-ed__find-hit').forEach(function (n) {
+      var p = n.parentNode; while (n.firstChild) p.insertBefore(n.firstChild, n); p.removeChild(n); p.normalize();
+    });
+    findHits = []; findIdx = -1;
+  }
+  function highlightAll(q) {
+    clearHits();
+    if (!q) { findCnt.textContent = '0 / 0'; return; }
+    var walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
+    var nodes = [], n;
+    while ((n = walker.nextNode())) { if (n.nodeValue && n.nodeValue.toLowerCase().indexOf(q.toLowerCase()) >= 0) nodes.push(n); }
+    var qL = q.length, qLo = q.toLowerCase();
+    nodes.forEach(function (node) {
+      var text = node.nodeValue, lower = text.toLowerCase(), frag = document.createDocumentFragment(), i = 0;
+      while (i < text.length) {
+        var pos = lower.indexOf(qLo, i);
+        if (pos < 0) { frag.appendChild(document.createTextNode(text.substring(i))); break; }
+        if (pos > i) frag.appendChild(document.createTextNode(text.substring(i, pos)));
+        var span = document.createElement('span'); span.className = 'ts-ed__find-hit';
+        span.appendChild(document.createTextNode(text.substring(pos, pos + qL)));
+        frag.appendChild(span); findHits.push(span); i = pos + qL;
+      }
+      node.parentNode.replaceChild(frag, node);
+    });
+    if (findHits.length) { findIdx = 0; markCurrent(); }
+    findCnt.textContent = (findHits.length ? (findIdx + 1) : 0) + ' / ' + findHits.length;
+  }
+  function markCurrent() {
+    editor.querySelectorAll('.ts-ed__find-hit--current').forEach(function (n) { n.classList.remove('ts-ed__find-hit--current'); });
+    if (findIdx >= 0 && findHits[findIdx]) { findHits[findIdx].classList.add('ts-ed__find-hit--current'); findHits[findIdx].scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    findCnt.textContent = (findHits.length ? (findIdx + 1) : 0) + ' / ' + findHits.length;
+  }
+  function openFind() { findEl.removeAttribute('hidden'); setTimeout(function () { findQ.focus(); findQ.select(); }, 0); }
+  function closeFind() { findEl.setAttribute('hidden', ''); clearHits(); editor.focus(); }
+  document.getElementById('tsd-find-close').addEventListener('click', closeFind);
+  document.getElementById('tsd-find-next').addEventListener('click', function () { if (findHits.length) { findIdx = (findIdx + 1) % findHits.length; markCurrent(); } });
+  document.getElementById('tsd-find-prev').addEventListener('click', function () { if (findHits.length) { findIdx = (findIdx - 1 + findHits.length) % findHits.length; markCurrent(); } });
+  document.getElementById('tsd-find-replace').addEventListener('click', function () {
+    if (findIdx < 0 || !findHits[findIdx]) return;
+    findHits[findIdx].parentNode.replaceChild(document.createTextNode(findR.value || ''), findHits[findIdx]);
+    highlightAll(findQ.value); scheduleSave();
+  });
+  document.getElementById('tsd-find-replace-all').addEventListener('click', function () {
+    while (findHits.length) { var s = findHits.shift(); s.parentNode.replaceChild(document.createTextNode(findR.value || ''), s); }
+    highlightAll(findQ.value); scheduleSave();
+  });
+  findQ.addEventListener('input', function () { highlightAll(findQ.value); });
+  findQ.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { if (findHits.length) { findIdx = (findIdx + (e.shiftKey ? -1 : 1) + findHits.length) % findHits.length; markCurrent(); } e.preventDefault(); }
+    if (e.key === 'Escape') { closeFind(); e.preventDefault(); }
+  });
+
+  // ===================================================================== COMMAND PALETTE
+  var cmdk = document.getElementById('tsd-cmdk'), cmdkIn = document.getElementById('tsd-cmdk-input'), cmdkList = document.getElementById('tsd-cmdk-list');
+  var COMMANDS = [
+    { label: 'File ▸ Save',          run: save,          hint: '⌘S' },
+    { label: 'File ▸ Print',         run: function () { window.print(); }, hint: '⌘P' },
+    { label: 'File ▸ Export PDF…',   run: showPdfDialog },
+    { label: 'File ▸ Version history', run: openHistory },
+    { label: 'Insert ▸ Table',       run: insertTable },
+    { label: 'Insert ▸ Image',       run: insertImage },
+    { label: 'Insert ▸ Signature',   run: insertSignature },
+    { label: 'Insert ▸ Field',       run: insertFieldVar },
+    { label: 'Insert ▸ TOC',         run: insertTOC },
+    { label: 'Layout ▸ A4',          run: function () { pageSize = 'a4'; applyPageSize(); } },
+    { label: 'Layout ▸ Letter',      run: function () { pageSize = 'letter'; applyPageSize(); } },
+    { label: 'Layout ▸ Legal',       run: function () { pageSize = 'legal'; applyPageSize(); } },
+    { label: 'Layout ▸ Landscape',   run: function () { pageOrient = 'landscape'; applyPageSize(); } },
+    { label: 'Layout ▸ Portrait',    run: function () { pageOrient = 'portrait'; applyPageSize(); } },
+    { label: 'View ▸ Toggle outline',run: function () { document.getElementById('tsd-workspace').classList.toggle('ts-ed__workspace--no-outline'); } },
+    { label: 'View ▸ Fit width',     run: fitZoomToWidth },
+    { label: 'View ▸ 100% zoom',     run: function () { setZoom(1); } },
+    { label: 'View ▸ Full screen',   run: function () { if (!document.fullscreenElement) shell.requestFullscreen && shell.requestFullscreen(); else document.exitFullscreen && document.exitFullscreen(); } },
+    { label: 'Security ▸ Open panel',run: openSecurity },
+    { label: 'Security ▸ Protect edit', run: toggleLock },
+    { label: 'Security ▸ Privacy',   run: togglePrivacy },
+    { label: 'Edit ▸ Find & replace',run: openFind, hint: '⌘F' },
+  ];
+  var cmdkActive = 0;
+  function renderCmdk(q) {
+    var query = (q || '').toLowerCase();
+    var items = COMMANDS.filter(function (c) { return !query || c.label.toLowerCase().indexOf(query) >= 0; });
+    cmdkList.innerHTML = items.map(function (c, i) {
+      return '<li class="' + (i === cmdkActive ? 'ts-is-active' : '') + '" data-idx="' + i + '"><span>' + c.label + '</span>' +
+        (c.hint ? '<span style="margin-left:auto;font-size:10px;font-family:var(--ts-font-mono);color:var(--ed-subtle)">' + c.hint + '</span>' : '') + '</li>';
+    }).join('');
+    cmdkList.querySelectorAll('[data-idx]').forEach(function (el) { el.addEventListener('click', function () { cmdkActive = parseInt(el.getAttribute('data-idx'), 10); runCmdk(items); }); });
+    cmdk._filtered = items;
+  }
+  function openCmdk() { cmdk.removeAttribute('hidden'); cmdk.style.display = 'flex'; cmdkIn.value = ''; cmdkActive = 0; renderCmdk(''); setTimeout(function () { cmdkIn.focus(); }, 0); }
+  function closeCmdk() { cmdk.setAttribute('hidden', ''); cmdk.style.display = 'none'; }
+  function runCmdk(items) { items = items || cmdk._filtered || COMMANDS; var c = items[cmdkActive]; closeCmdk(); if (c) c.run(); }
+  document.getElementById('tsd-cmdk-btn') && document.getElementById('tsd-cmdk-btn').addEventListener('click', openCmdk);
+  cmdkIn.addEventListener('input', function () { cmdkActive = 0; renderCmdk(cmdkIn.value); });
+  cmdkIn.addEventListener('keydown', function (e) {
+    var items = cmdk._filtered || COMMANDS;
+    if (e.key === 'ArrowDown') { cmdkActive = Math.min(items.length - 1, cmdkActive + 1); renderCmdk(cmdkIn.value); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { cmdkActive = Math.max(0, cmdkActive - 1); renderCmdk(cmdkIn.value); e.preventDefault(); }
+    else if (e.key === 'Enter') { runCmdk(items); e.preventDefault(); }
+    else if (e.key === 'Escape') { closeCmdk(); e.preventDefault(); }
+  });
+  cmdk.addEventListener('click', function (e) { if (e.target === cmdk) closeCmdk(); });
+
+  // ===================================================================== VERSION HISTORY
+  var historyPanel = document.getElementById('tsd-history-panel'), historyBody = document.getElementById('tsd-history-body');
+  function openHistory() {
+    if (!tsdId) { showToast('Save first — history appears after the first version.'); return; }
+    historyPanel.removeAttribute('hidden');
+    historyBody.innerHTML = '<p style="padding:12px;color:var(--ed-muted);font-size:11px">Loading…</p>';
+    fetch('/api/tsd/' + tsdId + '/versions', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (items) {
+      if (!items.length) { historyBody.innerHTML = '<p style="padding:12px;color:var(--ed-muted);font-size:11px">No prior versions.</p>'; return; }
+      historyBody.innerHTML = items.map(function (v) {
+        return '<div class="ts-ed__hist-row">' +
+          '<div class="ts-ed__hist-ver">v' + v.version + '</div>' +
+          '<div class="ts-ed__hist-meta">' + (v.created_at || '—').replace('T', ' ').substring(0, 16) + ' · ' + v.plaintext_bytes + ' B · ' + (v.ciphertext_sha256 || '').substring(0, 12) + '…' + (v.change_note ? ' · ' + v.change_note : '') + '</div>' +
+          '<div class="ts-ed__hist-acts">' +
+            '<button class="ts-ed__btn ts-ed__btn--ghost" data-preview="' + v.version + '">Preview</button>' +
+            '<button class="ts-ed__btn" data-restore="' + v.version + '">Restore</button>' +
+          '</div></div>';
+      }).join('');
+      historyBody.querySelectorAll('[data-preview]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var v = b.getAttribute('data-preview');
+          fetch('/api/tsd/' + tsdId + '/versions/' + v + '/content', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+            var w = window.open('', '_blank', 'width=720,height=900');
+            w.document.write('<html><head><title>v' + v + '</title><style>body{font:14px Arial;padding:40px;max-width:720px;margin:auto}</style></head><body>' + ((d.content && d.content.html) || '') + '</body></html>');
+            w.document.close();
+          });
+        });
+      });
+      historyBody.querySelectorAll('[data-restore]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var v = b.getAttribute('data-restore');
+          if (!confirm('Restore v' + v + ' as current? Current content will snapshot so you can undo.')) return;
+          fetch('/api/tsd/' + tsdId + '/versions/' + v + '/restore', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })
+            .then(function (r) { return r.json(); }).then(function (data) {
+              version = data.version;
+              return fetch('/api/tsd/' + tsdId + '/content', { credentials: 'same-origin' }).then(function (r) { return r.json(); });
+            }).then(function (c) {
+              editor.innerHTML = (c.content && c.content.html) || '';
+              updateWords(); rebuildOutline();
+              setSave('● Restored v' + v, 'saved');
+              openHistory();
+            });
+        });
+      });
+    });
+  }
+  document.getElementById('tsd-history-close').addEventListener('click', function () { historyPanel.setAttribute('hidden', ''); });
+  var historyBtn = document.getElementById('tsd-history-btn');
+  if (historyBtn) historyBtn.addEventListener('click', openHistory);
+
+  // ===================================================================== PDF EXPORT
+  var pdfOverlay = document.getElementById('tsd-pdf-overlay'),
+      pdfBtnTab  = document.getElementById('tsd-export-pdf-btn'),
+      pdfPwd     = document.getElementById('tsd-pdf-password'),
+      pdfStatus  = document.getElementById('tsd-pdf-status');
+  function showPdfDialog() {
+    if (!tsdId) { showToast('Save first — PDF export requires a saved TSD.'); return; }
     pdfPwd.value = ''; pdfStatus.style.display = 'none';
     pdfOverlay.removeAttribute('hidden'); pdfOverlay.style.display = 'flex';
-    setTimeout(function () { pdfPwd.focus(); }, 50);
+    setTimeout(function () { pdfPwd.focus(); }, 0);
   }
-  function hidePdf() {
-    if (!pdfOverlay) return;
-    pdfOverlay.setAttribute('hidden', ''); pdfOverlay.style.display = 'none';
-  }
-  if (pdfBtn) pdfBtn.addEventListener('click', showPdf);
-  if (pdfCancel) pdfCancel.addEventListener('click', hidePdf);
-  if (pdfOverlay) pdfOverlay.addEventListener('click', function (e) { if (e.target === pdfOverlay) hidePdf(); });
-  if (pdfSubmit) {
-    pdfSubmit.addEventListener('click', function () {
-      var pwd = (pdfPwd.value || '').trim();
-      if (pwd && (pwd.length < 4 || pwd.length > 128)) {
-        pdfStatus.style.display = '';
-        pdfStatus.style.color = 'var(--ts-danger)';
-        pdfStatus.textContent = 'Password must be 4–128 characters.';
-        return;
-      }
-      pdfStatus.style.display = '';
-      pdfStatus.style.color = 'var(--ts-text-muted)';
-      pdfStatus.textContent = 'Rendering…';
-      pdfSubmit.disabled = true;
+  function hidePdfDialog() { pdfOverlay.setAttribute('hidden', ''); pdfOverlay.style.display = 'none'; }
+  if (pdfBtnTab) pdfBtnTab.addEventListener('click', showPdfDialog);
+  document.getElementById('tsd-pdf-cancel').addEventListener('click', hidePdfDialog);
+  pdfOverlay.addEventListener('click', function (e) { if (e.target === pdfOverlay) hidePdfDialog(); });
+  document.getElementById('tsd-pdf-submit').addEventListener('click', function () {
+    var pwd = (pdfPwd.value || '').trim();
+    if (pwd && (pwd.length < 4 || pwd.length > 128)) { pdfStatus.style.display = ''; pdfStatus.style.color = 'var(--ts-danger)'; pdfStatus.textContent = 'Password must be 4–128 characters.'; return; }
+    pdfStatus.style.display = ''; pdfStatus.style.color = 'var(--ed-muted)'; pdfStatus.textContent = 'Rendering…';
+    fetch('/api/tsd/' + tsdId + '/export/pdf', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify({ user_password: pwd || undefined })
+    }).then(function (r) {
+      if (!r.ok) return r.json().then(function (j) { throw new Error(j.message || j.error || ('HTTP ' + r.status)); });
+      var enc = r.headers.get('X-TrustSeal-Pdf-Encrypted') === 'true';
+      return r.blob().then(function (b) { return { blob: b, enc: enc }; });
+    }).then(function (res) {
+      var url = URL.createObjectURL(res.blob);
+      var a = document.createElement('a'); a.href = url; a.download = (titleInput.value || 'document') + '.pdf'; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      pdfStatus.style.color = 'var(--ts-brand-green)'; pdfStatus.textContent = 'Downloaded ' + (res.enc ? '(password-protected).' : '(unprotected).');
+      setTimeout(hidePdfDialog, 800);
+    }).catch(function (e) { pdfStatus.style.color = 'var(--ts-danger)'; pdfStatus.textContent = 'Export failed: ' + e.message; });
+  });
 
-      fetch('/api/tsd/' + tsdId + '/export/pdf', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({ user_password: pwd || undefined }),
-      }).then(function (r) {
-        if (!r.ok) {
-          return r.json().then(function (j) { throw new Error(j.message || j.error || ('HTTP ' + r.status)); });
-        }
-        var encrypted = r.headers.get('X-TrustSeal-Pdf-Encrypted') === 'true';
-        return r.blob().then(function (b) { return { blob: b, encrypted: encrypted }; });
-      }).then(function (res) {
-        var url = URL.createObjectURL(res.blob);
-        var a = document.createElement('a');
-        a.href = url; a.download = (titleInput.value || 'document') + '.pdf';
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-        pdfStatus.style.color = 'var(--ts-brand-green)';
-        pdfStatus.textContent = 'Downloaded ' + (res.encrypted ? '(password-protected).' : '(unprotected).');
-        setTimeout(hidePdf, 800);
-      }).catch(function (e) {
-        pdfStatus.style.color = 'var(--ts-danger)';
-        pdfStatus.textContent = 'Export failed: ' + e.message;
-      }).finally(function () { pdfSubmit.disabled = false; });
-    });
+  // ===================================================================== SECURITY PANEL
+  var secPanel = document.getElementById('tsd-security-panel'),
+      secOpen  = document.getElementById('tsd-security-open'),
+      secClose = document.getElementById('tsd-security-close'),
+      classSel = document.getElementById('tsd-class-select'),
+      classTop = document.getElementById('tsd-class-top'),
+      toast    = document.getElementById('tsd-security-toast');
+  var toastTimer;
+  function showToast(msg) {
+    toast.textContent = msg; toast.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { toast.hidden = true; }, 3600);
   }
+  function openSecurity() { secPanel.classList.add('ts-is-open'); secOpen.setAttribute('aria-expanded', 'true'); }
+  function closeSecurity() { secPanel.classList.remove('ts-is-open'); secOpen.setAttribute('aria-expanded', 'false'); }
+  secOpen.addEventListener('click', function () { secPanel.classList.contains('ts-is-open') ? closeSecurity() : openSecurity(); });
+  secClose.addEventListener('click', closeSecurity);
+  classSel.addEventListener('change', function () {
+    classTop.textContent = classSel.value;
+    showToast('Classification updated locally. Server-side policy enforcement required for production.');
+  });
+  exportSel.addEventListener('change', scheduleSave);
+  tagsInput.addEventListener('input', scheduleSave);
+
+  var locked = false, concealed = false;
+  function toggleLock() {
+    locked = !locked;
+    editor.contentEditable = String(!locked);
+    editorWrap.classList.toggle('ts-is-locked', locked);
+    var b = document.getElementById('tsd-lock-toggle');
+    b.textContent = locked ? 'Unprotect' : 'Protect';
+    b.setAttribute('aria-pressed', String(locked));
+    showToast(locked ? 'Editing protected (local). Backend must enforce immutable versions.' : 'Editing enabled.');
+  }
+  function togglePrivacy() {
+    concealed = !concealed;
+    page.classList.toggle('ts-is-privacy', concealed);
+    var b = document.getElementById('tsd-privacy-toggle');
+    b.textContent = concealed ? 'Reveal' : 'Conceal';
+    b.setAttribute('aria-pressed', String(concealed));
+    showToast(concealed ? 'Preview concealed locally. Not a substitute for enterprise DLP.' : 'Preview visible.');
+  }
+  document.getElementById('tsd-lock-toggle').addEventListener('click', toggleLock);
+  document.getElementById('tsd-privacy-toggle').addEventListener('click', togglePrivacy);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSecurity(); });
+
+  // Share button placeholder (wires to document_share_api in a later phase).
+  document.getElementById('tsd-share-btn').addEventListener('click', function () {
+    showToast('Share routes through the TrustSeal tenant-scoped document-shares API (phase upcoming).');
+  });
+
+  // ===================================================================== GLOBAL SHORTCUTS
+  document.addEventListener('keydown', function (e) {
+    var mod = e.metaKey || e.ctrlKey;
+    if (mod && e.key.toLowerCase() === 'k') {
+      if (document.activeElement === slashInput || document.activeElement === cmdkIn) return;
+      openCmdk(); e.preventDefault();
+    } else if (mod && e.key.toLowerCase() === 'f') {
+      openFind(); e.preventDefault();
+    } else if (mod && e.key.toLowerCase() === 's') {
+      save(); e.preventDefault();
+    } else if (mod && e.shiftKey && e.key.toLowerCase() === 'o') {
+      document.getElementById('tsd-workspace').classList.toggle('ts-ed__workspace--no-outline');
+      e.preventDefault();
+    }
+  });
+
+  // ===================================================================== INIT
+  updateWords();
+  rebuildOutline();
+  applyPageSize();
+  applyMargins();
+  setTimeout(drawRulers, 50);
+  window.addEventListener('resize', function () { clearTimeout(window._tsdRulerT); window._tsdRulerT = setTimeout(drawRulers, 100); });
 })();
 </script>
 {% endblock %}
