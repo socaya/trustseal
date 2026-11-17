@@ -237,3 +237,182 @@ def list_documents_by_label(label: str):
             for doc in rows
         ],
     )
+
+
+# ============================================================ AK bulk ops
+
+
+@document_label_api.route("/bulk/label", methods=["POST"])
+@jwt_required()
+def bulk_tag_documents():
+    """Attach a single label to up to 100 documents atomically.
+
+    Payload: ``{"document_ids": [int, ...], "label": "<str>"}``.
+    Rows already carrying the label report ``succeeded`` with
+    ``already_tagged=True``. Rows the caller does not own return
+    ``document_not_found``.
+    """
+    user = _actor()
+    data = _payload()
+    ids = data.get("document_ids")
+    label_raw = data.get("label")
+    if not isinstance(ids, list) or not ids:
+        abort(400, description="document_ids_required")
+    if len(ids) > 100:
+        abort(413, description="bulk_label_limit_100")
+    label = _normalise_label(label_raw)
+    if label is None:
+        abort(400, description="label_invalid")
+
+    seen: set[int] = set()
+    results: list[dict] = []
+    added = 0
+    for doc_id in ids:
+        entry = {"document_id": doc_id}
+        if type(doc_id) is not int:
+            entry["status"] = "failed"
+            entry["error_code"] = "document_id_invalid"
+            results.append(entry)
+            continue
+        if doc_id in seen:
+            entry["status"] = "failed"
+            entry["error_code"] = "duplicate_id"
+            results.append(entry)
+            continue
+        seen.add(doc_id)
+        doc = Document.query.filter_by(
+            id=doc_id,
+            organization_id=user.organization_id,
+            created_by=user.id,
+            deleted_at=None,
+        ).first()
+        if doc is None:
+            entry["status"] = "failed"
+            entry["error_code"] = "document_not_found"
+            results.append(entry)
+            continue
+        existing = DocumentLabel.query.filter_by(
+            document_id=doc.id, label=label
+        ).first()
+        if existing is not None:
+            entry["status"] = "succeeded"
+            entry["already_tagged"] = True
+            results.append(entry)
+            continue
+        db.session.add(
+            DocumentLabel(
+                document_id=doc.id,
+                organization_id=doc.organization_id,
+                label=label,
+                created_by_id=user.id,
+            )
+        )
+        added += 1
+        entry["status"] = "succeeded"
+        entry["already_tagged"] = False
+        results.append(entry)
+
+    succeeded = sum(1 for r in results if r["status"] == "succeeded")
+    failed = len(results) - succeeded
+    if succeeded == 0:
+        db.session.rollback()
+        return (
+            jsonify(label=label, succeeded=0, failed=failed, results=results),
+            400,
+        )
+    db.session.commit()
+    http_status = 207 if failed else 200
+    return (
+        jsonify(
+            label=label,
+            succeeded=succeeded,
+            failed=failed,
+            added=added,
+            results=results,
+        ),
+        http_status,
+    )
+
+
+@document_label_api.route("/bulk/label/remove", methods=["POST"])
+@jwt_required()
+def bulk_untag_documents():
+    """Detach a label from up to 100 documents atomically.
+
+    Payload: ``{"document_ids": [int, ...], "label": "<str>"}``.
+    Rows that do not carry the label report ``succeeded`` with
+    ``already_removed=True``.
+    """
+    user = _actor()
+    data = _payload()
+    ids = data.get("document_ids")
+    label_raw = data.get("label")
+    if not isinstance(ids, list) or not ids:
+        abort(400, description="document_ids_required")
+    if len(ids) > 100:
+        abort(413, description="bulk_label_remove_limit_100")
+    label = _normalise_label(label_raw)
+    if label is None:
+        abort(400, description="label_invalid")
+
+    seen: set[int] = set()
+    results: list[dict] = []
+    removed = 0
+    for doc_id in ids:
+        entry = {"document_id": doc_id}
+        if type(doc_id) is not int:
+            entry["status"] = "failed"
+            entry["error_code"] = "document_id_invalid"
+            results.append(entry)
+            continue
+        if doc_id in seen:
+            entry["status"] = "failed"
+            entry["error_code"] = "duplicate_id"
+            results.append(entry)
+            continue
+        seen.add(doc_id)
+        doc = Document.query.filter_by(
+            id=doc_id,
+            organization_id=user.organization_id,
+            created_by=user.id,
+            deleted_at=None,
+        ).first()
+        if doc is None:
+            entry["status"] = "failed"
+            entry["error_code"] = "document_not_found"
+            results.append(entry)
+            continue
+        row = DocumentLabel.query.filter_by(
+            document_id=doc.id, label=label
+        ).first()
+        if row is None:
+            entry["status"] = "succeeded"
+            entry["already_removed"] = True
+            results.append(entry)
+            continue
+        db.session.delete(row)
+        removed += 1
+        entry["status"] = "succeeded"
+        entry["already_removed"] = False
+        results.append(entry)
+
+    succeeded = sum(1 for r in results if r["status"] == "succeeded")
+    failed = len(results) - succeeded
+    if succeeded == 0:
+        db.session.rollback()
+        return (
+            jsonify(label=label, succeeded=0, failed=failed, results=results),
+            400,
+        )
+    db.session.commit()
+    http_status = 207 if failed else 200
+    return (
+        jsonify(
+            label=label,
+            succeeded=succeeded,
+            failed=failed,
+            removed=removed,
+            results=results,
+        ),
+        http_status,
+    )
