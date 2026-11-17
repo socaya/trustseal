@@ -368,6 +368,10 @@ def create_app(config_class=None):
     blueprints.append(integrations_views)
     from .blueprints.system.routes.billing_view import billing_views
     blueprints.append(billing_views)
+    from .blueprints.documents.api.tsd_api import tsd_api
+    blueprints.append(tsd_api)
+    from .blueprints.documents.views.tsd_views import tsd_views
+    blueprints.append(tsd_views)
     from .blueprints.documents.api.document_label_api import (
         document_label_api,
     )

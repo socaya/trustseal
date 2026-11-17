@@ -7,9 +7,18 @@ import re
 
 from flask import abort, request
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
+from flask_login import current_user
 
 from app.extensions import db
 from app.models.system import Role, UserRole
+
+# API prefixes that are designed to be called from first-party authenticated
+# browser sessions (not just JWT-bearing API clients). Each endpoint still
+# authenticates and authorizes internally — this list only lets session
+# traffic through the blanket ``verify_jwt_in_request`` guard below.
+SESSION_AUTH_ALLOWED_PREFIXES = (
+    "/api/tsd",
+)
 
 PUBLIC_ENDPOINTS = frozenset((
     "/api/auth/login",
@@ -79,6 +88,12 @@ def enforce_legacy_api_security():
     # generic updates. Require the governed /api/stamp-custody workflow.
     if any(_under(path, prefix) for prefix in LEGACY_STAMP_PREFIXES):
         abort(410, description="Legacy stamp API retired; use stamp custody workflow")
+    # First-party browser calls (editor, inspector): allow session auth as
+    # a substitute for JWT. The route still runs its own @login_required
+    # and tenant checks.
+    if any(_under(path, prefix) for prefix in SESSION_AUTH_ALLOWED_PREFIXES):
+        if current_user.is_authenticated:
+            return
     verify_jwt_in_request()
     try:
         user_id = int(get_jwt_identity())
