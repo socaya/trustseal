@@ -43,32 +43,30 @@ Each UI phase ships a thin vertical slice: real route, real template, real smoke
 
 ### 2.2 Operator sidebar map
 
-The sidebar in the authenticated shell (`templates/partials_ds/sidebar.html`) groups items into three sections. Any row whose Flask endpoint is not registered in this build is hidden automatically (TS-UI-008).
+The sidebar in the authenticated shell (`templates/partials_ds/sidebar.html`) groups items into three labelled sections. Any row whose Flask endpoint is not registered is hidden automatically (TS-UI-008). Endpoint names below are the ones actually registered in this build.
 
 ```
 WORKSPACE
-  Overview                    system.main_views.home
-  My tasks                    system.main_views.home  (currently aliased)
-  Documents                   document_views.list_documents
-  Signature requests          signature_request_views.list
-  Stamps                      stamp_custody_views.list
-  Verification                verify_views.verify_form     ← renders app shell when authed
-  Evidence & audit            evidence_views.list_retentions
-  Notifications               operator_notifications_views.list_notifications
+  Overview                     system.main_views.home
+  Documents                    document_views.index
+  Verification                 verify_views.verify_form   ← app shell when authed
+  Evidence & audit             evidence_views.list_retentions
+  Notifications                operator_notifications_views.list_notifications
 
 MANAGEMENT
-  Templates                   templates_api.list_templates
-  Contacts & parties          document_party_views.list
-  Teams & delegation          teams_api.list
+  Contacts & parties           document_party_views.view_document_parties
+  Organizations                organizations_bp.view_organizations
+  Clients                      organizations_bp.view_clients
 
 ADMINISTRATION
-  Users & invitations         users_views.list
-  Roles & permissions         roles_views.list
-  Organization settings       settings_views.index
-  Integrations & API          webhook_api.list_endpoints
-  Subscriptions & billing     subscription_views.index
-  Audit & security            audit_logs_api.list_audit_logs
+  Roles                        system.view_roles
+  Permissions                  system.view_permissions
+  User-role assignments        system.assign_user_role_view
+  Organization settings        system.system_settings_view
+  Design system                design_gallery_bp.gallery  ← admin-only
 ```
+
+Rows planned but not yet routed (Signature requests, Stamps, Templates, Teams & delegation, Users & invitations, Integrations & API, Subscriptions & billing, Audit & security) stay hidden until their HTML views ship in Phases F–L of §5. The underlying APIs already exist — see the module inventory in §4.
 
 ### 2.3 Topbar
 
@@ -218,8 +216,8 @@ The tables below are **the implementation target**. `Status` uses:
 | `/`                              | Operator overview (dashboard)      | 🟢     | Compact metric strip + Recent documents + optional Recent activity.               |
 | `/welcome`                       | Public landing                     | 🟢     | Also served at `/` for anonymous users.                                            |
 | `/app/notifications`             | Notifications feed                 | 🟢     | Unread / All / kind filter; mark-read, mark-all-read.                              |
-| `/app/notifications` (quick-action) | Notification detail                | ⚪     | Navigate to subject link; no dedicated page yet.                                   |
-| `/app/tasks`                     | My tasks                           | ⚪     | Aggregate view of signing, approvals and admin follow-ups.                        |
+| `/app/notifications` (quick-action) | Notification detail             | ⚪     | Navigate to subject link; no dedicated page yet.                                   |
+| `/app/tasks`                     | My tasks (planned)                 | ⚪     | Aggregate view of signing, approvals and admin follow-ups. Not in sidebar until shipped. |
 | `/app/profile`                   | Your profile                       | 🟢     | Edit first_name / last_name / phone; identity fields are read-only.                |
 | `/app/global-search`             | Search results                     | ⚪     | Document / envelope / party / reference — cross-module scoped search.              |
 

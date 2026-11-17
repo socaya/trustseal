@@ -111,41 +111,37 @@
   {
     "label": "Workspace",
     "items": [
-      {"endpoint": "main_views.dashboard",        "label": "Overview",            "icon": "overview",   "key": "overview"},
-      {"endpoint": "main_views.dashboard",        "label": "My tasks",            "icon": "tasks",      "key": "tasks"},
-      {"endpoint": "document_views.list_documents","label": "Documents",          "icon": "documents",  "key": "documents"},
-      {"endpoint": "signature_request_views.list","label": "Signature requests",  "icon": "signature",  "key": "signatures"},
-      {"endpoint": "stamp_custody_views.list",    "label": "Stamps",              "icon": "stamp",      "key": "stamps"},
-      {"endpoint": "verify_views.verify_form",    "label": "Verification",        "icon": "verify",     "key": "verify"},
-      {"endpoint": "evidence_views.list_retentions","label":"Evidence & audit",   "icon": "evidence",   "key": "evidence"},
-      {"endpoint": "operator_notifications_views.list_notifications","label":"Notifications","icon": "notifications", "key": "notifications"}
+      {"endpoint": "system.main_views.home",        "label": "Overview",            "icon": "overview",     "key": "overview"},
+      {"endpoint": "document_views.index",          "label": "Documents",           "icon": "documents",    "key": "documents"},
+      {"endpoint": "verify_views.verify_form",      "label": "Verification",        "icon": "verify",       "key": "verify"},
+      {"endpoint": "evidence_views.list_retentions","label": "Evidence & audit",    "icon": "evidence",     "key": "evidence"},
+      {"endpoint": "operator_notifications_views.list_notifications", "label": "Notifications", "icon": "notifications", "key": "notifications"}
     ]
   },
   {
     "label": "Management",
     "items": [
-      {"endpoint": "templates_api.list_templates","label":"Templates",            "icon": "templates",  "key": "templates"},
-      {"endpoint": "document_party_views.list",   "label":"Contacts & parties",   "icon": "contacts",   "key": "contacts"},
-      {"endpoint": "teams_api.list",              "label":"Teams & delegation",   "icon": "teams",      "key": "teams"}
+      {"endpoint": "document_party_views.view_document_parties", "label": "Contacts & parties", "icon": "contacts", "key": "contacts"},
+      {"endpoint": "organizations_bp.view_organizations", "label": "Organizations", "icon": "teams",     "key": "organizations"},
+      {"endpoint": "organizations_bp.view_clients",       "label": "Clients",       "icon": "contacts",  "key": "clients"}
     ]
   },
   {
     "label": "Administration",
     "items": [
-      {"endpoint": "users_views.list",            "label":"Users & invitations",  "icon": "users",      "key": "users"},
-      {"endpoint": "roles_views.list",            "label":"Roles & permissions",  "icon": "settings",   "key": "roles"},
-      {"endpoint": "settings_views.index",        "label":"Organization settings","icon": "settings",   "key": "settings"},
-      {"endpoint": "webhook_api.list_endpoints",  "label":"Integrations & API",   "icon": "integrations","key":"integrations"},
-      {"endpoint": "subscription_views.index",    "label":"Subscriptions & billing","icon":"billing",   "key": "billing"},
-      {"endpoint": "audit_logs_api.list_audit_logs","label":"Audit & security",   "icon": "audit",      "key": "audit"}
+      {"endpoint": "system.view_roles",             "label": "Roles",               "icon": "settings",    "key": "roles"},
+      {"endpoint": "system.view_permissions",       "label": "Permissions",         "icon": "settings",    "key": "permissions"},
+      {"endpoint": "system.assign_user_role_view",  "label": "User-role assignments","icon": "users",      "key": "user-roles"},
+      {"endpoint": "system.system_settings_view",   "label": "Organization settings","icon": "settings",   "key": "settings"},
+      {"endpoint": "design_gallery_bp.gallery",     "label": "Design system",       "icon": "overview",    "key": "design"}
     ]
   }
 ] %}
 
 {% for section in nav_sections %}
   {% set rendered = namespace(count=0) %}
-  <nav class="ts-sidebar__section" aria-label="{{ section.label }}">
-    <span class="ts-sidebar__label">{{ section.label }}</span>
+  <nav class="ts-sidebar__section"{% if section.label %} aria-label="{{ section.label }}"{% endif %}>
+    {% if section.label %}<span class="ts-sidebar__label">{{ section.label }}</span>{% endif %}
     {% for item in section['items'] %}
       {# Only render the row if the backend route exists in this build. #}
       {% set href = None %}
