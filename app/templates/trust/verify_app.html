@@ -1,0 +1,21 @@
+{#
+  Authenticated verifier wrapper — operators clicking Verification
+  from the sidebar stay inside their workspace shell.
+#}
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'verify' %}
+
+{% block title %}Verification · TRUSTSEAL{% endblock %}
+{% block page_title %}Verify a sealed document{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Independently check a PDF against the platform's sealing certificate.
+    Verification compares bytes and evidence; it does not touch any
+    tenant lookup, and the uploaded file is discarded immediately after
+    hashing. Results list exactly which checks ran.
+  </p>
+{% endblock %}
+
+{% block content %}
+{% include "trust/_verify_body.html" %}
+{% endblock %}

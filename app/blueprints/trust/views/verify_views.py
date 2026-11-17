@@ -30,7 +30,23 @@ from flask import (
     render_template,
     request,
 )
+from flask_login import current_user
 from werkzeug.exceptions import RequestEntityTooLarge
+
+
+def _verify_template() -> str:
+    """Pick the authenticated app shell when the caller is signed in.
+
+    Verification is a public service, but a signed-in operator who
+    clicks "Verification" from the sidebar shouldn't be dumped out
+    of their workspace into the stripped public shell.
+    """
+    try:
+        if current_user.is_authenticated:
+            return "trust/verify_app.html"
+    except Exception:
+        pass
+    return "trust/verify.html"
 
 from app.services.platform_pdf_seal import (
     MAX_PDF_BYTES,
@@ -92,7 +108,7 @@ def verify_form():
     """Render the empty upload form."""
     enabled = bool(current_app.config.get("PUBLIC_PDF_VERIFICATION_ENABLED", False))
     return render_template(
-        "trust/verify.html",
+        _verify_template(),
         enabled=enabled,
         verdict=None,
         verdict_detail=None,
@@ -109,7 +125,7 @@ def verify_pdf():
     if _rate_limited():
         return (
             render_template(
-                "trust/verify.html",
+                _verify_template(),
                 enabled=True,
                 verdict=None,
                 verdict_detail=None,
@@ -123,7 +139,7 @@ def verify_pdf():
     if not current_app.config.get("PUBLIC_PDF_VERIFICATION_ENABLED", False):
         return (
             render_template(
-                "trust/verify.html",
+                _verify_template(),
                 enabled=False,
                 verdict=None,
                 verdict_detail=None,
@@ -139,7 +155,7 @@ def verify_pdf():
     if not isinstance(expected_cert, str) or not _CERT_HEX.fullmatch(expected_cert):
         return (
             render_template(
-                "trust/verify.html",
+                _verify_template(),
                 enabled=True,
                 verdict=None,
                 verdict_detail=None,
@@ -181,7 +197,7 @@ def verify_pdf():
     except PdfFinalizationError:
         return (
             render_template(
-                "trust/verify.html",
+                _verify_template(),
                 enabled=True,
                 verdict="invalid",
                 verdict_detail="Verification failed. The document may have been altered or sealed by a different platform.",
@@ -196,7 +212,7 @@ def verify_pdf():
     verdict, detail = _verdict_from(result)
     return (
         render_template(
-            "trust/verify.html",
+            _verify_template(),
             enabled=True,
             verdict=verdict,
             verdict_detail=detail,
@@ -212,7 +228,7 @@ def verify_pdf():
 def _render_bad_request(message: str):
     return (
         render_template(
-            "trust/verify.html",
+            _verify_template(),
             enabled=True,
             verdict=None,
             verdict_detail=None,
