@@ -47,9 +47,12 @@
 
   {# ======================= Ribbon tab strip ======================= #}
   <nav class="ts-ribbon-tabs" role="tablist" aria-label="Editor ribbon">
-    <button type="button" role="tab" class="ts-ribbon-tab ts-ribbon-tab--active" data-ribbon-tab="format" aria-selected="true">Format</button>
+    <button type="button" role="tab" class="ts-ribbon-tab ts-ribbon-tab--active" data-ribbon-tab="format"   aria-selected="true">Format</button>
+    <button type="button" role="tab" class="ts-ribbon-tab"                       data-ribbon-tab="insert"   aria-selected="false">Insert</button>
+    <button type="button" role="tab" class="ts-ribbon-tab"                       data-ribbon-tab="layout"   aria-selected="false">Layout</button>
     <button type="button" role="tab" class="ts-ribbon-tab"                       data-ribbon-tab="security" aria-selected="false">Security</button>
     <button type="button" role="tab" class="ts-ribbon-tab"                       data-ribbon-tab="review"   aria-selected="false">Review</button>
+    <button type="button" role="tab" class="ts-ribbon-tab"                       data-ribbon-tab="view"     aria-selected="false">View</button>
     <div class="ts-ribbon-tabs__spacer"></div>
   </nav>
 
@@ -132,12 +135,115 @@
       </button>
     </div>
     <div class="ts-ribbon__group">
+      <button type="button" class="ts-editor__btn" data-cmd="subscript" title="Subscript"><span>X<sub>₂</sub></span></button>
+      <button type="button" class="ts-editor__btn" data-cmd="superscript" title="Superscript"><span>X<sup>²</sup></span></button>
+      <button type="button" class="ts-editor__btn" data-case="UPPER" title="UPPERCASE"><span style="font-size: 10px;">AA</span></button>
+      <button type="button" class="ts-editor__btn" data-case="lower" title="lowercase"><span style="font-size: 10px;">aa</span></button>
+      <button type="button" class="ts-editor__btn" data-case="Title" title="Title Case"><span style="font-size: 10px;">Aa</span></button>
+    </div>
+    <div class="ts-ribbon__group">
       <button type="button" class="ts-editor__btn" data-cmd="createLink" title="Link">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10 14l4-4M9 7h3a4 4 0 010 8h-1M15 17h-3a4 4 0 010-8h1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <button type="button" class="ts-editor__btn" data-cmd="unlink" title="Remove link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 8l8 8M10 14l4-4M9 7h3a4 4 0 014 4M15 17h-3a4 4 0 01-4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
       <button type="button" class="ts-editor__btn" data-cmd="removeFormat" title="Clear formatting">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 4l-4 16M14 4l4 16M4 10h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
+    </div>
+  </div>
+
+  {# ======================= Insert ribbon ======================= #}
+  <div class="ts-ribbon" data-ribbon="insert" role="tabpanel" hidden>
+    <div class="ts-ribbon__group ts-ribbon__group--actions">
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-ins-table">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="16" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M3 10h18M3 15h18M9 4v16M15 4v16" stroke="currentColor" stroke-width="1.3"/>
+        </svg>
+        Table
+      </button>
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-ins-image">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="14" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="9" cy="10" r="1.5" fill="currentColor"/>
+          <path d="M3 17l5-5 4 4 3-3 6 6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+        Image
+      </button>
+      <input type="file" id="tsd-ins-image-input" accept="image/*" hidden>
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-ins-hr" title="Horizontal rule">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M3 12h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        Divider
+      </button>
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-ins-pagebreak">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M6 3h8l4 4v4H6V3zM6 13h12v8H6v-8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+        Page break
+      </button>
+    </div>
+    <div class="ts-ribbon__group ts-ribbon__group--actions">
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-ins-date">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="4" y="5" width="16" height="15" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Date
+      </button>
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-ins-signature">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 18c3-6 6-6 7-4s4 6 9 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M4 21h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Signature line
+      </button>
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-ins-field" title="Insert contract variable like {{client_name}}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M8 4h8M8 20h8M10 4v16M14 4v16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Field
+      </button>
+    </div>
+  </div>
+
+  {# ======================= Layout ribbon ======================= #}
+  <div class="ts-ribbon" data-ribbon="layout" role="tabpanel" hidden>
+    <div class="ts-ribbon__group ts-ribbon__group--labeled">
+      <label class="ts-ribbon__label">Page size</label>
+      <select id="tsd-page-size" class="ts-ribbon__select">
+        <option value="letter" selected>Letter (8.5 × 11 in)</option>
+        <option value="a4">A4 (210 × 297 mm)</option>
+        <option value="legal">Legal (8.5 × 14 in)</option>
+      </select>
+    </div>
+    <div class="ts-ribbon__group ts-ribbon__group--labeled">
+      <label class="ts-ribbon__label">Orientation</label>
+      <select id="tsd-page-orient" class="ts-ribbon__select">
+        <option value="portrait" selected>Portrait</option>
+        <option value="landscape">Landscape</option>
+      </select>
+    </div>
+    <div class="ts-ribbon__group ts-ribbon__group--labeled">
+      <label class="ts-ribbon__label">Margins</label>
+      <select id="tsd-page-margin" class="ts-ribbon__select">
+        <option value="normal" selected>Normal (1 in)</option>
+        <option value="narrow">Narrow (0.5 in)</option>
+        <option value="wide">Wide (1.5 in)</option>
+        <option value="moderate">Moderate (0.75 in)</option>
+      </select>
+    </div>
+    <div class="ts-ribbon__group ts-ribbon__group--labeled">
+      <label class="ts-ribbon__label">Line spacing</label>
+      <select id="tsd-line-spacing" class="ts-ribbon__select">
+        <option value="1.2">Single</option>
+        <option value="1.5">1.5</option>
+        <option value="1.6" selected>1.6 (default)</option>
+        <option value="2">Double</option>
+      </select>
     </div>
   </div>
 
@@ -223,6 +329,70 @@
       <span class="ts-panel__meta">Save the document first to unlock version history and signing-flow actions.</span>
     </div>
     {% endif %}
+    <div class="ts-ribbon__group ts-ribbon__group--actions">
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-spellcheck-toggle" aria-pressed="true" title="Toggle spell check">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 18l5-12 5 12M6 14h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M15 14l3 3 5-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Spell check
+      </button>
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-lock-toggle" aria-pressed="false" title="Lock editing">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="4" y="11" width="16" height="10" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        Lock editing
+      </button>
+    </div>
+  </div>
+
+  {# ======================= View ribbon ======================= #}
+  <div class="ts-ribbon" data-ribbon="view" role="tabpanel" hidden>
+    <div class="ts-ribbon__group ts-ribbon__group--labeled">
+      <label class="ts-ribbon__label">Zoom</label>
+      <select id="tsd-zoom" class="ts-ribbon__select">
+        <option value="0.5">50%</option>
+        <option value="0.75">75%</option>
+        <option value="0.9">90%</option>
+        <option value="1" selected>100%</option>
+        <option value="1.25">125%</option>
+        <option value="1.5">150%</option>
+        <option value="2">200%</option>
+      </select>
+    </div>
+    <div class="ts-ribbon__group ts-ribbon__group--actions">
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-zoom-fit="width" title="Fit page width to the canvas">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 12h16M4 12l4-4M4 12l4 4M20 12l-4-4M20 12l-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Fit width
+      </button>
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-zoom-reset title="Reset zoom to 100%">
+        100%
+      </button>
+    </div>
+    <div class="ts-ribbon__group ts-ribbon__group--actions">
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-toggle-watermark" aria-pressed="true" title="Show / hide watermark overlay">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M3 12s3-6 9-6 9 6 9 6-3 6-9 6-9-6-9-6z" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        Watermark
+      </button>
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-print" title="Open print dialog">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M6 9V3h12v6M6 14H4v7h16v-7h-2M6 14v7h12v-7H6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+        Print
+      </button>
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-fullscreen" title="Toggle full-screen editor">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+        </svg>
+        Full screen
+      </button>
+    </div>
   </div>
 
   {# ======================= Paper canvas ======================= #}
@@ -464,7 +634,24 @@
     font-size: 12pt; line-height: 1.6;
     outline: none; text-align: left;
     overflow: hidden;
+    transition: width var(--ts-dur-base) var(--ts-ease),
+                min-height var(--ts-dur-base) var(--ts-ease),
+                padding var(--ts-dur-base) var(--ts-ease);
   }
+  /* Page-size + orientation variants (assumes 96dpi). */
+  .ts-editor__page.ts-page--letter    { width: 816px;  min-height: 1056px; }
+  .ts-editor__page.ts-page--a4        { width: 794px;  min-height: 1123px; }
+  .ts-editor__page.ts-page--legal     { width: 816px;  min-height: 1344px; }
+  .ts-editor__page.ts-page--letter.ts-page--landscape { width: 1056px; min-height: 816px; }
+  .ts-editor__page.ts-page--a4.ts-page--landscape     { width: 1123px; min-height: 794px; }
+  .ts-editor__page.ts-page--legal.ts-page--landscape  { width: 1344px; min-height: 816px; }
+  /* Margins. */
+  .ts-editor__page.ts-page--m-normal   { padding: 96px; }
+  .ts-editor__page.ts-page--m-narrow   { padding: 48px; }
+  .ts-editor__page.ts-page--m-moderate { padding: 72px; }
+  .ts-editor__page.ts-page--m-wide     { padding: 144px; }
+  /* Watermark visibility toggle (View ▸ Watermark button). */
+  .ts-editor__page.ts-page--no-wm::before { content: none; }
   /* Watermark lives on the PAGE now, diagonal, behind content. */
   .ts-editor__page::before {
     content: attr(data-watermark);
@@ -645,15 +832,34 @@
     btn.addEventListener('click', function () {
       editor.focus();
       var cmd = btn.getAttribute('data-cmd');
+      var caseKind = btn.getAttribute('data-case');
       if (cmd === 'createLink') {
         var url = window.prompt('Link URL', 'https://');
         if (url) document.execCommand('createLink', false, url);
+      } else if (caseKind) {
+        applyCase(caseKind);
       } else if (cmd) {
         document.execCommand(cmd, false, null);
       }
       scheduleSave();
     });
   });
+
+  function applyCase(kind) {
+    var sel = window.getSelection();
+    if (!sel.rangeCount) return;
+    var range = sel.getRangeAt(0);
+    var text = sel.toString();
+    if (!text) return;
+    var transformed;
+    if (kind === 'UPPER') transformed = text.toUpperCase();
+    else if (kind === 'lower') transformed = text.toLowerCase();
+    else transformed = text.replace(/\w\S*/g,
+      function (w) { return w[0].toUpperCase() + w.substr(1).toLowerCase(); });
+    range.deleteContents();
+    range.insertNode(document.createTextNode(transformed));
+    sel.removeAllRanges();
+  }
   document.querySelectorAll('.ts-editor__select[data-cmd], .ts-editor__color input[data-cmd]').forEach(function (el) {
     el.addEventListener('mousedown', function () { editor.focus(); });
     el.addEventListener('change', function () {
@@ -809,6 +1015,188 @@
   if (historyClose) {
     historyClose.addEventListener('click', function () { historyPanel.setAttribute('hidden', ''); });
   }
+
+  // ============================================================ Insert tab
+  function insertHTML(html) {
+    editor.focus();
+    document.execCommand('insertHTML', false, html);
+    scheduleSave();
+  }
+
+  var insTable = document.getElementById('tsd-ins-table');
+  if (insTable) insTable.addEventListener('click', function () {
+    var rows = parseInt(window.prompt('Rows', '3'), 10);
+    var cols = parseInt(window.prompt('Columns', '3'), 10);
+    if (!(rows > 0 && cols > 0 && rows <= 50 && cols <= 20)) return;
+    var html = '<table style="border-collapse: collapse; width: 100%; margin: 12pt 0;">';
+    for (var r = 0; r < rows; r++) {
+      html += '<tr>';
+      for (var c = 0; c < cols; c++) {
+        var tag = r === 0 ? 'th' : 'td';
+        html += '<' + tag + ' style="border: 1px solid #c7ced6; padding: 6pt 8pt; text-align: left;">&nbsp;</' + tag + '>';
+      }
+      html += '</tr>';
+    }
+    html += '</table><p>&nbsp;</p>';
+    insertHTML(html);
+  });
+
+  var insImgBtn = document.getElementById('tsd-ins-image');
+  var insImgInput = document.getElementById('tsd-ins-image-input');
+  if (insImgBtn && insImgInput) {
+    insImgBtn.addEventListener('click', function () { insImgInput.click(); });
+    insImgInput.addEventListener('change', function () {
+      var f = insImgInput.files && insImgInput.files[0];
+      if (!f) return;
+      if (f.size > 4 * 1024 * 1024) {
+        alert('Image too large (max 4 MB). Upload bigger images via the Documents library import.');
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function () {
+        insertHTML('<img src="' + reader.result + '" alt="' + (f.name || 'image') + '" style="max-width: 100%; height: auto; margin: 6pt 0;">');
+      };
+      reader.readAsDataURL(f);
+      insImgInput.value = '';
+    });
+  }
+
+  var insHr = document.getElementById('tsd-ins-hr');
+  if (insHr) insHr.addEventListener('click', function () {
+    insertHTML('<hr style="border: 0; border-top: 1px solid #c7ced6; margin: 12pt 0;">');
+  });
+
+  var insPb = document.getElementById('tsd-ins-pagebreak');
+  if (insPb) insPb.addEventListener('click', function () {
+    insertHTML('<div style="page-break-after: always; border-top: 1px dashed #c7ced6; margin: 18pt 0; padding-top: 6pt; color: #7a8494; font-size: 9pt; text-align: center;">— Page break —</div>');
+  });
+
+  var insDate = document.getElementById('tsd-ins-date');
+  if (insDate) insDate.addEventListener('click', function () {
+    var d = new Date();
+    var m = ['January','February','March','April','May','June','July','August','September','October','November','December'][d.getMonth()];
+    insertHTML(m + ' ' + d.getDate() + ', ' + d.getFullYear());
+  });
+
+  var insSig = document.getElementById('tsd-ins-signature');
+  if (insSig) insSig.addEventListener('click', function () {
+    var name = window.prompt('Signer name (or label)', 'Signer');
+    if (name === null) return;
+    insertHTML(
+      '<div style="margin: 24pt 0 6pt; display: inline-block;">' +
+      '<div style="border-bottom: 1px solid #121a26; width: 240pt; height: 36pt;"></div>' +
+      '<div style="font-size: 9pt; color: #5a6676;">' + (name || 'Signer') + ' · signature</div>' +
+      '</div>'
+    );
+  });
+
+  var insField = document.getElementById('tsd-ins-field');
+  if (insField) insField.addEventListener('click', function () {
+    var name = window.prompt('Variable name (letters, digits, underscore)', 'client_name');
+    if (!name) return;
+    var safe = String(name).replace(/[^\w]/g, '_');
+    insertHTML('<span style="background: #eef3fa; color: #0f3b82; border: 1px solid #cfdcef; padding: 1px 6px; border-radius: 3px; font-family: monospace; font-size: 10pt;">{{' + safe + '}}</span>');
+  });
+
+  // ============================================================ Layout tab
+  function applyPageSize() {
+    var size = (document.getElementById('tsd-page-size') || {}).value || 'letter';
+    var orient = (document.getElementById('tsd-page-orient') || {}).value || 'portrait';
+    page.classList.remove('ts-page--letter','ts-page--a4','ts-page--legal','ts-page--landscape');
+    page.classList.add('ts-page--' + size);
+    if (orient === 'landscape') page.classList.add('ts-page--landscape');
+  }
+  function applyMargins() {
+    var m = (document.getElementById('tsd-page-margin') || {}).value || 'normal';
+    page.classList.remove('ts-page--m-normal','ts-page--m-narrow','ts-page--m-wide','ts-page--m-moderate');
+    page.classList.add('ts-page--m-' + m);
+  }
+  function applyLineSpacing() {
+    var s = (document.getElementById('tsd-line-spacing') || {}).value || '1.6';
+    page.style.lineHeight = s;
+  }
+  var pageSize   = document.getElementById('tsd-page-size');
+  var pageOrient = document.getElementById('tsd-page-orient');
+  var pageMargin = document.getElementById('tsd-page-margin');
+  var lineSpc    = document.getElementById('tsd-line-spacing');
+  if (pageSize)   pageSize.addEventListener('change', applyPageSize);
+  if (pageOrient) pageOrient.addEventListener('change', applyPageSize);
+  if (pageMargin) pageMargin.addEventListener('change', applyMargins);
+  if (lineSpc)    lineSpc.addEventListener('change', applyLineSpacing);
+  applyPageSize(); applyMargins(); applyLineSpacing();
+
+  // ============================================================ View tab
+  var canvas = document.getElementById('tsd-canvas');
+  var zoomSel = document.getElementById('tsd-zoom');
+  function applyZoom(scale) {
+    page.style.transformOrigin = 'top center';
+    page.style.transform = scale === 1 ? '' : 'scale(' + scale + ')';
+    // When zoomed, the canvas grows to avoid clipped content.
+    if (scale !== 1) {
+      page.style.marginBottom = ((scale - 1) * 1056) + 'px';
+    } else {
+      page.style.marginBottom = '';
+    }
+  }
+  if (zoomSel) zoomSel.addEventListener('change', function () { applyZoom(parseFloat(zoomSel.value)); });
+  document.querySelectorAll('[data-zoom-reset]').forEach(function (b) {
+    b.addEventListener('click', function () { if (zoomSel) zoomSel.value = '1'; applyZoom(1); });
+  });
+  document.querySelectorAll('[data-zoom-fit]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var pad = 80; // 2× canvas side padding
+      var scale = Math.max(0.5, Math.min(2, (canvas.clientWidth - pad) / 816));
+      scale = Math.round(scale * 100) / 100;
+      if (zoomSel) {
+        var opt = [0.5, 0.75, 0.9, 1, 1.25, 1.5, 2].reduce(function (best, v) {
+          return Math.abs(v - scale) < Math.abs(best - scale) ? v : best;
+        });
+        zoomSel.value = String(opt);
+        scale = opt;
+      }
+      applyZoom(scale);
+    });
+  });
+
+  var wmToggle = document.getElementById('tsd-toggle-watermark');
+  if (wmToggle) wmToggle.addEventListener('click', function () {
+    var on = wmToggle.getAttribute('aria-pressed') !== 'true';
+    wmToggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+    page.style.setProperty('--tsd-watermark-visible', on ? '1' : '0');
+    page.classList.toggle('ts-page--no-wm', !on);
+  });
+
+  var spellBtn = document.getElementById('tsd-spellcheck-toggle');
+  if (spellBtn) spellBtn.addEventListener('click', function () {
+    var on = spellBtn.getAttribute('aria-pressed') !== 'true';
+    spellBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    editor.setAttribute('spellcheck', on ? 'true' : 'false');
+  });
+
+  var lockBtn = document.getElementById('tsd-lock-toggle');
+  if (lockBtn) lockBtn.addEventListener('click', function () {
+    var on = lockBtn.getAttribute('aria-pressed') !== 'true';
+    lockBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    editor.setAttribute('contenteditable', on ? 'false' : 'true');
+    lockBtn.textContent = '';
+    lockBtn.innerHTML = (on
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="11" width="16" height="10" stroke="currentColor" stroke-width="1.5"/><path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" stroke-width="1.5" fill="currentColor"/></svg> Unlock'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="11" width="16" height="10" stroke="currentColor" stroke-width="1.5"/><path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" stroke-width="1.5"/></svg> Lock editing');
+    stat(on ? 'Editing locked' : 'Editing unlocked', 'saved');
+  });
+
+  var printBtn = document.getElementById('tsd-print');
+  if (printBtn) printBtn.addEventListener('click', function () { window.print(); });
+
+  var fsBtn = document.getElementById('tsd-fullscreen');
+  if (fsBtn) fsBtn.addEventListener('click', function () {
+    var target = document.getElementById('tsd-shell');
+    if (!document.fullscreenElement) {
+      (target.requestFullscreen || target.webkitRequestFullscreen || function () {}).call(target);
+    } else {
+      (document.exitFullscreen || document.webkitExitFullscreen || function () {}).call(document);
+    }
+  });
 
   // ============================================================ PDF export
   var pdfBtn     = document.getElementById('tsd-export-pdf-btn');
