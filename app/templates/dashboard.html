@@ -34,23 +34,23 @@
 
 <!-- Compact metric strip ------------------------------------- -->
 <section class="ts-metric-strip" aria-label="Workspace headline metrics">
-  <a class="ts-metric"
+  <a class="ts-metric ts-metric--link"
      href="{{ url_for('operator_notifications_views.list_notifications') if 'operator_notifications_views.list_notifications' in url_map_endpoints else '#' }}">
-    <span class="ts-metric__num">{{ metrics_my_pending|default(0) }}</span>
-    <span class="ts-metric__lbl">Needs your signature</span>
+    <span class="ts-metric__label">Needs your signature</span>
+    <span class="ts-metric__value">{{ metrics_my_pending|default(0) }}</span>
   </a>
-  <a class="ts-metric" href="{{ url_for('document_views.index') if 'document_views.index' in url_map_endpoints else '#' }}">
-    <span class="ts-metric__num">{{ metrics_awaiting_others|default(0) }}</span>
-    <span class="ts-metric__lbl">Awaiting others</span>
+  <a class="ts-metric ts-metric--link" href="{{ url_for('document_views.index') if 'document_views.index' in url_map_endpoints else '#' }}">
+    <span class="ts-metric__label">Awaiting others</span>
+    <span class="ts-metric__value">{{ metrics_awaiting_others|default(0) }}</span>
   </a>
-  <a class="ts-metric" href="{{ url_for('document_views.index') if 'document_views.index' in url_map_endpoints else '#' }}">
-    <span class="ts-metric__num">{{ metrics_recent_documents|default(0) }}</span>
-    <span class="ts-metric__lbl">Documents this week</span>
+  <a class="ts-metric ts-metric--link" href="{{ url_for('document_views.index') if 'document_views.index' in url_map_endpoints else '#' }}">
+    <span class="ts-metric__label">Documents this week</span>
+    <span class="ts-metric__value">{{ metrics_recent_documents|default(0) }}</span>
   </a>
-  <a class="ts-metric"
+  <a class="ts-metric ts-metric--link"
      href="{{ url_for('operator_notifications_views.list_notifications') if 'operator_notifications_views.list_notifications' in url_map_endpoints else '#' }}">
-    <span class="ts-metric__num">{{ metrics_unread_notifications|default(0) }}</span>
-    <span class="ts-metric__lbl">Unread notifications</span>
+    <span class="ts-metric__label">Unread notifications</span>
+    <span class="ts-metric__value">{{ metrics_unread_notifications|default(0) }}</span>
   </a>
 </section>
 
@@ -154,53 +154,15 @@
 
 {% block extra_head %}
 <style>
-  .ts-metric-strip {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1px;
-    background: var(--ts-border);
-    border: 1px solid var(--ts-border);
-    border-radius: var(--ts-radius);
-    overflow: hidden;
-  }
-  .ts-metric {
-    background: var(--ts-surface);
-    padding: var(--ts-space-4) var(--ts-space-5);
-    display: block;
+  /* Dashboard-local: activity list and clickable metric cells. */
+  .ts-metric--link {
     text-decoration: none;
+    color: inherit;
     transition: background var(--ts-dur-fast) var(--ts-ease);
   }
-  .ts-metric:hover {
-    background: var(--ts-brand-primary-soft);
+  .ts-metric--link:hover {
+    background: var(--ts-surface-alt);
     text-decoration: none;
-  }
-  .ts-metric__num {
-    display: block;
-    font-size: 32px;
-    font-weight: 600;
-    color: var(--ts-text);
-    line-height: 1.1;
-  }
-  .ts-metric__lbl {
-    display: block;
-    margin-top: 4px;
-    font-size: var(--ts-fs-label);
-    color: var(--ts-text-muted);
-    font-weight: var(--ts-fw-medium);
-  }
-
-  .ts-section-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--ts-space-3);
-    margin-bottom: var(--ts-space-3);
-  }
-  .ts-section-head h2 {
-    margin: 0;
-    font-size: var(--ts-fs-section);
-    font-weight: var(--ts-fw-semibold);
-    color: var(--ts-text);
   }
 
   .ts-activity { list-style: none; padding: 0; margin: 0; }
@@ -208,7 +170,7 @@
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr);
     gap: var(--ts-space-3);
-    padding: var(--ts-space-3) 0;
+    padding: var(--ts-space-4) 0;
     border-top: 1px solid var(--ts-border);
   }
   .ts-activity li:first-child { border-top: 0; padding-top: 0; }

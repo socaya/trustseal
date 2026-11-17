@@ -1,7 +1,5 @@
 /*
- * TRUSTSEAL minimal reset. Intentionally narrower than Normalize —
- * we want no cross-browser surprises in the design system without
- * paying for Bootstrap's full reboot.
+ * TRUSTSEAL minimal reset.
  */
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -18,11 +16,11 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "ss01" 1, "cv11" 1;
 }
 
-h1, h2, h3, h4, h5, h6, p, ul, ol, dl, dd, figure, pre {
-  margin: 0;
-}
+h1, h2, h3, h4, h5, h6, p, ul, ol, dl, dd, figure, pre { margin: 0; }
+h1, h2, h3, h4, h5, h6 { font-weight: var(--ts-fw-semibold); line-height: var(--ts-lh-tight); color: var(--ts-text); }
 
 ul, ol { padding: 0; list-style: none; }
 
@@ -33,17 +31,18 @@ a {
 }
 a:hover { color: var(--ts-brand-primary-hover); text-decoration: underline; }
 
-button, input, select, textarea {
-  font: inherit;
-  color: inherit;
-}
-
+button, input, select, textarea { font: inherit; color: inherit; }
 button { background: none; border: 0; padding: 0; cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 
 img, svg, video { max-width: 100%; display: block; }
 
 code, kbd, pre, samp { font-family: var(--ts-font-mono); font-size: 0.92em; }
+
+/* Tabular numerals wherever numeric columns matter. */
+.ts-metric__value, .ts-table td, .ts-table th, .ts-cell-sub code {
+  font-variant-numeric: tabular-nums;
+}
 
 hr {
   border: 0;
@@ -60,7 +59,6 @@ hr {
 
 [hidden] { display: none !important; }
 
-/* Reduced motion — second guard in addition to the per-token reset. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

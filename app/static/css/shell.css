@@ -3,15 +3,14 @@
  *
  * Structure:
  *   .ts-app
- *     .ts-topbar              (56px, fixed)
+ *     .ts-topbar              (60px, sticky)
  *     .ts-shell
- *       .ts-sidebar           (256px, collapsible to 56px rail; drawer on mobile)
+ *       .ts-sidebar           (248px, collapsible to 64px rail; drawer on mobile)
  *       .ts-content
  *         .ts-page
  *       .ts-inspector         (optional right panel, 360px)
  *
- * No AdminLTE. No Bootstrap grid. Plain CSS grid + a small
- * amount of flexbox.
+ * Direction: flat surfaces, generous page gutter, calm hierarchy.
  */
 
 .ts-app {
@@ -23,7 +22,7 @@
   font-family: var(--ts-font);
 }
 
-/* ------------------------------------------------------------------ Topbar */
+/* ============================================================== Topbar */
 
 .ts-topbar {
   position: sticky;
@@ -33,8 +32,8 @@
   border-bottom: 1px solid var(--ts-border);
   display: flex;
   align-items: center;
-  gap: var(--ts-space-3);
-  padding: 0 var(--ts-space-4);
+  gap: var(--ts-space-4);
+  padding: 0 var(--ts-space-5);
   height: var(--ts-topbar-h);
 }
 
@@ -48,7 +47,7 @@
 }
 .ts-topbar__brand:hover { text-decoration: none; }
 .ts-topbar__brand img {
-  height: 44px;
+  height: 38px;
   width: auto;
   display: block;
 }
@@ -61,13 +60,14 @@
   color: var(--ts-text-muted);
   font-size: var(--ts-fs-label);
   padding-left: var(--ts-space-4);
+  margin-left: var(--ts-space-1);
   border-left: 1px solid var(--ts-border);
   min-height: 28px;
 }
 
 .ts-topbar__search {
   flex: 1 1 320px;
-  max-width: 480px;
+  max-width: 440px;
   margin: 0 var(--ts-space-4);
 }
 
@@ -75,44 +75,39 @@
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: var(--ts-space-2);
+  gap: var(--ts-space-1);
 }
 
 .ts-topbar__icon-btn {
-  width: 36px; height: 36px;
+  width: 40px; height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--ts-text-muted);
-  border-radius: var(--ts-radius);
   position: relative;
+  transition: color var(--ts-dur-fast) var(--ts-ease);
 }
-.ts-topbar__icon-btn:hover {
-  background: var(--ts-brand-primary-soft);
-  color: var(--ts-brand-primary);
-}
+.ts-topbar__icon-btn:hover,
 .ts-topbar__icon-btn[aria-current="true"] {
-  background: var(--ts-brand-primary-soft);
   color: var(--ts-brand-primary);
 }
+.ts-topbar__icon-btn svg { width: 22px; height: 22px; }
 .ts-topbar__icon-btn .ts-dot {
   position: absolute;
-  top: 8px; right: 8px;
+  top: 10px; right: 10px;
   width: 8px; height: 8px;
   border-radius: 50%;
   background: var(--ts-danger);
   border: 2px solid var(--ts-surface);
 }
 
-/* Account dropdown. */
-.ts-account {
-  position: relative;
-}
+/* ---- Account dropdown ---- */
+.ts-account { position: relative; }
 .ts-account__menu {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  min-width: 240px;
+  min-width: 260px;
   background: var(--ts-surface);
   border: 1px solid var(--ts-border);
   border-radius: var(--ts-radius);
@@ -154,12 +149,15 @@
   background: transparent;
   cursor: pointer;
 }
-.ts-account__item:hover { background: var(--ts-brand-primary-soft); color: var(--ts-brand-primary); text-decoration: none; }
+.ts-account__item:hover {
+  color: var(--ts-brand-primary);
+  text-decoration: none;
+}
 .ts-account__item--danger { color: var(--ts-danger); }
-.ts-account__item--danger:hover { background: var(--ts-danger-soft); color: var(--ts-danger); }
+.ts-account__item--danger:hover { color: var(--ts-danger); text-decoration: underline; }
 .ts-account__divider { border-top: 1px solid var(--ts-border); margin: var(--ts-space-2) 0; }
 
-/* Sidebar toggle shown only below desktop. */
+/* ---- Mobile nav toggle ---- */
 .ts-topbar__nav-toggle { display: none; }
 @media (max-width: 1023px) {
   .ts-topbar__nav-toggle {
@@ -172,28 +170,26 @@
   }
 }
 
-/* ------------------------------------------------------------------- Shell */
+/* =============================================================== Shell */
 
 .ts-shell {
   display: grid;
   grid-template-columns: var(--ts-sidebar-w) minmax(0, 1fr);
   min-height: calc(100vh - var(--ts-topbar-h));
 }
-
 .ts-shell.ts-shell--with-inspector {
   grid-template-columns: var(--ts-sidebar-w) minmax(0, 1fr) var(--ts-inspector-w);
 }
-
 .ts-shell.ts-shell--collapsed {
   grid-template-columns: var(--ts-sidebar-rail-w) minmax(0, 1fr);
 }
 
-/* ---------------------------------------------------------------- Sidebar */
+/* ============================================================= Sidebar */
 
 .ts-sidebar {
   background: var(--ts-surface);
   border-right: 1px solid var(--ts-border);
-  padding: var(--ts-space-4) var(--ts-space-3);
+  padding: var(--ts-space-5) var(--ts-space-3);
   overflow-y: auto;
   position: sticky;
   top: var(--ts-topbar-h);
@@ -202,18 +198,22 @@
 }
 
 .ts-sidebar__section {
-  padding: var(--ts-space-4) 0 var(--ts-space-2);
+  padding: 0 0 var(--ts-space-3);
 }
-.ts-sidebar__section + .ts-sidebar__section { border-top: 1px solid var(--ts-border); }
+.ts-sidebar__section + .ts-sidebar__section {
+  margin-top: var(--ts-space-4);
+  padding-top: var(--ts-space-4);
+  border-top: 1px solid var(--ts-border);
+}
 
 .ts-sidebar__label {
   display: block;
   padding: 0 var(--ts-space-3) var(--ts-space-2);
-  font-size: 11px;
+  font-size: var(--ts-fs-micro);
   font-weight: var(--ts-fw-semibold);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--ts-text-muted);
+  color: var(--ts-text-subtle);
 }
 
 .ts-sidebar__item {
@@ -221,36 +221,33 @@
   align-items: center;
   gap: var(--ts-space-3);
   padding: 10px var(--ts-space-3);
-  margin: 2px 0;
   color: var(--ts-text);
   font-size: var(--ts-fs-body);
-  border-radius: var(--ts-radius);
-  line-height: 1.25;
-  min-height: 38px;
+  line-height: 1.3;
+  min-height: 40px;
   position: relative;
-  transition: background var(--ts-dur-fast) var(--ts-ease),
-              color var(--ts-dur-fast) var(--ts-ease);
+  text-decoration: none;
+  transition: color var(--ts-dur-fast) var(--ts-ease);
 }
 .ts-sidebar__item:hover {
-  background: var(--ts-brand-primary-soft);
   color: var(--ts-brand-primary);
   text-decoration: none;
 }
 .ts-sidebar__item[aria-current="page"] {
-  background: var(--ts-brand-primary-soft);
   color: var(--ts-brand-primary);
   font-weight: var(--ts-fw-semibold);
 }
 .ts-sidebar__item[aria-current="page"]::before {
   content: "";
   position: absolute;
-  left: -12px; top: 6px; bottom: 6px;
-  width: 4px;
-  border-radius: 0 2px 2px 0;
+  left: calc(-1 * var(--ts-space-3));
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
   background: var(--ts-brand-primary);
 }
 .ts-sidebar__item .ts-sidebar__icon {
-  width: 20px; height: 20px;
+  width: 22px; height: 22px;
   flex: 0 0 auto;
   color: var(--ts-text-muted);
   transition: color var(--ts-dur-fast) var(--ts-ease);
@@ -260,26 +257,27 @@
 
 .ts-sidebar__badge {
   margin-left: auto;
-  font-size: 11px;
+  font-size: var(--ts-fs-micro);
   font-weight: var(--ts-fw-semibold);
-  background: var(--ts-border);
-  color: var(--ts-text);
-  padding: 1px 6px;
-  border-radius: 10px;
+  background: var(--ts-surface-alt);
+  color: var(--ts-text-muted);
+  border: 1px solid var(--ts-border);
+  padding: 0 6px;
+  border-radius: var(--ts-radius-pill);
   min-width: 18px;
   text-align: center;
+  line-height: 16px;
 }
 .ts-sidebar__item[aria-current="page"] .ts-sidebar__badge {
   background: var(--ts-brand-primary);
   color: var(--ts-text-inverse);
+  border-color: var(--ts-brand-primary);
 }
 
-/* Collapsed rail mode (desktop). */
+/* Collapsed rail. */
 .ts-shell--collapsed .ts-sidebar__label,
 .ts-shell--collapsed .ts-sidebar__item span.ts-sidebar__text,
-.ts-shell--collapsed .ts-sidebar__badge {
-  display: none;
-}
+.ts-shell--collapsed .ts-sidebar__badge { display: none; }
 .ts-shell--collapsed .ts-sidebar__item { justify-content: center; }
 .ts-shell--collapsed .ts-sidebar__item[aria-current="page"]::before { display: none; }
 
@@ -302,12 +300,12 @@
     content: "";
     position: fixed;
     inset: var(--ts-topbar-h) 0 0 0;
-    background: rgba(23, 37, 54, 0.4);
+    background: rgba(18, 26, 38, 0.4);
     z-index: calc(var(--ts-z-sidebar) - 1);
   }
 }
 
-/* --------------------------------------------------------------- Content */
+/* ============================================================= Content */
 
 .ts-content {
   min-width: 0;
@@ -316,39 +314,48 @@
 }
 
 .ts-page {
-  padding: var(--ts-space-6);
+  padding: var(--ts-space-7) var(--ts-page-gutter);
   min-width: 0;
   flex: 1 1 auto;
+  max-width: var(--ts-content-max);
+  width: 100%;
 }
-
-.ts-page-title {
-  margin: 0;
-  font-size: var(--ts-fs-page-title);
-  font-weight: var(--ts-fw-semibold);
-  line-height: var(--ts-lh-tight);
-  color: var(--ts-text);
+@media (max-width: 767px) {
+  .ts-page { padding: var(--ts-space-5) var(--ts-space-4); }
 }
 
 .ts-page-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--ts-space-4);
+  gap: var(--ts-space-5);
   padding-bottom: var(--ts-space-5);
-  margin-bottom: var(--ts-space-5);
+  margin-bottom: var(--ts-space-6);
   border-bottom: 1px solid var(--ts-border);
 }
-.ts-page-header__text { min-width: 0; }
+.ts-page-header__text { min-width: 0; max-width: 72ch; }
+
+.ts-page-title,
+.ts-page-header h1 {
+  margin: 0;
+  font-size: var(--ts-fs-page-title);
+  font-weight: var(--ts-fw-semibold);
+  line-height: var(--ts-lh-tight);
+  letter-spacing: -0.015em;
+  color: var(--ts-text);
+}
 .ts-page-header__description {
-  margin-top: var(--ts-space-2);
+  margin-top: var(--ts-space-3);
   color: var(--ts-text-muted);
   font-size: var(--ts-fs-body);
-  max-width: 68ch;
+  line-height: var(--ts-lh-prose);
+  max-width: 72ch;
 }
 .ts-page-header__actions {
   display: inline-flex;
   gap: var(--ts-space-2);
   flex: 0 0 auto;
+  padding-top: var(--ts-space-1);
 }
 
 .ts-breadcrumbs {
@@ -364,7 +371,7 @@
 .ts-breadcrumbs a:hover { color: var(--ts-brand-primary); }
 .ts-breadcrumbs__sep { color: var(--ts-border-strong); }
 
-/* --------------------------------------------------------------- Inspector */
+/* =========================================================== Inspector */
 
 .ts-inspector {
   background: var(--ts-surface);
@@ -393,7 +400,7 @@
   color: var(--ts-text-muted);
   border-radius: var(--ts-radius);
 }
-.ts-inspector__close:hover { background: var(--ts-brand-primary-soft); color: var(--ts-brand-primary); }
+.ts-inspector__close:hover { background: var(--ts-surface-alt); color: var(--ts-text); }
 
 @media (max-width: 1023px) {
   .ts-inspector {
@@ -405,10 +412,10 @@
   }
 }
 
-/* --------------------------------------------------------------- Footer */
+/* =============================================================== Footer */
 
 .ts-footer {
-  padding: var(--ts-space-4) var(--ts-space-6);
+  padding: var(--ts-space-4) var(--ts-page-gutter);
   color: var(--ts-text-muted);
   font-size: var(--ts-fs-meta);
   border-top: 1px solid var(--ts-border);

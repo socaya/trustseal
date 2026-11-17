@@ -1,34 +1,39 @@
 /*
  * TRUSTSEAL canonical design tokens.
- * Source of truth: docs/TRUSTSEAL_UI_UX_Requirements_Design_System_v1.0.md §3.
  *
- * Do NOT redefine these values in page-local stylesheets. Semantic
- * meaning first; new tokens only after cross-page justification.
+ * Direction v3 (operator feedback):
+ *   - Soft, flat, professional. No gradients. No colored shadow lifts.
+ *   - Minimal radii — surfaces are near-square; only controls carry
+ *     a small 3px radius so pointer affordances still read.
+ *   - Generous, editorial type scale with tabular numerals.
+ *   - Neutrals lean slate-warm, not blue-cold, so content can breathe.
  */
 
 :root {
   /* Brand ------------------------------------------------------- */
   --ts-brand-primary:         #0f3b82;
-  --ts-brand-primary-hover:   #0c2e66;
+  --ts-brand-primary-hover:   #0b2f69;
   --ts-brand-primary-soft:    #eef3fa;
   --ts-brand-green:           #0e664d;
   --ts-green-soft:            #eaf5f0;
 
-  /* Surfaces ---------------------------------------------------- */
-  --ts-canvas:                #f6f8fb;
+  /* Surfaces --- subtle contrast between canvas and card ------- */
+  --ts-canvas:                #f5f6f8;
   --ts-surface:               #ffffff;
-  --ts-surface-alt:           #fafbfd;
+  --ts-surface-alt:           #fafbfc;
+  --ts-surface-sunken:        #f1f2f5;
 
-  /* Text -------------------------------------------------------- */
-  --ts-text:                  #172536;
-  --ts-text-muted:            #526174;
+  /* Text — higher contrast for body, softer for meta ----------- */
+  --ts-text:                  #121a26;
+  --ts-text-muted:            #5a6676;
+  --ts-text-subtle:           #7a8494;
   --ts-text-inverse:          #ffffff;
 
-  /* Boundaries -------------------------------------------------- */
-  --ts-border:                #e1e6ed;
-  --ts-border-strong:         #bcc6d2;
+  /* Boundaries ------------------------------------------------- */
+  --ts-border:                #e4e7ec;
+  --ts-border-strong:         #c7ced6;
 
-  /* Semantic utility -------------------------------------------- */
+  /* Semantic utility ------------------------------------------ */
   --ts-danger:                #9e2f36;
   --ts-danger-soft:           #fbeef0;
   --ts-warning:               #835a0c;
@@ -37,23 +42,30 @@
   --ts-info-soft:             #eaf0f8;
   --ts-focus:                 #3778d4;
 
-  /* Typography — enlarged for visibility (operator-feedback v2) --- */
-  --ts-font:                  "Inter", "Helvetica Neue", Arial, sans-serif;
+  /* Typography ------------------------------------------------- */
+  --ts-font:                  "Inter", system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --ts-font-mono:             ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  --ts-fs-page-title:         28px;
-  --ts-fs-section:            20px;
-  --ts-fs-subsection:         17px;
+
+  /* Editorial type scale (minor-third-ish, trimmed) ----------- */
+  --ts-fs-display:            32px;
+  --ts-fs-page-title:         26px;
+  --ts-fs-section:            18px;
+  --ts-fs-subsection:         16px;
   --ts-fs-body:               15px;
-  --ts-fs-label:              14px;
-  --ts-fs-meta:               13px;
-  --ts-fs-counter:            28px;
-  --ts-lh-base:               1.5;
-  --ts-lh-tight:              1.25;
+  --ts-fs-label:              13px;
+  --ts-fs-meta:               12px;
+  --ts-fs-micro:              11px;
+
+  --ts-lh-tight:              1.2;
+  --ts-lh-base:               1.55;
+  --ts-lh-prose:              1.65;
+
   --ts-fw-regular:            400;
   --ts-fw-medium:             500;
   --ts-fw-semibold:           600;
+  --ts-fw-bold:               700;
 
-  /* Spacing (4px base, 8px rhythm) ------------------------------ */
+  /* Spacing (4px base, 8px rhythm) ---------------------------- */
   --ts-space-1:               4px;
   --ts-space-2:               8px;
   --ts-space-3:               12px;
@@ -62,25 +74,32 @@
   --ts-space-6:               24px;
   --ts-space-7:               32px;
   --ts-space-8:               40px;
+  --ts-space-9:               48px;
+  --ts-space-10:              64px;
 
-  /* Shell geometry --------------------------------------------- */
-  --ts-topbar-h:              64px;
-  --ts-sidebar-w:             256px;
-  --ts-sidebar-w-min:         232px;
+  /* Shell geometry --- more breathing room -------------------- */
+  --ts-topbar-h:              60px;
+  --ts-sidebar-w:             248px;
+  --ts-sidebar-w-min:         224px;
   --ts-sidebar-w-max:         320px;
   --ts-sidebar-rail-w:        64px;
   --ts-inspector-w:           360px;
+  --ts-page-gutter:           32px;
+  --ts-content-max:           1240px;
 
-  /* Controls --------------------------------------------------- */
+  /* Controls --- only buttons/inputs have radii; surfaces don't */
   --ts-control-h:             40px;
-  --ts-control-h-sm:          32px;
-  --ts-control-h-lg:          48px;
-  --ts-radius:                3px;
-  --ts-radius-sm:             2px;
-  --ts-radius-lg:             6px;
+  --ts-control-h-sm:          30px;
+  --ts-control-h-lg:          46px;
 
-  /* Elevation (restrained) ------------------------------------- */
-  --ts-shadow-overlay:        0 8px 24px rgba(23, 37, 54, 0.12);
+  --ts-radius-none:           0;
+  --ts-radius-sm:             2px;
+  --ts-radius:                3px;
+  --ts-radius-pill:           999px;
+
+  /* Elevation (flat — only overlays lift) --------------------- */
+  --ts-shadow-sm:             0 1px 0 rgba(18, 26, 38, 0.04);
+  --ts-shadow-overlay:        0 6px 20px rgba(18, 26, 38, 0.10);
   --ts-shadow-inspector:      -1px 0 0 var(--ts-border);
 
   /* Motion ----------------------------------------------------- */
@@ -98,18 +117,15 @@
 }
 
 /*
- * Density preference (per spec §3.4). Opt-in via <body class="ts-density-comfortable">.
+ * Density preference. Opt-in via <body class="ts-density-comfortable">.
  */
 .ts-density-comfortable {
   --ts-control-h:             44px;
   --ts-space-4:               18px;
   --ts-space-6:               28px;
+  --ts-page-gutter:           40px;
 }
 
-/*
- * Reduced motion. Honored globally in reset.css; declared here so
- * individual components can read the duration tokens safely.
- */
 @media (prefers-reduced-motion: reduce) {
   :root {
     --ts-dur-fast: 0.01ms;

@@ -67,9 +67,10 @@
   font-weight: var(--ts-fw-semibold);
 }
 .ts-hero__title {
-  font-size: 32px;
+  font-size: var(--ts-fs-display);
   font-weight: var(--ts-fw-semibold);
-  line-height: 1.2;
+  line-height: var(--ts-lh-tight);
+  letter-spacing: -0.02em;
   max-width: 22ch;
 }
 .ts-hero__lede {
@@ -98,10 +99,10 @@
   gap: var(--ts-space-4);
 }
 .ts-feature {
-  padding: var(--ts-space-4);
+  padding: var(--ts-space-5);
   background: var(--ts-surface);
   border: 1px solid var(--ts-border);
-  border-radius: var(--ts-radius);
+  border-radius: var(--ts-radius-none);
 }
 .ts-feature__title {
   font-weight: var(--ts-fw-semibold);
@@ -177,10 +178,10 @@
 .ts-auth-card {
   background: var(--ts-surface);
   border: 1px solid var(--ts-border);
-  border-radius: var(--ts-radius-lg);
-  padding: var(--ts-space-6);
+  border-radius: var(--ts-radius-none);
+  padding: var(--ts-space-7);
   width: 100%;
-  max-width: 420px;
+  max-width: 440px;
 }
 .ts-auth-card__brand {
   display: flex;
