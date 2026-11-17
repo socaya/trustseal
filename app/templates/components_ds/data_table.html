@@ -1,0 +1,80 @@
+{#
+  Operational data table (spec §5.2). Server-paginated; minimal
+  presentation logic — the caller supplies rendered row HTML in the
+  `rows_html` block so each business area can shape its own cells.
+
+  Args:
+    columns           — [{key, label, sort, width}]
+    toolbar_left_html — optional string of filter controls
+    toolbar_right_html — optional string of extra actions (export, columns)
+    empty_title       — fallback when rows_html is empty
+    empty_hint        — short explanation
+    pagination        — {page, page_size, total, prev_url, next_url}
+#}
+<div class="ts-table-shell">
+  {% if toolbar_left_html or toolbar_right_html %}
+  <div class="ts-table-toolbar">
+    <div class="ts-table-toolbar__left">{{ toolbar_left_html|safe if toolbar_left_html }}</div>
+    <div class="ts-table-toolbar__right">{{ toolbar_right_html|safe if toolbar_right_html }}</div>
+  </div>
+  {% endif %}
+
+  {% if applied_filters %}
+  <div class="ts-filter-bar">
+    {% for chip in applied_filters %}
+      <span class="ts-filter-chip">
+        {{ chip.label }}
+        {% if chip.clear_url %}
+        <a class="ts-filter-chip__remove" href="{{ chip.clear_url }}" aria-label="Remove filter">×</a>
+        {% endif %}
+      </span>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="ts-table-scroll">
+    <table class="ts-table {{ table_modifier or '' }}">
+      <thead>
+        <tr>
+          {% if selectable %}<th scope="col" class="ts-table__select"><input type="checkbox" aria-label="Select all"></th>{% endif %}
+          {% for col in columns %}
+            <th scope="col"
+                {% if col.sort %}aria-sort="{{ col.sort }}"{% endif %}
+                {% if col.width %}style="width:{{ col.width }};"{% endif %}>{{ col.label }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% if rows_html %}
+          {{ rows_html|safe }}
+        {% else %}
+          <tr>
+            <td colspan="{{ (columns|length) + (1 if selectable else 0) }}">
+              <div class="ts-empty">
+                <div class="ts-empty__title">{{ empty_title or 'Nothing here yet' }}</div>
+                <p class="ts-empty__hint">{{ empty_hint or 'When records appear, they will be listed here.' }}</p>
+                {% if empty_action_html %}<div class="ts-empty__actions">{{ empty_action_html|safe }}</div>{% endif %}
+              </div>
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if pagination and pagination.total %}
+  <div class="ts-table-pagination">
+    <span>
+      Showing {{ ((pagination.page - 1) * pagination.page_size) + 1 }}–{{
+        [pagination.page * pagination.page_size, pagination.total]|min
+      }} of {{ pagination.total }}
+    </span>
+    <div class="ts-table-pagination__nav">
+      <a class="ts-btn ts-btn--secondary ts-btn--sm" href="{{ pagination.prev_url or '#' }}"
+         {% if not pagination.prev_url %}aria-disabled="true" tabindex="-1"{% endif %}>Previous</a>
+      <a class="ts-btn ts-btn--secondary ts-btn--sm" href="{{ pagination.next_url or '#' }}"
+         {% if not pagination.next_url %}aria-disabled="true" tabindex="-1"{% endif %}>Next</a>
+    </div>
+  </div>
+  {% endif %}
+</div>

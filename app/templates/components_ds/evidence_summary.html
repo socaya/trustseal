@@ -1,0 +1,25 @@
+{#
+  Evidence detail list (spec §5.4, §6.8). Each row names the claim
+  tested, the evidence source and the observed result. Supports
+  "indeterminate" so unchecked claims are never implied passing.
+
+  Args:
+    rows — list of {label, value, tone, state_label, title}
+#}
+<dl class="ts-evidence" aria-label="Verification evidence">
+  {% for row in rows %}
+    <div class="ts-evidence__row">
+      <dt class="ts-evidence__label">{{ row.label }}</dt>
+      <dd class="ts-evidence__value">
+        {% if row.mono %}<code>{{ row.value }}</code>{% else %}{{ row.value }}{% endif %}
+        {% if row.hint %}<div class="ts-field__hint">{{ row.hint }}</div>{% endif %}
+      </dd>
+      <span class="ts-evidence__state">
+        <span class="ts-status ts-status--{{ row.tone or 'neutral' }}"
+              {% if row.title %}title="{{ row.title }}"{% endif %}>
+          {{ row.state_label }}
+        </span>
+      </span>
+    </div>
+  {% endfor %}
+</dl>

@@ -1,0 +1,28 @@
+{#
+  Confirmation dialog. Server-rendered body + action form; no JS
+  state needed by default (browsers can close via the Cancel button).
+
+  Args:
+    title    — concise, names the affected object
+    message  — plain-language consequence explanation
+    danger   — bool, use red accent for irreversible operations
+    confirm_label, confirm_action (POST url), confirm_method
+    cancel_label, cancel_url
+#}
+<div class="ts-overlay" role="dialog" aria-modal="true" aria-labelledby="ts-dialog-title">
+  <div class="ts-modal {% if danger %}ts-modal--danger{% endif %}">
+    <h2 class="ts-modal__title" id="ts-dialog-title">{{ title }}</h2>
+    <p>{{ message }}</p>
+    {% if extra_body_html %}{{ extra_body_html|safe }}{% endif %}
+    <div class="ts-modal__actions">
+      <a class="ts-btn ts-btn--secondary" href="{{ cancel_url or '#' }}">{{ cancel_label or 'Cancel' }}</a>
+      <form method="{{ confirm_method or 'POST' }}" action="{{ confirm_action }}" style="display:inline;">
+        {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+        <button type="submit"
+                class="ts-btn {% if danger %}ts-btn--danger-primary{% else %}ts-btn--primary{% endif %}">
+          {{ confirm_label or 'Confirm' }}
+        </button>
+      </form>
+    </div>
+  </div>
+</div>

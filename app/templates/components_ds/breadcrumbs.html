@@ -1,0 +1,16 @@
+{#
+  Render breadcrumbs. Pass `trail = [{"label": "...", "url": "..."}]`.
+  The final entry is rendered as the current location (no link).
+#}
+{% if trail and trail|length > 0 %}
+<nav class="ts-breadcrumbs" aria-label="Breadcrumb">
+  {% for crumb in trail %}
+    {% if not loop.last and crumb.url %}
+      <a href="{{ crumb.url }}">{{ crumb.label }}</a>
+      <span class="ts-breadcrumbs__sep" aria-hidden="true">/</span>
+    {% else %}
+      <span aria-current="page">{{ crumb.label }}</span>
+    {% endif %}
+  {% endfor %}
+</nav>
+{% endif %}

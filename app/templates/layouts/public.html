@@ -1,0 +1,54 @@
+{#
+  TRUSTSEAL public shell (landing, verify, trust/security info).
+  No internal navigation; tagline lockup used for the brand.
+#}
+<!doctype html>
+<html lang="en" class="ts-html">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}TRUSTSEAL — Verified Integrity{% endblock %}</title>
+  <link rel="icon" type="image/png"
+        href="{{ url_for('static', filename='brand/trustseal/trustseal-shield-color.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/reset.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/public.css') }}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="ts-public">
+  <nav class="ts-public-nav" aria-label="TRUSTSEAL">
+    <a class="ts-public-nav__brand" href="/" aria-label="TRUSTSEAL · Verified Integrity">
+      <img src="{{ url_for('static', filename='brand/trustseal/trustseal-horizontal-tagline.png') }}"
+           alt="TRUSTSEAL — Verified Integrity" width="196" height="36">
+    </a>
+    <div class="ts-public-nav__links">
+      <a href="/verify">Verify a document</a>
+      <a href="/trust">Trust &amp; security</a>
+      <a href="/pricing">Pricing</a>
+    </div>
+    <div class="ts-public-nav__cta">
+      <a class="ts-btn ts-btn--secondary ts-btn--sm" href="/auth/login">Sign in</a>
+      <a class="ts-btn ts-btn--primary ts-btn--sm" href="/auth/register">Get started</a>
+    </div>
+  </nav>
+
+  <main class="ts-public-main {% block main_modifier %}{% endblock %}" id="ts-main" tabindex="-1">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="ts-public-footer">
+    <span>© {{ now.year if now else 2026 }} Vitalworks Limited. All rights reserved.</span>
+    <span>
+      <a href="/trust">Trust &amp; security</a>
+      &nbsp;·&nbsp;
+      <a href="/legal/privacy">Privacy</a>
+      &nbsp;·&nbsp;
+      <a href="/legal/terms">Terms</a>
+    </span>
+  </footer>
+
+  {% block extra_body %}{% endblock %}
+</body>
+</html>

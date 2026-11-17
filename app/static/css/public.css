@@ -1,0 +1,209 @@
+/*
+ * TRUSTSEAL public + signer surfaces (landing, verify, sign).
+ * No internal navigation. Tagline lockup. Calm hero.
+ */
+
+.ts-public {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ts-canvas);
+}
+
+.ts-public-nav {
+  background: var(--ts-surface);
+  border-bottom: 1px solid var(--ts-border);
+  padding: var(--ts-space-3) var(--ts-space-6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ts-space-4);
+}
+.ts-public-nav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ts-space-3);
+  text-decoration: none;
+}
+.ts-public-nav__brand img { height: 36px; width: auto; }
+
+.ts-public-nav__links {
+  display: flex;
+  gap: var(--ts-space-5);
+  color: var(--ts-text-muted);
+}
+.ts-public-nav__links a {
+  color: var(--ts-text-muted);
+  font-size: var(--ts-fs-body);
+}
+.ts-public-nav__links a:hover { color: var(--ts-brand-primary); }
+
+.ts-public-nav__cta {
+  display: inline-flex;
+  gap: var(--ts-space-2);
+}
+
+.ts-public-main {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: var(--ts-space-7) var(--ts-space-6);
+}
+
+/* Narrower content column for verification / signer flows. */
+.ts-public-main--narrow { max-width: 720px; }
+
+.ts-hero {
+  display: grid;
+  gap: var(--ts-space-5);
+  padding: var(--ts-space-7) 0;
+}
+.ts-hero__eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ts-brand-primary);
+  font-size: var(--ts-fs-label);
+  font-weight: var(--ts-fw-semibold);
+}
+.ts-hero__title {
+  font-size: 32px;
+  font-weight: var(--ts-fw-semibold);
+  line-height: 1.2;
+  max-width: 22ch;
+}
+.ts-hero__lede {
+  color: var(--ts-text-muted);
+  max-width: 60ch;
+}
+.ts-hero__actions {
+  display: flex;
+  gap: var(--ts-space-3);
+  flex-wrap: wrap;
+}
+
+.ts-section {
+  padding: var(--ts-space-6) 0;
+  border-top: 1px solid var(--ts-border);
+}
+.ts-section__title {
+  font-size: var(--ts-fs-section);
+  font-weight: var(--ts-fw-semibold);
+  margin-bottom: var(--ts-space-3);
+}
+
+.ts-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--ts-space-4);
+}
+.ts-feature {
+  padding: var(--ts-space-4);
+  background: var(--ts-surface);
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius);
+}
+.ts-feature__title {
+  font-weight: var(--ts-fw-semibold);
+  margin-bottom: var(--ts-space-2);
+}
+.ts-feature__body { color: var(--ts-text-muted); font-size: var(--ts-fs-body); }
+
+/* Signer shell — lightweight, no sidebar. */
+.ts-signer-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  background: var(--ts-canvas);
+}
+
+.ts-signer-nav {
+  background: var(--ts-surface);
+  border-bottom: 1px solid var(--ts-border);
+  padding: var(--ts-space-3) var(--ts-space-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ts-signer-nav__brand img { height: 32px; width: auto; }
+.ts-signer-nav__issuer {
+  color: var(--ts-text-muted);
+  font-size: var(--ts-fs-meta);
+}
+
+.ts-signer-main {
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: var(--ts-space-6);
+}
+
+.ts-signer-footer {
+  background: var(--ts-brand-primary);
+  color: var(--ts-text-inverse);
+  padding: var(--ts-space-4) var(--ts-space-6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ts-space-3);
+  flex-wrap: wrap;
+  font-size: var(--ts-fs-meta);
+}
+.ts-signer-footer img { height: 20px; width: auto; opacity: 0.95; }
+.ts-signer-footer a { color: var(--ts-text-inverse); text-decoration: underline; }
+
+/* Public footer (landing / verify). */
+.ts-public-footer {
+  padding: var(--ts-space-5) var(--ts-space-6);
+  border-top: 1px solid var(--ts-border);
+  background: var(--ts-surface);
+  color: var(--ts-text-muted);
+  font-size: var(--ts-fs-meta);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ts-space-3);
+  flex-wrap: wrap;
+}
+.ts-public-footer a { color: var(--ts-text-muted); }
+
+/* Auth shell (login / register / reset / MFA). */
+.ts-auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--ts-space-6);
+  background: var(--ts-canvas);
+}
+.ts-auth-card {
+  background: var(--ts-surface);
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-lg);
+  padding: var(--ts-space-6);
+  width: 100%;
+  max-width: 420px;
+}
+.ts-auth-card__brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--ts-space-5);
+}
+.ts-auth-card__brand img { height: 48px; width: auto; }
+.ts-auth-card__title {
+  font-size: var(--ts-fs-section);
+  font-weight: var(--ts-fw-semibold);
+  text-align: center;
+  margin-bottom: var(--ts-space-4);
+}
+.ts-auth-card__meta {
+  text-align: center;
+  color: var(--ts-text-muted);
+  font-size: var(--ts-fs-meta);
+  margin-top: var(--ts-space-4);
+}
+
+@media (max-width: 767px) {
+  .ts-public-nav { padding: var(--ts-space-3) var(--ts-space-4); }
+  .ts-public-nav__links { display: none; }
+  .ts-hero__title { font-size: 26px; }
+  .ts-public-main, .ts-signer-main { padding: var(--ts-space-5) var(--ts-space-4); }
+}

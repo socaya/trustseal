@@ -1,0 +1,25 @@
+{#
+  Reusable page header: single H1, optional description, right-aligned
+  actions, optional breadcrumbs. For pages that need more structure
+  than the default layout block provides.
+
+  Args:
+    title        — page title (H1)
+    description  — short description (shown muted)
+    breadcrumbs  — list of {label,url}
+    actions_slot — caller-rendered block (use the component as a with-block)
+#}
+<header class="ts-page-header">
+  <div class="ts-page-header__text">
+    {% if breadcrumbs %}
+      {% include "components_ds/breadcrumbs.html" %}
+    {% endif %}
+    <h1 class="ts-page-title">{{ title }}</h1>
+    {% if description %}
+      <p class="ts-page-header__description">{{ description }}</p>
+    {% endif %}
+  </div>
+  {% if actions_slot %}
+    <div class="ts-page-header__actions">{{ actions_slot|safe }}</div>
+  {% endif %}
+</header>

@@ -1,0 +1,80 @@
+{
+  "version": "1.0.0",
+  "updated": "2026-11-17",
+  "owner": "Vitalworks Limited",
+  "wordmark": "TRUSTSEAL",
+  "tagline": "VERIFIED INTEGRITY",
+  "colors": {
+    "navy": "#0F3B82",
+    "navy_hover": "#0C2E66",
+    "green": "#0E664D",
+    "mono_black": "#000000",
+    "mono_white": "#FFFFFF"
+  },
+  "assets": {
+    "primary-horizontal": {
+      "file": "trustseal-horizontal.png",
+      "use": "Primary authenticated UI topbar; horizontal lockup without tagline.",
+      "surfaces": ["app.topbar", "auth.header", "operator.dashboard"]
+    },
+    "horizontal-tagline": {
+      "file": "trustseal-horizontal-tagline.png",
+      "use": "Public marketing, public verifier page, document cover sheets. Use when the tagline is readable.",
+      "surfaces": ["public.landing", "public.verify", "document.cover_pdf", "email.header"]
+    },
+    "horizontal-tagline-alt": {
+      "file": "trustseal-horizontal-tagline-alt.png",
+      "use": "Alternate horizontal lockup with tagline; interchangeable with horizontal-tagline.",
+      "surfaces": ["marketing"]
+    },
+    "stacked-tagline": {
+      "file": "trustseal-stacked-tagline.png",
+      "use": "Narrow surfaces where vertical stack reads better than horizontal lockup.",
+      "surfaces": ["public.landing.mobile", "loading.splash", "pdf.cover_portrait"]
+    },
+    "shield-color": {
+      "file": "trustseal-shield-color.png",
+      "use": "Favicon, collapsed sidebar rail, app icon, small avatar contexts.",
+      "surfaces": ["favicon", "app.sidebar.collapsed", "pwa.icon"]
+    },
+    "shield-mono-navy": {
+      "file": "trustseal-shield-mono-navy.png",
+      "use": "Monochrome navy shield for minimalist contexts (print, cover sheet corners).",
+      "surfaces": ["pdf.corner", "letterhead"]
+    },
+    "wordmark-navy": {
+      "file": "trustseal-wordmark-navy.png",
+      "use": "Wordmark only; use sparingly where the shield is impractical.",
+      "surfaces": ["embedded.inline_text"]
+    },
+    "horizontal-mono-black": {
+      "file": "trustseal-horizontal-mono-black.png",
+      "use": "Monochrome black horizontal lockup for print and grayscale rendering.",
+      "surfaces": ["print", "grayscale"]
+    },
+    "horizontal-mono-white-on-navy": {
+      "file": "trustseal-horizontal-mono-white-on-navy.png",
+      "use": "Monochrome white lockup on navy background; dark surfaces.",
+      "surfaces": ["email.dark", "signer.footer_navy", "marketing.dark_hero"]
+    },
+    "variants-sheet": {
+      "file": "trustseal-variants-sheet.png",
+      "use": "Reference sheet; NOT for direct use in product chrome.",
+      "surfaces": ["reference_only"]
+    }
+  },
+  "rules": {
+    "clear_space_ratio": 0.5,
+    "min_pixel_height_horizontal": 28,
+    "min_pixel_height_shield_only": 20,
+    "never": [
+      "stretch or re-proportion artwork",
+      "re-typeset the wordmark",
+      "crop the shield",
+      "change the green check to any other decorative color",
+      "add gradients, shadows, glows, or ornamental chips",
+      "place the color lockup on a saturated background",
+      "describe a visual stamp or appearance signature as cryptographic assurance"
+    ]
+  }
+}

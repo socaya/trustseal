@@ -1,0 +1,231 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'overview' %}
+{% block title %}Design system · TRUSTSEAL{% endblock %}
+{% block page_title %}Design system gallery{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Canonical reference for the TRUSTSEAL UI foundations — brand lockups,
+    tokens, type, status semantics, buttons, forms, tables and evidence
+    presentation. Keep page implementations aligned with this gallery; do
+    not re-create component styles inline.
+  </p>
+{% endblock %}
+
+{% block content %}
+
+<section class="ts-stack">
+  <!-- 1. Brand ---------------------------------------------------- -->
+  <div class="ts-panel">
+    <h2 class="ts-panel__title">1 · Brand lockups</h2>
+    <p class="ts-panel__meta">Pick the variant whose <em>use</em> matches the surface. Never redraw or re-typeset.</p>
+    <div class="ts-grid-2col" style="margin-top: var(--ts-space-4);">
+      {% for a in assets %}
+        <div class="ts-panel" style="padding: 0; border-radius: var(--ts-radius);">
+          <div style="background: {{ a.bg }}; padding: var(--ts-space-5); display: flex; align-items: center; justify-content: center; min-height: 120px; border-bottom: 1px solid var(--ts-border);">
+            <img src="{{ url_for('static', filename=a.file) }}" alt="{{ a.key }}" style="max-height: 72px; max-width: 100%;">
+          </div>
+          <div style="padding: var(--ts-space-3) var(--ts-space-4);">
+            <div style="font-weight: 600;">{{ a.key }}</div>
+            <div class="ts-panel__meta">{{ a.use }}</div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- 2. Palette -------------------------------------------------- -->
+  <div class="ts-panel">
+    <h2 class="ts-panel__title">2 · Palette (semantic tokens)</h2>
+    <div class="ts-grid-2col" style="margin-top: var(--ts-space-4);">
+      {% set swatches = [
+        ('--ts-brand-primary',       '#0f3b82', 'Primary actions, chrome'),
+        ('--ts-brand-primary-hover', '#0c2e66', 'Hover / pressed'),
+        ('--ts-brand-primary-soft',  '#eef3fa', 'Selected row / focus context'),
+        ('--ts-brand-green',         '#0e664d', 'Verified / success semantics'),
+        ('--ts-green-soft',          '#eaf5f0', 'Success background'),
+        ('--ts-danger',              '#9e2f36', 'Rejection / invalid'),
+        ('--ts-warning',             '#835a0c', 'Pending attention'),
+        ('--ts-info',                '#2b5aa0', 'Informational'),
+        ('--ts-text',                '#172536', 'Default text'),
+        ('--ts-text-muted',          '#526174', 'Metadata / help text'),
+        ('--ts-canvas',              '#f6f8fb', 'Application canvas'),
+        ('--ts-surface',             '#ffffff', 'Forms / tables / panels'),
+      ] %}
+      {% for token, hex, use in swatches %}
+        <div style="display: grid; grid-template-columns: 56px 1fr; gap: var(--ts-space-3); align-items: center;">
+          <span style="background: {{ hex }}; width: 56px; height: 56px; border: 1px solid var(--ts-border); border-radius: var(--ts-radius); display: block;"></span>
+          <span>
+            <code>{{ token }}</code>
+            <div class="ts-panel__meta">{{ hex }} — {{ use }}</div>
+          </span>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- 3. Type ----------------------------------------------------- -->
+  <div class="ts-panel">
+    <h2 class="ts-panel__title">3 · Typography</h2>
+    <div class="ts-stack">
+      <div>
+        <h1 class="ts-page-title">Page title · 24/600</h1>
+        <p class="ts-panel__meta">One per page.</p>
+      </div>
+      <div>
+        <h2 style="font-size: 18px; font-weight: 600; margin: 0;">Section heading · 18/600</h2>
+      </div>
+      <div>
+        <h3 style="font-size: 16px; font-weight: 600; margin: 0;">Subsection heading · 16/600</h3>
+      </div>
+      <p style="margin: 0;">Body text · 14/400. Dense but readable. This is the default paragraph.</p>
+      <p class="ts-panel__meta" style="margin: 0;">Secondary metadata · 12–13/400.</p>
+      <code>Monospace · ui-monospace — used for hashes, correlation ids, keys.</code>
+    </div>
+  </div>
+
+  <!-- 4. Buttons -------------------------------------------------- -->
+  <div class="ts-panel">
+    <h2 class="ts-panel__title">4 · Buttons</h2>
+    <div class="ts-btn-group" style="flex-wrap: wrap;">
+      <button class="ts-btn ts-btn--primary">Send for signature</button>
+      <button class="ts-btn ts-btn--secondary">Save draft</button>
+      <button class="ts-btn ts-btn--text">Cancel</button>
+      <button class="ts-btn ts-btn--danger">Withdraw</button>
+      <button class="ts-btn ts-btn--danger-primary">Delete permanently</button>
+      <button class="ts-btn ts-btn--primary" disabled>Disabled</button>
+    </div>
+    <div class="ts-btn-group" style="margin-top: var(--ts-space-3); flex-wrap: wrap;">
+      <button class="ts-btn ts-btn--primary ts-btn--sm">Small</button>
+      <button class="ts-btn ts-btn--primary">Default</button>
+      <button class="ts-btn ts-btn--primary ts-btn--lg">Large</button>
+    </div>
+  </div>
+
+  <!-- 5. Status --------------------------------------------------- -->
+  <div class="ts-panel">
+    <h2 class="ts-panel__title">5 · Status semantics</h2>
+    <p class="ts-panel__meta">
+      Business workflow and cryptographic verification states stay
+      distinct. Verification outcomes include <em>indeterminate</em>
+      where the backend could not check.
+    </p>
+    <div class="ts-btn-group" style="flex-wrap: wrap; margin-top: var(--ts-space-3);">
+      <span class="ts-status ts-status--neutral">Draft</span>
+      <span class="ts-status ts-status--info">In review</span>
+      <span class="ts-status ts-status--pending">Awaiting signatures</span>
+      <span class="ts-status ts-status--success">Completed</span>
+      <span class="ts-status ts-status--neutral">Archived</span>
+      <span class="ts-status ts-status--success">Valid</span>
+      <span class="ts-status ts-status--danger">Invalid</span>
+      <span class="ts-status ts-status--warning">Untrusted</span>
+      <span class="ts-status ts-status--indeterminate">Indeterminate</span>
+    </div>
+  </div>
+
+  <!-- 6. Forms ---------------------------------------------------- -->
+  <div class="ts-panel">
+    <h2 class="ts-panel__title">6 · Forms</h2>
+    <div class="ts-form-row ts-form-row--split">
+      {% with name='sample_title', label='Document title', value='Master services agreement', required=true,
+              hint='Shown to all participants.' %}
+        {% include 'components_ds/form_field.html' %}
+      {% endwith %}
+      {% with name='sample_type', label='Type', type='select', value='nda',
+              options=[{'value':'nda','label':'NDA'},{'value':'msa','label':'MSA'},{'value':'other','label':'Other'}] %}
+        {% include 'components_ds/form_field.html' %}
+      {% endwith %}
+    </div>
+    <div class="ts-form-row" style="margin-top: var(--ts-space-4);">
+      {% with name='sample_notes', label='Notes', type='textarea', hint='Visible only to the issuing tenant.' %}
+        {% include 'components_ds/form_field.html' %}
+      {% endwith %}
+    </div>
+    <div class="ts-form-row" style="margin-top: var(--ts-space-4);">
+      {% with name='sample_error', label='Reference', error='Reference is required.', required=true %}
+        {% include 'components_ds/form_field.html' %}
+      {% endwith %}
+    </div>
+    <div class="ts-form-actions">
+      <button class="ts-btn ts-btn--text" type="button">Cancel</button>
+      <button class="ts-btn ts-btn--primary" type="submit">Save draft</button>
+    </div>
+  </div>
+
+  <!-- 7. Table ---------------------------------------------------- -->
+  <div class="ts-panel">
+    <h2 class="ts-panel__title">7 · Data table</h2>
+    {% set columns = [
+      {'key':'doc','label':'Document'},
+      {'key':'owner','label':'Owner'},
+      {'key':'status','label':'Status'},
+      {'key':'updated','label':'Updated','sort':'descending'},
+      {'key':'actions','label':''},
+    ] %}
+    {% set rows_html %}
+      <tr>
+        <td data-label="Document"><span class="ts-cell-title">Master services agreement</span><span class="ts-cell-sub">NDA · v3</span></td>
+        <td data-label="Owner">Legal</td>
+        <td data-label="Status"><span class="ts-status ts-status--pending">Awaiting signatures</span></td>
+        <td data-label="Updated">12 Nov 2026</td>
+        <td data-label="" class="ts-cell-actions"><a class="ts-btn ts-btn--text ts-btn--sm" href="#">Open</a></td>
+      </tr>
+      <tr>
+        <td data-label="Document"><span class="ts-cell-title">Supplier terms addendum</span></td>
+        <td data-label="Owner">Procurement</td>
+        <td data-label="Status"><span class="ts-status ts-status--success">Completed</span></td>
+        <td data-label="Updated">11 Nov 2026</td>
+        <td data-label="" class="ts-cell-actions"><a class="ts-btn ts-btn--text ts-btn--sm" href="#">Open</a></td>
+      </tr>
+    {% endset %}
+    {% with pagination={'page':1,'page_size':2,'total':2,'prev_url':None,'next_url':None} %}
+      {% include 'components_ds/data_table.html' %}
+    {% endwith %}
+  </div>
+
+  <!-- 8. Evidence ------------------------------------------------- -->
+  <div class="ts-panel">
+    <h2 class="ts-panel__title">8 · Verification evidence</h2>
+    {% set rows = [
+      {'label':'Document integrity',      'value':'Bytes match the recorded SHA-256.',             'state_label':'Valid',         'tone':'success'},
+      {'label':'Certificate path',        'value':'Platform signing certificate chained to trust root.', 'state_label':'Valid',   'tone':'success'},
+      {'label':'Revocation / time',       'value':'OCSP response captured at 2026-11-15T09:12:07Z.','state_label':'Valid',         'tone':'success'},
+      {'label':'Signer identity',         'value':'Signer appearance recorded, platform-attested.','state_label':'Indeterminate', 'tone':'indeterminate',
+       'title':'Appearance is a visual representation, not a cryptographic endorsement.'},
+      {'label':'Qualified trust framework','value':'Not configured for this deployment.',          'state_label':'Not checked',    'tone':'neutral'},
+    ] %}
+    {% include 'components_ds/evidence_summary.html' %}
+  </div>
+
+  <!-- 9. Inline messages ----------------------------------------- -->
+  <div class="ts-panel">
+    <h2 class="ts-panel__title">9 · Inline messages</h2>
+    <div class="ts-stack">
+      <div class="ts-inline ts-inline--success">
+        <div class="ts-inline__body"><div class="ts-inline__title">Signature request sent.</div> Notified 3 recipients. <a href="#">Open request detail</a>.</div>
+      </div>
+      <div class="ts-inline ts-inline--warning">
+        <div class="ts-inline__body"><div class="ts-inline__title">Verification indeterminate.</div> We could not reach the OCSP responder; retry or supply a captured proof.</div>
+      </div>
+      <div class="ts-inline ts-inline--danger">
+        <div class="ts-inline__body"><div class="ts-inline__title">Upload rejected.</div> PDF exceeds the 25 MB limit. Please compress and retry.</div>
+      </div>
+      <div class="ts-inline ts-inline--info">
+        <div class="ts-inline__body"><div class="ts-inline__title">Invitation expired.</div> Request a fresh invitation from the document issuer.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10. Copy value --------------------------------------------- -->
+  <div class="ts-panel">
+    <h2 class="ts-panel__title">10 · Copy value (hashes and IDs)</h2>
+    <div class="ts-stack">
+      {% with value='a7f1e9b3c2d8f05714aa6e4c8b19d5a9c1f7836c7d2a9e55b4d7e2f9a11e4c0a', label_hidden='Copy document digest' %}
+        {% include 'components_ds/copy_value.html' %}
+      {% endwith %}
+      {% with value='req_2026-11-15T09:12:07Z-corr-9af201', label_hidden='Copy correlation id' %}
+        {% include 'components_ds/copy_value.html' %}
+      {% endwith %}
+    </div>
+  </div>
+</section>
+{% endblock %}

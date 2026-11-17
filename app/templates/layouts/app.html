@@ -1,0 +1,154 @@
+{#
+  TRUSTSEAL authenticated application shell (UI/UX v1.0 §4.1).
+
+  Blocks:
+    - title              : page title shown in <title>
+    - page_title         : one H1 per page
+    - page_description   : short description below the title
+    - page_actions       : right-aligned primary actions
+    - breadcrumbs        : array of {label,url} dicts rendered via breadcrumbs partial
+    - content            : main page content
+    - inspector          : optional right panel (set has_inspector=True when using)
+    - extra_head         : page-specific <head> injections
+    - extra_body         : page-specific end-of-body scripts
+
+  Sidebar sections are rendered by the site navigation partial. Pages
+  only set `active_nav_item` so the sidebar can highlight the right row.
+#}
+<!doctype html>
+<html lang="{{ request.accept_languages.best_match(['en']) or 'en' }}" class="ts-html">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}TRUSTSEAL{% endblock %}</title>
+
+  <link rel="icon" type="image/png"
+        href="{{ url_for('static', filename='brand/trustseal/trustseal-shield-color.png') }}">
+  <link rel="apple-touch-icon"
+        href="{{ url_for('static', filename='brand/trustseal/trustseal-shield-color.png') }}">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/reset.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/shell.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tables.css') }}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="ts-app{% if density == 'comfortable' %} ts-density-comfortable{% endif %}">
+  <header class="ts-topbar" role="banner">
+    <button type="button"
+            class="ts-topbar__nav-toggle"
+            aria-label="Open navigation"
+            aria-controls="ts-sidebar"
+            data-ts-sidebar-toggle>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <a class="ts-topbar__brand"
+       href="{{ url_for('index') if 'index' in (request.endpoint or '') else '/' }}"
+       aria-label="TRUSTSEAL · Verified Integrity">
+      <img src="{{ url_for('static', filename='brand/trustseal/trustseal-horizontal.png') }}"
+           alt="TRUSTSEAL" width="140" height="28">
+    </a>
+
+    {% if current_user and current_user.is_authenticated and current_user.organization %}
+    <div class="ts-topbar__workspace" aria-label="Workspace">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M3 7l9-4 9 4-9 4-9-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M3 12l9 4 9-4M3 17l9 4 9-4" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+      </svg>
+      <span>{{ current_user.organization.name }}</span>
+    </div>
+    {% endif %}
+
+    <div class="ts-topbar__search" role="search">
+      <label class="ts-search">
+        <svg class="ts-search__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.75"/>
+          <path d="M20 20l-3.2-3.2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        </svg>
+        <input type="search" class="ts-input"
+               placeholder="Search documents, requests, parties…"
+               aria-label="Search">
+      </label>
+    </div>
+
+    <nav class="ts-topbar__actions" aria-label="Account and alerts">
+      <a class="ts-btn ts-btn--primary ts-btn--sm"
+         href="{{ url_for('document_views.create_document') if 'document_views.create_document' in url_map_endpoints else '#' }}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        New
+      </a>
+      <a class="ts-topbar__icon-btn" href="#" aria-label="Notifications">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M6 8a6 6 0 0112 0v4l1.5 3h-15L6 12V8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M10 19a2 2 0 004 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        {% if unread_notifications %}<span class="ts-dot" aria-hidden="true"></span>{% endif %}
+      </a>
+      <a class="ts-topbar__icon-btn" href="#" aria-label="Help">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M9.5 9.5a2.5 2.5 0 015 0c0 1.5-2.5 2-2.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="12" cy="17" r="1" fill="currentColor"/>
+        </svg>
+      </a>
+      <a class="ts-topbar__icon-btn" href="#" aria-label="Account menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </a>
+    </nav>
+  </header>
+
+  <div class="ts-shell{% if has_inspector %} ts-shell--with-inspector{% endif %}" id="ts-shell">
+    <aside id="ts-sidebar" class="ts-sidebar" aria-label="Primary navigation">
+      {% include "partials_ds/sidebar.html" ignore missing %}
+    </aside>
+
+    <main class="ts-content" id="ts-main" tabindex="-1">
+      <div class="ts-page">
+        {% block breadcrumbs %}{% endblock %}
+        <div class="ts-page-header">
+          <div class="ts-page-header__text">
+            <h1 class="ts-page-title">{% block page_title %}{% endblock %}</h1>
+            {% block page_description %}{% endblock %}
+          </div>
+          <div class="ts-page-header__actions">{% block page_actions %}{% endblock %}</div>
+        </div>
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+
+    {% if has_inspector %}
+    <aside class="ts-inspector" aria-label="Details">
+      {% block inspector %}{% endblock %}
+    </aside>
+    {% endif %}
+  </div>
+
+  <div class="ts-toast-region" aria-live="polite" aria-atomic="false" id="ts-toasts"></div>
+
+  <script>
+    // Tiny vanilla shell helper — no framework dependency.
+    (function () {
+      var toggle = document.querySelector('[data-ts-sidebar-toggle]');
+      var shell = document.getElementById('ts-shell');
+      if (toggle && shell) {
+        toggle.addEventListener('click', function () {
+          var open = shell.getAttribute('data-sidebar-open') === 'true';
+          shell.setAttribute('data-sidebar-open', open ? 'false' : 'true');
+          toggle.setAttribute('aria-expanded', open ? 'false' : 'true');
+        });
+      }
+    })();
+  </script>
+  {% block extra_body %}{% endblock %}
+</body>
+</html>

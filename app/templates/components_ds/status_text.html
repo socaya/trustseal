@@ -1,0 +1,9 @@
+{#
+  Render a status badge from one of the documented domains (§5.4).
+  Args:
+    tone  — neutral | info | success | warning | danger | pending | indeterminate
+    label — the human-readable label
+    title — optional long explanation surfaced via tooltip
+#}
+<span class="ts-status ts-status--{{ tone or 'neutral' }}"
+      {% if title %}title="{{ title }}"{% endif %}>{{ label }}</span>

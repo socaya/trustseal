@@ -100,6 +100,20 @@ def create_app(config_class=None):
         """Inject the current year into template contexts."""
         return {'current_year': datetime.now().year}
 
+    @app.context_processor
+    def inject_design_system_helpers():
+        """Expose a cheap set-lookup of registered endpoints and the
+        current moment to every template so the design-system sidebar
+        can hide dead links (TS-UI-008) and layouts can print the year
+        without reaching into global state.
+        """
+        return {
+            "url_map_endpoints": {rule.endpoint for rule in app.url_map.iter_rules()},
+            "now": datetime.utcnow(),
+            "density": "default",
+            "unread_notifications": False,
+        }
+
     # --- Request Hooks ---
     @app.before_request
     def before_request_handler():
@@ -135,6 +149,7 @@ def create_app(config_class=None):
             'sign_views.download',
             'sign_views.upload_attachment',
             'sign_views.status',
+            'design_gallery_bp.gallery',
             # SAML SP endpoints are the entry point for SSO — the IdP
             # posts the response here before the user has a session.
             'saml_views.metadata',
@@ -331,6 +346,8 @@ def create_app(config_class=None):
         operator_notifications_api,
     )
     blueprints.append(operator_notifications_api)
+    from .blueprints.system.routes.design_gallery import design_gallery_bp
+    blueprints.append(design_gallery_bp)
     from .blueprints.documents.api.document_label_api import (
         document_label_api,
     )

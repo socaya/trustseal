@@ -1,0 +1,33 @@
+{#
+  TRUSTSEAL auth shell (login, register, password reset, MFA, invitations).
+  Centered card, stacked tagline lockup overhead.
+#}
+<!doctype html>
+<html lang="en" class="ts-html">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Sign in — TRUSTSEAL{% endblock %}</title>
+  <link rel="icon" type="image/png"
+        href="{{ url_for('static', filename='brand/trustseal/trustseal-shield-color.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/reset.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/public.css') }}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="ts-auth-shell">
+  <main class="ts-auth-card" id="ts-main" tabindex="-1">
+    <div class="ts-auth-card__brand">
+      <img src="{{ url_for('static', filename='brand/trustseal/trustseal-stacked-tagline.png') }}"
+           alt="TRUSTSEAL — Verified Integrity" width="120" height="120">
+    </div>
+    <h1 class="ts-auth-card__title">{% block page_title %}Sign in{% endblock %}</h1>
+    {% block content %}{% endblock %}
+    <div class="ts-auth-card__meta">
+      <a href="/trust">Trust &amp; security</a> · <a href="/legal/privacy">Privacy</a>
+    </div>
+  </main>
+</body>
+</html>

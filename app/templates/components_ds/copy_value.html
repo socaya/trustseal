@@ -1,0 +1,19 @@
+{#
+  Mono-spaced, selectable "copy value" chip for hashes, correlation
+  IDs, keys. Pure HTML + a tiny vanilla script (hooked in the gallery)
+  so the component renders without Alpine/Stimulus.
+
+  Args:
+    value       — the string to display and copy
+    label_hidden — screen-reader label (defaults to "Copy")
+#}
+<span class="ts-copy-value" data-ts-copy>
+  <span class="ts-copy-value__text" title="{{ value }}">{{ value }}</span>
+  <button type="button" class="ts-copy-value__button" data-ts-copy-trigger
+          aria-label="{{ label_hidden or 'Copy value' }}">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="8" y="8" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+      <path d="M16 8V5H5a1 1 0 00-1 1v11h3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+    </svg>
+  </button>
+</span>

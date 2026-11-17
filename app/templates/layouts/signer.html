@@ -1,0 +1,53 @@
+{#
+  TRUSTSEAL signer / reviewer shell (/sign/<token>/*).
+  Public but authorized via one-time token — no internal menus.
+  Footer uses white-on-navy lockup so the brand stays visible on the
+  dark bar at the bottom of the page.
+#}
+<!doctype html>
+<html lang="en" class="ts-html">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Review &amp; sign — TRUSTSEAL{% endblock %}</title>
+  <link rel="icon" type="image/png"
+        href="{{ url_for('static', filename='brand/trustseal/trustseal-shield-color.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/reset.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/public.css') }}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="ts-signer-shell">
+  <header class="ts-signer-nav" role="banner">
+    <a class="ts-signer-nav__brand" href="/" aria-label="TRUSTSEAL · Verified Integrity">
+      <img src="{{ url_for('static', filename='brand/trustseal/trustseal-horizontal.png') }}"
+           alt="TRUSTSEAL" width="150" height="32">
+    </a>
+    {% block issuer %}
+      {% if issuer_name %}
+        <div class="ts-signer-nav__issuer">
+          Issued by <strong>{{ issuer_name }}</strong>
+          {% if issuer_verified %}· <span class="ts-status ts-status--success">Verified sender</span>{% endif %}
+        </div>
+      {% endif %}
+    {% endblock %}
+  </header>
+
+  <main class="ts-signer-main" id="ts-main" tabindex="-1">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="ts-signer-footer" role="contentinfo">
+    <a href="/" aria-label="TRUSTSEAL · Verified Integrity">
+      <img src="{{ url_for('static', filename='brand/trustseal/trustseal-horizontal-mono-white-on-navy.png') }}"
+           alt="TRUSTSEAL — Verified Integrity" width="130" height="20">
+    </a>
+    <span>
+      Need help? <a href="/trust">Learn about our verification process</a>.
+    </span>
+  </footer>
+  {% block extra_body %}{% endblock %}
+</body>
+</html>

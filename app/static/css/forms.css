@@ -1,0 +1,150 @@
+/*
+ * TRUSTSEAL form controls.
+ *
+ * Rules (spec §5.3):
+ *   - Labels always visible.
+ *   - Instructions before submission.
+ *   - Errors identify exactly what to fix.
+ */
+
+.ts-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ts-field__label {
+  font-size: var(--ts-fs-label);
+  font-weight: var(--ts-fw-semibold);
+  color: var(--ts-text);
+}
+.ts-field__label[data-required="true"]::after {
+  content: " *";
+  color: var(--ts-danger);
+}
+
+.ts-field__hint {
+  font-size: var(--ts-fs-meta);
+  color: var(--ts-text-muted);
+}
+
+.ts-field__error {
+  font-size: var(--ts-fs-meta);
+  color: var(--ts-danger);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ts-input,
+.ts-select,
+.ts-textarea {
+  width: 100%;
+  min-height: var(--ts-control-h);
+  padding: 0 var(--ts-space-3);
+  border: 1px solid var(--ts-border-strong);
+  background: var(--ts-surface);
+  color: var(--ts-text);
+  font-size: var(--ts-fs-body);
+  line-height: 1.3;
+  border-radius: var(--ts-radius);
+  transition: border-color var(--ts-dur-fast) var(--ts-ease),
+              box-shadow var(--ts-dur-fast) var(--ts-ease);
+}
+.ts-textarea {
+  min-height: calc(var(--ts-control-h) * 2.4);
+  padding: var(--ts-space-2) var(--ts-space-3);
+  resize: vertical;
+}
+.ts-input:focus,
+.ts-select:focus,
+.ts-textarea:focus {
+  border-color: var(--ts-brand-primary);
+  box-shadow: 0 0 0 3px rgba(55, 120, 212, 0.25);
+  outline: none;
+}
+.ts-input[aria-invalid="true"],
+.ts-select[aria-invalid="true"],
+.ts-textarea[aria-invalid="true"] {
+  border-color: var(--ts-danger);
+}
+.ts-input:disabled,
+.ts-select:disabled,
+.ts-textarea:disabled {
+  background: var(--ts-surface-alt);
+  color: var(--ts-text-muted);
+  cursor: not-allowed;
+}
+
+.ts-input--mono { font-family: var(--ts-font-mono); }
+
+/* Search variant with icon. */
+.ts-search {
+  position: relative;
+}
+.ts-search .ts-input {
+  padding-left: calc(var(--ts-space-3) + 20px);
+}
+.ts-search__icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ts-text-muted);
+  width: 16px; height: 16px;
+  pointer-events: none;
+}
+
+/* Checkbox / radio */
+.ts-check, .ts-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ts-space-2);
+  font-size: var(--ts-fs-body);
+  color: var(--ts-text);
+  cursor: pointer;
+  user-select: none;
+}
+.ts-check input, .ts-radio input {
+  width: 16px; height: 16px;
+  accent-color: var(--ts-brand-primary);
+  margin: 0;
+}
+
+/* File uploader */
+.ts-uploader {
+  border: 1px dashed var(--ts-border-strong);
+  background: var(--ts-surface-alt);
+  border-radius: var(--ts-radius-lg);
+  padding: var(--ts-space-6);
+  text-align: center;
+  color: var(--ts-text-muted);
+}
+.ts-uploader__title {
+  color: var(--ts-text);
+  font-weight: var(--ts-fw-semibold);
+  margin-bottom: var(--ts-space-2);
+}
+.ts-uploader__hint {
+  font-size: var(--ts-fs-meta);
+  color: var(--ts-text-muted);
+}
+
+/* Form row layouts */
+.ts-form-row {
+  display: grid;
+  gap: var(--ts-space-4);
+}
+@media (min-width: 768px) {
+  .ts-form-row--split { grid-template-columns: 1fr 1fr; }
+  .ts-form-row--3col  { grid-template-columns: 1fr 1fr 1fr; }
+}
+
+.ts-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ts-space-2);
+  padding-top: var(--ts-space-4);
+  margin-top: var(--ts-space-4);
+  border-top: 1px solid var(--ts-border);
+}
