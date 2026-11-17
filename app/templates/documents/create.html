@@ -1,102 +1,165 @@
-{% extends "layouts/module_base.html" %}
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'documents' %}
 
-{% block module_header %}
-  <h2 class="fw-bold text-primary">
-    <i class="fas fa-plus me-2"></i> Upload or Create Document
-  </h2>
+{% block title %}Upload or create document · TRUSTSEAL{% endblock %}
+{% block page_title %}Upload or create a document{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Upload a prepared file (PDF, DOCX or XLSX) or capture the content
+    inline. The draft stays private to you until you prepare an
+    envelope and send it for signature.
+  </p>
 {% endblock %}
 
-{% block module_content %}
-<div class="border p-4 rounded bg-white">
-  <form method="POST" enctype="multipart/form-data">
-    {{ form.hidden_tag() }}
+{% block breadcrumbs %}
+  {% set trail = [
+    {'label': 'Workspace', 'url': url_for('system.main_views.home')},
+    {'label': 'Documents', 'url': url_for('document_views.index') if 'document_views.index' in url_map_endpoints else None},
+    {'label': 'Upload or create'}
+  ] %}
+  {% include 'components_ds/breadcrumbs.html' %}
+{% endblock %}
 
-    <!-- Nav Tabs -->
-    <ul class="nav nav-tabs mb-4" role="tablist">
-      <li class="nav-item">
-        <a class="nav-link active" data-bs-toggle="tab" href="#upload-tab" role="tab">Upload File</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" data-bs-toggle="tab" href="#inline-tab" role="tab">Create Inline</a>
-      </li>
-    </ul>
+{% block content %}
+<form method="POST" enctype="multipart/form-data" class="ts-panel" novalidate>
+  {{ form.hidden_tag() }}
 
-    <div class="tab-content">
-      <!-- Upload File Tab -->
-      <div class="tab-pane fade show active" id="upload-tab">
-        <div class="row g-4">
-          <div class="col-md-8">
-            <div class="mb-3">
-              {{ form.title.label(class="form-label fw-semibold") }}
-              {{ form.title(class="form-control", placeholder="e.g. Trust Agreement") }}
-            </div>
-            <div class="mb-3">
-              {{ form.description.label(class="form-label fw-semibold") }}
-              {{ form.description(class="form-control", rows=3, placeholder="Brief description of the document...") }}
-            </div>
-            <div class="mb-3">
-              {{ form.file.label(class="form-label fw-semibold") }}
-              {{ form.file(class="form-control") }}
-              <small class="text-muted">Allowed formats: PDF, DOCX, XLSX</small>
-            </div>
-            <div class="mb-3">
-              {{ form.tags.label(class="form-label fw-semibold") }}
-              {{ form.tags(class="form-control", placeholder="Comma-separated keywords (e.g. legal, finance)") }}
-            </div>
-          </div>
+  <div role="tablist" aria-label="Create method"
+       style="display: inline-flex; gap: var(--ts-space-2); border-bottom: 1px solid var(--ts-border); padding-bottom: var(--ts-space-3); margin-bottom: var(--ts-space-4); width: 100%;">
+    <button type="button"
+            class="ts-btn ts-btn--primary ts-btn--sm"
+            role="tab"
+            aria-selected="true"
+            aria-controls="upload-panel"
+            id="upload-tab">Upload file</button>
+    <button type="button"
+            class="ts-btn ts-btn--secondary ts-btn--sm"
+            role="tab"
+            aria-selected="false"
+            aria-controls="inline-panel"
+            id="inline-tab">Create inline</button>
+  </div>
 
-          <div class="col-md-4">
-            <div class="mb-3">
-              {{ form.document_type.label(class="form-label fw-semibold") }}
-              {{ form.document_type(class="form-select") }}
-            </div>
-            <div class="mb-3">
-              {{ form.organization_id.label(class="form-label fw-semibold") }}
-              {{ form.organization_id(class="form-select") }}
-            </div>
-            <div class="mb-3">
-              {{ form.client_id.label(class="form-label fw-semibold") }}
-              {{ form.client_id(class="form-select") }}
-            </div>
-            <div class="mb-3">
-              {{ form.stamp_id.label(class="form-label fw-semibold") }}
-              {{ form.stamp_id(class="form-select") }}
-            </div>
-            <div class="form-check mb-2">
-              {{ form.is_template(class="form-check-input") }}
-              {{ form.is_template.label(class="form-check-label") }}
-            </div>
-            <div class="form-check">
-              {{ form.is_shared(class="form-check-input") }}
-              {{ form.is_shared.label(class="form-check-label") }}
-            </div>
-          </div>
+  <!-- Upload panel ------------------------------------------- -->
+  <div id="upload-panel" role="tabpanel" aria-labelledby="upload-tab">
+    <div class="ts-form-row ts-form-row--split">
+      <div class="ts-stack">
+        <div class="ts-field">
+          <label class="ts-field__label" data-required="true" for="title">
+            {{ form.title.label.text }}
+          </label>
+          {{ form.title(class="ts-input", id="title", placeholder="e.g. Trust agreement") }}
+          {% for error in form.title.errors %}
+            <span class="ts-field__error" role="alert">{{ error }}</span>
+          {% endfor %}
         </div>
-
-        <div class="mt-4 d-flex justify-content-end">
-          <button type="submit" class="btn btn-success px-4">
-            <i class="fas fa-upload me-1"></i> Upload Document
-          </button>
+        <div class="ts-field">
+          <label class="ts-field__label" for="description">{{ form.description.label.text }}</label>
+          {{ form.description(class="ts-textarea", id="description", rows=3,
+                               placeholder="Brief description of the document…") }}
+          {% for error in form.description.errors %}
+            <span class="ts-field__error" role="alert">{{ error }}</span>
+          {% endfor %}
+        </div>
+        <div class="ts-field">
+          <label class="ts-field__label" data-required="true" for="file">{{ form.file.label.text }}</label>
+          {{ form.file(class="ts-input", id="file", accept="application/pdf,.pdf,.docx,.xlsx") }}
+          <span class="ts-field__hint">Allowed formats: PDF, DOCX, XLSX. Uploaded bytes are hashed before storage.</span>
+          {% for error in form.file.errors %}
+            <span class="ts-field__error" role="alert">{{ error }}</span>
+          {% endfor %}
+        </div>
+        <div class="ts-field">
+          <label class="ts-field__label" for="tags">{{ form.tags.label.text }}</label>
+          {{ form.tags(class="ts-input", id="tags", placeholder="legal, finance, nda") }}
+          <span class="ts-field__hint">Comma-separated. Used for search and filtering.</span>
         </div>
       </div>
 
-      <!-- Inline Editor Tab -->
-      <div class="tab-pane fade" id="inline-tab">
-        <div class="mb-3">
-          {{ form.title.label(class="form-label fw-semibold") }}
-          {{ form.title(class="form-control", placeholder="Document title") }}
+      <div class="ts-stack">
+        <div class="ts-field">
+          <label class="ts-field__label" for="document_type">{{ form.document_type.label.text }}</label>
+          {{ form.document_type(class="ts-select", id="document_type") }}
         </div>
-        <div class="mb-3">
-          {{ form.content.label(class="form-label fw-semibold") }}
-          {{ form.content(class="form-control", rows=15, placeholder="Type or paste your document content here...") }}
+        <div class="ts-field">
+          <label class="ts-field__label" for="organization_id">{{ form.organization_id.label.text }}</label>
+          {{ form.organization_id(class="ts-select", id="organization_id") }}
         </div>
-        <div class="mt-3 d-flex justify-content-end">
-          <button type="submit" class="btn btn-primary">
-            <i class="fas fa-save me-1"></i> Save Inline
-          </button>
+        <div class="ts-field">
+          <label class="ts-field__label" for="client_id">{{ form.client_id.label.text }}</label>
+          {{ form.client_id(class="ts-select", id="client_id") }}
         </div>
+        <div class="ts-field">
+          <label class="ts-field__label" for="stamp_id">{{ form.stamp_id.label.text }}</label>
+          {{ form.stamp_id(class="ts-select", id="stamp_id") }}
+        </div>
+        <label class="ts-check">
+          {{ form.is_template(id="is_template") }}
+          <span>{{ form.is_template.label.text }}</span>
+        </label>
+        <label class="ts-check">
+          {{ form.is_shared(id="is_shared") }}
+          <span>{{ form.is_shared.label.text }}</span>
+        </label>
       </div>
     </div>
-  </form>
-</div>
+
+    <div class="ts-form-actions">
+      <a class="ts-btn ts-btn--text"
+         href="{{ url_for('document_views.index') if 'document_views.index' in url_map_endpoints else '/' }}">Cancel</a>
+      <button type="submit" class="ts-btn ts-btn--primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 4v12M6 11l6 6 6-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M4 20h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        </svg>
+        Upload document
+      </button>
+    </div>
+  </div>
+
+  <!-- Inline panel ------------------------------------------- -->
+  <div id="inline-panel" role="tabpanel" aria-labelledby="inline-tab" hidden>
+    <div class="ts-field">
+      <label class="ts-field__label" data-required="true" for="title_inline">{{ form.title.label.text }}</label>
+      {{ form.title(class="ts-input", id="title_inline", placeholder="Document title") }}
+    </div>
+    <div class="ts-field" style="margin-top: var(--ts-space-4);">
+      <label class="ts-field__label" for="content">{{ form.content.label.text }}</label>
+      {{ form.content(class="ts-textarea", id="content", rows=15,
+                       placeholder="Type or paste your document content here…") }}
+    </div>
+    <div class="ts-form-actions">
+      <button type="submit" class="ts-btn ts-btn--primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M7 5h10v14H7z" stroke="currentColor" stroke-width="1.75"/>
+          <path d="M9 9h6M9 13h6M9 17h4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        </svg>
+        Save draft
+      </button>
+    </div>
+  </div>
+</form>
+
+<script>
+  // Minimal tab panel switcher — no framework needed.
+  (function () {
+    var tabs = document.querySelectorAll('[role="tab"]');
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        tabs.forEach(function (t) {
+          t.setAttribute('aria-selected', 'false');
+          t.classList.remove('ts-btn--primary');
+          t.classList.add('ts-btn--secondary');
+          var panel = document.getElementById(t.getAttribute('aria-controls'));
+          if (panel) panel.setAttribute('hidden', '');
+        });
+        tab.setAttribute('aria-selected', 'true');
+        tab.classList.remove('ts-btn--secondary');
+        tab.classList.add('ts-btn--primary');
+        var active = document.getElementById(tab.getAttribute('aria-controls'));
+        if (active) active.removeAttribute('hidden');
+      });
+    });
+  })();
+</script>
 {% endblock %}

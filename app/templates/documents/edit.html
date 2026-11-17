@@ -1,27 +1,49 @@
-{% extends "layouts/module_base.html" %}
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'documents' %}
 
-{% block module_header %}
-  <h2 class="fw-bold text-primary"><i class="fas fa-edit me-2"></i> Edit Document</h2>
+{% block title %}Edit document · TRUSTSEAL{% endblock %}
+{% block page_title %}Edit document details{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Change the title and description of your draft. Finalized or sealed
+    documents cannot be edited through this screen — they are preserved
+    exactly as sent.
+  </p>
 {% endblock %}
 
-{% block module_content %}
-<div class="card card-outline card-success">
-  <div class="card-body">
-    <form method="POST" enctype="multipart/form-data">
-      {{ form.hidden_tag() }}
+{% block breadcrumbs %}
+  {% set trail = [
+    {'label': 'Workspace', 'url': url_for('system.main_views.home')},
+    {'label': 'Documents', 'url': url_for('document_views.index') if 'document_views.index' in url_map_endpoints else None},
+    {'label': 'Edit'}
+  ] %}
+  {% include 'components_ds/breadcrumbs.html' %}
+{% endblock %}
 
-      <div class="mb-3">
-        {{ form.title.label(class="form-label") }}
-        {{ form.title(class="form-control") }}
-      </div>
-      <div class="mb-3">
-        {{ form.description.label(class="form-label") }}
-        {{ form.description(class="form-control") }}
-      </div>
-      <div class="text-end">
-        <button type="submit" class="btn btn-success">Update</button>
-      </div>
-    </form>
+{% block content %}
+<form method="POST" enctype="multipart/form-data" class="ts-panel" style="max-width: 720px;" novalidate>
+  {{ form.hidden_tag() }}
+
+  <div class="ts-field">
+    <label class="ts-field__label" data-required="true" for="title">{{ form.title.label.text }}</label>
+    {{ form.title(class="ts-input", id="title") }}
+    {% for error in form.title.errors %}
+      <span class="ts-field__error" role="alert">{{ error }}</span>
+    {% endfor %}
   </div>
-</div>
+
+  <div class="ts-field" style="margin-top: var(--ts-space-4);">
+    <label class="ts-field__label" for="description">{{ form.description.label.text }}</label>
+    {{ form.description(class="ts-textarea", id="description", rows=4) }}
+    {% for error in form.description.errors %}
+      <span class="ts-field__error" role="alert">{{ error }}</span>
+    {% endfor %}
+  </div>
+
+  <div class="ts-form-actions">
+    <a class="ts-btn ts-btn--text"
+       href="{{ url_for('document_views.index') if 'document_views.index' in url_map_endpoints else '/' }}">Cancel</a>
+    <button type="submit" class="ts-btn ts-btn--primary">Save changes</button>
+  </div>
+</form>
 {% endblock %}

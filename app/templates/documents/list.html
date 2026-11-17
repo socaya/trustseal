@@ -1,153 +1,116 @@
-{% extends "layouts/module_base.html" %}
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'documents' %}
 
-{# Remove default module header, we'll put it in the card #}
-{% block module_header %}{% endblock %}
-
-{% block module_content %}
-<div class="card shadow-sm mb-4"> {# Added Bootstrap Card wrapper #}
-  <div class="card-header">
-    <div class="d-flex justify-content-between align-items-center">
-      <div>
-          <h4 class="fw-bold text-primary mb-0 d-inline-block me-3">Documents</h4> {# Card title #}
-          {# Display total count from the documents list passed to template #}
-          <span class="badge bg-secondary align-middle">Total: {{ documents|length }}</span>
-      </div>
-      {# Add New button #}
-      <a href="{{ url_for('document_views.create_document') }}" class="btn btn-primary btn-sm"> {# Use btn-sm #}
-        <i class="fas fa-plus me-1"></i> Add New
-      </a>
-    </div>
-  </div>{# End card-header #}
-
-  <div class="card-body p-0"> {# Remove card body padding as table has its own #}
-    <div class="table-responsive">
-      {# Added table-sm for compactness, removed table-bordered #}
-      <table class="table table-striped table-hover table-sm mb-0" id="documentTable">
-        <thead class="table-light">
-          <tr>
-            <th style="width: 40%;">Title</th> {# Adjusted width examples #}
-            {# Add Description back if desired #}
-            {# <th>Description</th> #}
-            <th style="width: 25%;">Uploaded By</th>
-            <th style="width: 20%;">Last Updated</th>
-            <th class="text-center" style="width: 15%;">Actions</th> {# Adjusted width #}
-          </tr>
-        </thead>
-        <tbody>
-          {% for doc in documents %}
-          <tr>
-            {# Access title safely #}
-            <td>
-                <a href="{{ url_for('document_views.view_document', document_id=doc.get('id', 0)) }}" class="text-decoration-none">
-                    {{ doc.get("title", "N/A") }}
-                </a>
-                 {# Optional: Add status badge here if needed in list view #}
-                 {# {% set status = doc.get("status", "") %} #}
-                 {# <span class="badge small {% if status == 'draft' %} bg-secondary {% elif status == 'signed' %} bg-success {% else %} bg-light text-dark {% endif %} ms-2">{{ status | capitalize }}</span> #}
-            </td>
-
-            {# Add Description back if needed, using default filter and truncation #}
-            {#
-            <td>
-              {% set description = doc.get("description") | default('', true) %}
-              <small class="text-muted">{{ description[:60] }}{% if description|length > 60 %}...{% endif %}</small>
-            </td>
-            #}
-
-            {# Access 'created_by' dictionary and then its 'name' key safely #}
-            <td>
-              {# Consider adding link to user profile if applicable #}
-              {% set creator_dict = doc.get("created_by") %}
-              {% if creator_dict %}
-                {{ creator_dict.get("name", "N/A") }}
-              {% else %}
-                <span class="text-muted">N/A</span>
-              {% endif %}
-            </td>
-
-            {# Format 'updated_at' date more concisely #}
-            <td>
-              {% set updated_iso = doc.get("updated_at") %}
-              {% if updated_iso %}
-                {# Use datetime filter for Date only #}
-                <span title="{{ updated_iso | datetime('%Y-%m-%d %H:%M:%S') }}"> {# Show full time on hover #}
-                    {{ updated_iso | datetime('%Y-%m-%d') }}
-                </span>
-                {# Or use slicing: {{ updated_iso[:10] }} #}
-              {% else %}
-                <span class="text-muted">N/A</span>
-              {% endif %}
-            </td>
-
-            {# Action buttons centered #}
-            <td class="text-center">
-               {% set doc_id = doc.get('id') %}
-               {% if doc_id %}
-                  <a href="{{ url_for('document_views.view_document', document_id=doc_id) }}"
-                     class="btn btn-xs btn-outline-primary me-1" title="View Document"> {# Changed to btn-xs? (Bootstrap 5 doesn't have btn-xs, use btn-sm or custom CSS) #}
-                    <i class="fas fa-eye"></i>
-                  </a>
-                  <a href="{{ url_for('document_views.edit_document_view', document_id=doc_id) }}"
-                     class="btn btn-xs btn-outline-secondary me-1" title="Edit Document"> {# Use btn-sm #}
-                    <i class="fas fa-edit"></i>
-                  </a>
-                  {# Add Delete button if needed #}
-              {% else %}
-                <span class="text-muted small">No ID</span>
-              {% endif %}
-            </td>
-          </tr>
-          {# Handle case where there are no documents #}
-          {% else %}
-          <tr>
-            {# Adjust colspan based on number of columns visible #}
-            <td colspan="4" class="text-center text-muted py-5"> {# Added padding #}
-              <p><i class="fas fa-folder-open fa-2x mb-2"></i></p>
-              No documents found. <a href="{{ url_for('document_views.create_document') }}">Add the first one!</a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div> {# End table-responsive #}
-  </div> {# End card #}
+{% block title %}Documents · TRUSTSEAL{% endblock %}
+{% block page_title %}Documents{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Draft documents you own. Upload a PDF to start preparing an
+    envelope, or open a draft to continue editing its metadata and
+    participants.
+  </p>
+{% endblock %}
+{% block page_actions %}
+  {% if 'document_views.create_document' in url_map_endpoints %}
+  <a class="ts-btn ts-btn--primary" href="{{ url_for('document_views.create_document') }}">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    Upload document
+  </a>
+  {% endif %}
 {% endblock %}
 
-{% block scripts %}
-  {{ super() }} {# Include scripts from parent template if necessary #}
-  <script>
-    $(document).ready(function() {
-      // Initialize DataTables ONLY if there are documents to display
-      // Avoids error message when table body is just the 'No documents found' row
-      if ($('#documentTable tbody tr').length > 1 || ($('#documentTable tbody tr').length === 1 && $('#documentTable tbody td').length > 1)) {
-          $('#documentTable').DataTable({
-            "order": [[ 2, "desc" ]], // Default sort by 'Last Updated' descending (Column index 2 now)
-            "pageLength": 10, // Set default page length
-            "language": { // Optional: Customize text
-                "search": "_INPUT_",
-                "searchPlaceholder": "Search documents..."
-            },
-            "columnDefs": [
-               { "orderable": false, "targets": 3 } // Disable sorting on Actions column (Index 3 now)
-             ],
-             // Add other options: dom for layout, buttons etc.
-             "layout": { // Bootstrap 5 specific layout adjustments (optional)
-                  "topStart": {
-                      "buttons": ['copy', 'csv', 'excel', 'pdf', 'print'] // Example buttons if needed
-                  },
-                 "topEnd": "search", // Keep search on right
-                  "bottomStart": "info", // Show info bottom left
-                  "bottomEnd": "paging" // Show pagination bottom right
-             }
-          });
-      }
+{% block content %}
+<section class="ts-panel" style="padding: 0;">
+  <div class="ts-table-toolbar">
+    <div class="ts-table-toolbar__left">
+      <span class="ts-panel__meta">{{ documents|length }} document{% if documents|length != 1 %}s{% endif %}</span>
+    </div>
+    <div class="ts-table-toolbar__right">
+      {# Search / filters can be added here by future phases. #}
+    </div>
+  </div>
 
-       // Optional: Add tooltips to action buttons
-       var tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'))
-       var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-         return new bootstrap.Tooltip(tooltipTriggerEl)
-       })
-    });
-  </script>
-</div>
+  {% if documents %}
+  <div class="ts-table-scroll">
+    <table class="ts-table">
+      <thead>
+        <tr>
+          <th scope="col" style="width: 40%;">Document</th>
+          <th scope="col" style="width: 20%;">Status</th>
+          <th scope="col" style="width: 20%;">Owner</th>
+          <th scope="col" style="width: 15%;">Updated</th>
+          <th scope="col" style="width: 5%;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for doc in documents %}
+          {% set doc_id = doc.get('id') %}
+          {% set status = (doc.get('status') or '').lower() %}
+          {% set status_tone =
+              'success' if status in ('signed', 'completed', 'sealed') else
+              'pending' if status in ('pending', 'awaiting_signatures', 'review') else
+              'warning' if status == 'archived' else
+              'neutral' %}
+          <tr>
+            <td data-label="Document">
+              <a class="ts-cell-title"
+                 href="{{ url_for('document_views.view_document', document_id=doc_id) if doc_id and 'document_views.view_document' in url_map_endpoints else '#' }}">
+                {{ doc.get('title', 'Untitled document') }}
+              </a>
+              {% set desc = doc.get('description') %}
+              {% if desc %}
+                <span class="ts-cell-sub">
+                  {{ desc[:90] }}{% if desc|length > 90 %}…{% endif %}
+                </span>
+              {% endif %}
+            </td>
+            <td data-label="Status">
+              <span class="ts-status ts-status--{{ status_tone }}">
+                {{ (doc.get('status') or 'draft')|capitalize }}
+              </span>
+            </td>
+            <td data-label="Owner">
+              {% set creator = doc.get('created_by') %}
+              {{ creator.get('name', '—') if creator else '—' }}
+            </td>
+            <td data-label="Updated">
+              {% set updated_iso = doc.get('updated_at') %}
+              {% if updated_iso %}
+                <span title="{{ updated_iso | datetime('%Y-%m-%d %H:%M:%S') }}">
+                  {{ updated_iso | datetime('%Y-%m-%d') }}
+                </span>
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td data-label="" class="ts-cell-actions">
+              {% if doc_id and 'document_views.view_document' in url_map_endpoints %}
+                <a class="ts-btn ts-btn--text ts-btn--sm"
+                   href="{{ url_for('document_views.view_document', document_id=doc_id) }}">Open</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="ts-empty">
+      <div class="ts-empty__title">No documents yet</div>
+      <p class="ts-empty__hint">
+        Upload a PDF, DOCX or XLSX to start preparing your first envelope.
+        Drafts stay private to you until you send them for signature.
+      </p>
+      {% if 'document_views.create_document' in url_map_endpoints %}
+      <div class="ts-empty__actions">
+        <a class="ts-btn ts-btn--primary" href="{{ url_for('document_views.create_document') }}">
+          Upload a document
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
 {% endblock %}
