@@ -154,6 +154,7 @@ def create_app(config_class=None):
             'system.main_views.home',
             'system.main_views.welcome',
             'system.main_views.trust',
+            'system.main_views.pricing',
             'design_gallery_bp.gallery',
             # SAML SP endpoints are the entry point for SSO — the IdP
             # posts the response here before the user has a session.
@@ -357,6 +358,8 @@ def create_app(config_class=None):
         operator_notifications_views,
     )
     blueprints.append(operator_notifications_views)
+    from .blueprints.auth.routes.profile_views import profile_views
+    blueprints.append(profile_views)
     from .blueprints.documents.api.document_label_api import (
         document_label_api,
     )

@@ -1,0 +1,96 @@
+{% extends "layouts/public.html" %}
+
+{% block title %}Pricing · TRUSTSEAL{% endblock %}
+{% block main_modifier %}ts-public-main--narrow{% endblock %}
+
+{% block content %}
+<header style="margin-bottom: var(--ts-space-5);">
+  <h1 class="ts-page-title">Pricing</h1>
+  <p class="ts-page-header__description">
+    TRUSTSEAL is deployed as a single-tenant workbench. Pricing depends on
+    the configuration your deployment needs — number of KMS signing keys,
+    Time-Stamp Authority throughput, evidence-retention storage, SCIM
+    provisioning, and whether SAML SSO is required. We do not publish
+    headline plan tiers because they would be misleading for most
+    deployments.
+  </p>
+</header>
+
+<section class="ts-panel">
+  <h2 class="ts-panel__title">What you always get</h2>
+  <ul class="ts-stack ts-stack--tight" style="padding-left: var(--ts-space-5); list-style: disc;">
+    <li>Unlimited signing envelopes, participants, review receipts and sealed PDFs for the subscribed deployment.</li>
+    <li>Public verifier API + hosted public verification page.</li>
+    <li>Chained-hash audit log with signed anchors, validation dossiers and evidence retention.</li>
+    <li>Pluggable private-object storage (filesystem or S3/MinIO compatible).</li>
+    <li>OIDC SSO out of the box; SAML 2.0 SSO available per-deployment.</li>
+    <li>SCIM 2.0 provisioning, scoped API tokens, webhook delivery with signatures + replay.</li>
+    <li>Operator notifications, structured OpenTelemetry + Prometheus observability, X-Request-Id correlation.</li>
+    <li>A disciplined design system — the same shell you are using right now.</li>
+  </ul>
+</section>
+
+<section class="ts-panel" style="margin-top: var(--ts-space-4);">
+  <h2 class="ts-panel__title">What drives price</h2>
+  <dl class="ts-evidence">
+    <div class="ts-evidence__row">
+      <dt class="ts-evidence__label">KMS signing keys</dt>
+      <dd class="ts-evidence__value">
+        Per-tenant managed keys for platform PDF seals. Additional
+        keys (e.g. per-business-unit) increase the base cost.
+      </dd>
+      <span class="ts-evidence__state"></span>
+    </div>
+    <div class="ts-evidence__row">
+      <dt class="ts-evidence__label">Trusted timestamps (RFC 3161)</dt>
+      <dd class="ts-evidence__value">
+        TSA throughput charged in request tiers. We pass through the
+        actual TSA cost; we do not mark up timestamps.
+      </dd>
+      <span class="ts-evidence__state"></span>
+    </div>
+    <div class="ts-evidence__row">
+      <dt class="ts-evidence__label">Evidence retention</dt>
+      <dd class="ts-evidence__value">
+        Storage for retained sealed PDFs, validation dossiers and
+        revocation evidence. Priced per-GB-month or passed through
+        from your S3/MinIO bucket.
+      </dd>
+      <span class="ts-evidence__state"></span>
+    </div>
+    <div class="ts-evidence__row">
+      <dt class="ts-evidence__label">Identity integrations</dt>
+      <dd class="ts-evidence__value">
+        SAML 2.0 with SP-signed AuthnRequests, SCIM 2.0 provisioning
+        to multiple identity providers, and federated Single Logout
+        are available where required.
+      </dd>
+      <span class="ts-evidence__state"></span>
+    </div>
+    <div class="ts-evidence__row">
+      <dt class="ts-evidence__label">Operational support</dt>
+      <dd class="ts-evidence__value">
+        Response targets, incident-handling cadence and break-glass
+        operator access are tiered by the support plan.
+      </dd>
+      <span class="ts-evidence__state"></span>
+    </div>
+  </dl>
+</section>
+
+<section class="ts-panel" style="margin-top: var(--ts-space-4);">
+  <h2 class="ts-panel__title">Request a quote</h2>
+  <p style="margin: 0 0 var(--ts-space-4);">
+    Tell us roughly how many envelopes you expect to seal per month,
+    which identity providers you use, and whether you want us to host
+    evidence retention or point at your own S3-compatible bucket. We
+    will reply with a scoped quote and a short deployment plan.
+  </p>
+  <div class="ts-form-actions" style="justify-content: flex-start;">
+    <a class="ts-btn ts-btn--primary" href="mailto:hello@trustseal.vitalworks.com?subject=TRUSTSEAL%20pricing%20inquiry">
+      Email the deployment team
+    </a>
+    <a class="ts-btn ts-btn--secondary" href="/trust">Review the trust &amp; security notes first</a>
+  </div>
+</section>
+{% endblock %}

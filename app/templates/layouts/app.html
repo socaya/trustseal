@@ -122,6 +122,16 @@
             <span class="ts-account__tenant">{{ current_user.organization.name }}</span>
             {% endif %}
           </div>
+          {% if 'profile_views.show' in url_map_endpoints %}
+          <a class="ts-account__item" role="menuitem"
+             href="{{ url_for('profile_views.show') }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Your profile
+          </a>
+          {% endif %}
           {% if 'operator_notifications_views.list_notifications' in url_map_endpoints %}
           <a class="ts-account__item" role="menuitem"
              href="{{ url_for('operator_notifications_views.list_notifications') }}">

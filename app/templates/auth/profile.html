@@ -1,0 +1,107 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'overview' %}
+
+{% block title %}Your profile · TRUSTSEAL{% endblock %}
+{% block page_title %}Your profile{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Update your display name and phone number. Email, username and
+    password changes keep their dedicated flows for security — email
+    changes require re-verification; passwords require your current
+    password; username changes are tenant-admin operations.
+  </p>
+{% endblock %}
+
+{% block content %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="ts-stack" style="margin-bottom: var(--ts-space-4); max-width: 720px;">
+      {% for category, text in messages %}
+        <div class="ts-inline ts-inline--{{ 'danger' if category == 'danger' else ('success' if category == 'success' else 'info') }}"
+             role="alert" aria-live="polite">
+          <div class="ts-inline__body">{{ text }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<section class="ts-panel" style="max-width: 720px;">
+  <h2 class="ts-panel__title">Account identity</h2>
+  <dl class="ts-evidence">
+    <div class="ts-evidence__row">
+      <dt class="ts-evidence__label">Email</dt>
+      <dd class="ts-evidence__value">
+        {{ user.email or '—' }}
+        <span class="ts-panel__meta" style="margin-left: var(--ts-space-2);">
+          (change via re-verification flow)
+        </span>
+      </dd>
+      <span class="ts-evidence__state"></span>
+    </div>
+    <div class="ts-evidence__row">
+      <dt class="ts-evidence__label">Username</dt>
+      <dd class="ts-evidence__value">{{ user.username or '—' }}</dd>
+      <span class="ts-evidence__state"></span>
+    </div>
+    {% if user.organization %}
+    <div class="ts-evidence__row">
+      <dt class="ts-evidence__label">Organization</dt>
+      <dd class="ts-evidence__value">{{ user.organization.name }}</dd>
+      <span class="ts-evidence__state"></span>
+    </div>
+    {% endif %}
+  </dl>
+</section>
+
+<section class="ts-panel" style="max-width: 720px; margin-top: var(--ts-space-4);">
+  <h2 class="ts-panel__title">Display &amp; contact</h2>
+  <form method="POST" action="{{ url_for('profile_views.update') }}" class="ts-stack" novalidate>
+    <div class="ts-form-row ts-form-row--split">
+      <div class="ts-field">
+        <label class="ts-field__label" for="first_name">First name</label>
+        <input id="first_name" name="first_name" type="text"
+               value="{{ user.first_name or '' }}"
+               autocomplete="given-name" class="ts-input">
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="last_name">Last name</label>
+        <input id="last_name" name="last_name" type="text"
+               value="{{ user.last_name or '' }}"
+               autocomplete="family-name" class="ts-input">
+      </div>
+    </div>
+    <div class="ts-field">
+      <label class="ts-field__label" for="phone">Phone</label>
+      <input id="phone" name="phone" type="tel"
+             value="{{ user.phone or '' }}"
+             autocomplete="tel" class="ts-input"
+             placeholder="+1 555 123 4567">
+      <span class="ts-field__hint">Optional. Used only for notifications you explicitly subscribe to.</span>
+    </div>
+    <div class="ts-form-actions">
+      <a class="ts-btn ts-btn--text" href="{{ url_for('profile_views.show') }}">Discard</a>
+      <button type="submit" class="ts-btn ts-btn--primary">Save changes</button>
+    </div>
+  </form>
+</section>
+
+<section class="ts-panel" style="max-width: 720px; margin-top: var(--ts-space-4);">
+  <h2 class="ts-panel__title">Security actions</h2>
+  <p class="ts-panel__meta" style="margin-bottom: var(--ts-space-3);">
+    These actions use their dedicated flows. Changes here are
+    double-protected with re-verification where required.
+  </p>
+  <div class="ts-form-actions" style="justify-content: flex-start;">
+    <a class="ts-btn ts-btn--secondary"
+       href="{{ url_for('auth_views.reset_password') if 'auth_views.reset_password' in url_map_endpoints else '/auth/change-password' }}">
+      Change password
+    </a>
+    <a class="ts-btn ts-btn--danger"
+       href="{{ url_for('auth_views.logout') if 'auth_views.logout' in url_map_endpoints else '/auth/logout' }}">
+      Sign out
+    </a>
+  </div>
+</section>
+{% endblock %}

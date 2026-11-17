@@ -36,3 +36,9 @@ def trust():
     footer, so the page must stay public (no auth gating).
     """
     return render_template("public/trust.html")
+
+
+@main_views.route('/pricing')
+def pricing():
+    """Public pricing page — honest contact-based quote flow."""
+    return render_template("public/pricing.html")
