@@ -2145,3 +2145,144 @@ def bulk_remove_envelope_label():
         ),
         http_status,
     )
+
+
+# ============================================================ AJ2 bulk transfer
+
+
+@envelope_api.route("/bulk/transfer", methods=["POST"])
+@jwt_required()
+def bulk_transfer_envelopes():
+    """Transfer up to 100 envelopes to one new owner atomically.
+
+    Payload: ``{"envelope_ids": [int, ...], "new_owner_id": int}``.
+    Each row is evaluated independently with the same guards as the
+    single-envelope transfer (owner or admin, pre-finalized state,
+    no decisions recorded). Target must be an active tenant member.
+    A row that already belongs to the target returns ``succeeded``
+    with ``already_owner=True``.
+    """
+    from app.models.signer_decision import SignerDecision
+    from app.policies.api_access import is_admin
+    from app.services import operator_notifications
+
+    user = _actor()
+    data = _payload()
+    ids = data.get("envelope_ids")
+    new_owner_id = data.get("new_owner_id")
+    if not isinstance(ids, list) or not ids:
+        abort(400, description="envelope_ids_required")
+    if len(ids) > 100:
+        abort(413, description="bulk_transfer_limit_100")
+    if type(new_owner_id) is not int or new_owner_id <= 0:
+        abort(400, description="new_owner_id_invalid")
+    target = db.session.get(User, new_owner_id)
+    if (
+        target is None
+        or not target.is_active
+        or target.organization_id != user.organization_id
+    ):
+        abort(404, description="new_owner_not_in_tenant")
+    is_caller_admin = is_admin(user.id)
+
+    seen: set[int] = set()
+    results: list[dict] = []
+    transferred = 0
+    for env_id in ids:
+        entry = {"envelope_id": env_id}
+        if type(env_id) is not int:
+            entry["status"] = "failed"
+            entry["error_code"] = "envelope_id_invalid"
+            results.append(entry)
+            continue
+        if env_id in seen:
+            entry["status"] = "failed"
+            entry["error_code"] = "duplicate_id"
+            results.append(entry)
+            continue
+        seen.add(env_id)
+        envelope = (
+            SigningEnvelope.query.filter_by(
+                id=env_id, organization_id=user.organization_id
+            )
+            .with_for_update()
+            .first()
+        )
+        if envelope is None:
+            entry["status"] = "failed"
+            entry["error_code"] = "envelope_not_found"
+            results.append(entry)
+            continue
+        if envelope.created_by_id != user.id and not is_caller_admin:
+            entry["status"] = "failed"
+            entry["error_code"] = "not_owner_or_admin"
+            results.append(entry)
+            continue
+        if envelope.state not in {"draft", "prepared"}:
+            entry["status"] = "failed"
+            entry["error_code"] = "state_not_transferable"
+            results.append(entry)
+            continue
+        if SignerDecision.query.filter_by(envelope_id=envelope.id).count():
+            entry["status"] = "failed"
+            entry["error_code"] = "decisions_recorded"
+            results.append(entry)
+            continue
+        if envelope.created_by_id == target.id:
+            entry["status"] = "succeeded"
+            entry["already_owner"] = True
+            results.append(entry)
+            continue
+        envelope.created_by_id = target.id
+        enqueue(
+            event_type="envelope.ownership.transferred",
+            aggregate_type="envelope",
+            aggregate_id=envelope.id,
+            organization_id=envelope.organization_id,
+            actor_id=user.id,
+            action="envelope.ownership.transferred",
+            idempotency_key=(
+                "envelope-bulk-transfer:%s:%s" % (envelope.id, target.id)
+            ),
+        )
+        operator_notifications.publish(
+            organization_id=envelope.organization_id,
+            recipient_user_id=target.id,
+            kind="envelope.ownership.transferred",
+            subject_type="signing_envelope",
+            subject_id=envelope.id,
+            summary=(
+                f"Envelope #{envelope.id} was transferred to you "
+                f"by user #{user.id}."
+            ),
+        )
+        transferred += 1
+        entry["status"] = "succeeded"
+        entry["already_owner"] = False
+        results.append(entry)
+
+    succeeded = sum(1 for r in results if r["status"] == "succeeded")
+    failed = len(results) - succeeded
+    if succeeded == 0:
+        db.session.rollback()
+        return (
+            jsonify(
+                new_owner_id=target.id,
+                succeeded=0,
+                failed=failed,
+                results=results,
+            ),
+            400,
+        )
+    db.session.commit()
+    http_status = 207 if failed else 200
+    return (
+        jsonify(
+            new_owner_id=target.id,
+            succeeded=succeeded,
+            failed=failed,
+            transferred=transferred,
+            results=results,
+        ),
+        http_status,
+    )

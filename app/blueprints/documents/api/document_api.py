@@ -1003,3 +1003,86 @@ def bulk_delete_documents():
         ),
         http_status,
     )
+
+
+# ============================================================ AJ1 doc transfer
+
+
+@document_api.route("/<int:document_id>/transfer", methods=["POST"])
+@jwt_required()
+def transfer_document(document_id):
+    """Reassign a draft/pending document to another tenant member.
+
+    Payload: ``{"new_owner_id": <int>}``. Only draft or pending
+    documents are transferable; once a document reaches a signed or
+    archived state the audit trail must retain the original issuer.
+    The target user must be active and in the same organisation.
+    """
+    from app.policies.api_access import is_admin
+    from app.services import operator_notifications
+    from app.services.event_delivery import enqueue
+
+    user = actor()
+    doc = (
+        Document.query.filter_by(
+            id=document_id,
+            organization_id=user.organization_id,
+            deleted_at=None,
+        )
+        .with_for_update()
+        .first()
+    )
+    if doc is None:
+        abort(404)
+    if doc.created_by != user.id and not is_admin(user.id):
+        abort(403, description="transfer_requires_owner_or_admin")
+    if (doc.status or "").lower() not in {"draft", "pending"}:
+        abort(409, description="transfer_requires_draft_or_pending")
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        abort(400, description="JSON object required")
+    new_owner_id = data.get("new_owner_id")
+    if type(new_owner_id) is not int or new_owner_id <= 0:
+        abort(400, description="new_owner_id_invalid")
+    if new_owner_id == doc.created_by:
+        return jsonify(
+            document_id=doc.id,
+            owner_id=doc.created_by,
+            changed=False,
+        ), 200
+    target = db.session.get(User, new_owner_id)
+    if (
+        target is None
+        or not target.is_active
+        or target.organization_id != doc.organization_id
+    ):
+        abort(404, description="new_owner_not_in_tenant")
+    previous = doc.created_by
+    doc.created_by = target.id
+    enqueue(
+        event_type="document.ownership.transferred",
+        aggregate_type="document",
+        aggregate_id=doc.id,
+        organization_id=doc.organization_id,
+        actor_id=user.id,
+        action="document.ownership.transferred",
+        idempotency_key="document-transfer:%s:%s" % (doc.id, target.id),
+    )
+    operator_notifications.publish(
+        organization_id=doc.organization_id,
+        recipient_user_id=target.id,
+        kind="document.ownership.transferred",
+        subject_type="document",
+        subject_id=doc.id,
+        summary=(
+            f"Document #{doc.id} '{doc.title}' was transferred to you "
+            f"by user #{user.id}."
+        ),
+    )
+    db.session.commit()
+    return jsonify(
+        document_id=doc.id,
+        previous_owner_id=previous,
+        owner_id=target.id,
+        changed=True,
+    ), 200
