@@ -1,0 +1,169 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'users' %}
+
+{% block title %}Users & invitations · TRUSTSEAL{% endblock %}
+{% block page_title %}Users &amp; invitations{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Everyone with a login into this tenant workspace, plus any pending
+    invitations. Role assignments drive what each user can do; email
+    verification and MFA stay enforced server-side.
+  </p>
+{% endblock %}
+{% block page_actions %}
+  <a class="ts-btn ts-btn--primary" href="/admin/users#invite">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    Invite user
+  </a>
+{% endblock %}
+
+{% block content %}
+<section>
+  <header class="ts-section-head">
+    <h2>Active members</h2>
+    <span class="ts-panel__meta">{{ users|length }} member{% if users|length != 1 %}s{% endif %}</span>
+  </header>
+  <div class="ts-table-shell">
+    <div class="ts-table-scroll">
+      <table class="ts-table">
+        <thead>
+          <tr>
+            <th scope="col" style="width: 26%;">User</th>
+            <th scope="col" style="width: 26%;">Email</th>
+            <th scope="col" style="width: 16%;">Roles</th>
+            <th scope="col" style="width: 12%;">Email verified</th>
+            <th scope="col" style="width: 12%;">Last login</th>
+            <th scope="col" style="width: 8%;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if users %}
+            {% for u in users %}
+            <tr>
+              <td data-label="User">
+                <span class="ts-cell-title">
+                  {{ (u.first_name ~ ' ' ~ u.last_name)|trim or u.username }}
+                </span>
+                <span class="ts-cell-sub">@{{ u.username }} · id #{{ u.id }}</span>
+              </td>
+              <td data-label="Email">{{ u.email }}</td>
+              <td data-label="Roles">
+                {% set role_names = roles_by_user.get(u.id, []) %}
+                {% if role_names %}
+                  {% for r in role_names %}
+                    <span class="ts-tag ts-tag--brand">{{ r }}</span>
+                  {% endfor %}
+                {% else %}
+                  <span class="ts-panel__meta">—</span>
+                {% endif %}
+              </td>
+              <td data-label="Email verified">
+                {% if u.email_verified %}
+                  <span class="ts-status ts-status--success">Verified</span>
+                {% else %}
+                  <span class="ts-status ts-status--warning">Pending</span>
+                {% endif %}
+              </td>
+              <td data-label="Last login">
+                {% if u.last_login %}
+                  {{ u.last_login.strftime('%Y-%m-%d %H:%M') }} UTC
+                {% else %}
+                  <span class="ts-panel__meta">Never</span>
+                {% endif %}
+              </td>
+              <td data-label="Status">
+                {% if u.is_active %}
+                  <span class="ts-status ts-status--success">Active</span>
+                {% else %}
+                  <span class="ts-status ts-status--danger">Disabled</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="6">
+                <div class="ts-empty">
+                  <div class="ts-empty__title">No users in this workspace yet</div>
+                  <p class="ts-empty__hint">Invite someone to get started.</p>
+                </div>
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section style="margin-top: var(--ts-space-6);" id="invitations">
+  <header class="ts-section-head">
+    <h2>Pending invitations</h2>
+    <span class="ts-panel__meta">{{ invitations|length }} invitation{% if invitations|length != 1 %}s{% endif %}</span>
+  </header>
+  <div class="ts-table-shell">
+    <div class="ts-table-scroll">
+      <table class="ts-table">
+        <thead>
+          <tr>
+            <th scope="col" style="width: 30%;">Email</th>
+            <th scope="col" style="width: 20%;">Status</th>
+            <th scope="col" style="width: 20%;">Created</th>
+            <th scope="col" style="width: 30%;">Token (hashed)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if invitations %}
+            {% for i in invitations %}
+            <tr>
+              <td data-label="Email">
+                <span class="ts-cell-title">{{ i.email }}</span>
+              </td>
+              <td data-label="Status">
+                {% if i.accepted_at %}
+                  <span class="ts-status ts-status--success">Accepted</span>
+                {% elif i.revoked_at %}
+                  <span class="ts-status ts-status--danger">Revoked</span>
+                {% elif i.expires_at and i.expires_at < now %}
+                  <span class="ts-status ts-status--warning">Expired</span>
+                {% else %}
+                  <span class="ts-status ts-status--pending">Pending</span>
+                {% endif %}
+              </td>
+              <td data-label="Created">
+                {{ i.created_at.strftime('%Y-%m-%d %H:%M') if i.created_at else '—' }}
+              </td>
+              <td data-label="Token (hashed)">
+                {% if i.token_hash %}
+                  {% with value=i.token_hash, label_hidden='Copy token hash' %}
+                    {% include 'components_ds/copy_value.html' %}
+                  {% endwith %}
+                {% else %}
+                  <span class="ts-panel__meta">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="4">
+                <div class="ts-empty">
+                  <div class="ts-empty__title">No pending invitations</div>
+                  <p class="ts-empty__hint">
+                    Send an invitation and it appears here with its lifecycle
+                    state (Pending / Accepted / Expired / Revoked). Raw
+                    invitation tokens are never shown — only their hashed
+                    digest is persisted.
+                  </p>
+                </div>
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

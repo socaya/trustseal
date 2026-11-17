@@ -1,0 +1,34 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'user-roles' %}
+
+{% block title %}Assign role · TRUSTSEAL{% endblock %}
+{% block page_title %}User &times; role assignment{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Grant a role to a user by ID. The assignment is written through the
+    users API and respects admin / tenant scoping.
+  </p>
+{% endblock %}
+
+{% block content %}
+<form method="post" class="ts-form" style="max-width: 560px;">
+  {{ form.hidden_tag() }}
+  <section class="ts-panel">
+    <h2 class="ts-panel__title">New assignment</h2>
+    <div class="ts-form-field">
+      {{ form.user_id.label(class="ts-form-label") }}
+      {{ form.user_id(class="ts-input", placeholder="e.g. 42") }}
+      {% for e in form.user_id.errors %}<span class="ts-form-error">{{ e }}</span>{% endfor %}
+    </div>
+    <div class="ts-form-field">
+      {{ form.role_id.label(class="ts-form-label") }}
+      {{ form.role_id(class="ts-select") }}
+      {% for e in form.role_id.errors %}<span class="ts-form-error">{{ e }}</span>{% endfor %}
+    </div>
+    <div class="ts-form-actions">
+      <button type="submit" class="ts-btn ts-btn--primary">Assign role</button>
+      <a href="{{ url_for('system.main_views.home') }}" class="ts-btn ts-btn--ghost">Cancel</a>
+    </div>
+  </section>
+</form>
+{% endblock %}

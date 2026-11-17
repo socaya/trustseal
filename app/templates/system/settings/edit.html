@@ -1,0 +1,60 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'settings' %}
+
+{% block title %}Organization settings · TRUSTSEAL{% endblock %}
+{% block page_title %}Organization settings{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Tenant-wide switches: mail transport, SMS gateway, signing features,
+    password policy, backup cadence, branding, and legal URLs. Changes
+    take effect immediately for this workspace.
+  </p>
+{% endblock %}
+
+{% block content %}
+<form method="post" class="ts-form" style="max-width: 920px;">
+  {{ form.hidden_tag() }}
+
+  {% set groups = [
+    ('Mail transport', ['smtp_host','smtp_port','smtp_username','smtp_password','smtp_use_tls','smtp_use_ssl','default_from_email']),
+    ('SMS gateway',    ['sms_gateway_type','sms_api_url','sms_api_key','sms_sender_id','sms_smpp_host','sms_smpp_port','sms_smpp_bind_type','sms_smpp_system_type']),
+    ('Features & policy', ['enable_signing','enable_stamping','require_email_verification','enable_two_factor_auth','password_complexity','account_lock_threshold']),
+    ('Backups',        ['auto_backup_enabled','backup_frequency_cron','backup_retention_days','backup_storage_path','backup_storage_provider']),
+    ('Branding & legal', ['platform_name','platform_logo_url','platform_brand_color','terms_url']),
+  ] %}
+
+  {% for label, fields in groups %}
+  <section class="ts-panel" style="margin-bottom: var(--ts-space-5);">
+    <h2 class="ts-panel__title">{{ label }}</h2>
+    <div class="ts-form-grid">
+      {% for name in fields %}
+        {% if form[name] is defined %}
+        {% set field = form[name] %}
+        <div class="ts-form-field">
+          {{ field.label(class="ts-form-label") }}
+          {% if field.type == 'BooleanField' %}
+            <label class="ts-form-switch">
+              {{ field(class="ts-switch__input") }}
+              <span class="ts-switch__slider"></span>
+            </label>
+          {% else %}
+            {{ field(class="ts-input") }}
+          {% endif %}
+          {% if field.errors %}
+            {% for e in field.errors %}
+              <span class="ts-form-error">{{ e }}</span>
+            {% endfor %}
+          {% endif %}
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+
+  <div class="ts-form-actions">
+    <button type="submit" class="ts-btn ts-btn--primary">Save settings</button>
+    <a href="{{ url_for('system.main_views.home') }}" class="ts-btn ts-btn--ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

@@ -360,6 +360,14 @@ def create_app(config_class=None):
     blueprints.append(operator_notifications_views)
     from .blueprints.auth.routes.profile_views import profile_views
     blueprints.append(profile_views)
+    from .blueprints.system.routes.admin_users_view import admin_users_views
+    blueprints.append(admin_users_views)
+    from .blueprints.system.routes.audit_security_view import audit_security_views
+    blueprints.append(audit_security_views)
+    from .blueprints.system.routes.integrations_view import integrations_views
+    blueprints.append(integrations_views)
+    from .blueprints.system.routes.billing_view import billing_views
+    blueprints.append(billing_views)
     from .blueprints.documents.api.document_label_api import (
         document_label_api,
     )

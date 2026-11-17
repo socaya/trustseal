@@ -1,0 +1,220 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'audit' %}
+
+{% block title %}Audit &amp; security · TRUSTSEAL{% endblock %}
+{% block page_title %}Audit &amp; security{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Chained-hash audit log of attributable security events plus the
+    transactional outbox that delivers signed webhooks. Each row carries
+    its canonical hash and the previous hash — tamper-evident and
+    exportable from <code>/api/security-events/export</code>.
+  </p>
+{% endblock %}
+
+{% block content %}
+
+<section class="ts-metric-strip" style="margin-bottom: var(--ts-space-5);">
+  <div class="ts-metric">
+    <span class="ts-metric__label">Events shown</span>
+    <span class="ts-metric__value">{{ events|length }}</span>
+    <span class="ts-metric__sub">of latest {{ limit }}</span>
+  </div>
+  {% for state_label, state_key in [
+      ('Pending outbox', 'pending'),
+      ('Processing',     'processing'),
+      ('Completed',      'completed'),
+      ('Dead-lettered',  'dead'),
+  ] %}
+  <div class="ts-metric">
+    <span class="ts-metric__label">{{ state_label }}</span>
+    <span class="ts-metric__value">{{ counts_by_state.get(state_key, 0) }}</span>
+    <span class="ts-metric__sub">outbox</span>
+  </div>
+  {% endfor %}
+</section>
+
+<section class="ts-panel" style="margin-bottom: var(--ts-space-5);">
+  <header class="ts-section-head">
+    <h2>Filters</h2>
+  </header>
+  <form method="get" class="ts-form-row ts-form-row--split" style="align-items: flex-end;">
+    <div class="ts-field">
+      <label class="ts-field__label" for="action">Action</label>
+      <input id="action" name="action" type="text"
+             value="{{ action_filter }}" class="ts-input"
+             placeholder="e.g. document.sign">
+    </div>
+    <div class="ts-field">
+      <label class="ts-field__label" for="outcome">Outcome</label>
+      <input id="outcome" name="outcome" type="text"
+             value="{{ outcome_filter }}" class="ts-input"
+             placeholder="success / denied / error">
+    </div>
+    <div class="ts-field">
+      <label class="ts-field__label" for="limit">Limit</label>
+      <input id="limit" name="limit" type="number" min="10" max="500"
+             value="{{ limit }}" class="ts-input">
+    </div>
+    <div class="ts-form-actions" style="margin-top: 0;">
+      <button type="submit" class="ts-btn ts-btn--primary">Apply</button>
+      <a href="{{ url_for('audit_security_views.index') }}"
+         class="ts-btn ts-btn--ghost">Reset</a>
+    </div>
+  </form>
+</section>
+
+<section>
+  <header class="ts-section-head">
+    <h2>Security events</h2>
+    <span class="ts-panel__meta">
+      {{ events|length }} event{% if events|length != 1 %}s{% endif %}
+      — chained by SHA-256(prev_hash || payload)
+    </span>
+  </header>
+  <div class="ts-table-shell">
+    <div class="ts-table-scroll">
+      <table class="ts-table">
+        <thead>
+          <tr>
+            <th scope="col" style="width:  6%;">#</th>
+            <th scope="col" style="width: 16%;">When (UTC)</th>
+            <th scope="col" style="width: 16%;">Actor</th>
+            <th scope="col" style="width: 16%;">Action</th>
+            <th scope="col" style="width: 16%;">Resource</th>
+            <th scope="col" style="width:  8%;">Outcome</th>
+            <th scope="col" style="width: 22%;">Correlation / hash</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% if events %}
+          {% for e in events %}
+          <tr>
+            <td data-label="#"><code>{{ e.id }}</code></td>
+            <td data-label="When">{{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') if e.created_at else '—' }}</td>
+            <td data-label="Actor">
+              {% set actor = actors.get(e.actor_id) %}
+              {% if actor %}
+                <span class="ts-cell-title">{{ (actor.first_name ~ ' ' ~ actor.last_name)|trim or actor.username }}</span>
+                <span class="ts-cell-sub">id #{{ actor.id }}</span>
+              {% elif e.actor_id %}
+                <span class="ts-panel__meta">id #{{ e.actor_id }}</span>
+              {% else %}
+                <span class="ts-panel__meta">system</span>
+              {% endif %}
+            </td>
+            <td data-label="Action"><code>{{ e.action }}</code></td>
+            <td data-label="Resource">
+              {{ e.resource_type }}{% if e.resource_id is not none %}
+                <span class="ts-panel__meta">#{{ e.resource_id }}</span>
+              {% endif %}
+            </td>
+            <td data-label="Outcome">
+              {% if e.outcome == 'success' %}
+                <span class="ts-status ts-status--success">Success</span>
+              {% elif e.outcome in ('denied', 'forbidden') %}
+                <span class="ts-status ts-status--warning">{{ e.outcome|title }}</span>
+              {% else %}
+                <span class="ts-status ts-status--danger">{{ e.outcome|title }}</span>
+              {% endif %}
+            </td>
+            <td data-label="Correlation">
+              <span class="ts-cell-sub"><code>{{ e.correlation_id[:16] }}…</code></span>
+              {% if e.event_hash %}
+                <span class="ts-cell-sub"><code>{{ e.event_hash[:16] }}…</code></span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="7">
+              <div class="ts-empty">
+                <div class="ts-empty__title">No security events in this workspace yet</div>
+                <p class="ts-empty__hint">
+                  Events are emitted automatically as users sign in,
+                  upload documents, manage roles, and sign envelopes.
+                </p>
+              </div>
+            </td>
+          </tr>
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section style="margin-top: var(--ts-space-6);">
+  <header class="ts-section-head">
+    <h2>Outbox (latest 50)</h2>
+    <span class="ts-panel__meta">
+      Transactional outbox — at-least-once delivery, idempotent downstream.
+    </span>
+  </header>
+  <div class="ts-table-shell">
+    <div class="ts-table-scroll">
+      <table class="ts-table">
+        <thead>
+          <tr>
+            <th scope="col" style="width:  6%;">#</th>
+            <th scope="col" style="width: 18%;">Event type</th>
+            <th scope="col" style="width: 18%;">Aggregate</th>
+            <th scope="col" style="width: 10%;">State</th>
+            <th scope="col" style="width:  8%;">Attempts</th>
+            <th scope="col" style="width: 16%;">Next attempt</th>
+            <th scope="col" style="width: 24%;">Last error</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% if outbox %}
+          {% for o in outbox %}
+          <tr>
+            <td data-label="#"><code>{{ o.id }}</code></td>
+            <td data-label="Event type"><code>{{ o.event_type }}</code></td>
+            <td data-label="Aggregate">
+              {{ o.aggregate_type }}
+              <span class="ts-panel__meta">#{{ o.aggregate_id }}</span>
+            </td>
+            <td data-label="State">
+              {% if o.state == 'completed' %}
+                <span class="ts-status ts-status--success">Completed</span>
+              {% elif o.state == 'pending' %}
+                <span class="ts-status ts-status--pending">Pending</span>
+              {% elif o.state == 'processing' %}
+                <span class="ts-status ts-status--info">Processing</span>
+              {% else %}
+                <span class="ts-status ts-status--danger">{{ o.state|title }}</span>
+              {% endif %}
+            </td>
+            <td data-label="Attempts">{{ o.attempts }}</td>
+            <td data-label="Next attempt">
+              {{ o.next_attempt_at.strftime('%Y-%m-%d %H:%M') if o.next_attempt_at else '—' }}
+            </td>
+            <td data-label="Last error">
+              {% if o.last_error %}
+                <span class="ts-cell-sub"><code>{{ o.last_error|truncate(60) }}</code></span>
+              {% else %}
+                <span class="ts-panel__meta">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="7">
+              <div class="ts-empty">
+                <div class="ts-empty__title">Outbox is empty</div>
+                <p class="ts-empty__hint">
+                  Nothing has been queued for webhook delivery yet.
+                </p>
+              </div>
+            </td>
+          </tr>
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

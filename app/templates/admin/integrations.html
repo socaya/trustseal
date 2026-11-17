@@ -1,0 +1,200 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'integrations' %}
+
+{% block title %}Integrations &amp; API · TRUSTSEAL{% endblock %}
+{% block page_title %}Integrations &amp; API{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Webhook endpoints registered for this tenant plus the latest 100
+    delivery attempts. Secrets are stored as hashes — the raw secret is
+    only returned once at creation time via the webhook API.
+  </p>
+{% endblock %}
+
+{% block content %}
+
+<section class="ts-metric-strip" style="margin-bottom: var(--ts-space-5);">
+  <div class="ts-metric">
+    <span class="ts-metric__label">Endpoints</span>
+    <span class="ts-metric__value">{{ endpoints|length }}</span>
+    <span class="ts-metric__sub">registered</span>
+  </div>
+  {% for label, key in [
+    ('Succeeded', 'succeeded'),
+    ('Pending',   'pending'),
+    ('In flight', 'in_flight'),
+    ('Failed',    'failed'),
+    ('Dead',      'dead'),
+  ] %}
+  <div class="ts-metric">
+    <span class="ts-metric__label">{{ label }}</span>
+    <span class="ts-metric__value">{{ counts_by_status.get(key, 0) }}</span>
+    <span class="ts-metric__sub">deliveries</span>
+  </div>
+  {% endfor %}
+</section>
+
+<section>
+  <header class="ts-section-head">
+    <h2>Webhook endpoints</h2>
+    <span class="ts-panel__meta">
+      Create / rotate / disable via <code>POST /api/webhooks</code>.
+    </span>
+  </header>
+  <div class="ts-table-shell">
+    <div class="ts-table-scroll">
+      <table class="ts-table">
+        <thead>
+          <tr>
+            <th scope="col" style="width:  6%;">#</th>
+            <th scope="col" style="width: 32%;">URL</th>
+            <th scope="col" style="width: 18%;">Events</th>
+            <th scope="col" style="width: 10%;">State</th>
+            <th scope="col" style="width: 16%;">Created by</th>
+            <th scope="col" style="width: 18%;">Created</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% if endpoints %}
+          {% for ep in endpoints %}
+          <tr>
+            <td data-label="#"><code>{{ ep.id }}</code></td>
+            <td data-label="URL">
+              {% with value=ep.url, label_hidden='Copy webhook URL' %}
+                {% include 'components_ds/copy_value.html' %}
+              {% endwith %}
+            </td>
+            <td data-label="Events">
+              {% if ep.events %}
+                {% for evt in ep.events[:4] %}
+                  <span class="ts-tag ts-tag--brand">{{ evt }}</span>
+                {% endfor %}
+                {% if ep.events|length > 4 %}
+                  <span class="ts-panel__meta">+{{ ep.events|length - 4 }} more</span>
+                {% endif %}
+              {% else %}
+                <span class="ts-panel__meta">—</span>
+              {% endif %}
+            </td>
+            <td data-label="State">
+              {% if ep.active %}
+                <span class="ts-status ts-status--success">Active</span>
+              {% else %}
+                <span class="ts-status ts-status--danger">Disabled</span>
+              {% endif %}
+            </td>
+            <td data-label="Created by">
+              {% set u = creators.get(ep.created_by_id) %}
+              {% if u %}
+                <span class="ts-cell-title">{{ (u.first_name ~ ' ' ~ u.last_name)|trim or u.username }}</span>
+                <span class="ts-cell-sub">id #{{ u.id }}</span>
+              {% else %}
+                <span class="ts-panel__meta">id #{{ ep.created_by_id }}</span>
+              {% endif %}
+            </td>
+            <td data-label="Created">
+              {{ ep.created_at.strftime('%Y-%m-%d %H:%M') if ep.created_at else '—' }}
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="6">
+              <div class="ts-empty">
+                <div class="ts-empty__title">No webhook endpoints configured</div>
+                <p class="ts-empty__hint">
+                  Register one via <code>POST /api/webhooks</code> with
+                  a URL and an <code>events</code> list. The response
+                  returns the raw signing secret exactly once — store it
+                  immediately.
+                </p>
+              </div>
+            </td>
+          </tr>
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section style="margin-top: var(--ts-space-6);">
+  <header class="ts-section-head">
+    <h2>Recent deliveries</h2>
+    <span class="ts-panel__meta">
+      At-least-once delivery; failed rows are retried with exponential backoff.
+    </span>
+  </header>
+  <div class="ts-table-shell">
+    <div class="ts-table-scroll">
+      <table class="ts-table">
+        <thead>
+          <tr>
+            <th scope="col" style="width:  6%;">#</th>
+            <th scope="col" style="width:  8%;">Endpoint</th>
+            <th scope="col" style="width: 18%;">Event type</th>
+            <th scope="col" style="width:  8%;">Status</th>
+            <th scope="col" style="width:  8%;">HTTP</th>
+            <th scope="col" style="width:  8%;">Attempts</th>
+            <th scope="col" style="width: 18%;">Next retry</th>
+            <th scope="col" style="width: 26%;">Last error</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% if deliveries %}
+          {% for d in deliveries %}
+          <tr>
+            <td data-label="#"><code>{{ d.id }}</code></td>
+            <td data-label="Endpoint"><code>#{{ d.endpoint_id }}</code></td>
+            <td data-label="Event type"><code>{{ d.event_type }}</code></td>
+            <td data-label="Status">
+              {% if d.status == 'succeeded' %}
+                <span class="ts-status ts-status--success">Succeeded</span>
+              {% elif d.status == 'pending' %}
+                <span class="ts-status ts-status--pending">Pending</span>
+              {% elif d.status == 'in_flight' %}
+                <span class="ts-status ts-status--info">In flight</span>
+              {% elif d.status == 'failed' %}
+                <span class="ts-status ts-status--warning">Failed</span>
+              {% else %}
+                <span class="ts-status ts-status--danger">Dead</span>
+              {% endif %}
+            </td>
+            <td data-label="HTTP">
+              {% if d.response_status %}
+                <code>{{ d.response_status }}</code>
+              {% else %}
+                <span class="ts-panel__meta">—</span>
+              {% endif %}
+            </td>
+            <td data-label="Attempts">{{ d.retry_count }}</td>
+            <td data-label="Next retry">
+              {{ d.next_retry_at.strftime('%Y-%m-%d %H:%M') if d.next_retry_at else '—' }}
+            </td>
+            <td data-label="Last error">
+              {% if d.last_error %}
+                <span class="ts-cell-sub"><code>{{ d.last_error|truncate(70) }}</code></span>
+              {% else %}
+                <span class="ts-panel__meta">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="8">
+              <div class="ts-empty">
+                <div class="ts-empty__title">No webhook deliveries yet</div>
+                <p class="ts-empty__hint">
+                  Nothing has been dispatched against these endpoints.
+                </p>
+              </div>
+            </td>
+          </tr>
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

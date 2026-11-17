@@ -48,7 +48,7 @@
     </button>
 
     <a class="ts-topbar__brand"
-       href="{{ url_for('index') if 'index' in (request.endpoint or '') else '/' }}"
+       href="{{ url_for('system.main_views.home') }}"
        aria-label="TRUSTSEAL · Verified Integrity">
       <img src="{{ url_for('static', filename='brand/trustseal/trustseal-horizontal.png') }}"
            alt="TRUSTSEAL" width="220" height="44">

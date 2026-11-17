@@ -85,23 +85,9 @@ def logout():
     return redirect(url_for("auth_views.login"))
 
 # --- Profile ---
+# The design-system profile UI lives at /app/profile (profile_views.show).
+# Keep /auth/profile as a 301 redirect so any legacy bookmark still works.
 @auth_views.route('/profile')
 @login_required
 def profile():
-    access_token = session.get("access_token")
-    if not access_token:
-        flash("Your session has expired. Please log in again.", "warning")
-        return redirect(url_for("auth_views.login"))
-
-    user_data = get_data("auth/me", token=access_token)
-    if user_data and "id" in user_data:
-        if str(user_data.get("id")) != str(current_user.get_id()):
-            current_app.logger.error("🔁 Token mismatch. Logging out.")
-            flash("Session mismatch. Please log in again.", "danger")
-            logout_user()
-            session.clear()
-            return redirect(url_for("auth_views.login"))
-        return render_template("auth/profile.html", user_data=user_data)
-
-    flash("Could not fetch your profile details.", "warning")
-    return redirect(url_for("system.main_views.home"))
+    return redirect(url_for("profile_views.show"), code=301)

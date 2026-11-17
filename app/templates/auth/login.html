@@ -50,9 +50,13 @@
     </div>
 
     <div style="display: flex; justify-content: space-between; align-items: center;">
-      <a class="ts-btn ts-btn--text ts-btn--sm" href="{{ url_for('auth_views.reset_password') if 'auth_views.reset_password' in url_map_endpoints else '#' }}">
+      {% if 'auth_views.reset_password' in url_map_endpoints %}
+      <a class="ts-btn ts-btn--text ts-btn--sm" href="{{ url_for('auth_views.reset_password') }}">
         Forgot password?
       </a>
+      {% else %}
+      <span></span>
+      {% endif %}
       <span class="ts-panel__meta">We never disclose whether an account exists.</span>
     </div>
 

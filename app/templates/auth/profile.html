@@ -94,10 +94,12 @@
     double-protected with re-verification where required.
   </p>
   <div class="ts-form-actions" style="justify-content: flex-start;">
+    {% if 'auth_views.reset_password' in url_map_endpoints %}
     <a class="ts-btn ts-btn--secondary"
-       href="{{ url_for('auth_views.reset_password') if 'auth_views.reset_password' in url_map_endpoints else '/auth/change-password' }}">
+       href="{{ url_for('auth_views.reset_password') }}">
       Change password
     </a>
+    {% endif %}
     <a class="ts-btn ts-btn--danger"
        href="{{ url_for('auth_views.logout') if 'auth_views.logout' in url_map_endpoints else '/auth/logout' }}">
       Sign out
