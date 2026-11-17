@@ -1,21 +1,38 @@
-{% extends "base.html" %}
+{% extends "layouts/signer.html" %}
 
-{% block title %}Invitation unavailable · TrustSeal{% endblock %}
+{% block title %}Invitation unavailable · TRUSTSEAL{% endblock %}
 
-{% block login_content %}
-<div class="unavail-shell" style="width: 100%; max-width: 560px;">
-  <section class="p-3" style="border: 1px solid #D6DADE; background: #FFFFFF;">
-    <h1 class="h4 mb-3" style="color: #164C83; font-weight: 600;">
-      <span aria-hidden="true">&#8856;</span> Invitation unavailable
+{% block content %}
+<section class="ts-panel" aria-labelledby="unavailable-heading" style="max-width: 640px; margin: 0 auto;">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ts-space-3); margin-bottom: var(--ts-space-3);">
+    <h1 id="unavailable-heading" class="ts-page-title" style="font-size: 22px;">
+      Invitation unavailable
     </h1>
-    <p class="mb-3" style="font-size: 0.95rem;">
-      This link is no longer valid. It may have expired, already been used,
-      or been revoked by the sender. Contact the party that invited you if
-      you believe this is in error.
-    </p>
-    <p class="mb-0">
-      <a href="{{ back_url }}" style="color: #164C83;">Back to verification</a>
-    </p>
-  </section>
-</div>
+    <span class="ts-status ts-status--warning">Unavailable</span>
+  </div>
+
+  <p>
+    This link is no longer valid. It may have expired, already been used,
+    or been revoked by the sender. For privacy reasons we do not disclose
+    which of these applies.
+  </p>
+
+  <div class="ts-inline ts-inline--info" style="margin-top: var(--ts-space-4);">
+    <div class="ts-inline__body">
+      <div class="ts-inline__title">Next steps</div>
+      <p style="margin-top: 4px;">
+        Contact the party that invited you to request a fresh link, or use
+        the independent public verifier to check a sealed PDF you already
+        received.
+      </p>
+    </div>
+  </div>
+
+  <div class="ts-form-actions" style="justify-content: flex-start;">
+    <a class="ts-btn ts-btn--primary" href="{{ back_url or '/verify' }}">
+      Open the public verifier
+    </a>
+    <a class="ts-btn ts-btn--text" href="/">Return home</a>
+  </div>
+</section>
 {% endblock %}

@@ -1,16 +1,16 @@
-{% extends "base.html" %}
+{% extends "layouts/signer.html" %}
 
-{% block title %}Too many attempts · TrustSeal{% endblock %}
+{% block title %}Too many attempts · TRUSTSEAL{% endblock %}
 
-{% block login_content %}
-<div class="unavail-shell" style="width: 100%; max-width: 560px;">
-  <section class="p-3" style="border: 1px solid #D6DADE; background: #FFFFFF;">
-    <h1 class="h4 mb-3" style="color: #164C83; font-weight: 600;">
-      <span aria-hidden="true">&#9888;</span> Too many attempts
-    </h1>
-    <p class="mb-0" style="font-size: 0.95rem;">
-      Please wait a moment and try again.
-    </p>
-  </section>
-</div>
+{% block content %}
+<section class="ts-panel" aria-labelledby="rl-heading" style="max-width: 640px; margin: 0 auto;">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ts-space-3); margin-bottom: var(--ts-space-3);">
+    <h1 id="rl-heading" class="ts-page-title" style="font-size: 22px;">Too many attempts</h1>
+    <span class="ts-status ts-status--warning">Rate limited</span>
+  </div>
+  <p style="margin: 0;">
+    Please wait a moment and try again. This limit exists to protect
+    invitation tokens from brute-force enumeration.
+  </p>
+</section>
 {% endblock %}

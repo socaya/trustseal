@@ -1,52 +1,95 @@
-{% extends "base.html" %}
-{% block title %}Register | TrustSeal{% endblock %}
+{% extends "layouts/auth.html" %}
 
-{% block login_content %}
-<div class="register-box">
-  <div class="card card-outline card-success shadow-sm">
-    <div class="card-header text-center">
-      <a href="#" class="h4 fw-bold text-success">TrustSeal</a>
-      <p class="text-muted small mb-0">Create an Account</p>
+{% block title %}Create an account · TRUSTSEAL{% endblock %}
+{% block page_title %}Create your workspace{% endblock %}
+
+{% block content %}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="ts-stack" style="margin-bottom: var(--ts-space-4);">
+        {% for category, text in messages %}
+          <div class="ts-inline ts-inline--{{ 'danger' if category == 'danger' else ('success' if category == 'success' else 'info') }}"
+               role="alert" aria-live="polite">
+            <div class="ts-inline__body">{{ text }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <form method="POST" action="{{ url_for('auth_views.register') }}" class="ts-stack" novalidate>
+    {{ form.hidden_tag() }}
+
+    <div class="ts-form-row ts-form-row--split">
+      <div class="ts-field">
+        <label class="ts-field__label" data-required="true" for="first_name">
+          {{ form.first_name.label.text }}
+        </label>
+        {{ form.first_name(class="ts-input", id="first_name", autocomplete="given-name") }}
+        {% for error in form.first_name.errors %}
+          <span class="ts-field__error" role="alert">{{ error }}</span>
+        {% endfor %}
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" data-required="true" for="last_name">
+          {{ form.last_name.label.text }}
+        </label>
+        {{ form.last_name(class="ts-input", id="last_name", autocomplete="family-name") }}
+        {% for error in form.last_name.errors %}
+          <span class="ts-field__error" role="alert">{{ error }}</span>
+        {% endfor %}
+      </div>
     </div>
-    <div class="card-body">
-      {% include 'partials/messages.html' %}
-      <form method="POST">
-        {{ form.hidden_tag() }}
 
-        <div class="mb-3">
-          {{ form.username.label(class="form-label") }}
-          {{ form.username(class="form-control") }}
-        </div>
-        <div class="mb-3">
-          {{ form.email.label(class="form-label") }}
-          {{ form.email(class="form-control") }}
-        </div>
-        <div class="mb-3">
-          {{ form.first_name.label(class="form-label") }}
-          {{ form.first_name(class="form-control") }}
-        </div>
-        <div class="mb-3">
-          {{ form.last_name.label(class="form-label") }}
-          {{ form.last_name(class="form-control") }}
-        </div>
-        <div class="mb-3">
-          {{ form.phone.label(class="form-label") }}
-          {{ form.phone(class="form-control") }}
-        </div>
-        <div class="mb-3">
-          {{ form.password.label(class="form-label") }}
-          {{ form.password(class="form-control") }}
-        </div>
-
-        <div class="d-grid">
-          <button type="submit" class="btn btn-success">Register</button>
-        </div>
-      </form>
-
-      <p class="mt-3 text-center small">
-        Already have an account? <a href="{{ url_for('auth_views.login') }}" class="text-success">Login</a>
-      </p>
+    <div class="ts-field">
+      <label class="ts-field__label" data-required="true" for="username">
+        {{ form.username.label.text }}
+      </label>
+      {{ form.username(class="ts-input", id="username", autocomplete="username") }}
+      <span class="ts-field__hint">Shown in audit records as the actor identity.</span>
+      {% for error in form.username.errors %}
+        <span class="ts-field__error" role="alert">{{ error }}</span>
+      {% endfor %}
     </div>
-  </div>
-</div>
+
+    <div class="ts-field">
+      <label class="ts-field__label" data-required="true" for="email">
+        {{ form.email.label.text }}
+      </label>
+      {{ form.email(class="ts-input", id="email", autocomplete="email",
+                    placeholder="you@example.com") }}
+      {% for error in form.email.errors %}
+        <span class="ts-field__error" role="alert">{{ error }}</span>
+      {% endfor %}
+    </div>
+
+    <div class="ts-field">
+      <label class="ts-field__label" for="phone">{{ form.phone.label.text }}</label>
+      {{ form.phone(class="ts-input", id="phone", autocomplete="tel",
+                    placeholder="+1 555 123 4567") }}
+      {% for error in form.phone.errors %}
+        <span class="ts-field__error" role="alert">{{ error }}</span>
+      {% endfor %}
+    </div>
+
+    <div class="ts-field">
+      <label class="ts-field__label" data-required="true" for="password">
+        {{ form.password.label.text }}
+      </label>
+      {{ form.password(class="ts-input", id="password", autocomplete="new-password") }}
+      <span class="ts-field__hint">At least 12 characters. Pick something you don't use elsewhere.</span>
+      {% for error in form.password.errors %}
+        <span class="ts-field__error" role="alert">{{ error }}</span>
+      {% endfor %}
+    </div>
+
+    <button type="submit" class="ts-btn ts-btn--primary ts-btn--lg" style="width: 100%;">
+      Create account
+    </button>
+  </form>
+
+  <p style="text-align: center; margin-top: var(--ts-space-4); color: var(--ts-text-muted); font-size: var(--ts-fs-label);">
+    Already have an account?
+    <a href="{{ url_for('auth_views.login') }}">Sign in</a>
+  </p>
 {% endblock %}

@@ -1,25 +1,69 @@
-{% extends "base.html" %}
+{% extends "layouts/signer.html" %}
 
-{% block title %}Decision recorded · TrustSeal{% endblock %}
+{% block title %}Decision recorded · TRUSTSEAL{% endblock %}
 
-{% block login_content %}
-<div class="recorded-shell" style="width: 100%; max-width: 560px;">
-  <section class="p-3" style="border: 1px solid #D6DADE; background: #FFFFFF;">
-    <h1 class="h4 mb-3" style="color: #164C83; font-weight: 600;">
-      {% if choice == "acknowledged" %}
-      <span aria-hidden="true">&#10003;</span> Acknowledged and recorded
-      {% else %}
-      <span aria-hidden="true">&#8856;</span> Declined and recorded
-      {% endif %}
+{% block content %}
+<section class="ts-panel" aria-labelledby="recorded-heading" style="max-width: 640px; margin: 0 auto;">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ts-space-3); margin-bottom: var(--ts-space-3);">
+    <h1 id="recorded-heading" class="ts-page-title" style="font-size: 22px;">
+      {% if choice == "acknowledged" %}Acknowledged{% else %}Declined{% endif %}
     </h1>
-    <p class="mb-3" style="font-size: 0.95rem;">
-      Your decision on envelope #{{ envelope.id }} has been saved. The
-      sender has been notified through their own notification stream.
-    </p>
-    <p class="text-muted mb-0" style="font-size: 0.85rem;">
-      Envelope digest:
-      <code>{{ envelope.document_sha256 }}</code>
-    </p>
-  </section>
-</div>
+    {% if choice == "acknowledged" %}
+      <span class="ts-status ts-status--success">Recorded</span>
+    {% else %}
+      <span class="ts-status ts-status--danger">Recorded</span>
+    {% endif %}
+  </div>
+
+  <p style="margin-bottom: var(--ts-space-4);">
+    {% if choice == "acknowledged" %}
+      Your acknowledgement of envelope <code>#{{ envelope.id }}</code> has
+      been saved. The sender has been notified through their own
+      notification stream.
+    {% else %}
+      Your decision to decline envelope <code>#{{ envelope.id }}</code> has
+      been saved. The sender has been notified; no additional action is
+      required from you.
+    {% endif %}
+    {% if attachments_bound %}
+      <br>
+      <span class="ts-panel__meta">
+        Your decision is accompanied by {{ attachments_bound }} supporting
+        attachment{% if attachments_bound != 1 %}s{% endif %} — each is hashed
+        into the signed receipt.
+      </span>
+    {% endif %}
+    {% if appearance_stored %}
+      <br>
+      <span class="ts-panel__meta">
+        Your drawn signature appearance has been stored as visual evidence
+        alongside this decision.
+      </span>
+    {% endif %}
+  </p>
+
+  <div class="ts-inline ts-inline--info" style="margin-bottom: var(--ts-space-4);">
+    <div class="ts-inline__body">
+      <div class="ts-inline__title">What was recorded</div>
+      <p style="margin-top: 4px;">
+        The envelope's exact SHA-256 digest at the moment of your decision,
+        the consent text you reviewed and your participant identifier are
+        appended to the immutable audit chain. The record cannot be
+        rewritten retroactively.
+      </p>
+    </div>
+  </div>
+
+  <dl class="ts-evidence">
+    <div class="ts-evidence__row">
+      <dt class="ts-evidence__label">Envelope digest</dt>
+      <dd class="ts-evidence__value">
+        {% with value=envelope.document_sha256, label_hidden='Copy envelope digest' %}
+          {% include 'components_ds/copy_value.html' %}
+        {% endwith %}
+      </dd>
+      <span class="ts-evidence__state"><span class="ts-status ts-status--neutral">Captured</span></span>
+    </div>
+  </dl>
+</section>
 {% endblock %}

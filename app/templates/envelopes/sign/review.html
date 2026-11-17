@@ -1,170 +1,162 @@
-{% extends "base.html" %}
+{% extends "layouts/signer.html" %}
 
-{% block title %}Review envelope · TrustSeal{% endblock %}
+{% block title %}Review &amp; sign envelope · TRUSTSEAL{% endblock %}
 
-{% block login_content %}
-<div class="sign-shell" style="width: 100%; max-width: 960px;">
-  <header class="pb-3 mb-4" style="border-bottom: 1px solid #D6DADE;">
-    <h1 class="h3 mb-1" style="color: #164C83; font-weight: 600;">
-      Review and record your decision
-    </h1>
-    <p class="text-muted mb-0" style="font-size: 0.95rem;">
-      You were invited to review envelope #{{ envelope.id }} as participant
-      #{{ participant.id }}. This page is bound to a single-use link.
-    </p>
-  </header>
+{% block content %}
+<header style="margin-bottom: var(--ts-space-5);">
+  <h1 class="ts-page-title">Review and record your decision</h1>
+  <p class="ts-page-header__description">
+    You were invited to review envelope <code>#{{ envelope.id }}</code> as
+    participant <code>#{{ participant.id }}</code>. This page is bound to a
+    single-use link and records the exact document digest you saw.
+  </p>
+</header>
 
-  <section class="p-3 mb-4" style="border: 1px solid #D6DADE; background: #FFFFFF;">
-    <h2 class="h5 mb-3" style="color: #164C83; font-weight: 600;">
-      Document identifier
-    </h2>
-    <dl class="row mb-0" style="font-size: 0.9rem;">
-      <dt class="col-sm-4 text-muted">Envelope SHA-256</dt>
-      <dd class="col-sm-8" style="font-family: monospace; word-break: break-all;">
-        {{ envelope.document_sha256 }}
+<!-- Document identifier ---------------------------------------- -->
+<section class="ts-panel" style="margin-bottom: var(--ts-space-4);">
+  <h2 class="ts-panel__title">Document identifier</h2>
+  <dl class="ts-evidence">
+    <div class="ts-evidence__row">
+      <dt class="ts-evidence__label">Envelope SHA-256</dt>
+      <dd class="ts-evidence__value">
+        {% with value=envelope.document_sha256, label_hidden='Copy envelope SHA-256' %}
+          {% include 'components_ds/copy_value.html' %}
+        {% endwith %}
       </dd>
-      <dt class="col-sm-4 text-muted">Download</dt>
-      <dd class="col-sm-8">
-        <a href="{{ download_url }}" style="color: #164C83;">
+      <span class="ts-evidence__state">
+        <span class="ts-status ts-status--neutral">Captured</span>
+      </span>
+    </div>
+    <div class="ts-evidence__row">
+      <dt class="ts-evidence__label">Download</dt>
+      <dd class="ts-evidence__value">
+        <a class="ts-btn ts-btn--secondary ts-btn--sm" href="{{ download_url }}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 4v12M6 11l6 6 6-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 20h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          </svg>
           Save a local copy
         </a>
       </dd>
-    </dl>
-  </section>
-
-  <section aria-labelledby="pdf-heading" class="mb-4"
-           style="border: 1px solid #D6DADE; background: #FFFFFF;">
-    <header class="d-flex align-items-center justify-content-between px-3 py-2"
-            style="background: #F6F7F8; border-bottom: 1px solid #D6DADE;">
-      <h2 id="pdf-heading" class="h6 mb-0"
-          style="color: #164C83; font-weight: 600;">
-        Document preview
-      </h2>
-      <div class="d-flex align-items-center gap-2">
-        <button type="button" id="zoom-out"
-                aria-label="Zoom out"
-                class="btn btn-sm"
-                style="border-radius: 0; border: 1px solid #D6DADE; background: #FFFFFF;">
-          <span aria-hidden="true">&minus;</span>
-        </button>
-        <span id="pdf-page" aria-live="polite"
-              style="font-size: 0.85rem; min-width: 56px; text-align: center;">
-          1 / ?
-        </span>
-        <button type="button" id="zoom-in"
-                aria-label="Zoom in"
-                class="btn btn-sm"
-                style="border-radius: 0; border: 1px solid #D6DADE; background: #FFFFFF;">
-          <span aria-hidden="true">+</span>
-        </button>
-      </div>
-    </header>
-    <div id="pdf-host"
-         role="document"
-         aria-label="Embedded PDF viewer"
-         tabindex="0"
-         style="max-height: 70vh; overflow: auto; padding: 12px;
-                background: #F0F2F4; outline: none;">
-      <noscript>
-        <p class="m-3">
-          Enable JavaScript to preview the document inline, or use the
-          download link above to review it locally before submitting
-          your decision.
-        </p>
-      </noscript>
+      <span class="ts-evidence__state"></span>
     </div>
-    <p id="pdf-status" class="px-3 py-2 mb-0"
-       style="font-size: 0.85rem; color: #164C83; border-top: 1px solid #D6DADE;">
-      Preparing viewer...
-    </p>
-  </section>
+  </dl>
+</section>
 
-  <section class="p-3 mb-4" style="border: 1px solid #D6DADE; background: #FFFFFF;">
-    <h2 class="h5 mb-3" style="color: #164C83; font-weight: 600;">Consent</h2>
-    <p style="font-size: 0.95rem;">{{ consent_text }}</p>
-    <p class="text-muted mb-0" style="font-size: 0.85rem;">
-      Consent version: <code>{{ consent_version }}</code>
-    </p>
-  </section>
-
-  <form method="POST" action="{{ url_for('sign_views.decision', token=token) }}"
-        class="p-3" style="border: 1px solid #D6DADE; background: #FFFFFF;">
-    <h2 class="h5 mb-3" style="color: #164C83; font-weight: 600;">
-      Record your decision
-    </h2>
-    <p style="font-size: 0.95rem;">
-      Choose one of the options below. Your decision is recorded along with
-      the document digest so an auditor can later verify what you saw.
-    </p>
-
-    <fieldset class="mb-3" style="border: 1px solid #D6DADE; padding: 12px;">
-      <legend class="h6" style="color: #164C83; font-weight: 600;">
-        Draw your signature (optional)
-      </legend>
-      <p class="text-muted" style="font-size: 0.85rem;">
-        A drawn signature is stored alongside your decision for visual
-        reference only. It does not create a cryptographic signature
-        on the sealed PDF; the platform seal and your signer-held
-        endorsement remain the authoritative evidence.
+<!-- PDF viewer ------------------------------------------------- -->
+<section class="ts-panel" aria-labelledby="pdf-heading" style="margin-bottom: var(--ts-space-4); padding: 0;">
+  <header style="display: flex; align-items: center; justify-content: space-between; padding: var(--ts-space-3) var(--ts-space-4); border-bottom: 1px solid var(--ts-border); background: var(--ts-surface-alt);">
+    <h2 id="pdf-heading" class="ts-panel__title" style="margin: 0; font-size: var(--ts-fs-subsection);">Document preview</h2>
+    <div style="display: inline-flex; align-items: center; gap: var(--ts-space-2);">
+      <button type="button" id="zoom-out" class="ts-btn ts-btn--secondary ts-btn--sm" aria-label="Zoom out">−</button>
+      <span id="pdf-page" aria-live="polite" style="font-size: var(--ts-fs-label); min-width: 60px; text-align: center; color: var(--ts-text-muted);">1 / ?</span>
+      <button type="button" id="zoom-in" class="ts-btn ts-btn--secondary ts-btn--sm" aria-label="Zoom in">+</button>
+    </div>
+  </header>
+  <div id="pdf-host"
+       role="document"
+       aria-label="Embedded PDF viewer"
+       tabindex="0"
+       style="max-height: 70vh; overflow: auto; padding: var(--ts-space-3); background: var(--ts-canvas); outline: none;">
+    <noscript>
+      <p style="margin: var(--ts-space-3); color: var(--ts-text-muted);">
+        Enable JavaScript to preview the document inline, or use the
+        download link above to review it locally before submitting your
+        decision.
       </p>
-      <canvas id="signature-pad"
-              aria-label="Drawn signature capture area"
-              style="width: 100%; max-width: 480px; height: 160px;
-                     display: block; background: #FFFFFF;
-                     border: 1px dashed #164C83; touch-action: none;">
-      </canvas>
-      <div class="d-flex gap-2 mt-2">
-        <button type="button" id="signature-clear"
-                class="btn btn-sm"
-                style="border-radius: 0; border: 1px solid #D6DADE; background: #FFFFFF;">
-          Clear
-        </button>
-      </div>
-      <input type="hidden" id="appearance-input" name="appearance_png_data_url" value="">
-    </fieldset>
+    </noscript>
+  </div>
+  <p id="pdf-status"
+     style="padding: var(--ts-space-2) var(--ts-space-4); margin: 0; border-top: 1px solid var(--ts-border); color: var(--ts-text-muted); font-size: var(--ts-fs-label);">
+    Preparing viewer…
+  </p>
+</section>
 
-    <div class="d-flex gap-3 flex-wrap">
-      <button type="submit" name="choice" value="acknowledged"
-              class="btn"
-              style="background-color: #164C83; color: #FFFFFF;
-                     border-radius: 0; border: 1px solid #164C83;">
-        <span aria-hidden="true">&#10003;</span> Acknowledge and record
-      </button>
-      <button type="submit" name="choice" value="declined"
-              class="btn"
-              style="background-color: #FFFFFF; color: #164C83;
-                     border-radius: 0; border: 1px solid #164C83;">
-        <span aria-hidden="true">&#8856;</span> Decline
+<!-- Consent --------------------------------------------------- -->
+<section class="ts-panel" style="margin-bottom: var(--ts-space-4);">
+  <h2 class="ts-panel__title">Consent</h2>
+  <p style="margin: 0 0 var(--ts-space-3); color: var(--ts-text);">{{ consent_text }}</p>
+  <p class="ts-panel__meta" style="margin: 0;">
+    Consent version: <code>{{ consent_version }}</code>
+  </p>
+</section>
+
+<!-- Decision form -------------------------------------------- -->
+<form method="POST" action="{{ url_for('sign_views.decision', token=token) }}"
+      class="ts-panel">
+  <h2 class="ts-panel__title">Record your decision</h2>
+  <p class="ts-panel__meta" style="margin-bottom: var(--ts-space-4);">
+    Your decision is recorded along with the envelope digest so an auditor
+    can later verify exactly what you saw at this moment.
+  </p>
+
+  <fieldset style="border: 1px solid var(--ts-border); padding: var(--ts-space-4); border-radius: var(--ts-radius); margin-bottom: var(--ts-space-4);">
+    <legend style="font-weight: var(--ts-fw-semibold); color: var(--ts-text); padding: 0 var(--ts-space-2);">
+      Draw your signature (optional)
+    </legend>
+    <p class="ts-panel__meta" style="margin: 0 0 var(--ts-space-3);">
+      A drawn signature is stored alongside your decision as a visual
+      representation. It is <strong>not</strong> a cryptographic signature on
+      the sealed PDF — the platform seal and your signer-held cryptographic
+      endorsement remain the authoritative evidence.
+    </p>
+    <canvas id="signature-pad"
+            aria-label="Drawn signature capture area"
+            style="width: 100%; max-width: 520px; height: 160px; display: block;
+                   background: var(--ts-surface);
+                   border: 1px dashed var(--ts-border-strong);
+                   border-radius: var(--ts-radius);
+                   touch-action: none;">
+    </canvas>
+    <div style="display: inline-flex; gap: var(--ts-space-2); margin-top: var(--ts-space-3);">
+      <button type="button" id="signature-clear" class="ts-btn ts-btn--text ts-btn--sm">
+        Clear
       </button>
     </div>
-  </form>
+    <input type="hidden" id="appearance-input" name="appearance_png_data_url" value="">
+  </fieldset>
 
-  <script src="{{ url_for('static', filename='vendor/signature_pad/signature_pad.umd.min.js') }}"></script>
-  <script type="module">
-    import { mountSignaturePad } from "{{ url_for('static', filename='vendor/signature_pad/trustseal-signature.mjs') }}";
-    mountSignaturePad({
-      canvas: document.getElementById("signature-pad"),
-      clearBtn: document.getElementById("signature-clear"),
-      hiddenInput: document.getElementById("appearance-input"),
-    });
-  </script>
+  <div class="ts-form-actions" style="justify-content: flex-start;">
+    <button type="submit" name="choice" value="acknowledged" class="ts-btn ts-btn--primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M5 12l5 5L20 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Acknowledge and record
+    </button>
+    <button type="submit" name="choice" value="declined" class="ts-btn ts-btn--danger">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      Decline
+    </button>
+  </div>
+</form>
 
-  <script type="module">
-    import { mountViewer } from "{{ url_for('static', filename='vendor/pdfjs/trustseal-viewer.mjs') }}";
-    mountViewer({
-      url: "{{ download_url }}",
-      container: document.getElementById("pdf-host"),
-      statusLabel: document.getElementById("pdf-status"),
-      page: document.getElementById("pdf-page"),
-      zoomInc: document.getElementById("zoom-in"),
-      zoomDec: document.getElementById("zoom-out"),
-    }).catch((err) => {
-      const status = document.getElementById("pdf-status");
-      if (status) {
-        status.textContent = "Could not load the document. Use the download link to review it.";
-      }
-      console.error("trustseal viewer failed", err);
-    });
-  </script>
-</div>
+<script src="{{ url_for('static', filename='vendor/signature_pad/signature_pad.umd.min.js') }}"></script>
+<script type="module">
+  import { mountSignaturePad } from "{{ url_for('static', filename='vendor/signature_pad/trustseal-signature.mjs') }}";
+  mountSignaturePad({
+    canvas: document.getElementById("signature-pad"),
+    clearBtn: document.getElementById("signature-clear"),
+    hiddenInput: document.getElementById("appearance-input"),
+  });
+</script>
+
+<script type="module">
+  import { mountViewer } from "{{ url_for('static', filename='vendor/pdfjs/trustseal-viewer.mjs') }}";
+  mountViewer({
+    url: "{{ download_url }}",
+    container: document.getElementById("pdf-host"),
+    statusLabel: document.getElementById("pdf-status"),
+    page: document.getElementById("pdf-page"),
+    zoomInc: document.getElementById("zoom-in"),
+    zoomDec: document.getElementById("zoom-out"),
+  }).catch((err) => {
+    const status = document.getElementById("pdf-status");
+    if (status) {
+      status.textContent = "Could not load the document. Use the download link above to review it locally.";
+    }
+    console.error("trustseal viewer failed", err);
+  });
+</script>
 {% endblock %}
