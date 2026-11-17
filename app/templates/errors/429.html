@@ -1,0 +1,18 @@
+{% extends "layouts/public.html" %}
+
+{% block title %}429 — Too many requests · TRUSTSEAL{% endblock %}
+{% block main_modifier %}ts-public-main--narrow{% endblock %}
+
+{% block content %}
+<section class="ts-panel" aria-labelledby="h-429">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ts-space-3); margin-bottom: var(--ts-space-3);">
+    <h1 id="h-429" class="ts-page-title" style="font-size: 22px;">Too many requests</h1>
+    <span class="ts-status ts-status--warning">429</span>
+  </div>
+  <p>
+    You've hit the rate limit on this surface. Wait a moment, then retry.
+    The limit exists to protect anonymous verification and signer
+    invitation tokens from brute-force enumeration.
+  </p>
+</section>
+{% endblock %}

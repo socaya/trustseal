@@ -1,4 +1,22 @@
-{% extends "base.html" %}
+{% extends "layouts/public.html" %}
+
+{% block title %}404 — Page not found · TRUSTSEAL{% endblock %}
+{% block main_modifier %}ts-public-main--narrow{% endblock %}
+
 {% block content %}
-  <h1>Page not found</h1>
+<section class="ts-panel" aria-labelledby="h-404">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ts-space-3); margin-bottom: var(--ts-space-3);">
+    <h1 id="h-404" class="ts-page-title" style="font-size: 22px;">Page not found</h1>
+    <span class="ts-status ts-status--warning">404</span>
+  </div>
+  <p>
+    We could not find the page you asked for. The link may be stale, or
+    the resource may have been moved. For privacy reasons we do not
+    disclose whether a document, envelope or user exists at this URL.
+  </p>
+  <div class="ts-form-actions" style="justify-content: flex-start;">
+    <a class="ts-btn ts-btn--primary" href="/">Return home</a>
+    <a class="ts-btn ts-btn--secondary" href="/verify">Open the public verifier</a>
+  </div>
+</section>
 {% endblock %}

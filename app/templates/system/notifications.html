@@ -1,0 +1,119 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'overview' %}
+
+{% block title %}Notifications · TRUSTSEAL{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    In-app events raised for you — envelope auto-expiry, webhook
+    dead-letter transitions, envelope sealing and operator-facing
+    audit notices. Unread badges clear only when you mark rows read.
+  </p>
+{% endblock %}
+{% block page_actions %}
+  {% if unread_count %}
+  <form method="POST" action="{{ url_for('operator_notifications_views.mark_all_read') }}" style="display: inline;">
+    <button type="submit" class="ts-btn ts-btn--secondary">
+      Mark all {{ unread_count }} as read
+    </button>
+  </form>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<section class="ts-panel">
+  <div class="ts-table-toolbar">
+    <div class="ts-table-toolbar__left">
+      <a class="ts-btn ts-btn--{{ 'primary' if unread_only else 'secondary' }} ts-btn--sm"
+         href="{{ url_for('operator_notifications_views.list_notifications', unread='1', kind=kind) }}">
+        Unread
+        {% if unread_count %}<span class="ts-tag ts-tag--brand">{{ unread_count }}</span>{% endif %}
+      </a>
+      <a class="ts-btn ts-btn--{{ 'secondary' if unread_only else 'primary' }} ts-btn--sm"
+         href="{{ url_for('operator_notifications_views.list_notifications', kind=kind) }}">
+        All
+      </a>
+      {% if kind %}
+        <span class="ts-filter-chip">
+          Kind: {{ kind }}
+          <a class="ts-filter-chip__remove" aria-label="Clear kind filter"
+             href="{{ url_for('operator_notifications_views.list_notifications', unread='1' if unread_only else None) }}">×</a>
+        </span>
+      {% endif %}
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, text in messages %}
+      <div class="ts-inline ts-inline--{{ 'success' if category == 'success' else 'info' }}" style="margin: var(--ts-space-3);">
+        <div class="ts-inline__body">{{ text }}</div>
+      </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  {% if rows %}
+  <div class="ts-table-scroll">
+    <table class="ts-table">
+      <thead>
+        <tr>
+          <th scope="col">Kind</th>
+          <th scope="col">Summary</th>
+          <th scope="col">Received</th>
+          <th scope="col">Status</th>
+          <th scope="col"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td data-label="Kind">
+            <a class="ts-cell-title"
+               href="{{ url_for('operator_notifications_views.list_notifications', kind=row.kind, unread='1' if unread_only else None) }}">
+              {{ row.kind }}
+            </a>
+            {% if row.subject_type %}<span class="ts-cell-sub">{{ row.subject_type }}{% if row.subject_id %} #{{ row.subject_id }}{% endif %}</span>{% endif %}
+          </td>
+          <td data-label="Summary">{{ row.summary }}</td>
+          <td data-label="Received">
+            {{ row.created_at.strftime('%Y-%m-%d %H:%M') }} UTC
+          </td>
+          <td data-label="Status">
+            {% if row.read_at %}
+              <span class="ts-status ts-status--neutral">Read</span>
+            {% else %}
+              <span class="ts-status ts-status--pending">Unread</span>
+            {% endif %}
+          </td>
+          <td data-label="" class="ts-cell-actions">
+            {% if not row.read_at %}
+            <form method="POST"
+                  action="{{ url_for('operator_notifications_views.mark_read', notification_id=row.id) }}"
+                  style="display: inline;">
+              <button type="submit" class="ts-btn ts-btn--text ts-btn--sm">Mark read</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="ts-empty">
+    <div class="ts-empty__title">
+      {% if unread_only %}Nothing unread{% else %}No notifications yet{% endif %}
+    </div>
+    <p class="ts-empty__hint">
+      {% if unread_only %}
+        You're caught up. Switch to <a href="{{ url_for('operator_notifications_views.list_notifications') }}">All</a> to review previously read notifications.
+      {% else %}
+        Events raised for you — envelope expiry, webhook dead-letter, seal
+        completions — will appear here.
+      {% endif %}
+    </p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

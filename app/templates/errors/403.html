@@ -1,0 +1,22 @@
+{% extends "layouts/public.html" %}
+
+{% block title %}403 — Access not permitted · TRUSTSEAL{% endblock %}
+{% block main_modifier %}ts-public-main--narrow{% endblock %}
+
+{% block content %}
+<section class="ts-panel" aria-labelledby="h-403">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ts-space-3); margin-bottom: var(--ts-space-3);">
+    <h1 id="h-403" class="ts-page-title" style="font-size: 22px;">Access not permitted</h1>
+    <span class="ts-status ts-status--warning">403</span>
+  </div>
+  <p>
+    Your account does not have the permissions required for this
+    operation, or the resource is scoped to a different organization.
+    If you believe this is a mistake, ask your TRUSTSEAL administrator
+    to review your role and organization assignment.
+  </p>
+  <div class="ts-form-actions" style="justify-content: flex-start;">
+    <a class="ts-btn ts-btn--primary" href="/">Return to your overview</a>
+  </div>
+</section>
+{% endblock %}

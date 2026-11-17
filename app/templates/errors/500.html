@@ -1,18 +1,40 @@
-{% extends "base.html" %}
+{% extends "layouts/public.html" %}
 
-{% block title %}500 - Internal Server Error{% endblock %}
+{% block title %}500 — Something went wrong · TRUSTSEAL{% endblock %}
+{% block main_modifier %}ts-public-main--narrow{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <h1 class="display-4 text-danger">500</h1>
-    <p class="lead">Oops! Something went wrong on our end.</p>
-    <hr>
-    <p class="text-muted">We're working to fix it. Meanwhile, here's what we know:</p>
+<section class="ts-panel" aria-labelledby="h-500">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ts-space-3); margin-bottom: var(--ts-space-3);">
+    <h1 id="h-500" class="ts-page-title" style="font-size: 22px;">Something went wrong on our side</h1>
+    <span class="ts-status ts-status--danger">500</span>
+  </div>
+  <p>
+    The request could not be completed. The incident has been recorded
+    with a correlation ID so support can investigate. The audit chain,
+    evidence store and pending requests remain intact.
+  </p>
 
-    <div class="alert alert-danger text-left" style="white-space: pre-wrap;">
-        {{ error_info }}
+  {% if request %}
+    {% set correlation = request.headers.get('X-Request-Id') or (g.request_id if g is defined else None) %}
+    {% if correlation %}
+    <div class="ts-inline" style="margin-top: var(--ts-space-4);">
+      <div class="ts-inline__body">
+        <div class="ts-inline__title">Correlation ID</div>
+        <p style="margin-top: 4px;">Share this with support so they can line up the failure with server-side logs.</p>
+        <div style="margin-top: var(--ts-space-3);">
+          {% with value=correlation, label_hidden='Copy correlation id' %}
+            {% include 'components_ds/copy_value.html' %}
+          {% endwith %}
+        </div>
+      </div>
     </div>
+    {% endif %}
+  {% endif %}
 
-    <a href="{{ url_for('system.home') }}" class="btn btn-outline-primary">Return to Home</a>
-</div>
+  <div class="ts-form-actions" style="justify-content: flex-start;">
+    <a class="ts-btn ts-btn--primary" href="/">Return home</a>
+    <a class="ts-btn ts-btn--secondary" href="/trust">Trust &amp; security</a>
+  </div>
+</section>
 {% endblock %}

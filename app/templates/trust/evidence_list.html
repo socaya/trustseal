@@ -1,54 +1,74 @@
-{% extends "base.html" %}
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'evidence' %}
 
-{% block title %}Evidence retentions · TrustSeal{% endblock %}
+{% block title %}Evidence & audit · TRUSTSEAL{% endblock %}
+{% block page_title %}Evidence retentions{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Preserved sealed artifacts, legal holds, checkpoints, timestamps,
+    OCSP/CRL observations and validation dossiers for your tenant.
+    Rows are immutable; new evidence is appended as events occur.
+  </p>
+{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 pb-3"
-     style="border-bottom: 1px solid #D6DADE;">
-  <div>
-    <h1 class="h3 mb-1" style="color: #164C83; font-weight: 600;">Evidence retentions</h1>
-    <p class="text-muted mb-0" style="font-size: 0.95rem;">
-      Preserved sealed artifacts, legal holds, checkpoints, timestamps,
-      OCSP / CRL responses and validation dossiers.
-    </p>
-  </div>
-</div>
-
-{% if not retentions %}
-<section class="p-3" style="border: 1px solid #D6DADE; background: #FFFFFF;">
-  <p class="mb-0" style="font-size: 0.95rem;">
-    No retentions have been recorded for your tenant yet.
-  </p>
+<section class="ts-panel" style="padding: 0;">
+  {% if retentions %}
+    <div class="ts-table-scroll">
+      <table class="ts-table">
+        <thead>
+          <tr>
+            <th scope="col" style="width: 64px;">#</th>
+            <th scope="col">Artifact</th>
+            <th scope="col">SHA-256</th>
+            <th scope="col" style="width: 160px;">Retain until</th>
+            <th scope="col" style="width: 100px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in retentions %}
+          <tr>
+            <td data-label="#">{{ r.id }}</td>
+            <td data-label="Artifact">
+              <span class="ts-cell-title">{{ r.artifact_type|capitalize }} #{{ r.artifact_id }}</span>
+              {% if r.created_at %}<span class="ts-cell-sub">Recorded {{ r.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</span>{% endif %}
+            </td>
+            <td data-label="SHA-256">
+              {% with value=r.artifact_sha256, label_hidden='Copy artifact digest' %}
+                {% include 'components_ds/copy_value.html' %}
+              {% endwith %}
+            </td>
+            <td data-label="Retain until">
+              {% if r.retain_until %}
+                {{ r.retain_until.strftime('%Y-%m-%d') }}
+                {% if r.retain_until < now %}
+                  <br><span class="ts-status ts-status--warning">Retention due</span>
+                {% else %}
+                  <br><span class="ts-status ts-status--success">Preserved</span>
+                {% endif %}
+              {% else %}
+                <span class="ts-status ts-status--neutral">Indefinite</span>
+              {% endif %}
+            </td>
+            <td data-label="" class="ts-cell-actions">
+              <a class="ts-btn ts-btn--text ts-btn--sm"
+                 href="{{ url_for('evidence_views.show_retention', retention_id=r.id) }}">
+                Open
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="ts-empty">
+      <div class="ts-empty__title">No retentions recorded</div>
+      <p class="ts-empty__hint">
+        Preserved artifacts will appear here once envelopes are sealed or
+        evidence is retained. Open the <a href="{{ url_for('audit_logs_api.list_audit_logs') if 'audit_logs_api.list_audit_logs' in url_map_endpoints else '#' }}">audit log</a> for the raw event stream.
+      </p>
+    </div>
+  {% endif %}
 </section>
-{% else %}
-<section style="border: 1px solid #D6DADE; background: #FFFFFF;">
-  <table class="table mb-0" style="font-size: 0.9rem;">
-    <thead style="background: #F6F7F8;">
-      <tr>
-        <th scope="col" style="color: #164C83; width: 12%;">#</th>
-        <th scope="col" style="color: #164C83;">Artifact</th>
-        <th scope="col" style="color: #164C83;">SHA-256</th>
-        <th scope="col" style="color: #164C83; width: 18%;">Retain until</th>
-        <th scope="col" style="color: #164C83; width: 10%;"></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in retentions %}
-      <tr>
-        <td>{{ r.id }}</td>
-        <td>{{ r.artifact_type }} #{{ r.artifact_id }}</td>
-        <td style="font-family: monospace; word-break: break-all;">
-          {{ r.artifact_sha256 }}
-        </td>
-        <td>{{ r.retain_until.strftime("%Y-%m-%d") if r.retain_until else "—" }}</td>
-        <td>
-          <a href="{{ url_for('evidence_views.show_retention', retention_id=r.id) }}"
-             style="color: #164C83;">Open</a>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</section>
-{% endif %}
 {% endblock %}

@@ -352,6 +352,10 @@ def create_app(config_class=None):
     blueprints.append(operator_notifications_api)
     from .blueprints.system.routes.design_gallery import design_gallery_bp
     blueprints.append(design_gallery_bp)
+    from .blueprints.system.routes.operator_notifications_view import (
+        operator_notifications_views,
+    )
+    blueprints.append(operator_notifications_views)
     from .blueprints.documents.api.document_label_api import (
         document_label_api,
     )
