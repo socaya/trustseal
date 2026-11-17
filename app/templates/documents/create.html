@@ -1,13 +1,13 @@
 {% extends "layouts/app.html" %}
 {% set active_nav_item = 'documents' %}
 
-{% block title %}Upload or create document · TRUSTSEAL{% endblock %}
-{% block page_title %}Upload or create a document{% endblock %}
+{% block title %}New document · TRUSTSEAL{% endblock %}
+{% block page_title %}New document{% endblock %}
 {% block page_description %}
   <p class="ts-page-header__description">
-    Upload a prepared file (PDF, DOCX or XLSX) or capture the content
-    inline. The draft stays private to you until you prepare an
-    envelope and send it for signature.
+    Draft a new document in the built-in editor, or upload a prepared
+    PDF / DOCX / XLSX. Either path produces a draft that stays private
+    to you until you prepare an envelope and send it for signature.
   </p>
 {% endblock %}
 
@@ -15,151 +15,616 @@
   {% set trail = [
     {'label': 'Workspace', 'url': url_for('system.main_views.home')},
     {'label': 'Documents', 'url': url_for('document_views.index') if 'document_views.index' in url_map_endpoints else None},
-    {'label': 'Upload or create'}
+    {'label': 'New document'}
   ] %}
   {% include 'components_ds/breadcrumbs.html' %}
 {% endblock %}
 
 {% block content %}
-<form method="POST" enctype="multipart/form-data" class="ts-panel" novalidate>
+{% set initial_mode = request.args.get('mode', 'draft') %}
+
+<nav class="ts-tabs" role="tablist" aria-label="Create method">
+  <button type="button" role="tab" id="tab-draft"
+          class="ts-tab{% if initial_mode == 'draft' %} ts-tab--active{% endif %}"
+          aria-selected="{% if initial_mode == 'draft' %}true{% else %}false{% endif %}"
+          aria-controls="panel-draft">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+    </svg>
+    Draft new document
+  </button>
+  <button type="button" role="tab" id="tab-upload"
+          class="ts-tab{% if initial_mode == 'upload' %} ts-tab--active{% endif %}"
+          aria-selected="{% if initial_mode == 'upload' %}true{% else %}false{% endif %}"
+          aria-controls="panel-upload">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 4v12M6 11l6 6 6-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M4 20h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+    </svg>
+    Upload prepared file
+  </button>
+</nav>
+
+<form method="POST" enctype="multipart/form-data" novalidate style="margin-top: var(--ts-space-5);">
   {{ form.hidden_tag() }}
 
-  <div role="tablist" aria-label="Create method"
-       style="display: inline-flex; gap: var(--ts-space-2); border-bottom: 1px solid var(--ts-border); padding-bottom: var(--ts-space-3); margin-bottom: var(--ts-space-4); width: 100%;">
-    <button type="button"
-            class="ts-btn ts-btn--primary ts-btn--sm"
-            role="tab"
-            aria-selected="true"
-            aria-controls="upload-panel"
-            id="upload-tab">Upload file</button>
-    <button type="button"
-            class="ts-btn ts-btn--secondary ts-btn--sm"
-            role="tab"
-            aria-selected="false"
-            aria-controls="inline-panel"
-            id="inline-tab">Create inline</button>
-  </div>
+  {# ============================= Draft panel ============================= #}
+  <div id="panel-draft" role="tabpanel" aria-labelledby="tab-draft"
+       {% if initial_mode != 'draft' %}hidden{% endif %}>
 
-  <!-- Upload panel ------------------------------------------- -->
-  <div id="upload-panel" role="tabpanel" aria-labelledby="upload-tab">
-    <div class="ts-form-row ts-form-row--split">
-      <div class="ts-stack">
-        <div class="ts-field">
-          <label class="ts-field__label" data-required="true" for="title">
-            {{ form.title.label.text }}
+    <div class="ts-panel" style="padding: 0;">
+      <div style="padding: var(--ts-space-5) var(--ts-space-6);">
+        <div class="ts-form-row ts-form-row--split">
+          <div class="ts-field">
+            <label class="ts-field__label" data-required="true" for="title_draft">
+              Document title
+            </label>
+            <input type="text" id="title_draft" name="title"
+                   class="ts-input" placeholder="e.g. Services agreement — Acme Co."
+                   value="{{ form.title.data or '' }}"
+                   {% if initial_mode == 'draft' %}required{% endif %}>
+          </div>
+          <div class="ts-field">
+            <label class="ts-field__label" for="tags_draft">Tags</label>
+            <input type="text" id="tags_draft" name="tags" class="ts-input"
+                   placeholder="legal, finance, nda"
+                   value="{{ form.tags.data or '' }}">
+            <span class="ts-field__hint">Comma-separated. Used for search and filtering.</span>
+          </div>
+        </div>
+        <div class="ts-field" style="margin-top: var(--ts-space-4);">
+          <label class="ts-field__label" for="description_draft">Description</label>
+          <textarea id="description_draft" name="description" rows="2"
+                    class="ts-textarea"
+                    placeholder="One-line summary shown in the documents list…">{{ form.description.data or '' }}</textarea>
+        </div>
+      </div>
+
+      {# ------------- Rich-text editor — Docs-style ------------- #}
+      <div class="ts-editor">
+        <div class="ts-editor__toolbar" role="toolbar" aria-label="Formatting">
+          <select class="ts-editor__select" data-cmd="fontName" aria-label="Font family">
+            <option value="Arial, sans-serif">Arial</option>
+            <option value="Georgia, serif">Georgia</option>
+            <option value="'Times New Roman', Times, serif">Times New Roman</option>
+            <option value="'Courier New', Courier, monospace">Courier New</option>
+            <option value="Verdana, sans-serif">Verdana</option>
+            <option value="Tahoma, sans-serif">Tahoma</option>
+          </select>
+          <select class="ts-editor__select ts-editor__select--sm" data-cmd="fontSize" aria-label="Font size">
+            <option value="2">10</option>
+            <option value="3" selected>12</option>
+            <option value="4">14</option>
+            <option value="5">18</option>
+            <option value="6">24</option>
+            <option value="7">36</option>
+          </select>
+
+          <span class="ts-editor__sep" aria-hidden="true"></span>
+
+          <button type="button" class="ts-editor__btn" data-cmd="bold" title="Bold (Ctrl+B)" aria-label="Bold">
+            <strong>B</strong>
+          </button>
+          <button type="button" class="ts-editor__btn" data-cmd="italic" title="Italic (Ctrl+I)" aria-label="Italic">
+            <em>I</em>
+          </button>
+          <button type="button" class="ts-editor__btn" data-cmd="underline" title="Underline (Ctrl+U)" aria-label="Underline">
+            <span style="text-decoration: underline;">U</span>
+          </button>
+          <button type="button" class="ts-editor__btn" data-cmd="strikeThrough" title="Strikethrough" aria-label="Strikethrough">
+            <span style="text-decoration: line-through;">S</span>
+          </button>
+
+          <label class="ts-editor__color" title="Text color">
+            <span style="border-bottom: 3px solid #d14343;">A</span>
+            <input type="color" data-cmd="foreColor" value="#121a26">
           </label>
-          {{ form.title(class="ts-input", id="title", placeholder="e.g. Trust agreement") }}
-          {% for error in form.title.errors %}
-            <span class="ts-field__error" role="alert">{{ error }}</span>
-          {% endfor %}
+          <label class="ts-editor__color" title="Highlight color">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 20h16M7 17l6-9 4 3-6 9H5l2-3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+            <input type="color" data-cmd="hiliteColor" value="#fff3b0">
+          </label>
+
+          <span class="ts-editor__sep" aria-hidden="true"></span>
+
+          <select class="ts-editor__select ts-editor__select--sm" data-block-select aria-label="Paragraph style">
+            <option value="P">Normal</option>
+            <option value="H1">Title</option>
+            <option value="H2">Heading 1</option>
+            <option value="H3">Heading 2</option>
+            <option value="H4">Heading 3</option>
+            <option value="BLOCKQUOTE">Quote</option>
+            <option value="PRE">Code</option>
+          </select>
+
+          <span class="ts-editor__sep" aria-hidden="true"></span>
+
+          <button type="button" class="ts-editor__btn" data-cmd="justifyLeft" title="Align left" aria-label="Align left">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 6h16M4 10h10M4 14h16M4 18h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" class="ts-editor__btn" data-cmd="justifyCenter" title="Align center" aria-label="Align center">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 6h16M7 10h10M4 14h16M7 18h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" class="ts-editor__btn" data-cmd="justifyRight" title="Align right" aria-label="Align right">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 6h16M10 10h10M4 14h16M10 18h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" class="ts-editor__btn" data-cmd="justifyFull" title="Justify" aria-label="Justify">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 6h16M4 10h16M4 14h16M4 18h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+
+          <span class="ts-editor__sep" aria-hidden="true"></span>
+
+          <button type="button" class="ts-editor__btn" data-cmd="insertUnorderedList" title="Bullet list" aria-label="Bullet list">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="5" cy="7"  r="1.3" fill="currentColor"/>
+              <circle cx="5" cy="12" r="1.3" fill="currentColor"/>
+              <circle cx="5" cy="17" r="1.3" fill="currentColor"/>
+              <path d="M10 7h10M10 12h10M10 17h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" class="ts-editor__btn" data-cmd="insertOrderedList" title="Numbered list" aria-label="Numbered list">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <text x="2" y="9"  font-size="7" fill="currentColor">1</text>
+              <text x="2" y="14" font-size="7" fill="currentColor">2</text>
+              <text x="2" y="19" font-size="7" fill="currentColor">3</text>
+              <path d="M10 7h10M10 12h10M10 17h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" class="ts-editor__btn" data-cmd="outdent" title="Decrease indent" aria-label="Outdent">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 6h16M10 10h10M10 14h10M4 18h16M8 10l-3 2 3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button type="button" class="ts-editor__btn" data-cmd="indent" title="Increase indent" aria-label="Indent">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 6h16M10 10h10M10 14h10M4 18h16M4 10l3 2-3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+
+          <span class="ts-editor__sep" aria-hidden="true"></span>
+
+          <button type="button" class="ts-editor__btn" data-cmd="createLink" title="Insert link" aria-label="Insert link">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M10 14l4-4M9 7h3a4 4 0 010 8h-1M15 17h-3a4 4 0 010-8h1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" class="ts-editor__btn" data-cmd="removeFormat" title="Clear formatting" aria-label="Clear formatting">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M8 4l-4 16M14 4l4 16M4 10h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
         </div>
-        <div class="ts-field">
-          <label class="ts-field__label" for="description">{{ form.description.label.text }}</label>
-          {{ form.description(class="ts-textarea", id="description", rows=3,
-                               placeholder="Brief description of the document…") }}
-          {% for error in form.description.errors %}
-            <span class="ts-field__error" role="alert">{{ error }}</span>
-          {% endfor %}
+
+        <div class="ts-editor__canvas">
+          <div id="editor-surface" class="ts-editor__page"
+               contenteditable="true"
+               aria-label="Document body"
+               data-placeholder="Start typing your document here. Use the toolbar for headings, emphasis, alignment, lists and links…">{{ form.content.data or '' }}</div>
         </div>
-        <div class="ts-field">
-          <label class="ts-field__label" data-required="true" for="file">{{ form.file.label.text }}</label>
-          {{ form.file(class="ts-input", id="file", accept="application/pdf,.pdf,.docx,.xlsx") }}
-          <span class="ts-field__hint">Allowed formats: PDF, DOCX, XLSX. Uploaded bytes are hashed before storage.</span>
-          {% for error in form.file.errors %}
-            <span class="ts-field__error" role="alert">{{ error }}</span>
-          {% endfor %}
-        </div>
-        <div class="ts-field">
-          <label class="ts-field__label" for="tags">{{ form.tags.label.text }}</label>
-          {{ form.tags(class="ts-input", id="tags", placeholder="legal, finance, nda") }}
-          <span class="ts-field__hint">Comma-separated. Used for search and filtering.</span>
+        <textarea name="content" id="content" hidden>{{ form.content.data or '' }}</textarea>
+
+        <div class="ts-editor__footer">
+          <span id="editor-stats">0 words · 0 characters</span>
+          <span>Drafts are private until you prepare an envelope and send for signature.</span>
         </div>
       </div>
 
-      <div class="ts-stack">
-        <div class="ts-field">
-          <label class="ts-field__label" for="document_type">{{ form.document_type.label.text }}</label>
-          {{ form.document_type(class="ts-select", id="document_type") }}
-        </div>
-        <div class="ts-field">
-          <label class="ts-field__label" for="organization_id">{{ form.organization_id.label.text }}</label>
-          {{ form.organization_id(class="ts-select", id="organization_id") }}
-        </div>
-        <div class="ts-field">
-          <label class="ts-field__label" for="client_id">{{ form.client_id.label.text }}</label>
-          {{ form.client_id(class="ts-select", id="client_id") }}
-        </div>
-        <div class="ts-field">
-          <label class="ts-field__label" for="stamp_id">{{ form.stamp_id.label.text }}</label>
-          {{ form.stamp_id(class="ts-select", id="stamp_id") }}
-        </div>
-        <label class="ts-check">
-          {{ form.is_template(id="is_template") }}
-          <span>{{ form.is_template.label.text }}</span>
-        </label>
-        <label class="ts-check">
-          {{ form.is_shared(id="is_shared") }}
-          <span>{{ form.is_shared.label.text }}</span>
-        </label>
+      <div class="ts-form-actions" style="padding: var(--ts-space-4) var(--ts-space-6);">
+        <a class="ts-btn ts-btn--text"
+           href="{{ url_for('document_views.index') if 'document_views.index' in url_map_endpoints else '/' }}">Cancel</a>
+        <button type="submit" class="ts-btn ts-btn--primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M7 5h10v14H7z" stroke="currentColor" stroke-width="1.75"/>
+            <path d="M9 9h6M9 13h6M9 17h4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          </svg>
+          Save draft
+        </button>
       </div>
-    </div>
-
-    <div class="ts-form-actions">
-      <a class="ts-btn ts-btn--text"
-         href="{{ url_for('document_views.index') if 'document_views.index' in url_map_endpoints else '/' }}">Cancel</a>
-      <button type="submit" class="ts-btn ts-btn--primary">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M12 4v12M6 11l6 6 6-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M4 20h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-        </svg>
-        Upload document
-      </button>
     </div>
   </div>
 
-  <!-- Inline panel ------------------------------------------- -->
-  <div id="inline-panel" role="tabpanel" aria-labelledby="inline-tab" hidden>
-    <div class="ts-field">
-      <label class="ts-field__label" data-required="true" for="title_inline">{{ form.title.label.text }}</label>
-      {{ form.title(class="ts-input", id="title_inline", placeholder="Document title") }}
-    </div>
-    <div class="ts-field" style="margin-top: var(--ts-space-4);">
-      <label class="ts-field__label" for="content">{{ form.content.label.text }}</label>
-      {{ form.content(class="ts-textarea", id="content", rows=15,
-                       placeholder="Type or paste your document content here…") }}
-    </div>
-    <div class="ts-form-actions">
-      <button type="submit" class="ts-btn ts-btn--primary">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M7 5h10v14H7z" stroke="currentColor" stroke-width="1.75"/>
-          <path d="M9 9h6M9 13h6M9 17h4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-        </svg>
-        Save draft
-      </button>
+  {# ============================= Upload panel ============================ #}
+  <div id="panel-upload" role="tabpanel" aria-labelledby="tab-upload"
+       {% if initial_mode != 'upload' %}hidden{% endif %}>
+
+    <div class="ts-panel">
+      <div class="ts-form-row ts-form-row--split">
+        <div class="ts-stack">
+          <div class="ts-field">
+            <label class="ts-field__label" data-required="true" for="title_upload">
+              {{ form.title.label.text }}
+            </label>
+            {{ form.title(class="ts-input", id="title_upload", placeholder="e.g. Trust agreement") }}
+            {% for error in form.title.errors %}
+              <span class="ts-field__error" role="alert">{{ error }}</span>
+            {% endfor %}
+          </div>
+          <div class="ts-field">
+            <label class="ts-field__label" for="description_upload">{{ form.description.label.text }}</label>
+            {{ form.description(class="ts-textarea", id="description_upload", rows=3,
+                                 placeholder="Brief description of the document…") }}
+          </div>
+          <div class="ts-field">
+            <label class="ts-field__label" data-required="true" for="file">{{ form.file.label.text }}</label>
+            {{ form.file(class="ts-input", id="file", accept="application/pdf,.pdf,.docx,.xlsx") }}
+            <span class="ts-field__hint">
+              Allowed: PDF, DOCX, XLSX. Uploaded bytes are hashed before storage so
+              the sealed PDF can be verified against the original later.
+            </span>
+            {% for error in form.file.errors %}
+              <span class="ts-field__error" role="alert">{{ error }}</span>
+            {% endfor %}
+          </div>
+          <div class="ts-field">
+            <label class="ts-field__label" for="tags_upload">{{ form.tags.label.text }}</label>
+            {{ form.tags(class="ts-input", id="tags_upload", placeholder="legal, finance, nda") }}
+            <span class="ts-field__hint">Comma-separated. Used for search and filtering.</span>
+          </div>
+        </div>
+
+        <div class="ts-stack">
+          <div class="ts-field">
+            <label class="ts-field__label" for="document_type">{{ form.document_type.label.text }}</label>
+            {{ form.document_type(class="ts-select", id="document_type") }}
+          </div>
+          <div class="ts-field">
+            <label class="ts-field__label" for="organization_id">{{ form.organization_id.label.text }}</label>
+            {{ form.organization_id(class="ts-select", id="organization_id") }}
+          </div>
+          <div class="ts-field">
+            <label class="ts-field__label" for="client_id">{{ form.client_id.label.text }}</label>
+            {{ form.client_id(class="ts-select", id="client_id") }}
+          </div>
+          <div class="ts-field">
+            <label class="ts-field__label" for="stamp_id">{{ form.stamp_id.label.text }}</label>
+            {{ form.stamp_id(class="ts-select", id="stamp_id") }}
+          </div>
+          <label class="ts-check">
+            {{ form.is_template(id="is_template") }}
+            <span>{{ form.is_template.label.text }}</span>
+          </label>
+          <label class="ts-check">
+            {{ form.is_shared(id="is_shared") }}
+            <span>{{ form.is_shared.label.text }}</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="ts-form-actions">
+        <a class="ts-btn ts-btn--text"
+           href="{{ url_for('document_views.index') if 'document_views.index' in url_map_endpoints else '/' }}">Cancel</a>
+        <button type="submit" class="ts-btn ts-btn--primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 4v12M6 11l6 6 6-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 20h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          </svg>
+          Upload document
+        </button>
+      </div>
     </div>
   </div>
 </form>
 
+<style>
+  /* Tabs (reused from documents list). */
+  .ts-tabs {
+    display: inline-flex;
+    gap: 0;
+    border: 1px solid var(--ts-border);
+    background: var(--ts-surface);
+    border-radius: var(--ts-radius);
+    padding: 3px;
+  }
+  .ts-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-size: var(--ts-fs-label);
+    font-weight: var(--ts-fw-medium);
+    color: var(--ts-text-muted);
+    background: transparent;
+    border: 0;
+    border-radius: var(--ts-radius-sm);
+    cursor: pointer;
+    transition: color var(--ts-dur-fast) var(--ts-ease),
+                background var(--ts-dur-fast) var(--ts-ease);
+  }
+  .ts-tab:hover { color: var(--ts-text); }
+  .ts-tab--active {
+    background: var(--ts-brand-primary);
+    color: var(--ts-text-inverse);
+  }
+  .ts-tab--active:hover { color: var(--ts-text-inverse); }
+
+  /* ================================= Editor shell */
+  .ts-editor {
+    border-top: 1px solid var(--ts-border);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---- Toolbar ---- */
+  .ts-editor__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: var(--ts-space-2) var(--ts-space-4);
+    border-bottom: 1px solid var(--ts-border);
+    background: var(--ts-surface-alt);
+    flex-wrap: wrap;
+    position: sticky;
+    top: var(--ts-topbar-h);
+    z-index: 5;
+  }
+  .ts-editor__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    height: 30px;
+    padding: 0 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--ts-text);
+    border-radius: var(--ts-radius-sm);
+    cursor: pointer;
+    font-weight: var(--ts-fw-medium);
+    font-size: var(--ts-fs-label);
+    transition: background var(--ts-dur-fast) var(--ts-ease),
+                border-color var(--ts-dur-fast) var(--ts-ease);
+  }
+  .ts-editor__btn:hover {
+    background: var(--ts-surface);
+    border-color: var(--ts-border);
+  }
+  .ts-editor__btn[aria-pressed="true"] {
+    background: var(--ts-surface);
+    border-color: var(--ts-border-strong);
+    color: var(--ts-brand-primary);
+  }
+  .ts-editor__select {
+    height: 30px;
+    padding: 0 22px 0 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--ts-text);
+    font-size: var(--ts-fs-label);
+    border-radius: var(--ts-radius-sm);
+    appearance: none;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--ts-text-muted) 50%),
+      linear-gradient(135deg, var(--ts-text-muted) 50%, transparent 50%);
+    background-position: calc(100% - 12px) 50%, calc(100% - 8px) 50%;
+    background-size: 4px 4px;
+    background-repeat: no-repeat;
+    cursor: pointer;
+    min-width: 110px;
+  }
+  .ts-editor__select--sm { min-width: 70px; }
+  .ts-editor__select:hover { background-color: var(--ts-surface); border-color: var(--ts-border); }
+  .ts-editor__color {
+    display: inline-flex;
+    position: relative;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid transparent;
+    border-radius: var(--ts-radius-sm);
+    cursor: pointer;
+  }
+  .ts-editor__color:hover { background: var(--ts-surface); border-color: var(--ts-border); }
+  .ts-editor__color input[type="color"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .ts-editor__sep {
+    display: inline-block;
+    width: 1px;
+    height: 20px;
+    background: var(--ts-border);
+    margin: 0 4px;
+  }
+
+  /* ---- Canvas + paper page ---- */
+  .ts-editor__canvas {
+    background: var(--ts-surface-sunken);
+    padding: var(--ts-space-7) var(--ts-space-5);
+    min-height: 60vh;
+    overflow-x: auto;
+  }
+  .ts-editor__page {
+    background: #ffffff;
+    width: 816px;        /* 8.5" × 96 */
+    min-height: 1056px;  /* 11"  × 96 */
+    margin: 0 auto;
+    padding: 96px;       /* 1" margins */
+    border: 1px solid var(--ts-border);
+    box-shadow: 0 1px 3px rgba(18, 26, 38, 0.06), 0 8px 24px rgba(18, 26, 38, 0.06);
+    color: #121a26;
+    font-family: Arial, "Helvetica Neue", sans-serif;
+    font-size: 12pt;
+    line-height: 1.6;
+    outline: none;
+    text-align: left;
+  }
+  @media (max-width: 1023px) {
+    .ts-editor__canvas { padding: var(--ts-space-4); }
+    .ts-editor__page { width: 100%; padding: var(--ts-space-5); min-height: 80vh; box-shadow: none; }
+  }
+  .ts-editor__page:empty::before {
+    content: attr(data-placeholder);
+    color: var(--ts-text-subtle);
+    pointer-events: none;
+  }
+  .ts-editor__page h1 { font-size: 22pt; font-weight: 600; margin: 24pt 0 12pt; letter-spacing: -0.01em; color: #121a26; }
+  .ts-editor__page h2 { font-size: 16pt; font-weight: 600; margin: 20pt 0 10pt; color: #121a26; }
+  .ts-editor__page h3 { font-size: 13pt; font-weight: 600; margin: 16pt 0 8pt; color: #121a26; }
+  .ts-editor__page h4 { font-size: 12pt; font-weight: 600; margin: 14pt 0 6pt; color: #121a26; }
+  .ts-editor__page p  { margin: 0 0 11pt; }
+  .ts-editor__page ul, .ts-editor__page ol { padding-left: 32pt; margin: 0 0 11pt; list-style: revert; }
+  .ts-editor__page a  { color: var(--ts-brand-primary); text-decoration: underline; }
+  .ts-editor__page blockquote {
+    margin: 0 0 11pt;
+    padding: 6pt 18pt;
+    border-left: 3px solid var(--ts-border-strong);
+    color: var(--ts-text-muted);
+    font-style: italic;
+  }
+  .ts-editor__page pre {
+    margin: 0 0 11pt;
+    padding: 10pt 14pt;
+    background: var(--ts-surface-alt);
+    border: 1px solid var(--ts-border);
+    font-family: var(--ts-font-mono);
+    font-size: 10pt;
+    white-space: pre-wrap;
+  }
+
+  .ts-editor__footer {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--ts-space-3);
+    padding: var(--ts-space-2) var(--ts-space-4);
+    border-top: 1px solid var(--ts-border);
+    background: var(--ts-surface-alt);
+    color: var(--ts-text-muted);
+    font-size: var(--ts-fs-meta);
+    flex-wrap: wrap;
+  }
+</style>
+
 <script>
-  // Minimal tab panel switcher — no framework needed.
   (function () {
+    // ---- Tabs ----
+    // Disable form controls in hidden panels so only the active panel
+    // submits (otherwise duplicate name="title" from both panels
+    // would collide on the server).
+    function applyPanelState() {
+      document.querySelectorAll('[role="tabpanel"]').forEach(function (panel) {
+        var hidden = panel.hasAttribute('hidden');
+        panel.querySelectorAll('input, select, textarea, button').forEach(function (el) {
+          if (el.type === 'hidden' || el.name === 'csrf_token') return;
+          el.disabled = hidden;
+        });
+      });
+    }
     var tabs = document.querySelectorAll('[role="tab"]');
     tabs.forEach(function (tab) {
       tab.addEventListener('click', function () {
         tabs.forEach(function (t) {
+          t.classList.remove('ts-tab--active');
           t.setAttribute('aria-selected', 'false');
-          t.classList.remove('ts-btn--primary');
-          t.classList.add('ts-btn--secondary');
           var panel = document.getElementById(t.getAttribute('aria-controls'));
           if (panel) panel.setAttribute('hidden', '');
         });
+        tab.classList.add('ts-tab--active');
         tab.setAttribute('aria-selected', 'true');
-        tab.classList.remove('ts-btn--secondary');
-        tab.classList.add('ts-btn--primary');
         var active = document.getElementById(tab.getAttribute('aria-controls'));
         if (active) active.removeAttribute('hidden');
+        applyPanelState();
       });
     });
+    applyPanelState();
+
+    // ---- Rich-text editor ----
+    var editor = document.getElementById('editor-surface');
+    var hidden = document.getElementById('content');
+    var stats = document.getElementById('editor-stats');
+    if (!editor) return;
+
+    function sync() {
+      if (hidden) hidden.value = editor.innerHTML;
+      if (stats) {
+        var text = editor.innerText || '';
+        var words = text.trim().split(/\s+/).filter(Boolean).length;
+        var chars = text.length;
+        stats.textContent = words + ' word' + (words === 1 ? '' : 's') +
+                            ' · ' + chars + ' character' + (chars === 1 ? '' : 's');
+      }
+    }
+    editor.addEventListener('input', sync);
+    editor.addEventListener('blur', sync);
+
+    document.querySelectorAll('.ts-editor__btn').forEach(function (btn) {
+      btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      btn.addEventListener('click', function () {
+        editor.focus();
+        var cmd = btn.getAttribute('data-cmd');
+        if (cmd === 'createLink') {
+          var url = window.prompt('Link URL', 'https://');
+          if (url) document.execCommand('createLink', false, url);
+        } else if (cmd) {
+          document.execCommand(cmd, false, null);
+        }
+        sync();
+        refreshPressed();
+      });
+    });
+
+    // Paragraph-style select.
+    var blockSelect = document.querySelector('[data-block-select]');
+    if (blockSelect) {
+      blockSelect.addEventListener('mousedown', function () { editor.focus(); });
+      blockSelect.addEventListener('change', function () {
+        editor.focus();
+        document.execCommand('formatBlock', false, blockSelect.value);
+        sync();
+      });
+    }
+
+    // Font family + font size + color pickers (data-cmd on select / input).
+    document.querySelectorAll('.ts-editor__select[data-cmd], .ts-editor__color input[data-cmd]').forEach(function (el) {
+      el.addEventListener('mousedown', function () { editor.focus(); });
+      el.addEventListener('change', function () {
+        editor.focus();
+        document.execCommand(el.getAttribute('data-cmd'), false, el.value);
+        sync();
+      });
+    });
+
+    function refreshPressed() {
+      document.querySelectorAll('.ts-editor__btn[data-cmd]').forEach(function (btn) {
+        var cmd = btn.getAttribute('data-cmd');
+        try {
+          btn.setAttribute('aria-pressed', document.queryCommandState(cmd) ? 'true' : 'false');
+        } catch (e) { /* queryCommandState throws on some commands — ignore */ }
+      });
+    }
+    editor.addEventListener('keyup', refreshPressed);
+    editor.addEventListener('mouseup', refreshPressed);
+
+    // ---- Autosave to localStorage (per-title key) ----
+    var draftKey = 'ts-draft-' + (document.getElementById('title_draft') ? document.getElementById('title_draft').value || 'untitled' : 'untitled');
+    try {
+      var saved = localStorage.getItem(draftKey);
+      if (saved && !editor.innerHTML.trim()) {
+        editor.innerHTML = saved;
+        sync();
+      }
+    } catch (e) { /* localStorage may be disabled */ }
+    editor.addEventListener('input', function () {
+      try { localStorage.setItem(draftKey, editor.innerHTML); }
+      catch (e) { /* storage full */ }
+    });
+
+    // Ensure the content field is populated on submit.
+    var form = editor.closest('form');
+    if (form) form.addEventListener('submit', sync);
+
+    sync();
   })();
 </script>
 {% endblock %}

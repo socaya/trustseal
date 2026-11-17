@@ -5,55 +5,104 @@
 {% block page_title %}Documents{% endblock %}
 {% block page_description %}
   <p class="ts-page-header__description">
-    Draft documents you own. Upload a PDF to start preparing an
-    envelope, or open a draft to continue editing its metadata and
-    participants.
+    Draft, upload, review and seal documents. Everything you compose or
+    upload here stays private to you until you prepare an envelope and
+    send it for signature.
   </p>
 {% endblock %}
 {% block page_actions %}
-  {% if 'document_views.create_document' in url_map_endpoints %}
-  <a class="ts-btn ts-btn--primary" href="{{ url_for('document_views.create_document') }}">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    </svg>
-    Upload document
-  </a>
-  {% endif %}
+  <div class="ts-btn-group">
+    {% if 'document_views.create_document' in url_map_endpoints %}
+    <a class="ts-btn ts-btn--primary" href="{{ url_for('document_views.create_document') }}?mode=draft">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+      </svg>
+      New document
+    </a>
+    <a class="ts-btn ts-btn--secondary" href="{{ url_for('document_views.create_document') }}?mode=upload">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 4v12M6 11l6 6 6-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M4 20h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+      </svg>
+      Upload file
+    </a>
+    {% endif %}
+  </div>
 {% endblock %}
 
 {% block content %}
-<section class="ts-panel" style="padding: 0;">
+
+{# ---------- counts for status tabs ---------- #}
+{% set counts = {'all': documents|length, 'draft': 0, 'pending': 0, 'signed': 0, 'archived': 0} %}
+{% for d in documents %}
+  {% set s = (d.get('status') or 'draft')|lower %}
+  {% if s in ('draft',) %}{% set _ = counts.update({'draft': counts['draft'] + 1}) %}
+  {% elif s in ('pending','review','awaiting_signatures') %}{% set _ = counts.update({'pending': counts['pending'] + 1}) %}
+  {% elif s in ('signed','completed','sealed') %}{% set _ = counts.update({'signed': counts['signed'] + 1}) %}
+  {% elif s == 'archived' %}{% set _ = counts.update({'archived': counts['archived'] + 1}) %}
+  {% endif %}
+{% endfor %}
+
+<nav class="ts-tabs" role="tablist" aria-label="Document status">
+  {% for key, label in [('all','All'),('draft','Drafts'),('pending','Awaiting signature'),('signed','Sealed & completed'),('archived','Archived')] %}
+  <button type="button"
+          class="ts-tab{% if loop.first %} ts-tab--active{% endif %}"
+          role="tab"
+          data-status-filter="{{ key }}"
+          aria-selected="{% if loop.first %}true{% else %}false{% endif %}">
+    {{ label }}
+    <span class="ts-tab__count">{{ counts[key] }}</span>
+  </button>
+  {% endfor %}
+</nav>
+
+<section class="ts-panel" style="padding: 0; margin-top: var(--ts-space-5);">
   <div class="ts-table-toolbar">
     <div class="ts-table-toolbar__left">
-      <span class="ts-panel__meta">{{ documents|length }} document{% if documents|length != 1 %}s{% endif %}</span>
+      <div class="ts-search" style="min-width: 300px;">
+        <svg class="ts-search__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="1.75"/>
+          <path d="M20 20l-4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        </svg>
+        <input type="search" class="ts-input" id="doc-search"
+               placeholder="Search by title or description…"
+               aria-label="Search documents">
+      </div>
     </div>
     <div class="ts-table-toolbar__right">
-      {# Search / filters can be added here by future phases. #}
+      <span class="ts-panel__meta" id="doc-count">
+        {{ documents|length }} document{% if documents|length != 1 %}s{% endif %}
+      </span>
     </div>
   </div>
 
   {% if documents %}
   <div class="ts-table-scroll">
-    <table class="ts-table">
+    <table class="ts-table" id="doc-table">
       <thead>
         <tr>
-          <th scope="col" style="width: 40%;">Document</th>
-          <th scope="col" style="width: 20%;">Status</th>
-          <th scope="col" style="width: 20%;">Owner</th>
-          <th scope="col" style="width: 15%;">Updated</th>
-          <th scope="col" style="width: 5%;"></th>
+          <th scope="col" style="width: 38%;">Document</th>
+          <th scope="col" style="width: 16%;">Status</th>
+          <th scope="col" style="width: 18%;">Owner</th>
+          <th scope="col" style="width: 18%;">Updated</th>
+          <th scope="col" style="width: 10%;"></th>
         </tr>
       </thead>
       <tbody>
         {% for doc in documents %}
           {% set doc_id = doc.get('id') %}
-          {% set status = (doc.get('status') or '').lower() %}
+          {% set status = (doc.get('status') or 'draft')|lower %}
+          {% set bucket =
+              'draft' if status in ('draft',) else
+              'pending' if status in ('pending','review','awaiting_signatures') else
+              'signed' if status in ('signed','completed','sealed') else
+              'archived' if status == 'archived' else 'draft' %}
           {% set status_tone =
-              'success' if status in ('signed', 'completed', 'sealed') else
-              'pending' if status in ('pending', 'awaiting_signatures', 'review') else
-              'warning' if status == 'archived' else
+              'success' if bucket == 'signed' else
+              'pending' if bucket == 'pending' else
+              'warning' if bucket == 'archived' else
               'neutral' %}
-          <tr>
+          <tr data-status="{{ bucket }}" data-haystack="{{ (doc.get('title','') ~ ' ' ~ (doc.get('description') or ''))|lower }}">
             <td data-label="Document">
               <a class="ts-cell-title"
                  href="{{ url_for('document_views.view_document', document_id=doc_id) if doc_id and 'document_views.view_document' in url_map_endpoints else '#' }}">
@@ -68,7 +117,7 @@
             </td>
             <td data-label="Status">
               <span class="ts-status ts-status--{{ status_tone }}">
-                {{ (doc.get('status') or 'draft')|capitalize }}
+                {{ (doc.get('status') or 'Draft')|capitalize }}
               </span>
             </td>
             <td data-label="Owner">
@@ -100,17 +149,146 @@
     <div class="ts-empty">
       <div class="ts-empty__title">No documents yet</div>
       <p class="ts-empty__hint">
-        Upload a PDF, DOCX or XLSX to start preparing your first envelope.
-        Drafts stay private to you until you send them for signature.
+        Two ways to start. Compose a new draft in the built-in editor
+        when you want full control over the text, or upload an existing
+        PDF, DOCX or XLSX when the file is already prepared. Either
+        path produces a draft that stays private until you prepare an
+        envelope and send it for signature.
       </p>
       {% if 'document_views.create_document' in url_map_endpoints %}
       <div class="ts-empty__actions">
-        <a class="ts-btn ts-btn--primary" href="{{ url_for('document_views.create_document') }}">
-          Upload a document
-        </a>
+        <div class="ts-btn-group" style="justify-content: center;">
+          <a class="ts-btn ts-btn--primary ts-btn--lg"
+             href="{{ url_for('document_views.create_document') }}?mode=draft">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+            </svg>
+            Draft a new document
+          </a>
+          <a class="ts-btn ts-btn--secondary ts-btn--lg"
+             href="{{ url_for('document_views.create_document') }}?mode=upload">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 4v12M6 11l6 6 6-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 20h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            </svg>
+            Upload a prepared file
+          </a>
+        </div>
       </div>
       {% endif %}
     </div>
+
+    <div class="ts-grid-2col" style="padding: var(--ts-space-5); border-top: 1px solid var(--ts-border);">
+      <div>
+        <h3 style="font-size: var(--ts-fs-subsection); font-weight: var(--ts-fw-semibold); margin-bottom: var(--ts-space-2);">
+          Draft in TrustSeal
+        </h3>
+        <p style="color: var(--ts-text-muted);">
+          Open the built-in editor, write your contract, memo, or
+          policy with headings, lists and emphasis, then save as a
+          draft. The content is versioned from the first keystroke.
+        </p>
+      </div>
+      <div>
+        <h3 style="font-size: var(--ts-fs-subsection); font-weight: var(--ts-fw-semibold); margin-bottom: var(--ts-space-2);">
+          Upload a prepared file
+        </h3>
+        <p style="color: var(--ts-text-muted);">
+          Already have a PDF, DOCX or XLSX? Drop it in and we hash
+          the bytes on arrival. TrustSeal keeps the original and every
+          later revision so every sealed PDF is attributable.
+        </p>
+      </div>
+    </div>
   {% endif %}
 </section>
+
+<style>
+  /* Segmented tab bar for list status filters. */
+  .ts-tabs {
+    display: inline-flex;
+    gap: 0;
+    border: 1px solid var(--ts-border);
+    background: var(--ts-surface);
+    border-radius: var(--ts-radius);
+    padding: 3px;
+  }
+  .ts-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    font-size: var(--ts-fs-label);
+    font-weight: var(--ts-fw-medium);
+    color: var(--ts-text-muted);
+    background: transparent;
+    border: 0;
+    border-radius: var(--ts-radius-sm);
+    cursor: pointer;
+    transition: color var(--ts-dur-fast) var(--ts-ease),
+                background var(--ts-dur-fast) var(--ts-ease);
+  }
+  .ts-tab:hover { color: var(--ts-text); }
+  .ts-tab--active {
+    background: var(--ts-brand-primary);
+    color: var(--ts-text-inverse);
+  }
+  .ts-tab--active:hover { color: var(--ts-text-inverse); }
+  .ts-tab__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 18px;
+    padding: 0 6px;
+    font-size: var(--ts-fs-micro);
+    font-weight: var(--ts-fw-semibold);
+    background: var(--ts-surface-alt);
+    color: var(--ts-text-muted);
+    border-radius: var(--ts-radius-pill);
+    font-variant-numeric: tabular-nums;
+  }
+  .ts-tab--active .ts-tab__count {
+    background: rgba(255,255,255,0.22);
+    color: var(--ts-text-inverse);
+  }
+</style>
+
+<script>
+  (function () {
+    var tabs = document.querySelectorAll('[data-status-filter]');
+    var rows = document.querySelectorAll('#doc-table tbody tr');
+    var search = document.getElementById('doc-search');
+    var count = document.getElementById('doc-count');
+    var currentStatus = 'all';
+
+    function apply() {
+      var query = (search && search.value || '').trim().toLowerCase();
+      var shown = 0;
+      rows.forEach(function (row) {
+        var statusMatch = (currentStatus === 'all' || row.getAttribute('data-status') === currentStatus);
+        var textMatch = !query || (row.getAttribute('data-haystack') || '').indexOf(query) >= 0;
+        var visible = statusMatch && textMatch;
+        row.style.display = visible ? '' : 'none';
+        if (visible) shown++;
+      });
+      if (count) count.textContent = shown + ' document' + (shown === 1 ? '' : 's');
+    }
+
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        tabs.forEach(function (t) {
+          t.classList.remove('ts-tab--active');
+          t.setAttribute('aria-selected', 'false');
+        });
+        tab.classList.add('ts-tab--active');
+        tab.setAttribute('aria-selected', 'true');
+        currentStatus = tab.getAttribute('data-status-filter');
+        apply();
+      });
+    });
+    if (search) search.addEventListener('input', apply);
+  })();
+</script>
+
 {% endblock %}
