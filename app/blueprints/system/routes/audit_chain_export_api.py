@@ -13,6 +13,55 @@ audit_chain_export_api = Blueprint(
 )
 
 
+@audit_chain_export_api.route("/anchors", methods=["GET"])
+@jwt_required()
+def anchors():
+    """List the tenant's signed audit-chain anchors (Phase AL2).
+
+    Query: ``limit`` (1..500, default 100), ``after_id`` (optional
+    forward paging cursor). Returns rows ordered oldest-first so a
+    client can walk forward from an earlier known id.
+    """
+    from app.models.audit_chain_anchor import AuditChainAnchor
+
+    user = active_token_user()
+    if user is None or not user.is_active:
+        abort(401)
+    if not is_admin(user.id):
+        abort(403, description="admin_required")
+    if user.organization_id is None:
+        abort(403, description="organization_required")
+    limit = request.args.get("limit", default=100, type=int)
+    if limit < 1 or limit > 500:
+        abort(400, description="limit_out_of_range")
+    after_id = request.args.get("after_id", type=int)
+    query = AuditChainAnchor.query.filter_by(
+        organization_id=user.organization_id
+    )
+    if after_id is not None:
+        if after_id < 0:
+            abort(400, description="after_id_invalid")
+        query = query.filter(AuditChainAnchor.id > after_id)
+    rows = query.order_by(AuditChainAnchor.id.asc()).limit(limit).all()
+    return jsonify(
+        organization_id=user.organization_id,
+        count=len(rows),
+        next_after_id=rows[-1].id if rows else after_id,
+        anchors=[
+            {
+                "id": row.id,
+                "anchor_event_id": row.anchor_event_id,
+                "chain_tip_hash": row.chain_tip_hash,
+                "algorithm": row.algorithm,
+                "key_id": row.key_id,
+                "operator_id": row.operator_id,
+                "created_at": row.created_at.isoformat(),
+            }
+            for row in rows
+        ],
+    )
+
+
 @audit_chain_export_api.route("/proof", methods=["GET"])
 @jwt_required()
 def proof():

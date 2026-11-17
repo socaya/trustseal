@@ -2286,3 +2286,108 @@ def bulk_transfer_envelopes():
         ),
         http_status,
     )
+
+
+# ============================================================ AL1 bulk cadence
+
+
+@envelope_api.route("/bulk/reminders", methods=["POST"])
+@jwt_required()
+def bulk_update_reminder_cadence():
+    """Apply the same cadence overrides to many envelopes.
+
+    Payload: ``{"envelope_ids": [int...], "cooloff_hours": int|null,
+    "max_count": int|null}``. ``cooloff_hours`` must be in 1..720 or
+    null; ``max_count`` in 1..50 or null. Null clears the override
+    and reverts to the scanner's global default.
+    """
+    user = _actor()
+    data = _payload()
+    allowed = {"envelope_ids", "cooloff_hours", "max_count"}
+    extra = set(data) - allowed
+    if extra:
+        abort(400, description="unknown_fields")
+    ids = data.get("envelope_ids")
+    if not isinstance(ids, list) or not ids:
+        abort(400, description="envelope_ids_required")
+    if len(ids) > 100:
+        abort(413, description="bulk_reminder_limit_100")
+
+    has_cooloff = "cooloff_hours" in data
+    has_max = "max_count" in data
+    if not (has_cooloff or has_max):
+        abort(400, description="cadence_fields_required")
+    cooloff = data.get("cooloff_hours") if has_cooloff else None
+    max_count = data.get("max_count") if has_max else None
+    if has_cooloff and cooloff is not None and (
+        type(cooloff) is not int or cooloff < 1 or cooloff > 720
+    ):
+        abort(400, description="cooloff_hours_out_of_range")
+    if has_max and max_count is not None and (
+        type(max_count) is not int or max_count < 1 or max_count > 50
+    ):
+        abort(400, description="max_count_out_of_range")
+
+    seen: set[int] = set()
+    results: list[dict] = []
+    updated = 0
+    for env_id in ids:
+        entry = {"envelope_id": env_id}
+        if type(env_id) is not int:
+            entry["status"] = "failed"
+            entry["error_code"] = "envelope_id_invalid"
+            results.append(entry)
+            continue
+        if env_id in seen:
+            entry["status"] = "failed"
+            entry["error_code"] = "duplicate_id"
+            results.append(entry)
+            continue
+        seen.add(env_id)
+        envelope = (
+            SigningEnvelope.query.filter_by(
+                id=env_id,
+                organization_id=user.organization_id,
+                created_by_id=user.id,
+            )
+            .with_for_update()
+            .first()
+        )
+        if envelope is None:
+            entry["status"] = "failed"
+            entry["error_code"] = "envelope_not_found"
+            results.append(entry)
+            continue
+        if has_cooloff:
+            envelope.reminder_cooloff_hours = cooloff
+        if has_max:
+            envelope.reminder_max_count = max_count
+        updated += 1
+        entry["status"] = "succeeded"
+        entry["cooloff_hours"] = envelope.reminder_cooloff_hours
+        entry["max_count"] = envelope.reminder_max_count
+        results.append(entry)
+
+    succeeded = sum(1 for r in results if r["status"] == "succeeded")
+    failed = len(results) - succeeded
+    if succeeded == 0:
+        db.session.rollback()
+        return (
+            jsonify(
+                succeeded=0,
+                failed=failed,
+                results=results,
+            ),
+            400,
+        )
+    db.session.commit()
+    http_status = 207 if failed else 200
+    return (
+        jsonify(
+            succeeded=succeeded,
+            failed=failed,
+            updated=updated,
+            results=results,
+        ),
+        http_status,
+    )
