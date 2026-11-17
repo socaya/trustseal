@@ -17,6 +17,7 @@ from .documents.document_label import DocumentLabel
 from .revoked_token import RevokedToken
 from .event_delivery import SecurityEvent, OutboxEvent
 from .tsd_document import TSDocument
+from .tsd_document_version import TSDocumentVersion
 from .tenant_key import TenantKey
 from .signing_envelope import SigningEnvelope, EnvelopeParticipant
 from .signer_decision import SignerChallenge, SignerDecision

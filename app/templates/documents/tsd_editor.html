@@ -4,32 +4,10 @@
 {% block title %}
   {% if doc %}{{ doc.title }}{% else %}New document{% endif %} · TRUSTSEAL
 {% endblock %}
-{% block page_title %}
-  {% if doc %}{{ doc.title }}{% else %}New document{% endif %}
-{% endblock %}
-{% block page_description %}
-  <p class="ts-page-header__description">
-    Compose in the built-in editor. Content is AES-encrypted per tenant
-    before it leaves the browser's reach — saved blobs are useless to
-    anyone outside TrustSeal. Autosave runs on every keystroke.
-  </p>
-{% endblock %}
-{% block page_actions %}
-  <div class="ts-btn-group">
-    <span class="ts-tsd-badge">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <rect x="4" y="11" width="16" height="10" stroke="currentColor" stroke-width="1.75" rx="1"/>
-        <path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" stroke-width="1.75"/>
-      </svg>
-      TrustSeal Document
-    </span>
-    {% if doc %}
-      <a class="ts-btn ts-btn--secondary" href="/api/tsd/{{ doc.id }}/download">
-        Download .tsd
-      </a>
-    {% endif %}
-  </div>
-{% endblock %}
+{# No page_title / page_description — the editor owns the full page. #}
+{% block page_title %}{% endblock %}
+{% block page_description %}{% endblock %}
+{% block page_actions %}{% endblock %}
 
 {% block breadcrumbs %}
   {% set trail = [
@@ -46,35 +24,37 @@
      data-tsd-id="{{ doc.id if doc else '' }}"
      data-tsd-version="{{ doc.version if doc else '' }}">
 
-  <section class="ts-panel" style="padding: 0;">
-    <div style="padding: var(--ts-space-5) var(--ts-space-6); display: grid; grid-template-columns: 2fr 1fr 1fr; gap: var(--ts-space-4);">
-      <div class="ts-field">
-        <label class="ts-field__label" for="tsd-title">Document title</label>
-        <input id="tsd-title" type="text" class="ts-input"
-               value="{{ doc.title if doc else '' }}"
-               placeholder="e.g. Services agreement — Acme Co.">
-      </div>
-      <div class="ts-field">
-        <label class="ts-field__label" for="tsd-tags">Tags</label>
-        <input id="tsd-tags" type="text" class="ts-input"
-               value="{{ doc.tags if doc else '' }}"
-               placeholder="legal, finance">
-      </div>
-      <div class="ts-field">
-        <label class="ts-field__label" for="tsd-export">Export policy</label>
-        <select id="tsd-export" class="ts-select">
-          <option value="pdf_allowed"    {% if not doc or doc.export_policy == 'pdf_allowed' %}selected{% endif %}>
-            PDF export allowed
-          </option>
-          <option value="encrypted_only" {% if doc and doc.export_policy == 'encrypted_only' %}selected{% endif %}>
-            Encrypted only (no exports)
-          </option>
-        </select>
-      </div>
+  {# ======================= Document title bar ======================= #}
+  <div class="ts-editor__titlebar">
+    <div class="ts-editor__titlebar-left">
+      <input type="text" id="tsd-title" class="ts-editor__titleinput"
+             value="{{ doc.title if doc else '' }}"
+             placeholder="Untitled document"
+             aria-label="Document title">
+      <span class="ts-tsd-badge" title="Encrypted at rest with per-tenant key">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="4" y="11" width="16" height="10" stroke="currentColor" stroke-width="1.75" rx="1"/>
+          <path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" stroke-width="1.75"/>
+        </svg>
+        .tsd
+      </span>
     </div>
+    <div class="ts-editor__titlebar-right">
+      <span id="tsd-save-state" class="ts-panel__meta">New draft — not saved yet</span>
+    </div>
+  </div>
 
-    {# ---------- Toolbar ---------- #}
-    <div class="ts-editor__toolbar" role="toolbar" aria-label="Formatting">
+  {# ======================= Ribbon tab strip ======================= #}
+  <nav class="ts-ribbon-tabs" role="tablist" aria-label="Editor ribbon">
+    <button type="button" role="tab" class="ts-ribbon-tab ts-ribbon-tab--active" data-ribbon-tab="format" aria-selected="true">Format</button>
+    <button type="button" role="tab" class="ts-ribbon-tab"                       data-ribbon-tab="security" aria-selected="false">Security</button>
+    <button type="button" role="tab" class="ts-ribbon-tab"                       data-ribbon-tab="review"   aria-selected="false">Review</button>
+    <div class="ts-ribbon-tabs__spacer"></div>
+  </nav>
+
+  {# ======================= Format ribbon ======================= #}
+  <div class="ts-ribbon" data-ribbon="format" role="tabpanel">
+    <div class="ts-ribbon__group">
       <select class="ts-editor__select" data-cmd="fontName" aria-label="Font family">
         <option value="Arial, sans-serif">Arial</option>
         <option value="Georgia, serif">Georgia</option>
@@ -88,11 +68,12 @@
         <option value="4">14</option><option value="5">18</option>
         <option value="6">24</option><option value="7">36</option>
       </select>
-      <span class="ts-editor__sep"></span>
-      <button type="button" class="ts-editor__btn" data-cmd="bold"><strong>B</strong></button>
-      <button type="button" class="ts-editor__btn" data-cmd="italic"><em>I</em></button>
-      <button type="button" class="ts-editor__btn" data-cmd="underline"><span style="text-decoration: underline;">U</span></button>
-      <button type="button" class="ts-editor__btn" data-cmd="strikeThrough"><span style="text-decoration: line-through;">S</span></button>
+    </div>
+    <div class="ts-ribbon__group">
+      <button type="button" class="ts-editor__btn" data-cmd="bold" title="Bold"><strong>B</strong></button>
+      <button type="button" class="ts-editor__btn" data-cmd="italic" title="Italic"><em>I</em></button>
+      <button type="button" class="ts-editor__btn" data-cmd="underline" title="Underline"><span style="text-decoration: underline;">U</span></button>
+      <button type="button" class="ts-editor__btn" data-cmd="strikeThrough" title="Strikethrough"><span style="text-decoration: line-through;">S</span></button>
       <label class="ts-editor__color" title="Text color">
         <span style="border-bottom: 3px solid #d14343;">A</span>
         <input type="color" data-cmd="foreColor" value="#121a26">
@@ -103,7 +84,8 @@
         </svg>
         <input type="color" data-cmd="hiliteColor" value="#fff3b0">
       </label>
-      <span class="ts-editor__sep"></span>
+    </div>
+    <div class="ts-ribbon__group">
       <select class="ts-editor__select ts-editor__select--sm" data-block-select aria-label="Paragraph style">
         <option value="P">Normal</option>
         <option value="H1">Title</option>
@@ -113,7 +95,8 @@
         <option value="BLOCKQUOTE">Quote</option>
         <option value="PRE">Code</option>
       </select>
-      <span class="ts-editor__sep"></span>
+    </div>
+    <div class="ts-ribbon__group">
       <button type="button" class="ts-editor__btn" data-cmd="justifyLeft" title="Align left">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 10h10M4 14h16M4 18h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
@@ -126,7 +109,8 @@
       <button type="button" class="ts-editor__btn" data-cmd="justifyFull" title="Justify">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 10h16M4 14h16M4 18h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
-      <span class="ts-editor__sep"></span>
+    </div>
+    <div class="ts-ribbon__group">
       <button type="button" class="ts-editor__btn" data-cmd="insertUnorderedList" title="Bullet list">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <circle cx="5" cy="7" r="1.3" fill="currentColor"/><circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="5" cy="17" r="1.3" fill="currentColor"/>
@@ -145,7 +129,8 @@
       <button type="button" class="ts-editor__btn" data-cmd="indent" title="Indent">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M10 10h10M10 14h10M4 18h16M4 10l3 2-3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
-      <span class="ts-editor__sep"></span>
+    </div>
+    <div class="ts-ribbon__group">
       <button type="button" class="ts-editor__btn" data-cmd="createLink" title="Link">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10 14l4-4M9 7h3a4 4 0 010 8h-1M15 17h-3a4 4 0 010-8h1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
@@ -153,46 +138,263 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 4l-4 16M14 4l4 16M4 10h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
     </div>
+  </div>
 
-    <div class="ts-editor__canvas">
-      <div id="tsd-surface" class="ts-editor__page"
-           contenteditable="true"
-           data-placeholder="Start drafting your TrustSeal Document. Autosave runs on every keystroke; the server encrypts before writing."></div>
+  {# ======================= Security ribbon ======================= #}
+  <div class="ts-ribbon" data-ribbon="security" role="tabpanel" hidden>
+    <div class="ts-ribbon__group ts-ribbon__group--labeled">
+      <label class="ts-ribbon__label">Export policy</label>
+      <select id="tsd-export" class="ts-ribbon__select">
+        <option value="pdf_allowed"    {% if not doc or doc.export_policy == 'pdf_allowed' %}selected{% endif %}>
+          PDF export allowed
+        </option>
+        <option value="encrypted_only" {% if doc and doc.export_policy == 'encrypted_only' %}selected{% endif %}>
+          Encrypted only — no PDF
+        </option>
+      </select>
     </div>
+    <div class="ts-ribbon__group ts-ribbon__group--labeled">
+      <label class="ts-ribbon__label">Confidentiality</label>
+      <select id="tsd-confidentiality" class="ts-ribbon__select">
+        <option value="internal" selected>Internal</option>
+        <option value="confidential">Confidential</option>
+        <option value="restricted">Restricted</option>
+        <option value="public">Public</option>
+      </select>
+    </div>
+    <div class="ts-ribbon__group ts-ribbon__group--labeled">
+      <label class="ts-ribbon__label">Watermark</label>
+      <input type="text" id="tsd-watermark" class="ts-ribbon__input"
+             placeholder="DRAFT" value="{% if doc %}{% else %}DRAFT{% endif %}"
+             maxlength="20"
+             aria-label="Watermark text">
+    </div>
+    <div class="ts-ribbon__group ts-ribbon__group--labeled">
+      <label class="ts-ribbon__label">Tags</label>
+      <input type="text" id="tsd-tags" class="ts-ribbon__input"
+             value="{{ doc.tags if doc else '' }}"
+             placeholder="legal, finance"
+             aria-label="Tags">
+    </div>
+    {% if doc and doc.export_policy == 'pdf_allowed' %}
+    <div class="ts-ribbon__group ts-ribbon__group--actions">
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-export-pdf-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M6 3h8l4 4v14H6V3z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+          <path d="M14 3v4h4" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+          <path d="M9 14h6M9 17h4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        </svg>
+        Export PDF
+      </button>
+    </div>
+    {% endif %}
+  </div>
 
-    <div class="ts-editor__footer">
-      <span id="tsd-stats">0 words · 0 characters</span>
-      <span id="tsd-save-state" class="ts-panel__meta">Draft — not saved yet</span>
+  {# ======================= Review ribbon ======================= #}
+  <div class="ts-ribbon" data-ribbon="review" role="tabpanel" hidden>
+    {% if doc %}
+    <div class="ts-ribbon__group ts-ribbon__group--actions">
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="tsd-history-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.75"/>
+          <path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        </svg>
+        Version history
+      </button>
+      <a class="ts-btn ts-btn--secondary ts-btn--sm" href="/api/tsd/{{ doc.id }}/download">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 4v12M6 11l6 6 6-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M4 20h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        </svg>
+        Download .tsd
+      </a>
     </div>
-  </section>
+    <div class="ts-ribbon__group ts-ribbon__group--labeled">
+      <label class="ts-ribbon__label">Status</label>
+      <select id="tsd-status" class="ts-ribbon__select">
+        <option value="draft"      {% if doc.status == 'draft' %}selected{% endif %}>Draft</option>
+        <option value="finalized"  {% if doc.status == 'finalized' %}selected{% endif %}>Finalized</option>
+        <option value="archived"   {% if doc.status == 'archived' %}selected{% endif %}>Archived</option>
+      </select>
+    </div>
+    {% else %}
+    <div class="ts-ribbon__group">
+      <span class="ts-panel__meta">Save the document first to unlock version history and signing-flow actions.</span>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ======================= Paper canvas ======================= #}
+  <div class="ts-editor__canvas" id="tsd-canvas">
+    <div id="tsd-surface" class="ts-editor__page"
+         contenteditable="true"
+         data-placeholder="Start drafting your document. Autosave runs on every keystroke; the server encrypts before writing.">{{ doc.title if doc else '' }}</div>
+  </div>
+
+  <div class="ts-editor__statusbar">
+    <span id="tsd-stats">0 words · 0 characters</span>
+    <span>
+      {% if doc %}
+        <code>v{{ doc.version }}</code> · ciphertext <code>{{ doc.ciphertext_sha256[:12] }}…</code>
+      {% else %}
+        Autosaves encrypt before writing.
+      {% endif %}
+    </span>
+  </div>
+
+  {# ======================= Version history drawer ======================= #}
+  <aside id="tsd-history-panel" class="ts-history-panel" hidden aria-label="Version history">
+    <header class="ts-history-panel__head">
+      <h3>Version history</h3>
+      <button type="button" class="ts-btn ts-btn--text ts-btn--sm" id="tsd-history-close">Close</button>
+    </header>
+    <div id="tsd-history-body">
+      <p class="ts-panel__meta" style="padding: var(--ts-space-4);">Loading…</p>
+    </div>
+  </aside>
+
+  {# ======================= Export-PDF dialog ======================= #}
+  <div id="tsd-pdf-overlay" class="ts-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="tsd-pdf-title">
+    <div class="ts-modal" style="max-width: 460px;">
+      <h2 class="ts-modal__title" id="tsd-pdf-title">Export as PDF</h2>
+      <p class="ts-panel__meta" style="margin-bottom: var(--ts-space-4);">
+        Optionally protect the exported PDF with a password. Viewers
+        must enter the password to open the file. Leave blank to export
+        an unprotected PDF.
+      </p>
+      <div class="ts-field">
+        <label class="ts-field__label" for="tsd-pdf-password">Password (optional, 4–128 chars)</label>
+        <input type="password" id="tsd-pdf-password" class="ts-input" autocomplete="new-password" placeholder="Leave blank for no password">
+        <span class="ts-field__hint">AES-encrypted. We do not store exported passwords — losing it means re-exporting from the editor.</span>
+      </div>
+      <div class="ts-modal__actions">
+        <button type="button" class="ts-btn ts-btn--ghost" id="tsd-pdf-cancel">Cancel</button>
+        <button type="button" class="ts-btn ts-btn--primary" id="tsd-pdf-submit">Export</button>
+      </div>
+      <p class="ts-panel__meta" id="tsd-pdf-status" style="margin-top: var(--ts-space-3); display: none;"></p>
+    </div>
+  </div>
 </div>
 
 <style>
-  .ts-tsd-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 10px;
-    font-size: var(--ts-fs-label);
+  /* ====================================================== Title bar */
+  .ts-editor__titlebar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: var(--ts-space-4);
+    padding: var(--ts-space-3) var(--ts-space-5);
+    background: var(--ts-surface);
+    border: 1px solid var(--ts-border);
+    border-bottom: 0;
+  }
+  .ts-editor__titlebar-left { display: inline-flex; align-items: center; gap: var(--ts-space-3); flex: 1 1 auto; min-width: 0; }
+  .ts-editor__titleinput {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: var(--ts-fs-page-title);
     font-weight: var(--ts-fw-semibold);
+    letter-spacing: -0.015em;
+    color: var(--ts-text);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--ts-radius);
+    padding: 4px 8px;
+    line-height: 1.2;
+  }
+  .ts-editor__titleinput:hover { border-color: var(--ts-border); }
+  .ts-editor__titleinput:focus {
+    outline: none;
+    border-color: var(--ts-brand-primary);
+    box-shadow: 0 0 0 3px rgba(55, 120, 212, 0.18);
+  }
+  .ts-tsd-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px;
+    font-size: var(--ts-fs-micro);
+    font-weight: var(--ts-fw-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
     color: var(--ts-brand-primary);
     background: var(--ts-brand-primary-soft);
     border: 1px solid var(--ts-brand-primary-soft);
-    border-radius: var(--ts-radius);
-    letter-spacing: 0.02em;
+    border-radius: var(--ts-radius-sm);
+    flex: 0 0 auto;
   }
 
-  .ts-editor__toolbar {
-    display: flex; align-items: center; gap: 2px;
-    padding: var(--ts-space-2) var(--ts-space-4);
-    border-top: 1px solid var(--ts-border);
-    border-bottom: 1px solid var(--ts-border);
+  /* ====================================================== Ribbon tabs */
+  .ts-ribbon-tabs {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    background: var(--ts-surface);
+    border: 1px solid var(--ts-border);
+    border-bottom: 0;
+    padding: 0 var(--ts-space-3);
+  }
+  .ts-ribbon-tab {
+    padding: 10px 18px;
+    font-size: var(--ts-fs-label);
+    font-weight: var(--ts-fw-medium);
+    color: var(--ts-text-muted);
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color var(--ts-dur-fast) var(--ts-ease),
+                border-color var(--ts-dur-fast) var(--ts-ease);
+  }
+  .ts-ribbon-tab:hover { color: var(--ts-text); }
+  .ts-ribbon-tab--active {
+    color: var(--ts-brand-primary);
+    border-bottom-color: var(--ts-brand-primary);
+  }
+  .ts-ribbon-tabs__spacer { flex: 1 1 auto; }
+
+  /* ====================================================== Ribbon body */
+  .ts-ribbon {
+    display: flex; align-items: center; gap: 0;
+    padding: var(--ts-space-3) var(--ts-space-3);
     background: var(--ts-surface-alt);
+    border: 1px solid var(--ts-border);
+    border-top: 0;
     flex-wrap: wrap;
     position: sticky;
     top: var(--ts-topbar-h);
     z-index: 5;
   }
+  .ts-ribbon__group {
+    display: inline-flex; align-items: center; gap: 2px;
+    padding: 0 var(--ts-space-3);
+    border-right: 1px solid var(--ts-border);
+    min-height: 34px;
+  }
+  .ts-ribbon__group:first-child { padding-left: var(--ts-space-2); }
+  .ts-ribbon__group:last-child { border-right: 0; }
+  .ts-ribbon__group--labeled { flex-direction: column; align-items: stretch; gap: 2px; padding: 0 var(--ts-space-4); }
+  .ts-ribbon__group--actions { gap: var(--ts-space-2); }
+  .ts-ribbon__label {
+    font-size: var(--ts-fs-micro);
+    font-weight: var(--ts-fw-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ts-text-subtle);
+  }
+  .ts-ribbon__select, .ts-ribbon__input {
+    min-width: 160px;
+    height: 30px;
+    padding: 0 var(--ts-space-3);
+    font-size: var(--ts-fs-label);
+    background: var(--ts-surface);
+    border: 1px solid var(--ts-border);
+    border-radius: var(--ts-radius);
+    color: var(--ts-text);
+  }
+  .ts-ribbon__select:focus, .ts-ribbon__input:focus {
+    outline: none;
+    border-color: var(--ts-brand-primary);
+    box-shadow: 0 0 0 3px rgba(55, 120, 212, 0.18);
+  }
+
+  /* Format-tab helpers (reused from previous editor). */
   .ts-editor__btn {
     display: inline-flex; align-items: center; justify-content: center;
     min-width: 30px; height: 30px; padding: 0 6px;
@@ -232,28 +434,15 @@
   }
   .ts-editor__color:hover { background: var(--ts-surface); border-color: var(--ts-border); }
   .ts-editor__color input[type="color"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-  .ts-editor__sep { display: inline-block; width: 1px; height: 20px; background: var(--ts-border); margin: 0 4px; }
 
+  /* ====================================================== Canvas + page */
   .ts-editor__canvas {
     background: var(--ts-surface-sunken);
     padding: var(--ts-space-7) var(--ts-space-5);
-    min-height: 60vh;
+    min-height: 62vh;
     overflow-x: auto;
-    position: relative;
-  }
-  /* Faint diagonal watermark across the canvas — reinforces the brand
-     without touching the saved content. */
-  .ts-editor__canvas::before {
-    content: "TRUSTSEAL • " attr(data-wm);
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%,-50%) rotate(-30deg);
-    font-size: 10vw;
-    font-weight: var(--ts-fw-bold);
-    color: rgba(18, 26, 38, 0.035);
-    letter-spacing: 0.2em;
-    pointer-events: none;
-    white-space: nowrap;
+    border: 1px solid var(--ts-border);
+    border-top: 0;
   }
   .ts-editor__page {
     position: relative;
@@ -266,36 +455,99 @@
     font-family: Arial, "Helvetica Neue", sans-serif;
     font-size: 12pt; line-height: 1.6;
     outline: none; text-align: left;
+    overflow: hidden;
   }
+  /* Watermark lives on the PAGE now, diagonal, behind content. */
+  .ts-editor__page::before {
+    content: attr(data-watermark);
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%,-50%) rotate(-30deg);
+    font-size: 110pt;
+    font-weight: 700;
+    color: rgba(18, 26, 38, 0.06);
+    letter-spacing: 0.08em;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 0;
+    text-transform: uppercase;
+  }
+  .ts-editor__page[data-watermark=""]::before { content: none; }
+  .ts-editor__page > * { position: relative; z-index: 1; }
+
   @media (max-width: 1023px) {
     .ts-editor__canvas { padding: var(--ts-space-4); }
     .ts-editor__page { width: 100%; padding: var(--ts-space-5); min-height: 80vh; box-shadow: none; }
   }
-  .ts-editor__page:empty::before {
-    content: attr(data-placeholder); color: var(--ts-text-subtle); pointer-events: none;
-  }
-  .ts-editor__page h1 { font-size: 22pt; font-weight: 600; margin: 24pt 0 12pt; }
-  .ts-editor__page h2 { font-size: 16pt; font-weight: 600; margin: 20pt 0 10pt; }
-  .ts-editor__page h3 { font-size: 13pt; font-weight: 600; margin: 16pt 0 8pt; }
-  .ts-editor__page h4 { font-size: 12pt; font-weight: 600; margin: 14pt 0 6pt; }
+  .ts-editor__page:empty::before { content: attr(data-placeholder); color: var(--ts-text-subtle); pointer-events: none; font-size: 12pt; font-weight: 400; letter-spacing: 0; text-transform: none; transform: translate(-50%,-50%); }
+  .ts-editor__page h1 { font-size: 22pt; font-weight: 600; margin: 0 0 12pt; letter-spacing: -0.01em; }
+  .ts-editor__page h2 { font-size: 16pt; font-weight: 600; margin: 18pt 0 10pt; }
+  .ts-editor__page h3 { font-size: 13pt; font-weight: 600; margin: 14pt 0 8pt; }
+  .ts-editor__page h4 { font-size: 12pt; font-weight: 600; margin: 12pt 0 6pt; }
   .ts-editor__page p  { margin: 0 0 11pt; }
   .ts-editor__page ul, .ts-editor__page ol { padding-left: 32pt; margin: 0 0 11pt; list-style: revert; }
   .ts-editor__page a  { color: var(--ts-brand-primary); text-decoration: underline; }
   .ts-editor__page blockquote { margin: 0 0 11pt; padding: 6pt 18pt; border-left: 3px solid var(--ts-border-strong); color: var(--ts-text-muted); font-style: italic; }
   .ts-editor__page pre { margin: 0 0 11pt; padding: 10pt 14pt; background: var(--ts-surface-alt); border: 1px solid var(--ts-border); font-family: var(--ts-font-mono); font-size: 10pt; white-space: pre-wrap; }
 
-  .ts-editor__footer {
+  /* ====================================================== Status bar */
+  .ts-editor__statusbar {
     display: flex; justify-content: space-between; gap: var(--ts-space-3);
     padding: var(--ts-space-2) var(--ts-space-4);
-    border-top: 1px solid var(--ts-border);
-    background: var(--ts-surface-alt);
-    color: var(--ts-text-muted); font-size: var(--ts-fs-meta);
+    background: var(--ts-surface);
+    border: 1px solid var(--ts-border);
+    border-top: 0;
+    color: var(--ts-text-muted);
+    font-size: var(--ts-fs-meta);
     flex-wrap: wrap;
   }
 
+  /* Save-state coloring. */
   .ts-save-state--saving  { color: var(--ts-text-muted); }
   .ts-save-state--saved   { color: var(--ts-brand-green); }
   .ts-save-state--error   { color: var(--ts-danger); }
+
+  /* ====================================================== History drawer */
+  .ts-history-panel {
+    position: fixed;
+    top: var(--ts-topbar-h);
+    right: 0;
+    width: 380px;
+    max-width: 90vw;
+    height: calc(100vh - var(--ts-topbar-h));
+    background: var(--ts-surface);
+    border-left: 1px solid var(--ts-border);
+    box-shadow: var(--ts-shadow-overlay);
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .ts-history-panel__head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--ts-space-4) var(--ts-space-5);
+    border-bottom: 1px solid var(--ts-border);
+  }
+  .ts-history-panel__head h3 {
+    font-size: var(--ts-fs-section); font-weight: var(--ts-fw-semibold); margin: 0;
+  }
+  #tsd-history-body { overflow-y: auto; flex: 1 1 auto; }
+  .ts-history-row {
+    padding: var(--ts-space-4) var(--ts-space-5);
+    border-bottom: 1px solid var(--ts-border);
+  }
+  .ts-history-row:last-child { border-bottom: 0; }
+  .ts-history-row__head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: var(--ts-space-3); margin-bottom: var(--ts-space-2);
+  }
+  .ts-history-row__version {
+    font-weight: var(--ts-fw-semibold);
+    font-family: var(--ts-font-mono);
+    color: var(--ts-brand-primary);
+  }
+  .ts-history-row__meta { color: var(--ts-text-muted); font-size: var(--ts-fs-meta); }
+  .ts-history-row__actions { display: flex; gap: var(--ts-space-2); margin-top: var(--ts-space-2); }
 </style>
 
 <script>
@@ -305,9 +557,11 @@
   var titleInput = document.getElementById('tsd-title');
   var tagsInput = document.getElementById('tsd-tags');
   var exportSelect = document.getElementById('tsd-export');
+  var statusSelect = document.getElementById('tsd-status');
+  var watermarkInput = document.getElementById('tsd-watermark');
   var stats = document.getElementById('tsd-stats');
   var state = document.getElementById('tsd-save-state');
-  var canvas = document.querySelector('.ts-editor__canvas');
+  var page = document.getElementById('tsd-surface');
 
   var tsdId = shell.dataset.tsdId ? parseInt(shell.dataset.tsdId, 10) : null;
   var version = shell.dataset.tsdVersion ? parseInt(shell.dataset.tsdVersion, 10) : null;
@@ -317,22 +571,16 @@
     return m ? decodeURIComponent(m[1]) : null;
   }
   function headers() {
-    var h = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'X-Requested-With': 'fetch',
-    };
+    var h = { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'fetch' };
     var t = csrfToken();
     if (t) h['X-CSRFToken'] = t;
     if (version) h['If-Match'] = String(version);
     return h;
   }
-
   function stat(msg, cls) {
     state.textContent = msg;
     state.className = 'ts-panel__meta ts-save-state--' + (cls || 'saving');
   }
-
   function wordstats() {
     var text = editor.innerText || '';
     var words = text.trim().split(/\s+/).filter(Boolean).length;
@@ -340,9 +588,37 @@
                         ' · ' + text.length + ' character' + (text.length === 1 ? '' : 's');
   }
 
+  // Watermark text on the page element (CSS reads attr(data-watermark)).
+  function applyWatermark() {
+    var txt = (watermarkInput && watermarkInput.value || '').trim();
+    page.setAttribute('data-watermark', txt);
+  }
+  if (watermarkInput) {
+    watermarkInput.addEventListener('input', applyWatermark);
+    applyWatermark();
+  }
+
+  // ---- Ribbon tab switching ----
+  var ribbonTabs = document.querySelectorAll('.ts-ribbon-tab');
+  var ribbonPanels = document.querySelectorAll('[data-ribbon]');
+  ribbonTabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      var key = tab.getAttribute('data-ribbon-tab');
+      ribbonTabs.forEach(function (t) {
+        t.classList.remove('ts-ribbon-tab--active');
+        t.setAttribute('aria-selected', 'false');
+      });
+      tab.classList.add('ts-ribbon-tab--active');
+      tab.setAttribute('aria-selected', 'true');
+      ribbonPanels.forEach(function (p) {
+        if (p.getAttribute('data-ribbon') === key) p.removeAttribute('hidden');
+        else p.setAttribute('hidden', '');
+      });
+    });
+  });
+
   // ---- Load existing content ----
   if (tsdId) {
-    canvas.setAttribute('data-wm', tsdId);
     stat('Loading encrypted content…', 'saving');
     fetch('/api/tsd/' + tsdId + '/content', { credentials: 'same-origin' })
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
@@ -353,11 +629,10 @@
       })
       .catch(function (e) { stat('Load failed: ' + e.message, 'error'); });
   } else {
-    canvas.setAttribute('data-wm', 'DRAFT');
     stat('New draft — not saved yet', 'saving');
   }
 
-  // ---- Toolbar handlers ----
+  // ---- Toolbar buttons ----
   document.querySelectorAll('.ts-editor__btn').forEach(function (btn) {
     btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
     btn.addEventListener('click', function () {
@@ -390,7 +665,7 @@
     });
   }
 
-  // ---- Autosave (debounced) ----
+  // ---- Autosave ----
   var saveTimer = null;
   function scheduleSave() {
     wordstats();
@@ -399,8 +674,9 @@
   }
   editor.addEventListener('input', scheduleSave);
   titleInput.addEventListener('input', scheduleSave);
-  tagsInput.addEventListener('input', scheduleSave);
-  exportSelect.addEventListener('change', scheduleSave);
+  if (tagsInput)   tagsInput.addEventListener('input', scheduleSave);
+  if (exportSelect) exportSelect.addEventListener('change', scheduleSave);
+  if (statusSelect) statusSelect.addEventListener('change', scheduleSave);
 
   function save() {
     var title = (titleInput.value || '').trim();
@@ -409,16 +685,17 @@
       return;
     }
     stat('Encrypting & saving…', 'saving');
-    var body = JSON.stringify({
+    var payload = {
       title: title,
-      tags: tagsInput.value || '',
-      export_policy: exportSelect.value,
+      tags: (tagsInput && tagsInput.value) || '',
+      export_policy: (exportSelect && exportSelect.value) || 'pdf_allowed',
       content_html: editor.innerHTML || '',
-    });
+    };
+    if (statusSelect) payload.status = statusSelect.value;
 
     var url = tsdId ? '/api/tsd/' + tsdId : '/api/tsd/';
     var method = tsdId ? 'PUT' : 'POST';
-    fetch(url, { method: method, credentials: 'same-origin', headers: headers(), body: body })
+    fetch(url, { method: method, credentials: 'same-origin', headers: headers(), body: JSON.stringify(payload) })
       .then(function (r) {
         if (r.status === 412) throw new Error('Someone else just saved a newer version. Reload to merge.');
         if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -427,18 +704,165 @@
       .then(function (data) {
         tsdId = data.id;
         version = data.version;
-        canvas.setAttribute('data-wm', tsdId);
         if (!shell.dataset.tsdId) {
           shell.dataset.tsdId = tsdId;
-          // Rewrite the URL so refresh keeps editing the same TSD.
           history.replaceState({}, '', '/documents/library/' + tsdId);
         }
-        stat('Saved · v' + data.version + ' · ' + data.plaintext_bytes + ' B plaintext · ciphertext ' + data.ciphertext_sha256.substring(0,12) + '…', 'saved');
+        stat('Saved · v' + data.version + ' · ciphertext ' + data.ciphertext_sha256.substring(0,12) + '…', 'saved');
       })
       .catch(function (e) { stat('Save failed: ' + e.message, 'error'); });
   }
-
   wordstats();
+
+  // ============================================================ History
+  var historyBtn   = document.getElementById('tsd-history-btn');
+  var historyPanel = document.getElementById('tsd-history-panel');
+  var historyClose = document.getElementById('tsd-history-close');
+  var historyBody  = document.getElementById('tsd-history-body');
+
+  function renderHistory(items) {
+    if (!items || !items.length) {
+      historyBody.innerHTML = '<p class="ts-panel__meta" style="padding: var(--ts-space-4);">No prior versions yet. Autosave creates one on every content change.</p>';
+      return;
+    }
+    historyBody.innerHTML = items.map(function (v) {
+      return (
+        '<div class="ts-history-row" data-version="' + v.version + '">' +
+        '  <div class="ts-history-row__head">' +
+        '    <span class="ts-history-row__version">v' + v.version + '</span>' +
+        '    <span class="ts-history-row__meta">' + (v.created_at || '—').replace('T', ' ').substring(0, 16) + '</span>' +
+        '  </div>' +
+        '  <div class="ts-history-row__meta">' +
+        '    ' + v.plaintext_bytes + ' B · ciphertext ' + (v.ciphertext_sha256 || '').substring(0, 12) + '…' +
+        (v.change_note ? ' · ' + v.change_note : '') +
+        '  </div>' +
+        '  <div class="ts-history-row__actions">' +
+        '    <button type="button" class="ts-btn ts-btn--text ts-btn--sm" data-preview="' + v.version + '">Preview</button>' +
+        '    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-restore="' + v.version + '">Restore</button>' +
+        '  </div>' +
+        '</div>'
+      );
+    }).join('');
+
+    historyBody.querySelectorAll('[data-preview]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var v = btn.getAttribute('data-preview');
+        fetch('/api/tsd/' + tsdId + '/versions/' + v + '/content', { credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            var html = (data.content && data.content.html) || '';
+            var w = window.open('', '_blank', 'width=720,height=900');
+            w.document.write('<html><head><title>v' + v + '</title><style>body{font:14px Arial;padding:40px;max-width:720px;margin:auto}</style></head><body>' + html + '</body></html>');
+            w.document.close();
+          });
+      });
+    });
+
+    historyBody.querySelectorAll('[data-restore]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var v = btn.getAttribute('data-restore');
+        if (!window.confirm('Restore v' + v + ' as current? Current content will be snapshotted so you can undo.')) return;
+        fetch('/api/tsd/' + tsdId + '/versions/' + v + '/restore', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'X-Requested-With': 'fetch' },
+        }).then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        }).then(function (data) {
+          version = data.version;
+          return fetch('/api/tsd/' + tsdId + '/content', { credentials: 'same-origin' })
+            .then(function (r2) { return r2.json(); })
+            .then(function (c) {
+              editor.innerHTML = (c.content && c.content.html) || '';
+              wordstats();
+              stat('Restored v' + v + ' as v' + data.version, 'saved');
+              loadHistory();
+            });
+        }).catch(function (e) { stat('Restore failed: ' + e.message, 'error'); });
+      });
+    });
+  }
+
+  function loadHistory() {
+    if (!tsdId) return;
+    historyBody.innerHTML = '<p class="ts-panel__meta" style="padding: var(--ts-space-4);">Loading…</p>';
+    fetch('/api/tsd/' + tsdId + '/versions', { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(renderHistory)
+      .catch(function (e) {
+        historyBody.innerHTML = '<p class="ts-panel__meta" style="padding: var(--ts-space-4); color: var(--ts-danger);">Failed: ' + e.message + '</p>';
+      });
+  }
+
+  if (historyBtn) {
+    historyBtn.addEventListener('click', function () {
+      historyPanel.removeAttribute('hidden'); loadHistory();
+    });
+  }
+  if (historyClose) {
+    historyClose.addEventListener('click', function () { historyPanel.setAttribute('hidden', ''); });
+  }
+
+  // ============================================================ PDF export
+  var pdfBtn     = document.getElementById('tsd-export-pdf-btn');
+  var pdfOverlay = document.getElementById('tsd-pdf-overlay');
+  var pdfCancel  = document.getElementById('tsd-pdf-cancel');
+  var pdfSubmit  = document.getElementById('tsd-pdf-submit');
+  var pdfPwd     = document.getElementById('tsd-pdf-password');
+  var pdfStatus  = document.getElementById('tsd-pdf-status');
+
+  function showPdf() {
+    if (!pdfOverlay) return;
+    pdfPwd.value = ''; pdfStatus.style.display = 'none';
+    pdfOverlay.removeAttribute('hidden'); pdfOverlay.style.display = 'flex';
+    setTimeout(function () { pdfPwd.focus(); }, 50);
+  }
+  function hidePdf() {
+    if (!pdfOverlay) return;
+    pdfOverlay.setAttribute('hidden', ''); pdfOverlay.style.display = 'none';
+  }
+  if (pdfBtn) pdfBtn.addEventListener('click', showPdf);
+  if (pdfCancel) pdfCancel.addEventListener('click', hidePdf);
+  if (pdfOverlay) pdfOverlay.addEventListener('click', function (e) { if (e.target === pdfOverlay) hidePdf(); });
+  if (pdfSubmit) {
+    pdfSubmit.addEventListener('click', function () {
+      var pwd = (pdfPwd.value || '').trim();
+      if (pwd && (pwd.length < 4 || pwd.length > 128)) {
+        pdfStatus.style.display = '';
+        pdfStatus.style.color = 'var(--ts-danger)';
+        pdfStatus.textContent = 'Password must be 4–128 characters.';
+        return;
+      }
+      pdfStatus.style.display = '';
+      pdfStatus.style.color = 'var(--ts-text-muted)';
+      pdfStatus.textContent = 'Rendering…';
+      pdfSubmit.disabled = true;
+
+      fetch('/api/tsd/' + tsdId + '/export/pdf', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({ user_password: pwd || undefined }),
+      }).then(function (r) {
+        if (!r.ok) {
+          return r.json().then(function (j) { throw new Error(j.message || j.error || ('HTTP ' + r.status)); });
+        }
+        var encrypted = r.headers.get('X-TrustSeal-Pdf-Encrypted') === 'true';
+        return r.blob().then(function (b) { return { blob: b, encrypted: encrypted }; });
+      }).then(function (res) {
+        var url = URL.createObjectURL(res.blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = (titleInput.value || 'document') + '.pdf';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        pdfStatus.style.color = 'var(--ts-brand-green)';
+        pdfStatus.textContent = 'Downloaded ' + (res.encrypted ? '(password-protected).' : '(unprotected).');
+        setTimeout(hidePdf, 800);
+      }).catch(function (e) {
+        pdfStatus.style.color = 'var(--ts-danger)';
+        pdfStatus.textContent = 'Export failed: ' + e.message;
+      }).finally(function () { pdfSubmit.disabled = false; });
+    });
+  }
 })();
 </script>
 {% endblock %}

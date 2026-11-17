@@ -30,6 +30,7 @@ from app.metrics import (
 )
 from app.models.event_delivery import SecurityEvent
 from app.models.tsd_document import EXPORT_POLICIES, TSD_STATUSES, TSDocument
+from app.models.tsd_document_version import TSDocumentVersion
 from app.services.tsd_format import (
     TSDError,
     decrypt_content_envelope,
@@ -40,6 +41,7 @@ from app.services.tsd_format import (
     sha256_hex,
 )
 from app.services.tsd_ingest import IngestError, ingest
+from app.services.tsd_pdf import PdfExportError, render_html_to_pdf
 
 
 tsd_api = Blueprint("tsd_api", __name__, url_prefix="/api/tsd")
@@ -298,6 +300,23 @@ def update_tsd(tsd_id: int):
         except TSDError as exc:
             record_tsd_operation("update", "encrypt_failed")
             return jsonify({"error": "encrypt_failed", "message": str(exc)}), 400
+
+        # Snapshot the OLD ciphertext into the versions table before
+        # we overwrite the parent row. Append-only; prior versions are
+        # never mutated or deleted.
+        change_note = (payload.get("change_note") or "").strip() or None
+        if change_note and len(change_note) > 500:
+            change_note = change_note[:500]
+        db.session.add(TSDocumentVersion(
+            tsd_id=row.id,
+            version=row.version,
+            ciphertext=row.ciphertext,
+            ciphertext_sha256=row.ciphertext_sha256,
+            plaintext_bytes=row.plaintext_bytes,
+            created_by_id=row.created_by_id,
+            change_note=change_note,
+        ))
+
         row.ciphertext = ciphertext
         row.ciphertext_sha256 = sha256_hex(ciphertext)
         row.plaintext_bytes = len(plaintext)
@@ -342,6 +361,82 @@ def download_tsd(tsd_id: int):
             "Content-Disposition": f'attachment; filename="{safe_title}.tsd"',
             "X-TrustSeal-Document-Id": str(row.id),
             "X-TrustSeal-Document-Version": str(row.version),
+        },
+    )
+
+
+# ============================================================ PDF export
+
+
+@tsd_api.route("/<int:tsd_id>/export/pdf", methods=["POST"])
+@login_required
+def export_tsd_pdf(tsd_id: int):
+    """Render the decrypted content to PDF, optionally password-protected.
+
+    Body (all optional)::
+
+        {
+            "user_password":  "<viewer password>",   # required to open
+            "owner_password": "<owner password>"     # permissions control
+        }
+
+    ``encrypted_only`` export policy blocks this path.
+    """
+    row = _owned(tsd_id)
+    if row.export_policy != "pdf_allowed":
+        record_tsd_operation("export_pdf", "policy_blocked")
+        return jsonify({
+            "error": "export_policy_denies",
+            "policy": row.export_policy,
+        }), 403
+
+    payload = request.get_json(silent=True) or {}
+    user_password = payload.get("user_password") or None
+    owner_password = payload.get("owner_password") or None
+    if user_password is not None and not isinstance(user_password, str):
+        return jsonify({"error": "user_password_must_be_string"}), 400
+    if owner_password is not None and not isinstance(owner_password, str):
+        return jsonify({"error": "owner_password_must_be_string"}), 400
+    if user_password is not None and (len(user_password) < 4 or len(user_password) > 128):
+        return jsonify({"error": "user_password_length", "min": 4, "max": 128}), 400
+
+    try:
+        content = decrypt_content_envelope(
+            row.ciphertext, organization_id=row.organization_id
+        )
+    except TSDError as exc:
+        record_tsd_operation("export_pdf", "decrypt_failed")
+        return jsonify({"error": "decrypt_failed", "message": str(exc)}), 500
+
+    try:
+        pdf_bytes = render_html_to_pdf(
+            html=content.get("html") or "",
+            title=row.title,
+            document_id=row.id,
+            version=row.version,
+            tenant_id=row.organization_id,
+            user_password=user_password,
+            owner_password=owner_password,
+        )
+    except PdfExportError as exc:
+        record_tsd_operation("export_pdf", "render_failed")
+        return jsonify({"error": "render_failed", "message": str(exc)}), 500
+
+    _emit(actor_id=current_user.id, organization_id=row.organization_id,
+          action="tsd.export_pdf", resource_id=row.id,
+          outcome="encrypted" if user_password else "cleartext")
+    db.session.commit()
+    record_tsd_operation("export_pdf", "encrypted" if user_password else "cleartext")
+
+    safe_title = "".join(c for c in row.title if c.isalnum() or c in ("-", "_", " ")).strip() or "document"
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_title}.pdf"',
+            "X-TrustSeal-Document-Id": str(row.id),
+            "X-TrustSeal-Document-Version": str(row.version),
+            "X-TrustSeal-Pdf-Encrypted": "true" if user_password else "false",
         },
     )
 
@@ -414,6 +509,117 @@ def ingest_tsd():
     record_tsd_ingest(meta.get("source_type", "unknown"))
     record_tsd_plaintext(len(plaintext))
     return jsonify(row.to_dict()), 201
+
+
+# ============================================================ versions
+
+
+@tsd_api.route("/<int:tsd_id>/versions", methods=["GET"])
+@login_required
+def list_versions(tsd_id: int):
+    """List prior versions of a TSD. The current version is NOT included
+    (fetch that via ``GET /api/tsd/<id>``)."""
+    row = _owned(tsd_id)
+    versions = (
+        TSDocumentVersion.query
+        .filter_by(tsd_id=row.id)
+        .order_by(TSDocumentVersion.version.desc())
+        .all()
+    )
+    return jsonify([
+        {
+            "id": v.id,
+            "tsd_id": v.tsd_id,
+            "version": v.version,
+            "ciphertext_sha256": v.ciphertext_sha256,
+            "plaintext_bytes": v.plaintext_bytes,
+            "created_by_id": v.created_by_id,
+            "change_note": v.change_note,
+            "created_at": v.created_at.isoformat() if v.created_at else None,
+        }
+        for v in versions
+    ])
+
+
+@tsd_api.route("/<int:tsd_id>/versions/<int:version>/content", methods=["GET"])
+@login_required
+def get_version_content(tsd_id: int, version: int):
+    """Return the decrypted content of a prior version."""
+    row = _owned(tsd_id)
+    snap = (
+        TSDocumentVersion.query
+        .filter_by(tsd_id=row.id, version=version)
+        .first()
+    )
+    if snap is None:
+        abort(404, description="version_not_found")
+
+    try:
+        content = decrypt_content_envelope(
+            snap.ciphertext, organization_id=row.organization_id
+        )
+    except TSDError as exc:
+        return jsonify({"error": "decrypt_failed", "message": str(exc)}), 500
+
+    _emit(actor_id=current_user.id, organization_id=row.organization_id,
+          action="tsd.open_version", resource_id=row.id,
+          outcome=f"v{version}")
+    db.session.commit()
+    record_tsd_operation("open_version")
+
+    return jsonify({
+        "tsd_id": row.id,
+        "version": version,
+        "ciphertext_sha256": snap.ciphertext_sha256,
+        "plaintext_bytes": snap.plaintext_bytes,
+        "change_note": snap.change_note,
+        "created_at": snap.created_at.isoformat() if snap.created_at else None,
+        "content": content,
+    })
+
+
+@tsd_api.route("/<int:tsd_id>/versions/<int:version>/restore", methods=["POST"])
+@login_required
+def restore_version(tsd_id: int, version: int):
+    """Restore a prior version as the current one.
+
+    The current ciphertext is first snapshotted (so the restore is
+    itself reversible), then the chosen prior version becomes the
+    active content. Produces a brand-new version number — history is
+    linear and append-only.
+    """
+    row = _owned(tsd_id)
+    snap = (
+        TSDocumentVersion.query
+        .filter_by(tsd_id=row.id, version=version)
+        .first()
+    )
+    if snap is None:
+        abort(404, description="version_not_found")
+
+    # Snapshot the current state before overwriting.
+    db.session.add(TSDocumentVersion(
+        tsd_id=row.id,
+        version=row.version,
+        ciphertext=row.ciphertext,
+        ciphertext_sha256=row.ciphertext_sha256,
+        plaintext_bytes=row.plaintext_bytes,
+        created_by_id=current_user.id,
+        change_note=f"snapshot before restore to v{version}",
+    ))
+
+    row.ciphertext = snap.ciphertext
+    row.ciphertext_sha256 = snap.ciphertext_sha256
+    row.plaintext_bytes = snap.plaintext_bytes
+    row.version += 1
+    row.updated_at = datetime.utcnow()
+
+    _emit(actor_id=current_user.id, organization_id=row.organization_id,
+          action="tsd.restore_version", resource_id=row.id,
+          outcome=f"restored_v{version}_as_v{row.version}")
+    db.session.commit()
+    record_tsd_operation("restore_version")
+    return jsonify(row.to_dict())
 
 
 # ============================================================ delete

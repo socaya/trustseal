@@ -322,6 +322,151 @@ def test_api_emits_security_events(pg_app, tenant_pair):
     assert "tsd.create" in actions
 
 
+# ================================================================ versions
+
+
+def test_update_snapshots_prior_version(pg_app, tenant_pair):
+    """Every content change must write a snapshot to ts_document_versions."""
+    from app.models.tsd_document_version import TSDocumentVersion
+    from app.models.tsd_document import TSDocument
+    from app.services import tsd_format
+
+    user = db.session.get(User, tenant_pair["user_a"])
+    client = pg_app.test_client()
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(user.id)
+        sess["_fresh"] = True
+        sess["_id"] = "test-session-id"
+
+    r = client.post("/api/tsd/",
+        json={"title": "v-snap", "content_html": "<p>v1</p>"},
+        headers={"X-Requested-With": "fetch"})
+    doc_id = r.get_json()["id"]
+
+    r = client.put(f"/api/tsd/{doc_id}",
+        json={"content_html": "<p>v2</p>", "change_note": "bumped"},
+        headers={"X-Requested-With": "fetch", "If-Match": "1"})
+    assert r.status_code == 200
+
+    snapshots = (
+        TSDocumentVersion.query
+        .filter_by(tsd_id=doc_id)
+        .order_by(TSDocumentVersion.version)
+        .all()
+    )
+    assert len(snapshots) == 1
+    assert snapshots[0].version == 1
+    row = db.session.get(TSDocument, doc_id)
+    v1 = tsd_format.decrypt_content_envelope(
+        snapshots[0].ciphertext, organization_id=row.organization_id
+    )
+    assert v1["html"] == "<p>v1</p>"
+
+
+def test_restore_version_bumps_and_preserves(pg_app, tenant_pair):
+    """Restoring a prior version produces a new current version carrying
+    the restored content, AND snapshots the pre-restore state."""
+    from app.models.tsd_document_version import TSDocumentVersion
+
+    user = db.session.get(User, tenant_pair["user_a"])
+    client = pg_app.test_client()
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(user.id)
+        sess["_fresh"] = True
+        sess["_id"] = "test-session-id"
+
+    r = client.post("/api/tsd/",
+        json={"title": "restore-test", "content_html": "<p>v1 original</p>"},
+        headers={"X-Requested-With": "fetch"})
+    doc_id = r.get_json()["id"]
+    client.put(f"/api/tsd/{doc_id}",
+        json={"content_html": "<p>v2 edit</p>"},
+        headers={"X-Requested-With": "fetch", "If-Match": "1"})
+
+    r = client.post(f"/api/tsd/{doc_id}/versions/1/restore",
+        headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 200
+    assert r.get_json()["version"] == 3
+
+    r = client.get(f"/api/tsd/{doc_id}/content")
+    assert r.get_json()["content"]["html"] == "<p>v1 original</p>"
+
+    versions = TSDocumentVersion.query.filter_by(tsd_id=doc_id).all()
+    assert {v.version for v in versions} == {1, 2}
+
+
+# ================================================================ PDF export
+
+
+def test_export_pdf_unprotected(pg_app, tenant_pair):
+    user = db.session.get(User, tenant_pair["user_a"])
+    client = pg_app.test_client()
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(user.id)
+        sess["_fresh"] = True
+        sess["_id"] = "test-session-id"
+
+    r = client.post("/api/tsd/",
+        json={"title": "pdf-plain", "content_html": "<h1>Hi</h1><p>Body.</p>"},
+        headers={"X-Requested-With": "fetch"})
+    doc_id = r.get_json()["id"]
+
+    r = client.post(f"/api/tsd/{doc_id}/export/pdf",
+        json={}, headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 200
+    assert r.data[:4] == b"%PDF"
+    assert r.headers.get("X-TrustSeal-Pdf-Encrypted") == "false"
+
+
+def test_export_pdf_password_protected(pg_app, tenant_pair):
+    from pypdf import PdfReader
+    import io
+
+    user = db.session.get(User, tenant_pair["user_a"])
+    client = pg_app.test_client()
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(user.id)
+        sess["_fresh"] = True
+        sess["_id"] = "test-session-id"
+
+    r = client.post("/api/tsd/",
+        json={"title": "pdf-locked", "content_html": "<h1>Secret</h1>"},
+        headers={"X-Requested-With": "fetch"})
+    doc_id = r.get_json()["id"]
+
+    r = client.post(f"/api/tsd/{doc_id}/export/pdf",
+        json={"user_password": "correct-horse-battery"},
+        headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 200
+    assert r.headers.get("X-TrustSeal-Pdf-Encrypted") == "true"
+
+    reader = PdfReader(io.BytesIO(r.data))
+    assert reader.is_encrypted
+    assert reader.decrypt("wrong-password") == 0
+    reader2 = PdfReader(io.BytesIO(r.data))
+    assert reader2.decrypt("correct-horse-battery") > 0
+
+
+def test_export_pdf_blocked_by_policy(pg_app, tenant_pair):
+    user = db.session.get(User, tenant_pair["user_a"])
+    client = pg_app.test_client()
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(user.id)
+        sess["_fresh"] = True
+        sess["_id"] = "test-session-id"
+
+    r = client.post("/api/tsd/",
+        json={"title": "locked", "content_html": "<p>only encrypted</p>",
+              "export_policy": "encrypted_only"},
+        headers={"X-Requested-With": "fetch"})
+    doc_id = r.get_json()["id"]
+
+    r = client.post(f"/api/tsd/{doc_id}/export/pdf",
+        json={}, headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 403
+    assert r.get_json()["error"] == "export_policy_denies"
+
+
 def test_model_level_tenant_isolation(pg_app, tenant_pair):
     """The TSDocument.organization_id filter used by _owned() must
     reject cross-tenant lookups.
