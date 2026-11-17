@@ -1,0 +1,135 @@
+{% extends "layouts/public.html" %}
+
+{% block title %}Trust &amp; security · TRUSTSEAL{% endblock %}
+{% block main_modifier %}ts-public-main--narrow{% endblock %}
+
+{% block content %}
+<header style="margin-bottom: var(--ts-space-5);">
+  <h1 class="ts-page-title">Trust &amp; security</h1>
+  <p class="ts-page-header__description">
+    What TRUSTSEAL cryptographically proves, what it records as workflow
+    evidence and what it deliberately does not claim. This page is the
+    canonical statement of our assurance scope.
+  </p>
+</header>
+
+<section class="ts-panel">
+  <h2 class="ts-panel__title">What we prove cryptographically</h2>
+  <ul class="ts-stack ts-stack--tight" style="padding-left: var(--ts-space-5); list-style: disc;">
+    <li>
+      <strong>Platform-sealed PDFs.</strong> Each finalized envelope is
+      sealed with a TRUSTSEAL-controlled PAdES-B-B signature backed by
+      an AWS KMS-held key. An independent verifier can confirm the
+      sealed bytes were signed by our platform certificate and have
+      not been altered since.
+    </li>
+    <li>
+      <strong>RFC 3161 trusted timestamps.</strong> Every seal captures
+      a signed Time-Stamp Authority response bound to the sealed
+      document digest. The TSA response is retained inside the
+      validation dossier.
+    </li>
+    <li>
+      <strong>OCSP + CRL revocation evidence.</strong> At seal time we
+      capture OCSP responses (and CRLs where applicable) for the
+      certificates involved. These responses are stored with the
+      evidence dossier so a later check can see what was true at
+      sealing.
+    </li>
+    <li>
+      <strong>Chained-hash audit log.</strong> Every significant action
+      — envelope prepared, decision recorded, seal written, admin
+      operation — appends a SecurityEvent whose hash is chained from
+      the previous event. Signed anchors pin the chain tip so any
+      retrospective rewrite produces a detectable break.
+    </li>
+    <li>
+      <strong>Ed25519 review receipts.</strong> Each recorded signer
+      decision gets a canonical, Ed25519-signed receipt. Verifiers
+      can replay the receipt against a trusted public key without
+      calling TRUSTSEAL.
+    </li>
+  </ul>
+</section>
+
+<section class="ts-panel" style="margin-top: var(--ts-space-4);">
+  <h2 class="ts-panel__title">What we record as workflow evidence</h2>
+  <ul class="ts-stack ts-stack--tight" style="padding-left: var(--ts-space-5); list-style: disc;">
+    <li>
+      <strong>Signer appearances.</strong> A drawn signature captured
+      during review is stored as a visual representation of consent.
+      It is <em>not</em> a cryptographic signature on the sealed PDF.
+    </li>
+    <li>
+      <strong>Supporting attachments.</strong> Files the signer uploads
+      alongside their decision are hashed and the hashes are included
+      in the signed review receipt, so the receipt attests to the
+      exact bytes.
+    </li>
+    <li>
+      <strong>Organizational stamps.</strong> A visible stamp is a
+      workflow record that an authorized custodian applied a specific
+      design. It is not a cryptographic organizational seal on its
+      own; the authoritative seal is the platform PAdES signature.
+    </li>
+    <li>
+      <strong>Operator activity.</strong> Who prepared, reissued,
+      withdrew, archived, labelled or transferred an envelope — every
+      operation lands in SecurityEvent and the per-envelope timeline.
+    </li>
+  </ul>
+</section>
+
+<section class="ts-panel" style="margin-top: var(--ts-space-4);">
+  <h2 class="ts-panel__title">What TRUSTSEAL does <em>not</em> claim</h2>
+  <div class="ts-inline ts-inline--warning">
+    <div class="ts-inline__body">
+      <p style="margin: 0;">
+        TRUSTSEAL does not represent the current build as legally
+        certified, universally binding, tamper-proof or compliant with
+        a specific jurisdiction. We do not emit "qualified electronic
+        signature" status unless the operator has independently
+        configured a QSCD integration. We do not derive signer
+        identity from a drawn signature. We do not guarantee the
+        truth of the document's underlying claims — verification can
+        only establish properties of the recorded bytes and evidence.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="ts-panel" style="margin-top: var(--ts-space-4);">
+  <h2 class="ts-panel__title">How verification runs</h2>
+  <ol class="ts-stack ts-stack--tight" style="padding-left: var(--ts-space-5); list-style: decimal;">
+    <li>You upload the sealed PDF and the evidence digest supplied by the issuer.</li>
+    <li>We hash the uploaded bytes server-side; the file is discarded immediately after hashing.</li>
+    <li>The embedded platform signature is validated against the pinned signing certificate.</li>
+    <li>The response tells you what was checked, what passed, what failed and what we could not check — never conflating the four.</li>
+  </ol>
+  <div class="ts-form-actions" style="justify-content: flex-start;">
+    <a class="ts-btn ts-btn--primary" href="/verify">Open the public verifier</a>
+  </div>
+</section>
+
+<section class="ts-panel" style="margin-top: var(--ts-space-4);">
+  <h2 class="ts-panel__title">Operating assurances</h2>
+  <ul class="ts-stack ts-stack--tight" style="padding-left: var(--ts-space-5); list-style: disc;">
+    <li>PostgreSQL row-level security enforces tenant isolation as defence in depth.</li>
+    <li>Pluggable private-object storage (filesystem or S3/MinIO) keeps retained artifacts off the generic static server.</li>
+    <li>Rate limiting is DB-backed so per-worker ceilings do not multiply across the cluster.</li>
+    <li>Idempotency keys + a transaction outbox ensure replayed webhook deliveries and API retries don't double-write.</li>
+    <li>Reusable OpenTelemetry + Prometheus instrumentation. Every HTTP response carries <code>X-Request-Id</code> and <code>X-Trace-Id</code> for support correlation.</li>
+    <li>No third-party CDN assets are required for the authenticated UI; brand and design tokens are self-hosted.</li>
+  </ul>
+</section>
+
+<section class="ts-panel" style="margin-top: var(--ts-space-4);">
+  <h2 class="ts-panel__title">Reporting a problem</h2>
+  <p style="margin: 0;">
+    Correlation IDs appear on error pages and in every response header.
+    Please include the <code>X-Request-Id</code> when contacting support.
+    Security issues should be reported through the channel established
+    with your TRUSTSEAL administrator.
+  </p>
+</section>
+{% endblock %}

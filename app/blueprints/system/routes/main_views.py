@@ -24,3 +24,15 @@ def home():
 def welcome():
     """Public landing — always rendered regardless of auth state."""
     return render_template("public/landing.html")
+
+
+@main_views.route('/trust')
+def trust():
+    """Public Trust & Security page.
+
+    Canonical statement of what TRUSTSEAL cryptographically proves,
+    what it records as workflow evidence, and what it does not claim.
+    Linked from the landing hero, every error page and the signer
+    footer, so the page must stay public (no auth gating).
+    """
+    return render_template("public/trust.html")

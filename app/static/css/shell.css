@@ -103,6 +103,61 @@
   border: 2px solid var(--ts-surface);
 }
 
+/* Account dropdown. */
+.ts-account {
+  position: relative;
+}
+.ts-account__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 240px;
+  background: var(--ts-surface);
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius);
+  box-shadow: var(--ts-shadow-overlay);
+  padding: var(--ts-space-2) 0;
+  z-index: var(--ts-z-overlay);
+}
+.ts-account[data-open="false"] .ts-account__menu { display: none; }
+.ts-account__header {
+  padding: var(--ts-space-3) var(--ts-space-4);
+  border-bottom: 1px solid var(--ts-border);
+}
+.ts-account__email {
+  display: block;
+  color: var(--ts-text);
+  font-weight: var(--ts-fw-semibold);
+  font-size: var(--ts-fs-label);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ts-account__tenant {
+  display: block;
+  color: var(--ts-text-muted);
+  font-size: var(--ts-fs-meta);
+  margin-top: 2px;
+}
+.ts-account__item {
+  display: flex;
+  align-items: center;
+  gap: var(--ts-space-3);
+  padding: 8px var(--ts-space-4);
+  color: var(--ts-text);
+  font-size: var(--ts-fs-body);
+  text-decoration: none;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.ts-account__item:hover { background: var(--ts-brand-primary-soft); color: var(--ts-brand-primary); text-decoration: none; }
+.ts-account__item--danger { color: var(--ts-danger); }
+.ts-account__item--danger:hover { background: var(--ts-danger-soft); color: var(--ts-danger); }
+.ts-account__divider { border-top: 1px solid var(--ts-border); margin: var(--ts-space-2) 0; }
+
 /* Sidebar toggle shown only below desktop. */
 .ts-topbar__nav-toggle { display: none; }
 @media (max-width: 1023px) {
