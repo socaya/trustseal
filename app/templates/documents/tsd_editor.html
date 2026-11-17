@@ -317,7 +317,11 @@
     return m ? decodeURIComponent(m[1]) : null;
   }
   function headers() {
-    var h = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+    var h = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-Requested-With': 'fetch',
+    };
     var t = csrfToken();
     if (t) h['X-CSRFToken'] = t;
     if (version) h['If-Match'] = String(version);

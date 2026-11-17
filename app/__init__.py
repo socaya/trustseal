@@ -404,6 +404,8 @@ def create_app(config_class=None):
     _register_envelope_cli(app)
     from .cli.reminders import register_cli as _register_reminders_cli
     _register_reminders_cli(app)
+    from .cli.tsd_rewrap import register_cli as _register_tsd_cli
+    _register_tsd_cli(app)
 
     # --- Register Error Handlers (RFC 7807 for /api/, Jinja for views) ---
     from .errors.problem import register_problem_handlers

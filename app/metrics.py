@@ -71,6 +71,24 @@ operator_notifications_published_total = Counter(
     registry=registry,
 )
 
+tsd_operations_total = Counter(
+    "trustseal_tsd_operations_total",
+    "TrustSeal Document operations, labeled by operation and outcome.",
+    labelnames=("operation", "outcome"),
+    registry=registry,
+)
+tsd_plaintext_bytes_total = Counter(
+    "trustseal_tsd_plaintext_bytes_total",
+    "Total plaintext bytes encrypted into TrustSeal Documents.",
+    registry=registry,
+)
+tsd_ingest_total = Counter(
+    "trustseal_tsd_ingest_total",
+    "TrustSeal Document ingest operations, labeled by source type and outcome.",
+    labelnames=("source_type", "outcome"),
+    registry=registry,
+)
+
 outbox_backlog = Gauge(
     "trustseal_outbox_backlog",
     "Count of outbox events in each state.",
@@ -201,3 +219,16 @@ def record_idempotency_outcome(outcome: str) -> None:
 
 def record_operator_notification(kind: str) -> None:
     operator_notifications_published_total.labels(kind).inc()
+
+
+def record_tsd_operation(operation: str, outcome: str = "ok") -> None:
+    tsd_operations_total.labels(operation, outcome).inc()
+
+
+def record_tsd_plaintext(bytes_: int) -> None:
+    if bytes_ > 0:
+        tsd_plaintext_bytes_total.inc(bytes_)
+
+
+def record_tsd_ingest(source_type: str, outcome: str = "ok") -> None:
+    tsd_ingest_total.labels(source_type, outcome).inc()

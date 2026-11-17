@@ -16,6 +16,8 @@ from .documents.document_blob import DocumentBlob
 from .documents.document_label import DocumentLabel
 from .revoked_token import RevokedToken
 from .event_delivery import SecurityEvent, OutboxEvent
+from .tsd_document import TSDocument
+from .tenant_key import TenantKey
 from .signing_envelope import SigningEnvelope, EnvelopeParticipant
 from .signer_decision import SignerChallenge, SignerDecision
 from .review_receipt import ReviewReceipt

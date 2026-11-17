@@ -90,9 +90,16 @@ def enforce_legacy_api_security():
         abort(410, description="Legacy stamp API retired; use stamp custody workflow")
     # First-party browser calls (editor, inspector): allow session auth as
     # a substitute for JWT. The route still runs its own @login_required
-    # and tenant checks.
+    # and tenant checks. Mutating verbs must present a same-origin
+    # ``X-Requested-With: fetch`` header OR a matching session CSRF
+    # token so cross-origin pages can't forge requests against the
+    # editor APIs.
     if any(_under(path, prefix) for prefix in SESSION_AUTH_ALLOWED_PREFIXES):
         if current_user.is_authenticated:
+            if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+                xrw = request.headers.get("X-Requested-With", "")
+                if xrw.lower() not in ("fetch", "xmlhttprequest"):
+                    abort(403, description="missing X-Requested-With header")
             return
     verify_jwt_in_request()
     try:

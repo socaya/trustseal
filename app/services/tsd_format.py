@@ -5,39 +5,44 @@ Container specification, version 1
 
 A .tsd file is a binary container composed of:
 
-* ``Magic``   — 4 bytes ``b"TSD\\x01"``. The format version is encoded in
-                the fourth byte so parsers can refuse unknown versions
-                without touching the header.
-* ``HdrLen``  — 4 bytes big-endian uint32. Length of the JSON header.
+* ``Magic``   — 4 bytes ``b"TSD\\x01"``.
+* ``HdrLen``  — 4 bytes big-endian uint32.
 * ``Header``  — UTF-8 JSON bytes. See :func:`_canonical_header`.
-* ``BodyLen`` — 4 bytes big-endian uint32. Length of the ciphertext body.
-* ``Body``    — Fernet ciphertext bytes. The plaintext inside Fernet is
-                the JSON content envelope (see :func:`pack_content`).
+* ``BodyLen`` — 4 bytes big-endian uint32.
+* ``Body``    — Fernet ciphertext. The plaintext inside Fernet is the
+                JSON content envelope (see :func:`pack_content`).
 
-The header is cleartext on purpose — it's what TrustSeal needs to route
-the file back to the right tenant and reject tampered copies. Nothing
-sensitive goes in the header; the document body and metadata the editor
-produces are inside the encrypted body.
+Key management — envelope encryption
+------------------------------------
 
-Encryption
-----------
+Each tenant has a random 32-byte Fernet key — the Data Encryption Key
+(DEK) — generated the first time a document is written for that
+tenant. The raw DEK is **never** stored. What's persisted in the
+``tenant_keys`` table is the DEK wrapped (envelope-encrypted) by a
+master Key Encryption Key (KEK) derived from the server's
+``SECRET_KEY``.
 
-Each tenant has a Fernet key derived deterministically from
-``SECRET_KEY`` plus the organization id — one secret in ops, per-tenant
-isolation at use. Fernet provides AES-128-CBC + HMAC-SHA256 with a
-bundled IV and auth tag, so tampering with the ciphertext fails the
-MAC check before any plaintext leaves the service.
+Two independent rotation axes:
 
-Rotation moves through the same dual-key pattern as :mod:`app.services.mfa`:
-set ``TSD_PREVIOUS_SECRET_KEYS`` in app config, rotate ``SECRET_KEY``,
-then run the ``flask tsd rewrap`` command to re-encrypt stored rows
-under the new key.
+* **Master KEK rotation** — `flask tsd rewrap --master` re-wraps every
+  tenant's DEK under the new master, leaving document ciphertext
+  untouched.
+* **Tenant DEK rotation** — `flask tsd rewrap --tenant <id>` generates
+  a new random DEK and re-encrypts every document in that tenant
+  under it.
+
+A single ``SECRET_KEY`` compromise is still serious (the attacker can
+unwrap every tenant's DEK from the database), but the separation is
+what lets individual tenants rotate without disturbing others and sets
+the shape for a future KMS-backed KEK.
 """
 from __future__ import annotations
 
 import base64
 import hashlib
 import json
+import os
+import re
 import struct
 from datetime import datetime, timezone
 from typing import Any
@@ -45,49 +50,95 @@ from typing import Any
 from cryptography.fernet import Fernet, InvalidToken
 from flask import current_app
 
+from app.extensions import db
+
 
 MAGIC = b"TSD\x01"
 HEADER_MAX = 64 * 1024  # 64 KiB
-BODY_MAX = 32 * 1024 * 1024  # 32 MiB — enough for very large hand-authored drafts
+BODY_MAX = 32 * 1024 * 1024  # 32 MiB
 CONTENT_MIME = "application/vnd.trustseal.doc+json"
 
 
 class TSDError(RuntimeError):
-    """Domain-level TSD failure (tampered / unreadable / version mismatch)."""
+    """Domain-level TSD failure (tampered / unreadable / unauthorized)."""
 
 
-# ============================================================ key derivation
+# ============================================================ master KEK
 
 
-def _fernet_key(app_secret: str, organization_id: int) -> bytes:
-    """Derive the per-tenant Fernet key.
-
-    Hashes ``"tsd:" + SECRET_KEY + ":" + org_id`` so neither the app
-    secret nor the tenant id can be recovered from the key alone. The
-    SHA-256 digest produces a 32-byte key regardless of input length;
-    operators are still responsible for choosing a high-entropy
-    ``SECRET_KEY`` — this derivation adds domain separation, not
-    entropy.
-    """
-    if not isinstance(app_secret, str) or not app_secret:
+def _master_kek(app_secret: str | None = None) -> Fernet:
+    """Derive the master Key Encryption Key used to wrap tenant DEKs."""
+    secret = app_secret or current_app.config.get("SECRET_KEY")
+    if not isinstance(secret, str) or not secret:
         raise TSDError("SECRET_KEY is required")
-    if not isinstance(organization_id, int) or organization_id <= 0:
-        raise TSDError("organization_id must be a positive integer")
-    material = f"tsd:{app_secret}:{organization_id}".encode("utf-8")
-    raw = hashlib.sha256(material).digest()
-    return base64.urlsafe_b64encode(raw)
+    raw = hashlib.sha256(("tsd-kek:" + secret).encode("utf-8")).digest()
+    return Fernet(base64.urlsafe_b64encode(raw))
 
 
-def _tenant_fernets(organization_id: int) -> list[Fernet]:
-    """Return the active Fernet first, then any rotation fallbacks."""
-    primary = current_app.config.get("SECRET_KEY")
-    if not primary:
-        raise TSDError("SECRET_KEY is not configured")
-    keys = [_fernet_key(primary, organization_id)]
+def _previous_master_keks() -> list[Fernet]:
+    """Rotation fallbacks for the master KEK."""
+    out: list[Fernet] = []
     for prev in current_app.config.get("TSD_PREVIOUS_SECRET_KEYS", []) or []:
         if isinstance(prev, str) and prev:
-            keys.append(_fernet_key(prev, organization_id))
-    return [Fernet(k) for k in keys]
+            try:
+                out.append(_master_kek(prev))
+            except TSDError:
+                pass
+    return out
+
+
+# ============================================================ tenant DEK
+
+
+def _generate_dek() -> bytes:
+    """Fresh random 32-byte Fernet key, url-safe-base64 encoded."""
+    return base64.urlsafe_b64encode(os.urandom(32))
+
+
+def _unwrap_dek(wrapped: bytes) -> bytes:
+    """Unwrap a stored DEK using the active KEK, falling back to previous."""
+    last_exc: Exception | None = None
+    for kek in (_master_kek(), *_previous_master_keks()):
+        try:
+            return kek.decrypt(wrapped)
+        except InvalidToken as exc:
+            last_exc = exc
+    raise TSDError(
+        "could not unwrap tenant key — SECRET_KEY may have been rotated "
+        "without running `flask tsd rewrap --master`"
+    ) from last_exc
+
+
+def _tenant_fernet(organization_id: int) -> Fernet:
+    """Get-or-create the Fernet for a tenant.
+
+    Lazy provisioning: the first document write for a tenant generates
+    its DEK, wraps it under the master KEK, and commits.
+    """
+    from app.models.tenant_key import TenantKey  # local import avoids cycle
+
+    if not isinstance(organization_id, int) or organization_id <= 0:
+        raise TSDError("organization_id must be a positive integer")
+
+    row = db.session.get(TenantKey, organization_id)
+    if row is None:
+        dek = _generate_dek()
+        row = TenantKey(
+            organization_id=organization_id,
+            wrapped_key=_master_kek().encrypt(dek),
+        )
+        db.session.add(row)
+        db.session.flush()  # surface IntegrityError now, not at commit
+    else:
+        dek = _unwrap_dek(row.wrapped_key)
+
+    return Fernet(dek)
+
+
+def ensure_tenant_key(organization_id: int) -> None:
+    """Public helper for CLI/tests to pre-provision a tenant's DEK."""
+    _tenant_fernet(organization_id)
+    db.session.commit()
 
 
 # ============================================================ content envelope
@@ -100,11 +151,6 @@ def pack_content(
     tags: list[str] | None = None,
     extras: dict[str, Any] | None = None,
 ) -> bytes:
-    """Serialize the editor's content into the canonical JSON envelope.
-
-    This is what Fernet wraps. Keeping it JSON lets us version the
-    schema without breaking older stored rows.
-    """
     envelope: dict[str, Any] = {
         "schema": "trustseal.doc.v1",
         "html": html or "",
@@ -131,23 +177,17 @@ def unpack_content(blob: bytes) -> dict[str, Any]:
 
 
 def encrypt_content_envelope(plaintext: bytes, *, organization_id: int) -> bytes:
-    """Encrypt the content envelope with the tenant's active Fernet key."""
     if len(plaintext) > BODY_MAX:
         raise TSDError(f"content exceeds TSD body limit ({BODY_MAX} bytes)")
-    fernets = _tenant_fernets(organization_id)
-    return fernets[0].encrypt(plaintext)
+    return _tenant_fernet(organization_id).encrypt(plaintext)
 
 
 def decrypt_content_envelope(ciphertext: bytes, *, organization_id: int) -> dict[str, Any]:
-    """Decrypt the stored ciphertext, trying rotation keys as fallbacks."""
-    last_exc: Exception | None = None
-    for fernet in _tenant_fernets(organization_id):
-        try:
-            return unpack_content(fernet.decrypt(ciphertext))
-        except InvalidToken as exc:
-            last_exc = exc
-            continue
-    raise TSDError("ciphertext failed authentication under all tenant keys") from last_exc
+    try:
+        plaintext = _tenant_fernet(organization_id).decrypt(ciphertext)
+    except InvalidToken as exc:
+        raise TSDError("ciphertext failed authentication under tenant DEK") from exc
+    return unpack_content(plaintext)
 
 
 def sha256_hex(data: bytes) -> str:
@@ -172,7 +212,7 @@ def _canonical_header(
         "format": "tsd",
         "version": 1,
         "mime": CONTENT_MIME,
-        "encryption": "fernet-tenant-scoped",
+        "encryption": "fernet-tenant-dek-wrapped",
         "tenant_id": int(organization_id),
         "document_id": int(document_id),
         "document_version": int(document_version),
@@ -198,7 +238,6 @@ def serialize_container(
     ciphertext: bytes,
     export_policy: str,
 ) -> bytes:
-    """Produce the downloadable .tsd bytes."""
     ciphertext_sha256 = sha256_hex(ciphertext)
     header = _canonical_header(
         organization_id=organization_id,
@@ -224,11 +263,6 @@ def serialize_container(
 
 
 def parse_container(blob: bytes) -> tuple[dict[str, Any], bytes]:
-    """Inverse of :func:`serialize_container`. Returns (header, ciphertext).
-
-    Rejects unknown magic / version and over-long sections before
-    allocating memory for the body.
-    """
     if len(blob) < 12:
         raise TSDError("tsd container too short")
     if blob[:4] != MAGIC:
@@ -260,3 +294,127 @@ def parse_container(blob: bytes) -> tuple[dict[str, Any], bytes]:
         raise TSDError("tsd ciphertext hash mismatch — tamper detected")
 
     return header, body
+
+
+# ============================================================ rotation
+
+
+def rewrap_master(*, previous_secret: str) -> int:
+    """Re-encrypt every tenant DEK under the current master KEK.
+
+    Call after rotating ``SECRET_KEY``. ``previous_secret`` must be the
+    old value so the old wrappers can be unwrapped. Returns the number
+    of tenant rows re-wrapped.
+    """
+    from app.models.tenant_key import TenantKey
+
+    old_kek = _master_kek(previous_secret)
+    new_kek = _master_kek()
+    count = 0
+    for row in TenantKey.query.all():
+        dek = old_kek.decrypt(row.wrapped_key)
+        row.wrapped_key = new_kek.encrypt(dek)
+        row.master_key_version += 1
+        row.rotated_at = datetime.utcnow()
+        count += 1
+    db.session.commit()
+    return count
+
+
+def rotate_tenant_key(organization_id: int) -> int:
+    """Generate a fresh DEK for a tenant and re-encrypt all their documents.
+
+    Returns the number of documents re-encrypted.
+    """
+    from app.models.tenant_key import TenantKey
+    from app.models.tsd_document import TSDocument
+
+    row = db.session.get(TenantKey, organization_id)
+    if row is None:
+        raise TSDError(f"tenant {organization_id} has no DEK provisioned")
+
+    old_fernet = Fernet(_unwrap_dek(row.wrapped_key))
+    new_dek = _generate_dek()
+    new_fernet = Fernet(new_dek)
+
+    count = 0
+    docs = (
+        TSDocument.query
+        .filter_by(organization_id=organization_id)
+        .all()
+    )
+    for d in docs:
+        plaintext = old_fernet.decrypt(d.ciphertext)
+        d.ciphertext = new_fernet.encrypt(plaintext)
+        d.ciphertext_sha256 = sha256_hex(d.ciphertext)
+        count += 1
+
+    row.wrapped_key = _master_kek().encrypt(new_dek)
+    row.tenant_key_version += 1
+    row.rotated_at = datetime.utcnow()
+    db.session.commit()
+    return count
+
+
+# ============================================================ sanitization
+
+
+_ALLOWED_TAGS = {
+    "a", "abbr", "b", "blockquote", "br", "code", "em", "figure",
+    "figcaption", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i",
+    "img", "li", "ol", "p", "pre", "span", "strong", "sub", "sup",
+    "table", "tbody", "td", "th", "thead", "tr", "u", "ul",
+}
+_ALLOWED_ATTRS = {
+    "*": ["style", "class"],
+    "a": ["href", "title", "rel", "target"],
+    "img": ["src", "alt", "width", "height"],
+    "td": ["colspan", "rowspan"],
+    "th": ["colspan", "rowspan", "scope"],
+}
+_ALLOWED_STYLES = {
+    "color", "background-color", "font-family", "font-size", "font-weight",
+    "font-style", "text-align", "text-decoration", "line-height", "margin",
+    "margin-top", "margin-bottom", "padding", "padding-left", "border-left",
+    "border-collapse", "border-top", "letter-spacing", "max-width", "height",
+}
+_ALLOWED_PROTOCOLS = {"http", "https", "mailto", "data"}
+
+
+def sanitize_html(raw: str, *, allow_data_images: bool = True) -> str:
+    """Strip XSS vectors from ingested or editor-authored HTML.
+
+    * Tag + attribute whitelist above
+    * Inline ``style`` values filtered through :mod:`bleach.css_sanitizer`
+    * ``data:`` URIs allowed only on ``<img>`` so image ingest keeps
+      working without opening the door to ``data:text/html`` XSS
+    """
+    if not raw:
+        return ""
+    import bleach
+    from bleach.css_sanitizer import CSSSanitizer
+
+    css = CSSSanitizer(allowed_css_properties=sorted(_ALLOWED_STYLES))
+
+    protocols = set(_ALLOWED_PROTOCOLS)
+    if not allow_data_images:
+        protocols.discard("data")
+
+    cleaned = bleach.clean(
+        raw,
+        tags=_ALLOWED_TAGS,
+        attributes=_ALLOWED_ATTRS,
+        protocols=protocols,
+        css_sanitizer=css,
+        strip=True,
+    )
+    # Second pass: non-image data: URIs slip through the protocol
+    # filter above because bleach only inspects ``href``/``src`` text.
+    # Pattern below catches anything the first pass left on a non-img.
+    cleaned = re.sub(
+        r'<(?!img\b)([a-zA-Z][^\s>]*)([^>]*?)(href|src)\s*=\s*"data:[^"]*"',
+        r'<\1\2',
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    return cleaned

@@ -77,11 +77,19 @@ def _populate_form_choices(form):
 
 
 # === LIST ===
+# Legacy /documents/ list is superseded by the TSD library. Redirect so
+# bookmarks and in-the-wild links keep working. See tsd_views.library.
 @document_views.route('/')
-@login_required # Good practice to protect list view too
+@login_required
 def index():
-    """Displays the list of accessible documents."""
-    current_app.logger.debug(f"User {current_user.id} accessing document list view.")
+    return redirect(url_for('tsd_views.library'), code=301)
+
+
+@document_views.route('/legacy')
+@login_required
+def legacy_index():
+    """Historical document list (pre-TSD). Kept for admin spelunking."""
+    current_app.logger.debug(f"User {current_user.id} accessing legacy document list view.")
     # Use trailing slash if API expects it, aligning with API route definitions
     api_endpoint = "documents/"
     documents_data = api_client.get_data(api_endpoint)
@@ -150,10 +158,19 @@ def view_document(document_id):
 
 
 # === CREATE ===
-@document_views.route('/create', methods=['GET', 'POST'])
+# /documents/create is superseded by the TSD editor. Redirect so old
+# links work. The legacy file-upload form is still reachable at
+# /documents/legacy/create for administrators needing the old flow.
+@document_views.route('/create', methods=['GET'])
+@login_required
+def create_document_redirect():
+    return redirect(url_for('tsd_views.new'), code=301)
+
+
+@document_views.route('/legacy/create', methods=['GET', 'POST'])
 @login_required
 def create_document():
-    """Handles document creation form display (GET) and submission (POST)."""
+    """Legacy document-upload form (pre-TSD). Kept for admin spelunking."""
     form = DocumentForm() # Instantiate the form
 
     # Populate choices BEFORE validation attempt on POST or rendering on GET

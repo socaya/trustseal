@@ -190,6 +190,7 @@
     fetch('/api/tsd/ingest', {
       method: 'POST',
       credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'fetch' },
       body: fd,
     }).then(function (r) {
       if (!r.ok) {
