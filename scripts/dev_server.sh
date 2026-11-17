@@ -29,6 +29,10 @@ fi
 export FLASK_APP="${FLASK_APP:-main:app}"
 export FLASK_DEBUG="${FLASK_DEBUG:-1}"
 export FLASK_ENV="${FLASK_ENV:-development}"
+# Keep the browser-facing frontend and the internal API client on the
+# same origin — register / login views otherwise POST to :5000 and
+# get a connection-refused (or 403 from a stale backend).
+export API_BASE_URL="http://127.0.0.1:${PORT}/api"
 
 echo "[dev-server] Seeding demo tenant + admin user (idempotent)…"
 "$PY" scripts/seed_dev.py

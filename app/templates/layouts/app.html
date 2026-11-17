@@ -51,7 +51,7 @@
        href="{{ url_for('index') if 'index' in (request.endpoint or '') else '/' }}"
        aria-label="TRUSTSEAL · Verified Integrity">
       <img src="{{ url_for('static', filename='brand/trustseal/trustseal-horizontal.png') }}"
-           alt="TRUSTSEAL" width="140" height="28">
+           alt="TRUSTSEAL" width="220" height="44">
     </a>
 
     {% if current_user and current_user.is_authenticated and current_user.organization %}

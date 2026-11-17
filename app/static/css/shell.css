@@ -33,23 +33,24 @@
   border-bottom: 1px solid var(--ts-border);
   display: flex;
   align-items: center;
-  gap: var(--ts-space-4);
-  padding: 0 var(--ts-space-5);
+  gap: var(--ts-space-3);
+  padding: 0 var(--ts-space-4);
   height: var(--ts-topbar-h);
 }
 
 .ts-topbar__brand {
   display: inline-flex;
   align-items: center;
-  gap: var(--ts-space-3);
+  gap: var(--ts-space-2);
   text-decoration: none;
   color: var(--ts-text);
   flex: 0 0 auto;
 }
 .ts-topbar__brand:hover { text-decoration: none; }
 .ts-topbar__brand img {
-  height: 28px;
+  height: 44px;
   width: auto;
+  display: block;
 }
 
 .ts-topbar__workspace {
