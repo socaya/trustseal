@@ -1,8 +1,10 @@
 # TSD real-time multi-cursor collab — architecture plan
 
-**Status (2026-11-18):** Awareness channel shipped. Full co-editing
-(conflict-free text merging) still requires CRDT engine integration —
-see §Recommended path below.
+**Status (2026-11-18):** Both awareness and CRDT co-editing are shipped
+as a single-string Y.Text model over Flask-SocketIO, with server-side
+pycrdt and snapshot-to-encrypted-TSD persistence. Structural
+(ProseMirror-level) CRDT remains an upgrade path when the HTML string
+model becomes insufficient — see §Future work.
 
 ## What ships today
 
@@ -38,14 +40,81 @@ Realistic test coverage ships in `tests/documents/test_tsd_realtime.py`
 (colour stability, access check parity, outsider denial). The socket
 round-trip itself is proven via a live smoke script (see §Smoke).
 
-## What is still deferred
+## CRDT co-editing (shipped alongside awareness)
 
-**Conflict-free co-editing.** Two users editing the same paragraph
-simultaneously still need the Y.js / Automerge CRDT or an OT engine
-— the awareness channel moves cursors, not text. Today the existing
-`If-Match` optimistic-concurrency guard prevents silent clobbering;
-the losing write gets `412 version_conflict` and the loser's version
-is accessible from the append-only `ts_document_versions` snapshot.
+Protocol events on the same `/tsd` namespace:
+
+* `y-sync-request` — a new joiner asks the server for the current
+  accumulated Y.Doc state so late arrivals don't start from empty.
+* `y-sync-reply`   — binary Y.Doc state the joiner applies to bootstrap.
+* `y-update`       — binary Y.Doc update. Client → server: merge into
+  the authoritative in-memory Doc, snapshot if the debounce has
+  elapsed, broadcast to the room (skip sender). Server → client:
+  updates from other peers, ready to apply locally.
+
+Server-side state:
+
+* One `pycrdt.Doc` per active `tsd_id`, held in `_DOC_CACHE` with a
+  ref count tied to join / leave / disconnect. On the LAST peer
+  leaving, the server forces one final snapshot and drops the Doc so
+  no memory grows with idle documents.
+* Snapshots write to the TSD via the normal sanitize → pack → encrypt
+  path **and** append a `ts_document_versions` row with change note
+  `"crdt co-editing snapshot"`. So co-edited content lands in the
+  same audit trail and `If-Match` version history as HTTP autosave.
+* `SNAPSHOT_DEBOUNCE_SECONDS = 4` caps write amplification under
+  heavy co-editing; the last-peer-out force always writes so nothing
+  is lost at shutdown.
+
+Client-side binding:
+
+* `yjs-bootstrap.js` loads Y.js as an ESM module, attaches it to
+  `window.Y`, and fires a `yjs-ready` event. The classic editor
+  script waits for it and for Socket.IO to connect before constructing
+  the Y.Doc.
+* Local `input` events → debounced (120 ms) full-string replace of
+  Y.Text under a `yDoc.transact(..., 'local')` origin tag so the
+  observer can skip it.
+* Y.Text `observe` → preserves caret via plain-text offset walking,
+  rewrites `editor.innerHTML` from the merged Y.Text string,
+  recomputes word count + outline.
+* `ydoc.on('update')` → emits `y-update` to the socket. Incoming
+  `y-update` from peers is applied under the `'remote'` origin so the
+  broadcast loop doesn't echo.
+
+Model limitation (honest):
+
+* Y.Text operates on a single HTML string, so two users editing the
+  same character offset can produce interleaved characters. Common
+  case (different paragraphs, different sentences) merges cleanly
+  because the CRDT tracks causal position.
+* Structural CRDT (block / inline-mark awareness) requires swapping
+  the engine out for ProseMirror + `y-prosemirror`, which demands
+  a schema for every ribbon command. The Y.Text model ships today
+  so collab is available; the structural upgrade is an isolatable
+  swap — the socket transport, auth check, snapshot cadence and
+  version-history integration are all reusable.
+
+## Future work (structural upgrade)
+
+When the HTML-string CRDT starts producing noticeable artifacts under
+heavy concurrent editing:
+
+1. Define a ProseMirror schema covering the ribbon's format/insert
+   features (headings, paragraphs, blockquote, pre, lists, tables,
+   links, inline marks).
+2. Replace the contentEditable surface with a ProseMirror view bound
+   to the same Y.Doc via `y-prosemirror`.
+3. Rewire every ribbon command from `document.execCommand` to
+   ProseMirror transactions. The visual surface (ribbon / rulers /
+   security / review / shares / comments / etc.) is completely
+   reusable.
+4. Replace the Y.Text snapshot serialization with
+   `prosemirrorJSONToYDoc` → DOMSerializer → HTML.
+
+Effort estimate for that upgrade: ~2 engineering weeks. Not shipping
+today keeps the ribbon's existing commands working without a schema
+rewrite.
 
 ## Why not shipped yet
 

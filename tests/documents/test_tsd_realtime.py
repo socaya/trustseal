@@ -72,6 +72,69 @@ def test_can_access_matches_owner(realtime_tenant):
     assert _can_access(realtime_tenant["bob"], doc.id) is True   # same tenant
 
 
+def test_crdt_session_bootstraps_from_tsd(pg_app, realtime_tenant):
+    """A new CrdtSession for an existing TSD must bootstrap its Y.Text
+    from the decrypted current HTML."""
+    from app.services import tsd_format
+    from app.services.tsd_realtime import _get_or_create_session, _release_session, _DOC_CACHE
+    from app.models.tsd_document import TSDocument
+
+    pt = tsd_format.pack_content(html="<h1>Hello CRDT</h1>")
+    ct = tsd_format.encrypt_content_envelope(pt, organization_id=realtime_tenant["org"])
+    doc = TSDocument(
+        organization_id=realtime_tenant["org"],
+        created_by_id=realtime_tenant["alice"].id,
+        title="crdt-boot", ciphertext=ct,
+        ciphertext_sha256=tsd_format.sha256_hex(ct),
+        plaintext_bytes=len(pt),
+    )
+    db.session.add(doc); db.session.commit()
+
+    sess = _get_or_create_session(doc.id)
+    try:
+        assert "<h1>Hello CRDT</h1>" in sess.current_html()
+    finally:
+        _release_session(doc.id)
+        _DOC_CACHE.pop(doc.id, None)
+
+
+def test_crdt_session_snapshots_to_tsd(pg_app, realtime_tenant):
+    """Applying a CRDT update + snapshot must write the merged text
+    back into the TSD ciphertext and bump the version."""
+    from app.services import tsd_format
+    from app.services.tsd_realtime import _get_or_create_session, _snapshot_session, _DOC_CACHE
+    from app.models.tsd_document import TSDocument
+
+    pt = tsd_format.pack_content(html="<p>start</p>")
+    ct = tsd_format.encrypt_content_envelope(pt, organization_id=realtime_tenant["org"])
+    doc = TSDocument(
+        organization_id=realtime_tenant["org"],
+        created_by_id=realtime_tenant["alice"].id,
+        title="crdt-snap", ciphertext=ct,
+        ciphertext_sha256=tsd_format.sha256_hex(ct),
+        plaintext_bytes=len(pt),
+    )
+    db.session.add(doc); db.session.commit()
+    original_version = doc.version
+
+    sess = _get_or_create_session(doc.id)
+    try:
+        # Simulate a remote edit by mutating the Y.Text directly.
+        sess.ytext += " AND MORE"
+        sess.dirty = True
+        wrote = _snapshot_session(sess, force=True)
+        assert wrote is True
+
+        db.session.refresh(doc)
+        assert doc.version == original_version + 1
+        decrypted = tsd_format.decrypt_content_envelope(
+            doc.ciphertext, organization_id=doc.organization_id
+        )
+        assert "AND MORE" in decrypted["html"]
+    finally:
+        _DOC_CACHE.pop(doc.id, None)
+
+
 def test_can_access_denies_outsider(realtime_tenant):
     from app.services import tsd_format
     from app.services.tsd_realtime import _can_access

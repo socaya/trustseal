@@ -1,18 +1,34 @@
-"""Real-time TSD awareness channel via Flask-SocketIO.
+"""Real-time TSD awareness + CRDT text co-editing via Flask-SocketIO.
 
-Scope of this module
---------------------
+This module ships two coupled things:
 
-This ships the **awareness layer** that a Y.js / Automerge CRDT engine
-will later reuse — live presence, cursors and selections broadcast
-over a WebSocket, under a per-document room. It does **not** ship
-conflict-free co-editing of the document content itself; text changes
-still travel through the existing HTTP autosave (PUT /api/tsd/<id>)
-with ``If-Match`` concurrency guards.
+1. **Awareness layer** — live presence, cursors, selections and
+   typing indicators broadcast over a WebSocket, under per-document
+   rooms.
+2. **CRDT co-editing** — Y.js updates relayed over the same socket,
+   with a server-side :class:`pycrdt.Doc` per document that applies
+   every update, serves initial state to late joiners, and
+   periodically snapshots the merged plaintext back to the encrypted
+   TSD so disconnect-reconnect never loses edits.
 
-The step from "awareness only" to "full co-editing" is to plug the
-same socket channel into a `y-websocket` server or embed `y-redis`
-as the backing store. See ``docs/TSD_Real_Time_Collab_Plan.md``.
+CRDT protocol events (namespace ``/tsd``)
+-----------------------------------------
+
+Client → server:
+
+* ``y-sync-request``  — ``{tsd_id}``. New joiner asks the server for
+                        the current accumulated Y.js state.
+* ``y-update``        — ``{tsd_id, update: bytes}``. Local Y.Doc
+                        update to merge + broadcast.
+
+Server → client:
+
+* ``y-sync-reply``    — ``{tsd_id, state: bytes}``. Full Y.Doc
+                        encoded state the joiner applies to bootstrap.
+* ``y-update``        — ``{tsd_id, update: bytes, from_sid: str}``.
+                        Updates from other peers in the room,
+                        broadcast after the server has merged them
+                        into its authoritative Doc.
 
 Protocol (namespace ``/tsd``)
 -----------------------------
@@ -48,7 +64,10 @@ import hashlib
 import logging
 from typing import Any
 
-from flask import request
+from datetime import datetime
+from threading import Lock
+
+from flask import current_app, request
 from flask_login import current_user
 from flask_socketio import SocketIO, disconnect, emit, join_room, leave_room
 
@@ -90,6 +109,141 @@ def _user_payload(user) -> dict:
         "initials": _initials(user),
         "color": _color_for(user.id),
     }
+
+
+# ---- CRDT document state ----------------------------------------------
+
+# One :class:`pycrdt.Doc` is kept in memory per active tsd_id for as long
+# as there's at least one connected editor. Updates are applied here and
+# the encoded state is handed out to late joiners. On every N ms of
+# inactivity the merged plaintext is snapshotted back to the encrypted
+# TSD via the existing autosave path.
+
+_DOC_CACHE: dict[int, "CrdtSession"] = {}
+_CACHE_LOCK = Lock()
+
+# Minimum interval between snapshot writes per document, in seconds.
+# Keeps the write amplification sensible under rapid co-editing.
+SNAPSHOT_DEBOUNCE_SECONDS = 4
+
+
+class CrdtSession:
+    """In-memory Y.Doc + metadata for a single active TSD."""
+
+    __slots__ = ("tsd_id", "ydoc", "ytext", "ref_count", "dirty",
+                 "last_snapshot_at", "last_update_at")
+
+    def __init__(self, tsd_id: int):
+        from pycrdt import Doc, Text
+        self.tsd_id = tsd_id
+        self.ydoc = Doc()
+        self.ytext: Text = self.ydoc.get("content", type=Text)
+        self.ref_count = 0
+        self.dirty = False
+        self.last_snapshot_at = datetime.utcnow()
+        self.last_update_at = datetime.utcnow()
+
+    def bootstrap_from_tsd(self, tsd_html: str) -> None:
+        """Initialise the empty Y.Doc with the current TSD HTML."""
+        if tsd_html and len(str(self.ytext)) == 0:
+            self.ytext += tsd_html
+
+    def apply_update(self, update: bytes) -> None:
+        self.ydoc.apply_update(update)
+        self.dirty = True
+        self.last_update_at = datetime.utcnow()
+
+    def encode_state(self) -> bytes:
+        return self.ydoc.get_update()
+
+    def current_html(self) -> str:
+        return str(self.ytext)
+
+
+def _get_or_create_session(tsd_id: int) -> CrdtSession:
+    from app.models.tsd_document import TSDocument
+    from app.services.tsd_format import decrypt_content_envelope
+
+    with _CACHE_LOCK:
+        sess = _DOC_CACHE.get(tsd_id)
+        if sess is None:
+            sess = CrdtSession(tsd_id)
+            _DOC_CACHE[tsd_id] = sess
+            # Bootstrap from the stored TSD so late joiners don't start
+            # from an empty doc.
+            doc = TSDocument.query.get(tsd_id)
+            if doc is not None:
+                try:
+                    content = decrypt_content_envelope(
+                        doc.ciphertext, organization_id=doc.organization_id
+                    )
+                    sess.bootstrap_from_tsd(content.get("html") or "")
+                except Exception as exc:
+                    log.warning("bootstrap_from_tsd failed for %s: %s", tsd_id, exc)
+        sess.ref_count += 1
+        return sess
+
+
+def _release_session(tsd_id: int) -> None:
+    """Drop the in-memory Doc when the last peer leaves (after snapshot)."""
+    with _CACHE_LOCK:
+        sess = _DOC_CACHE.get(tsd_id)
+        if sess is None:
+            return
+        sess.ref_count = max(0, sess.ref_count - 1)
+        if sess.ref_count == 0:
+            _snapshot_session(sess, force=True)
+            _DOC_CACHE.pop(tsd_id, None)
+
+
+def _snapshot_session(sess: CrdtSession, *, force: bool = False) -> bool:
+    """Write the merged CRDT plaintext back to the encrypted TSD.
+
+    Respects :data:`SNAPSHOT_DEBOUNCE_SECONDS` unless ``force`` is set.
+    Uses the existing format sanitize + encrypt + version-snapshot path
+    so Y.js co-editing lands in the same audit trail as HTTP autosave.
+    """
+    from app.models.tsd_document import TSDocument
+    from app.models.tsd_document_version import TSDocumentVersion
+    from app.services.tsd_format import (
+        encrypt_content_envelope, pack_content, sanitize_html, sha256_hex,
+    )
+
+    if not sess.dirty:
+        return False
+    now = datetime.utcnow()
+    if not force and (now - sess.last_snapshot_at).total_seconds() < SNAPSHOT_DEBOUNCE_SECONDS:
+        return False
+
+    doc = TSDocument.query.get(sess.tsd_id)
+    if doc is None or doc.deleted_at is not None:
+        return False
+
+    html = sanitize_html(sess.current_html() or "")
+    plaintext = pack_content(html=html, description=doc.description,
+                             tags=[t for t in (doc.tags or "").split(",") if t.strip()])
+    ciphertext = encrypt_content_envelope(plaintext, organization_id=doc.organization_id)
+
+    # Mirror the HTTP update path: snapshot the previous version first.
+    db.session.add(TSDocumentVersion(
+        tsd_id=doc.id,
+        version=doc.version,
+        ciphertext=doc.ciphertext,
+        ciphertext_sha256=doc.ciphertext_sha256,
+        plaintext_bytes=doc.plaintext_bytes,
+        created_by_id=doc.created_by_id,
+        change_note="crdt co-editing snapshot",
+    ))
+    doc.ciphertext = ciphertext
+    doc.ciphertext_sha256 = sha256_hex(ciphertext)
+    doc.plaintext_bytes = len(plaintext)
+    doc.version += 1
+    doc.updated_at = now
+    db.session.commit()
+
+    sess.dirty = False
+    sess.last_snapshot_at = now
+    return True
 
 
 def _can_access(user, tsd_id: int) -> bool:
@@ -151,10 +305,16 @@ def register_handlers(sio: SocketIO) -> None:
             return
         room = _room(tsd_id)
         join_room(room)
+        # Track the session for CRDT lifecycle (release on disconnect/leave).
+        from flask import session as _fs
+        tracked = _fs.setdefault("_tsd_rooms", [])
+        if tsd_id not in tracked:
+            tracked.append(tsd_id)
+            _fs.modified = True
+        _get_or_create_session(tsd_id)
+
         payload = {**_user_payload(current_user), "sid": request.sid}
         emit("peer_joined", payload, room=room, include_self=False)
-        # Tell the newcomer who's already here (best-effort — we broadcast
-        # a "whois" event that existing peers answer with their identity).
         emit("whois", {"asker_sid": request.sid}, room=room, include_self=False)
 
     @sio.on("whoami", namespace="/tsd")
@@ -178,14 +338,27 @@ def register_handlers(sio: SocketIO) -> None:
             return
         room = _room(tsd_id)
         leave_room(room)
+        _release_session(tsd_id)
+        from flask import session as _fs
+        tracked = _fs.get("_tsd_rooms") or []
+        if tsd_id in tracked:
+            tracked.remove(tsd_id)
+            _fs["_tsd_rooms"] = tracked
+            _fs.modified = True
         emit("peer_left", {"user_id": current_user.id, "sid": request.sid},
              room=room, include_self=False)
 
     @sio.on("disconnect", namespace="/tsd")
     def _disconnect():
-        # The library auto-leaves rooms on disconnect; broadcast a
-        # best-effort departure so UIs can drop the cursor overlay
-        # without waiting for the per-doc join list to refresh.
+        # Release every room we joined on this socket; last-one-out
+        # snapshots the Y.Doc back to the encrypted TSD.
+        try:
+            from flask import session as _fs
+            for tsd_id in list(_fs.get("_tsd_rooms") or []):
+                _release_session(tsd_id)
+            _fs.pop("_tsd_rooms", None)
+        except Exception:
+            pass
         try:
             user_id = current_user.id
         except Exception:
@@ -219,6 +392,65 @@ def register_handlers(sio: SocketIO) -> None:
             "user_id": current_user.id,
             "sid": request.sid,
         }, room=_room(tsd_id), include_self=False)
+
+    # ---- CRDT co-editing handlers --------------------------------------
+
+    @sio.on("y-sync-request", namespace="/tsd")
+    def _y_sync_request(data: dict[str, Any]):
+        try:
+            tsd_id = int(data.get("tsd_id"))
+        except (TypeError, ValueError):
+            return
+        if not _can_access(current_user, tsd_id):
+            emit("error", {"error": "access_denied"})
+            return
+        sess = _get_or_create_session(tsd_id)
+        state = sess.encode_state()
+        emit("y-sync-reply", {
+            "tsd_id": tsd_id,
+            "state": bytes(state),  # socket.io sends as binary attachment
+        })
+
+    @sio.on("y-update", namespace="/tsd")
+    def _y_update(data: dict[str, Any]):
+        try:
+            tsd_id = int(data.get("tsd_id"))
+        except (TypeError, ValueError):
+            return
+        if not _can_access(current_user, tsd_id):
+            return
+        update = data.get("update")
+        if not update:
+            return
+        # Normalise to bytes — Socket.IO can hand us a bytearray or bytes.
+        if isinstance(update, (bytearray, memoryview)):
+            update = bytes(update)
+        if not isinstance(update, (bytes,)):
+            return
+        sess = _DOC_CACHE.get(tsd_id)
+        if sess is None:
+            # Late message after our in-memory session was cleared;
+            # bootstrap one so we still merge + broadcast.
+            sess = _get_or_create_session(tsd_id)
+        try:
+            sess.apply_update(update)
+        except Exception as exc:
+            log.warning("y-update apply failed for %s: %s", tsd_id, exc)
+            return
+
+        emit("y-update", {
+            "tsd_id": tsd_id,
+            "update": update,
+            "from_sid": request.sid,
+            "from_user_id": current_user.id,
+        }, room=_room(tsd_id), include_self=False)
+
+        # Opportunistic snapshot — honours the debounce window.
+        try:
+            _snapshot_session(sess)
+        except Exception as exc:
+            log.warning("snapshot_session failed for %s: %s", tsd_id, exc)
+            db.session.rollback()
 
 
 def init_app(app) -> SocketIO:
