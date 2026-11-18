@@ -29,7 +29,7 @@ from datetime import datetime
 from app.extensions import db
 
 
-TSD_STAMP_KINDS = ("seal", "date", "rubber", "custom")
+TSD_STAMP_KINDS = ("seal", "date", "company_dated", "rubber", "custom")
 
 
 class TSDStamp(db.Model):
@@ -55,7 +55,7 @@ class TSDStamp(db.Model):
 
     __table_args__ = (
         db.CheckConstraint(
-            "kind IN ('seal','date','rubber','custom')",
+            "kind IN ('seal','date','company_dated','rubber','custom')",
             name="ck_tsd_stamp_kind",
         ),
         db.UniqueConstraint(

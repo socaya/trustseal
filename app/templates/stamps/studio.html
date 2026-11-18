@@ -35,12 +35,39 @@
     <div class="ts-field">
       <label class="ts-field__label" for="st-kind">Stamp kind</label>
       <select id="st-kind" class="ts-select">
-        <option value="seal"   {% if stamp and stamp.kind == 'seal'   %}selected{% endif %}>Round seal</option>
-        <option value="date"   {% if stamp and stamp.kind == 'date'   %}selected{% endif %}>Date stamp</option>
-        <option value="rubber" {% if stamp and stamp.kind == 'rubber' %}selected{% endif %}>Rubber stamp</option>
+        <option value="seal"          {% if stamp and stamp.kind == 'seal'          %}selected{% endif %}>Round seal</option>
+        <option value="company_dated" {% if stamp and stamp.kind == 'company_dated' %}selected{% endif %}>Company stamp (dated)</option>
+        <option value="date"          {% if stamp and stamp.kind == 'date'          %}selected{% endif %}>Date stamp (RECEIVED / APPROVED…)</option>
+        <option value="rubber"        {% if stamp and stamp.kind == 'rubber'        %}selected{% endif %}>Rubber stamp</option>
       </select>
       <span class="ts-field__hint">Each kind exposes different fields below.</span>
     </div>
+
+    <fieldset class="ts-studio__group" id="st-logo-fields">
+      <legend>Company logo (optional)</legend>
+      <div class="ts-field">
+        <label class="ts-field__label" for="st-logo-file">Upload logo (PNG, JPG, SVG — max 200 KB)</label>
+        <input type="file" id="st-logo-file" accept="image/png,image/jpeg,image/svg+xml,image/webp" class="ts-input">
+        <span class="ts-field__hint">
+          Auto-embedded into the stamp SVG. For round seals and the
+          company-dated stamp, the logo is centered and auto-cropped
+          to a circular watermark. Clear to remove.
+        </span>
+      </div>
+      <div style="display:flex; align-items:center; gap:var(--ts-space-3);">
+        <div id="st-logo-preview" style="width:64px;height:64px;border:1px solid var(--ts-border);display:flex;align-items:center;justify-content:center;background:#fafbfc;overflow:hidden;">
+          <span style="color:var(--ts-text-subtle);font-size:10px;">no logo</span>
+        </div>
+        <div>
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:var(--ts-fs-label);">
+            <input type="checkbox" id="st-logo-watermark" checked>
+            Use as faint watermark behind text
+          </label>
+          <br>
+          <button type="button" id="st-logo-clear" class="ts-btn ts-btn--text ts-btn--sm" style="padding-left:0;">Clear logo</button>
+        </div>
+      </div>
+    </fieldset>
 
     <div class="ts-divider"></div>
 
@@ -73,6 +100,60 @@ APPROVED
             <option value="dashed">Dashed ring</option>
           </select>
         </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="ts-studio__group" id="st-company-fields" hidden>
+      <legend>Company stamp (dated)</legend>
+      <div class="ts-field">
+        <label class="ts-field__label" for="st-cd-company">Company name (top arc)</label>
+        <input type="text" id="st-cd-company" class="ts-input" value="VITALWORKS LIMITED" maxlength="48">
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="st-cd-tagline">Tagline / registration (bottom arc)</label>
+        <input type="text" id="st-cd-tagline" class="ts-input" value="REG. NO. 12345 · NAIROBI" maxlength="64">
+      </div>
+      <div class="ts-form-row ts-form-row--split">
+        <div class="ts-field">
+          <label class="ts-field__label" for="st-cd-date-format">Date format</label>
+          <select id="st-cd-date-format" class="ts-select">
+            <option value="DD MMM YYYY">DD MMM YYYY (17 NOV 2026)</option>
+            <option value="YYYY-MM-DD">YYYY-MM-DD (2026-11-17)</option>
+            <option value="DD/MM/YYYY">DD/MM/YYYY (17/11/2026)</option>
+            <option value="MMM DD, YYYY">MMM DD, YYYY (NOV 17, 2026)</option>
+            <option value="FIXED">Fixed date (set below)</option>
+          </select>
+        </div>
+        <div class="ts-field">
+          <label class="ts-field__label" for="st-cd-fixed-date">Fixed date (if chosen)</label>
+          <input type="text" id="st-cd-fixed-date" class="ts-input" placeholder="auto" value="">
+        </div>
+      </div>
+      <div class="ts-form-row ts-form-row--split">
+        <div class="ts-field">
+          <label class="ts-field__label" for="st-cd-tag-label">Verb (small, above date)</label>
+          <select id="st-cd-tag-label" class="ts-select">
+            <option value="">(none)</option>
+            <option>DATED</option>
+            <option>ISSUED</option>
+            <option>APPROVED ON</option>
+            <option>CERTIFIED ON</option>
+            <option>RECEIVED</option>
+            <option>SEALED</option>
+          </select>
+        </div>
+        <div class="ts-field">
+          <label class="ts-field__label" for="st-cd-color">Ink colour</label>
+          <input type="color" id="st-cd-color" class="ts-input" value="#0f3b82">
+        </div>
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="st-cd-border-style">Border</label>
+        <select id="st-cd-border-style" class="ts-select">
+          <option value="double" selected>Double ring (formal)</option>
+          <option value="single">Single ring</option>
+          <option value="rope">Rope (hatched)</option>
+        </select>
       </div>
     </fieldset>
 
@@ -204,9 +285,10 @@ APPROVED
 
   // ---- Hide / show per-kind field groups ----
   var fieldsets = {
-    seal:   document.getElementById('st-seal-fields'),
-    date:   document.getElementById('st-date-fields'),
-    rubber: document.getElementById('st-rubber-fields'),
+    seal:          document.getElementById('st-seal-fields'),
+    company_dated: document.getElementById('st-company-fields'),
+    date:          document.getElementById('st-date-fields'),
+    rubber:        document.getElementById('st-rubber-fields'),
   };
   var kindSel = document.getElementById('st-kind');
   function syncFieldsets() {
@@ -260,10 +342,11 @@ APPROVED
       return '<text y="' + y + '" text-anchor="middle" font-family="Georgia, serif" font-size="' + size + '" font-weight="700" fill="' + color + '">' + escapeXml(line) + '</text>';
     }).join('');
 
+    var wmLogo = (logoDataUri && logoWM.checked) ? logoImage('seal', 0, 0, 180, 0.08) : '';
     return (
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-160 -160 320 320" width="300" height="300">' +
       '<g>' +
-        outer +
+        wmLogo + outer +
         textOnArc('seal-top-' + Date.now(), top, 115, 'top', color) +
         textOnArc('seal-bot-' + Date.now(), bot, 115, 'bottom', color) +
         centerText +
@@ -313,9 +396,17 @@ APPROVED
       ? '<text x="160" y="85" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="42" font-weight="900" fill="' + color + '" letter-spacing="4">' + escapeXml(lines[0]) + '</text>'
       : '<text x="160" y="60" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="26" font-weight="900" fill="' + color + '" letter-spacing="2">' + escapeXml(lines[0]) + '</text>' +
         '<text x="160" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="' + color + '" letter-spacing="2">' + escapeXml(lines[1]) + '</text>';
+    var badge = logoDataUri
+      ? '<image href="' + logoDataUri + '" x="24" y="35" width="70" height="70" preserveAspectRatio="xMidYMid meet"/>'
+      : '';
+    // If a logo is embedded, nudge the text right so it doesn't overlap.
+    if (logoDataUri) {
+      textBlock = textBlock.replace(/x="160"/g, 'x="200"');
+      textBlock = textBlock.replace(/text-anchor="middle"/g, 'text-anchor="middle"');
+    }
     return (
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 140" width="320" height="140">' +
-      outer + textBlock +
+      outer + badge + textBlock +
       '</svg>'
     );
   }
@@ -324,17 +415,132 @@ APPROVED
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  // ---- Logo state + upload ----
+  var logoDataUri = '';            // e.g. "data:image/png;base64,…"
+  var logoPreview = document.getElementById('st-logo-preview');
+  var logoFile    = document.getElementById('st-logo-file');
+  var logoWM      = document.getElementById('st-logo-watermark');
+  var logoClear   = document.getElementById('st-logo-clear');
+
+  function setLogo(uri) {
+    logoDataUri = uri || '';
+    logoPreview.innerHTML = logoDataUri
+      ? '<img src="' + logoDataUri + '" style="max-width:100%;max-height:100%;">'
+      : '<span style="color:var(--ts-text-subtle);font-size:10px;">no logo</span>';
+    render();
+  }
+  logoFile.addEventListener('change', function () {
+    var f = logoFile.files && logoFile.files[0]; if (!f) return;
+    if (f.size > 200 * 1024) { alert('Logo too large (max 200 KB).'); logoFile.value = ''; return; }
+    var r = new FileReader();
+    r.onload = function () { setLogo(r.result); };
+    r.readAsDataURL(f);
+  });
+  logoClear.addEventListener('click', function () {
+    logoFile.value = '';
+    setLogo('');
+  });
+  logoWM.addEventListener('change', render);
+
+  // Helper: renders an <image> inside the stamp, either center-small
+  // or faded-watermark depending on the checkbox state and container.
+  function logoImage(kind, cx, cy, size, opacity) {
+    if (!logoDataUri) return '';
+    return (
+      '<image href="' + logoDataUri + '" ' +
+      'x="' + (cx - size / 2) + '" y="' + (cy - size / 2) + '" ' +
+      'width="' + size + '" height="' + size + '" ' +
+      'opacity="' + opacity + '" ' +
+      'preserveAspectRatio="xMidYMid meet"/>'
+    );
+  }
+
+  // ---- Company Dated renderer ----
+  function renderCompanyDated() {
+    var company = document.getElementById('st-cd-company').value;
+    var tagline = document.getElementById('st-cd-tagline').value;
+    var fmt     = document.getElementById('st-cd-date-format').value;
+    var fixed   = (document.getElementById('st-cd-fixed-date').value || '').trim();
+    var verb    = document.getElementById('st-cd-tag-label').value;
+    var color   = document.getElementById('st-cd-color').value;
+    var border  = document.getElementById('st-cd-border-style').value;
+
+    var dateStr;
+    if (fmt === 'FIXED' && fixed) {
+      dateStr = fixed;
+    } else {
+      var d = new Date();
+      var dd = String(d.getDate()).padStart(2, '0');
+      var mm = String(d.getMonth() + 1).padStart(2, '0');
+      var mmm = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][d.getMonth()];
+      var yyyy = d.getFullYear();
+      switch (fmt) {
+        case 'YYYY-MM-DD':  dateStr = yyyy + '-' + mm + '-' + dd; break;
+        case 'DD/MM/YYYY':  dateStr = dd + '/' + mm + '/' + yyyy; break;
+        case 'MMM DD, YYYY': dateStr = mmm + ' ' + dd + ', ' + yyyy; break;
+        default:            dateStr = dd + ' ' + mmm + ' ' + yyyy;
+      }
+    }
+
+    var outer;
+    if (border === 'single') {
+      outer = '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3"/>';
+    } else if (border === 'rope') {
+      outer = '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3"/>' +
+              '<circle r="132" fill="none" stroke="' + color + '" stroke-width="1" stroke-dasharray="2,2"/>' +
+              '<circle r="124" fill="none" stroke="' + color + '" stroke-width="0.75"/>';
+    } else {
+      outer = '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3"/>' +
+              '<circle r="128" fill="none" stroke="' + color + '" stroke-width="1"/>';
+    }
+
+    // Logo: faded watermark behind text when the box is checked,
+    // otherwise small centered badge above the date.
+    var wmLogo = (logoDataUri && logoWM.checked)
+      ? logoImage('company_dated', 0, 0, 180, 0.08)
+      : '';
+    var inlineLogo = (logoDataUri && !logoWM.checked)
+      ? logoImage('company_dated', 0, -42, 56, 1)
+      : '';
+
+    var verbY = logoDataUri && !logoWM.checked ? -2 : -12;
+    var dateY = logoDataUri && !logoWM.checked ? 28 : 18;
+
+    var verbText = verb
+      ? '<text y="' + verbY + '" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="' + color + '" letter-spacing="3">' + escapeXml(verb) + '</text>'
+      : '';
+    var midLine = !verb && !logoDataUri
+      ? '<line x1="-70" y1="-14" x2="70" y2="-14" stroke="' + color + '" stroke-width="1"/>'
+      : '';
+    var dateText =
+      '<text y="' + dateY + '" text-anchor="middle" font-family="Courier New, monospace" font-size="20" font-weight="700" fill="' + color + '">' + escapeXml(dateStr) + '</text>';
+
+    return (
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-160 -160 320 320" width="300" height="300">' +
+        wmLogo + outer +
+        textOnArc('cd-top-' + Date.now(), company, 115, 'top', color) +
+        textOnArc('cd-bot-' + Date.now(), tagline, 115, 'bottom', color) +
+        inlineLogo + verbText + midLine + dateText +
+      '</svg>'
+    );
+  }
+
   function currentSvg() {
     switch (kindSel.value) {
-      case 'date':   return renderDate();
-      case 'rubber': return renderRubber();
-      default:       return renderSeal();
+      case 'date':          return renderDate();
+      case 'rubber':        return renderRubber();
+      case 'company_dated': return renderCompanyDated();
+      default:              return renderSeal();
     }
   }
 
   function currentLayout() {
+    var base = {
+      logo_data_uri: logoDataUri || null,
+      logo_watermark: !!logoWM.checked,
+    };
     if (kindSel.value === 'seal') {
-      return {
+      return { ...base,
         top: document.getElementById('st-top-text').value,
         bottom: document.getElementById('st-bottom-text').value,
         center: (document.getElementById('st-center-lines').value || '').split('\n'),
@@ -342,15 +548,26 @@ APPROVED
         border_style: document.getElementById('st-border-style').value,
       };
     }
+    if (kindSel.value === 'company_dated') {
+      return { ...base,
+        company: document.getElementById('st-cd-company').value,
+        tagline: document.getElementById('st-cd-tagline').value,
+        date_format: document.getElementById('st-cd-date-format').value,
+        fixed_date: document.getElementById('st-cd-fixed-date').value,
+        verb: document.getElementById('st-cd-tag-label').value,
+        color: document.getElementById('st-cd-color').value,
+        border_style: document.getElementById('st-cd-border-style').value,
+      };
+    }
     if (kindSel.value === 'date') {
-      return {
+      return { ...base,
         label: document.getElementById('st-date-label').value,
         date: document.getElementById('st-date-value').value,
         byline: document.getElementById('st-date-byline').value,
         color: document.getElementById('st-date-color').value,
       };
     }
-    return {
+    return { ...base,
       text: document.getElementById('st-rubber-text').value,
       color: document.getElementById('st-rubber-color').value,
       shape: document.getElementById('st-rubber-shape').value,
@@ -370,12 +587,24 @@ APPROVED
   // Load existing layout if editing.
   var initLayout = null;
   try { initLayout = JSON.parse(root.dataset.stampLayout); } catch (e) { initLayout = null; }
+  if (initLayout) {
+    if (initLayout.logo_data_uri) setLogo(initLayout.logo_data_uri);
+    if (typeof initLayout.logo_watermark === 'boolean') logoWM.checked = initLayout.logo_watermark;
+  }
   if (initLayout && kindSel.value === 'seal') {
     document.getElementById('st-top-text').value = initLayout.top || '';
     document.getElementById('st-bottom-text').value = initLayout.bottom || '';
     document.getElementById('st-center-lines').value = (initLayout.center || []).join('\n');
     if (initLayout.color) document.getElementById('st-color').value = initLayout.color;
     if (initLayout.border_style) document.getElementById('st-border-style').value = initLayout.border_style;
+  } else if (initLayout && kindSel.value === 'company_dated') {
+    document.getElementById('st-cd-company').value = initLayout.company || '';
+    document.getElementById('st-cd-tagline').value = initLayout.tagline || '';
+    document.getElementById('st-cd-date-format').value = initLayout.date_format || 'DD MMM YYYY';
+    document.getElementById('st-cd-fixed-date').value = initLayout.fixed_date || '';
+    document.getElementById('st-cd-tag-label').value = initLayout.verb || '';
+    if (initLayout.color) document.getElementById('st-cd-color').value = initLayout.color;
+    if (initLayout.border_style) document.getElementById('st-cd-border-style').value = initLayout.border_style;
   } else if (initLayout && kindSel.value === 'date') {
     document.getElementById('st-date-label').value = initLayout.label || 'RECEIVED';
     document.getElementById('st-date-value').value = initLayout.date || '';

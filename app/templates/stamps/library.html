@@ -35,14 +35,14 @@
     <span class="ts-metric__sub">round seals</span>
   </div>
   <div class="ts-metric">
-    <span class="ts-metric__label">Date</span>
-    <span class="ts-metric__value">{{ stamps|selectattr('kind','equalto','date')|list|length }}</span>
-    <span class="ts-metric__sub">date stamps</span>
+    <span class="ts-metric__label">Company</span>
+    <span class="ts-metric__value">{{ stamps|selectattr('kind','equalto','company_dated')|list|length }}</span>
+    <span class="ts-metric__sub">dated seals</span>
   </div>
   <div class="ts-metric">
-    <span class="ts-metric__label">Rubber</span>
-    <span class="ts-metric__value">{{ stamps|selectattr('kind','equalto','rubber')|list|length }}</span>
-    <span class="ts-metric__sub">rubber stamps</span>
+    <span class="ts-metric__label">Date / Rubber</span>
+    <span class="ts-metric__value">{{ stamps|rejectattr('kind','equalto','seal')|rejectattr('kind','equalto','company_dated')|list|length }}</span>
+    <span class="ts-metric__sub">RECEIVED · rubber</span>
   </div>
 </section>
 

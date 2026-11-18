@@ -79,8 +79,8 @@ def create_stamp():
         return jsonify({"error": "layout_must_be_object"}), 400
     if not svg.startswith("<svg") or not svg.endswith("</svg>"):
         return jsonify({"error": "svg_invalid"}), 400
-    if len(svg) > 32 * 1024:
-        return jsonify({"error": "svg_too_large", "max": 32 * 1024}), 400
+    if len(svg) > 512 * 1024:
+        return jsonify({"error": "svg_too_large", "max": 512 * 1024}), 400
 
     row = TSDStamp(
         organization_id=actor.organization_id,
