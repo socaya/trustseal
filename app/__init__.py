@@ -377,6 +377,10 @@ def create_app(config_class=None):
     blueprints.append(tsd_views)
     from .blueprints.documents.views.tsd_external_views import tsd_external_views
     blueprints.append(tsd_external_views)
+    from .blueprints.estamp.tsd_stamps_api import tsd_stamps_api
+    blueprints.append(tsd_stamps_api)
+    from .blueprints.estamp.tsd_stamps_views import tsd_stamps_views
+    blueprints.append(tsd_stamps_views)
     from .blueprints.documents.api.document_label_api import (
         document_label_api,
     )

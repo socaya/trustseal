@@ -237,6 +237,25 @@
     <div id="tsd-history-body"><p>Loading…</p></div>
   </aside>
 
+  {# ======================= Stamp picker ======================= #}
+  <div id="tsd-stamp-overlay" class="ts-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="tsd-stamp-title">
+    <div class="ts-stamp-modal">
+      <header class="ts-stamp-modal__head">
+        <div>
+          <h2 id="tsd-stamp-title" class="ts-modal__title" style="margin:0;">Insert a stamp</h2>
+          <p class="ts-panel__meta" style="margin:4px 0 0;">
+            Pick a registered stamp to drop into the document.
+            New stamps are designed in <a href="/stamps/studio" target="_blank">Stamps ▸ Studio</a>.
+          </p>
+        </div>
+        <button type="button" class="ts-btn ts-btn--text" id="tsd-stamp-close" aria-label="Close">✕</button>
+      </header>
+      <ul id="tsd-stamp-grid" class="ts-stamp-picker-grid">
+        <li class="ts-stamp-picker-empty">Loading…</li>
+      </ul>
+    </div>
+  </div>
+
   {# ======================= Comments side panel ======================= #}
   <aside id="tsd-comments-panel" class="ts-ed__comments-panel" hidden aria-label="Comments">
     <header>
@@ -909,6 +928,59 @@
 .ts-ed__hist-meta { color: var(--ed-muted); font-size: 11px; margin-top: 2px; }
 .ts-ed__hist-acts { display: flex; gap: 6px; margin-top: 6px; }
 
+/* ---------- Stamp picker ---------- */
+.ts-stamp-modal {
+  background: var(--ts-surface);
+  border: 1px solid var(--ts-border);
+  width: 820px; max-width: 95vw; max-height: 85vh;
+  display: flex; flex-direction: column;
+}
+.ts-stamp-modal__head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: var(--ts-space-5) var(--ts-space-6);
+  border-bottom: 1px solid var(--ts-border);
+}
+.ts-stamp-picker-grid {
+  overflow-y: auto; flex: 1 1 auto;
+  padding: var(--ts-space-5);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--ts-space-4);
+  list-style: none; margin: 0;
+}
+.ts-stamp-picker-item {
+  cursor: pointer;
+  background: var(--ts-surface);
+  border: 1px solid var(--ts-border);
+  padding: var(--ts-space-3);
+  text-align: center;
+  transition: border-color var(--ts-dur-fast) var(--ts-ease),
+              background var(--ts-dur-fast) var(--ts-ease);
+}
+.ts-stamp-picker-item:hover {
+  border-color: var(--ts-brand-primary);
+  background: var(--ts-brand-primary-soft);
+}
+.ts-stamp-picker-item__preview {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 140px; background: #fafbfc;
+  margin-bottom: var(--ts-space-2);
+  padding: var(--ts-space-3);
+}
+.ts-stamp-picker-item__preview svg { max-width: 120px; max-height: 120px; }
+.ts-stamp-picker-item__name {
+  font-size: var(--ts-fs-label); font-weight: var(--ts-fw-semibold);
+}
+.ts-stamp-picker-item__kind {
+  font-size: var(--ts-fs-micro); color: var(--ts-text-muted);
+  letter-spacing: 0.08em; margin-top: 2px;
+}
+.ts-stamp-picker-empty {
+  grid-column: 1 / -1;
+  text-align: center; padding: var(--ts-space-7);
+  color: var(--ts-text-muted);
+}
+
 /* ---------- Remote cursor overlays (realtime awareness) ---------- */
 .ts-ed__page {
   /* The absolutely-positioned cursor overlays live inside the paper
@@ -1295,30 +1367,52 @@
 
   // --- Ribbon tab layouts ---
   function tabHome() {
-    // Comprehensive font stack — 20 families grouped by category.
-    // Each option's label carries a title attribute hint so operators
-    // know the semantic category at a glance.
+    // Comprehensive font stack — 35 families grouped by use case.
+    // Contract-standard legal / government fonts first, then general
+    // office / editorial / display / monospace / handwriting.
     var fontCombo = makeCombo([
-      { value: 'Inter, system-ui, sans-serif',                       label: 'Inter — Modern sans' },
-      { value: 'Arial, Helvetica, sans-serif',                       label: 'Arial — Standard sans' },
-      { value: '"Helvetica Neue", Helvetica, sans-serif',            label: 'Helvetica Neue' },
-      { value: 'Calibri, Carlito, sans-serif',                       label: 'Calibri — Office sans' },
-      { value: 'Verdana, sans-serif',                                label: 'Verdana — Legible sans' },
-      { value: 'Tahoma, Geneva, sans-serif',                         label: 'Tahoma' },
-      { value: '"Trebuchet MS", sans-serif',                         label: 'Trebuchet MS' },
-      { value: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif', label: 'System UI (native)' },
-      { value: 'Georgia, "Times New Roman", serif',                  label: 'Georgia — Elegant serif' },
-      { value: '"Times New Roman", Times, serif',                    label: 'Times New Roman — Classic serif' },
+      // ── Contract & legal (most-used for signed agreements) ──
+      { value: '"Times New Roman", Times, serif',                    label: 'Times New Roman — Legal standard' },
+      { value: '"Century Schoolbook", "Century Sch Bk", Century, serif', label: 'Century Schoolbook — U.S. Supreme Court' },
+      { value: 'Baskerville, "Libre Baskerville", serif',            label: 'Baskerville — Classical contract serif' },
       { value: '"Palatino Linotype", "Book Antiqua", Palatino, serif', label: 'Palatino — Editorial serif' },
-      { value: '"Cambria", Georgia, serif',                          label: 'Cambria — Legal serif' },
-      { value: '"Garamond", "EB Garamond", serif',                   label: 'Garamond — Literary serif' },
-      { value: '"Bookman Old Style", serif',                         label: 'Bookman — Report serif' },
-      { value: 'Consolas, "Courier New", monospace',                 label: 'Consolas — Code' },
-      { value: '"Courier New", Courier, monospace',                  label: 'Courier New — Typewriter' },
-      { value: '"Comic Sans MS", cursive',                           label: 'Comic Sans — Casual' },
-      { value: '"Brush Script MT", cursive',                         label: 'Brush Script — Handwritten' },
-      { value: 'Impact, Haettenschweiler, sans-serif',               label: 'Impact — Display' },
+      { value: '"Cambria", Georgia, serif',                          label: 'Cambria — Word legal default' },
+      { value: '"EB Garamond", "Garamond", serif',                   label: 'Garamond — Treaty serif' },
+      { value: '"Minion Pro", "Minion", serif',                      label: 'Minion Pro — Publishing serif' },
+      { value: '"Sabon", Garamond, serif',                           label: 'Sabon — Fine-print serif' },
+      { value: '"Bookman Old Style", "URW Bookman", serif',          label: 'Bookman — Statute serif' },
+      { value: '"Charter", "Bitstream Charter", serif',              label: 'Charter — Highly legible serif' },
+      { value: 'Georgia, "Times New Roman", serif',                  label: 'Georgia — Screen-friendly serif' },
+      // ── Government & correspondence ──
+      { value: 'Arial, Helvetica, sans-serif',                       label: 'Arial — Government standard' },
+      { value: 'Calibri, Carlito, sans-serif',                       label: 'Calibri — Office default' },
+      { value: '"Helvetica Neue", Helvetica, Arial, sans-serif',     label: 'Helvetica Neue — Corporate sans' },
+      { value: '"Open Sans", Arial, sans-serif',                     label: 'Open Sans — Web-standard sans' },
+      { value: '"Source Sans Pro", "Source Sans 3", sans-serif',     label: 'Source Sans — Public-sector sans' },
+      { value: 'Lato, Arial, sans-serif',                            label: 'Lato — Modern sans' },
+      { value: 'Verdana, sans-serif',                                label: 'Verdana — Accessible sans' },
+      { value: 'Tahoma, Geneva, sans-serif',                         label: 'Tahoma — Form sans' },
+      { value: '"Trebuchet MS", sans-serif',                         label: 'Trebuchet MS — Memo sans' },
+      // ── Modern UI / system ──
+      { value: 'Inter, system-ui, sans-serif',                       label: 'Inter — Product sans' },
+      { value: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif', label: 'System UI (native)' },
+      { value: 'Roboto, Arial, sans-serif',                          label: 'Roboto — Android sans' },
+      { value: 'Montserrat, "Open Sans", sans-serif',                label: 'Montserrat — Geometric sans' },
+      // ── Display / branding ──
+      { value: '"Playfair Display", Georgia, serif',                 label: 'Playfair Display — Masthead' },
+      { value: 'Merriweather, Georgia, serif',                       label: 'Merriweather — Reading serif' },
+      { value: 'Impact, Haettenschweiler, sans-serif',               label: 'Impact — Display headline' },
       { value: '"Arial Narrow", sans-serif',                         label: 'Arial Narrow — Condensed' },
+      // ── Handwriting / signature ──
+      { value: '"Great Vibes", "Brush Script MT", cursive',          label: 'Great Vibes — Signature' },
+      { value: '"Dancing Script", "Brush Script MT", cursive',       label: 'Dancing Script — Script' },
+      { value: '"Brush Script MT", cursive',                         label: 'Brush Script — Handwritten' },
+      { value: '"Comic Sans MS", cursive',                           label: 'Comic Sans — Casual' },
+      // ── Monospace / code ──
+      { value: 'Consolas, "SF Mono", Menlo, monospace',              label: 'Consolas — Code' },
+      { value: '"Courier Prime", "Courier New", Courier, monospace', label: 'Courier Prime — Screenplay' },
+      { value: '"Courier New", Courier, monospace',                  label: 'Courier New — Typewriter' },
+      { value: 'Inconsolata, "Courier New", monospace',              label: 'Inconsolata — Readable mono' },
     ], function (v) { exec('fontName', v); });
 
     // Font-size options align with the real pt values we apply via inline CSS
@@ -1424,7 +1518,7 @@
       ]),
       makeGroup('Trust', [
         { name: 'Signature',  icon: 'signature', fn: insertSignature },
-        { name: 'Stamp field',icon: 'lock',      fn: function () { insertHTML('<span style="background:#eef3fa;color:#0f3b82;border:1px solid #cfdcef;padding:1px 6px;border-radius:3px;font-family:monospace;font-size:10pt;">[STAMP]</span>'); } },
+        { name: 'Stamp',      icon: 'lock',      fn: openStampPicker },
         { name: 'Field',      icon: 'page',      fn: insertFieldVar },
       ]),
     ];
@@ -1605,6 +1699,52 @@
     var safe = String(n).replace(/[^\w]/g, '_');
     insertHTML('<span style="background:#eef3fa;color:#0f3b82;border:1px solid #cfdcef;padding:1px 6px;border-radius:3px;font-family:monospace;font-size:10pt;">{' + '{' + safe + '}' + '}</span>');
   }
+
+  // ---- Stamp picker (Insert ▸ Stamp) ----
+  function openStampPicker() {
+    var overlay = document.getElementById('tsd-stamp-overlay');
+    var grid = document.getElementById('tsd-stamp-grid');
+    if (!overlay) return;
+    overlay.removeAttribute('hidden'); overlay.style.display = 'flex';
+    grid.innerHTML = '<li class="ts-stamp-picker-empty">Loading…</li>';
+    fetch('/api/tsd-stamps/', { credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (items) {
+        if (!items.length) {
+          grid.innerHTML = '<li class="ts-stamp-picker-empty">No stamps registered yet. ' +
+            '<a href="/stamps/studio" target="_blank">Open the Stamp Studio</a> to design one.</li>';
+          return;
+        }
+        grid.innerHTML = items.map(function (s) {
+          return '<li class="ts-stamp-picker-item" data-sid="' + s.id + '">' +
+            '<div class="ts-stamp-picker-item__preview">' + s.svg + '</div>' +
+            '<div class="ts-stamp-picker-item__name">' + s.name + '</div>' +
+            '<div class="ts-stamp-picker-item__kind">' + s.kind.toUpperCase() + '</div>' +
+          '</li>';
+        }).join('');
+        grid.querySelectorAll('[data-sid]').forEach(function (el) {
+          el.addEventListener('click', function () {
+            var svg = el.querySelector('svg');
+            if (!svg) return;
+            // Wrap the SVG in an inline block so it flows nicely with text.
+            var wrapper = '<span style="display:inline-block;vertical-align:middle;margin:0 6pt;max-width:220px;" contenteditable="false">' + svg.outerHTML + '</span>';
+            insertHTML(wrapper);
+            closeStampPicker();
+          });
+        });
+      })
+      .catch(function (e) {
+        grid.innerHTML = '<li class="ts-stamp-picker-empty">Failed to load: ' + e.message + '</li>';
+      });
+  }
+  function closeStampPicker() {
+    var o = document.getElementById('tsd-stamp-overlay');
+    if (!o) return;
+    o.setAttribute('hidden', ''); o.style.display = 'none';
+  }
+  document.getElementById('tsd-stamp-close') && document.getElementById('tsd-stamp-close').addEventListener('click', closeStampPicker);
+  var _stOv = document.getElementById('tsd-stamp-overlay');
+  if (_stOv) _stOv.addEventListener('click', function (e) { if (e.target === _stOv) closeStampPicker(); });
   function insertComment() {
     var sel = window.getSelection(); if (!sel.rangeCount || sel.isCollapsed) { showToast('Select text to comment on first.'); return; }
     var note = prompt('Comment'); if (!note) return;

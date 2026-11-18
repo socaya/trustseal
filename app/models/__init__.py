@@ -23,6 +23,7 @@ from .tsd_external_share import TSDExternalShare
 from .tsd_comment import TSDComment
 from .tsd_approval import TSDApproval
 from .tsd_presence import TSDPresence
+from .tsd_stamp import TSDStamp
 from .tenant_key import TenantKey
 from .signing_envelope import SigningEnvelope, EnvelopeParticipant
 from .signer_decision import SignerChallenge, SignerDecision

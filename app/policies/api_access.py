@@ -18,6 +18,7 @@ from app.models.system import Role, UserRole
 # traffic through the blanket ``verify_jwt_in_request`` guard below.
 SESSION_AUTH_ALLOWED_PREFIXES = (
     "/api/tsd",
+    "/api/tsd-stamps",
 )
 
 PUBLIC_ENDPOINTS = frozenset((

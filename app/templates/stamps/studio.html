@@ -1,0 +1,432 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'stamps' %}
+
+{% block title %}
+  {% if stamp %}Edit stamp · {{ stamp.name }}{% else %}Stamp Studio{% endif %} · TRUSTSEAL
+{% endblock %}
+{% block page_title %}
+  {% if stamp %}Edit {{ stamp.name }}{% else %}Stamp Studio{% endif %}
+{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Compose a stamp from parameters — tune the preview on the right in
+    real-time. Save to register it under the tenant and make it
+    insertable from <em>Documents ▸ Insert ▸ Stamp</em>.
+  </p>
+{% endblock %}
+{% block page_actions %}
+  <a class="ts-btn ts-btn--ghost" href="{{ url_for('tsd_stamps_views.library') }}">Back to library</a>
+{% endblock %}
+
+{% block content %}
+<div class="ts-studio"
+     data-stamp-id="{{ stamp.id if stamp else '' }}"
+     data-stamp-layout='{{ stamp.layout|tojson if stamp else "null" }}'
+     data-stamp-kind="{{ stamp.kind if stamp else 'seal' }}"
+     data-stamp-name="{{ stamp.name if stamp else '' }}">
+
+  <aside class="ts-studio__controls">
+    <div class="ts-field">
+      <label class="ts-field__label" for="st-name">Stamp name (unique in tenant)</label>
+      <input type="text" id="st-name" class="ts-input" placeholder="e.g. Acme Co. Official Seal"
+             value="{{ stamp.name if stamp else '' }}">
+    </div>
+
+    <div class="ts-field">
+      <label class="ts-field__label" for="st-kind">Stamp kind</label>
+      <select id="st-kind" class="ts-select">
+        <option value="seal"   {% if stamp and stamp.kind == 'seal'   %}selected{% endif %}>Round seal</option>
+        <option value="date"   {% if stamp and stamp.kind == 'date'   %}selected{% endif %}>Date stamp</option>
+        <option value="rubber" {% if stamp and stamp.kind == 'rubber' %}selected{% endif %}>Rubber stamp</option>
+      </select>
+      <span class="ts-field__hint">Each kind exposes different fields below.</span>
+    </div>
+
+    <div class="ts-divider"></div>
+
+    <fieldset class="ts-studio__group" id="st-seal-fields">
+      <legend>Round seal</legend>
+      <div class="ts-field">
+        <label class="ts-field__label" for="st-top-text">Top arc text</label>
+        <input type="text" id="st-top-text" class="ts-input" value="OFFICIAL SEAL" maxlength="40">
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="st-bottom-text">Bottom arc text</label>
+        <input type="text" id="st-bottom-text" class="ts-input" value="VITALWORKS LIMITED" maxlength="40">
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="st-center-lines">Center text (one line each)</label>
+        <textarea id="st-center-lines" class="ts-textarea" rows="3">★★★
+APPROVED
+2026</textarea>
+      </div>
+      <div class="ts-form-row ts-form-row--split">
+        <div class="ts-field">
+          <label class="ts-field__label" for="st-color">Ink colour</label>
+          <input type="color" id="st-color" class="ts-input" value="#0f3b82">
+        </div>
+        <div class="ts-field">
+          <label class="ts-field__label" for="st-border-style">Border</label>
+          <select id="st-border-style" class="ts-select">
+            <option value="single">Single ring</option>
+            <option value="double">Double ring</option>
+            <option value="dashed">Dashed ring</option>
+          </select>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="ts-studio__group" id="st-date-fields" hidden>
+      <legend>Date stamp</legend>
+      <div class="ts-field">
+        <label class="ts-field__label" for="st-date-label">Label (top ribbon)</label>
+        <select id="st-date-label" class="ts-select">
+          <option>RECEIVED</option>
+          <option>APPROVED</option>
+          <option>PAID</option>
+          <option>REJECTED</option>
+          <option>DRAFT</option>
+          <option>FILED</option>
+          <option>URGENT</option>
+          <option>COPY</option>
+          <option>CONFIDENTIAL</option>
+          <option>VOID</option>
+        </select>
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="st-date-value">Date value</label>
+        <input type="text" id="st-date-value" class="ts-input" value="" placeholder="auto (today) if blank">
+        <span class="ts-field__hint">Leave blank to auto-fill today's date each time the stamp is inserted.</span>
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="st-date-byline">By / ref (optional bottom line)</label>
+        <input type="text" id="st-date-byline" class="ts-input" value="" placeholder="e.g. VW/ADM/2026/001">
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="st-date-color">Ink colour</label>
+        <input type="color" id="st-date-color" class="ts-input" value="#9e2f36">
+      </div>
+    </fieldset>
+
+    <fieldset class="ts-studio__group" id="st-rubber-fields" hidden>
+      <legend>Rubber stamp</legend>
+      <div class="ts-field">
+        <label class="ts-field__label" for="st-rubber-text">Text (one or two lines)</label>
+        <textarea id="st-rubber-text" class="ts-textarea" rows="2">ORIGINAL</textarea>
+      </div>
+      <div class="ts-form-row ts-form-row--split">
+        <div class="ts-field">
+          <label class="ts-field__label" for="st-rubber-color">Ink colour</label>
+          <input type="color" id="st-rubber-color" class="ts-input" value="#0f3b82">
+        </div>
+        <div class="ts-field">
+          <label class="ts-field__label" for="st-rubber-shape">Shape</label>
+          <select id="st-rubber-shape" class="ts-select">
+            <option value="rect">Rectangle</option>
+            <option value="rounded">Rounded rectangle</option>
+            <option value="oval">Oval</option>
+          </select>
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="ts-form-actions">
+      <button type="button" class="ts-btn ts-btn--primary" id="st-save">
+        {% if stamp %}Save changes{% else %}Register stamp{% endif %}
+      </button>
+      <span class="ts-panel__meta" id="st-status"></span>
+    </div>
+  </aside>
+
+  <section class="ts-studio__preview" id="st-preview-pane">
+    <div class="ts-studio__preview-canvas">
+      <div id="st-preview"></div>
+    </div>
+    <p class="ts-panel__meta" style="text-align:center;margin-top:var(--ts-space-3);">
+      Preview — updates live as you tune the fields on the left.
+    </p>
+  </section>
+</div>
+
+<style>
+.ts-studio {
+  display: grid;
+  grid-template-columns: 420px minmax(0, 1fr);
+  gap: var(--ts-space-5);
+}
+.ts-studio__controls {
+  background: var(--ts-surface);
+  border: 1px solid var(--ts-border);
+  padding: var(--ts-space-5);
+}
+.ts-studio__controls .ts-field { margin-bottom: var(--ts-space-3); }
+.ts-studio__controls input[type="color"] { height: 36px; padding: 2px; }
+.ts-studio__group {
+  border: 1px solid var(--ts-border);
+  padding: var(--ts-space-4) var(--ts-space-4) 0;
+  margin-bottom: var(--ts-space-4);
+}
+.ts-studio__group legend {
+  padding: 0 var(--ts-space-2);
+  font-size: var(--ts-fs-label);
+  font-weight: var(--ts-fw-semibold);
+  color: var(--ts-brand-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.ts-studio__preview {
+  background: var(--ts-surface);
+  border: 1px solid var(--ts-border);
+  padding: var(--ts-space-5);
+  display: flex; flex-direction: column;
+  justify-content: center;
+  min-height: 420px;
+}
+.ts-studio__preview-canvas {
+  display: flex; align-items: center; justify-content: center;
+  background: #fafbfc;
+  border: 1px dashed var(--ts-border);
+  padding: var(--ts-space-7);
+  min-height: 300px;
+}
+#st-preview svg { max-width: 320px; max-height: 320px; }
+@media (max-width: 900px) {
+  .ts-studio { grid-template-columns: 1fr; }
+}
+</style>
+
+<script>
+(function () {
+  var root = document.querySelector('.ts-studio');
+  var stampId = root.dataset.stampId ? parseInt(root.dataset.stampId, 10) : null;
+  var previewEl = document.getElementById('st-preview');
+  var statusEl = document.getElementById('st-status');
+
+  // ---- Hide / show per-kind field groups ----
+  var fieldsets = {
+    seal:   document.getElementById('st-seal-fields'),
+    date:   document.getElementById('st-date-fields'),
+    rubber: document.getElementById('st-rubber-fields'),
+  };
+  var kindSel = document.getElementById('st-kind');
+  function syncFieldsets() {
+    Object.keys(fieldsets).forEach(function (k) {
+      if (k === kindSel.value) fieldsets[k].removeAttribute('hidden');
+      else fieldsets[k].setAttribute('hidden', '');
+    });
+    render();
+  }
+  kindSel.addEventListener('change', syncFieldsets);
+
+  // ---- SVG renderers ----
+  function textOnArc(id, text, r, side, color) {
+    // side: 'top' or 'bottom'. Draws an invisible arc path then
+    // positions the text along it.
+    var path, startAngle, endAngle;
+    if (side === 'top') {
+      // Top half, left-to-right
+      path = 'M ' + (-r) + ' 0 A ' + r + ' ' + r + ' 0 0 1 ' + r + ' 0';
+    } else {
+      // Bottom half, right-to-left so letters read left-to-right
+      path = 'M ' + r + ' 0 A ' + r + ' ' + r + ' 0 0 1 ' + (-r) + ' 0';
+    }
+    var tr = side === 'top' ? '' : 'transform="translate(0,20)"';
+    return (
+      '<defs><path id="' + id + '" d="' + path + '" fill="none"/></defs>' +
+      '<text font-family="Georgia, serif" font-size="18" font-weight="700" letter-spacing="2" fill="' + color + '" ' + tr + '>' +
+      '<textPath href="#' + id + '" startOffset="50%" text-anchor="middle">' + (text || '').toUpperCase() + '</textPath>' +
+      '</text>'
+    );
+  }
+
+  function renderSeal() {
+    var top = document.getElementById('st-top-text').value || '';
+    var bot = document.getElementById('st-bottom-text').value || '';
+    var center = (document.getElementById('st-center-lines').value || '').split(/\n/).slice(0, 4);
+    var color = document.getElementById('st-color').value;
+    var borderStyle = document.getElementById('st-border-style').value;
+
+    var outer = borderStyle === 'single'
+      ? '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3"/>'
+      : borderStyle === 'double'
+        ? '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3"/>' +
+          '<circle r="128" fill="none" stroke="' + color + '" stroke-width="1"/>'
+        : '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3" stroke-dasharray="6,4"/>';
+
+    var centerY = center.length === 1 ? 6 : (center.length === 2 ? -4 : -18);
+    var centerText = center.map(function (line, i) {
+      var y = centerY + i * 24;
+      var size = (line.length > 12) ? 14 : 20;
+      return '<text y="' + y + '" text-anchor="middle" font-family="Georgia, serif" font-size="' + size + '" font-weight="700" fill="' + color + '">' + escapeXml(line) + '</text>';
+    }).join('');
+
+    return (
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-160 -160 320 320" width="300" height="300">' +
+      '<g>' +
+        outer +
+        textOnArc('seal-top-' + Date.now(), top, 115, 'top', color) +
+        textOnArc('seal-bot-' + Date.now(), bot, 115, 'bottom', color) +
+        centerText +
+      '</g>' +
+      '</svg>'
+    );
+  }
+
+  function renderDate() {
+    var label = document.getElementById('st-date-label').value;
+    var dateVal = (document.getElementById('st-date-value').value || '').trim();
+    var byline = (document.getElementById('st-date-byline').value || '').trim();
+    var color = document.getElementById('st-date-color').value;
+    if (!dateVal) {
+      var d = new Date();
+      dateVal = d.getDate().toString().padStart(2, '0') + ' ' +
+                ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][d.getMonth()] + ' ' +
+                d.getFullYear();
+    }
+    return (
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 170" width="320" height="170">' +
+      '<rect x="4" y="4" width="312" height="162" fill="none" stroke="' + color + '" stroke-width="3" rx="4"/>' +
+      '<rect x="12" y="14" width="296" height="40" fill="' + color + '"/>' +
+      '<text x="160" y="42" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="26" fill="#fff" letter-spacing="3">' + escapeXml(label) + '</text>' +
+      '<text x="160" y="100" text-anchor="middle" font-family="Courier New, monospace" font-size="28" font-weight="700" fill="' + color + '">' + escapeXml(dateVal) + '</text>' +
+      (byline
+        ? '<text x="160" y="140" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="' + color + '" letter-spacing="2">' + escapeXml(byline) + '</text>'
+        : '<line x1="40" y1="130" x2="280" y2="130" stroke="' + color + '" stroke-width="1"/>' +
+          '<text x="160" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="' + color + '" letter-spacing="2">BY ____________________________</text>') +
+      '</svg>'
+    );
+  }
+
+  function renderRubber() {
+    var lines = (document.getElementById('st-rubber-text').value || '').split(/\n/).slice(0, 2);
+    var color = document.getElementById('st-rubber-color').value;
+    var shape = document.getElementById('st-rubber-shape').value;
+    var outer;
+    if (shape === 'oval') {
+      outer = '<ellipse cx="160" cy="70" rx="150" ry="55" fill="none" stroke="' + color + '" stroke-width="4"/>';
+    } else if (shape === 'rounded') {
+      outer = '<rect x="10" y="15" width="300" height="110" rx="18" fill="none" stroke="' + color + '" stroke-width="4"/>';
+    } else {
+      outer = '<rect x="10" y="15" width="300" height="110" fill="none" stroke="' + color + '" stroke-width="4"/>';
+    }
+    var textBlock = lines.length === 1
+      ? '<text x="160" y="85" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="42" font-weight="900" fill="' + color + '" letter-spacing="4">' + escapeXml(lines[0]) + '</text>'
+      : '<text x="160" y="60" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="26" font-weight="900" fill="' + color + '" letter-spacing="2">' + escapeXml(lines[0]) + '</text>' +
+        '<text x="160" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="' + color + '" letter-spacing="2">' + escapeXml(lines[1]) + '</text>';
+    return (
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 140" width="320" height="140">' +
+      outer + textBlock +
+      '</svg>'
+    );
+  }
+
+  function escapeXml(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function currentSvg() {
+    switch (kindSel.value) {
+      case 'date':   return renderDate();
+      case 'rubber': return renderRubber();
+      default:       return renderSeal();
+    }
+  }
+
+  function currentLayout() {
+    if (kindSel.value === 'seal') {
+      return {
+        top: document.getElementById('st-top-text').value,
+        bottom: document.getElementById('st-bottom-text').value,
+        center: (document.getElementById('st-center-lines').value || '').split('\n'),
+        color: document.getElementById('st-color').value,
+        border_style: document.getElementById('st-border-style').value,
+      };
+    }
+    if (kindSel.value === 'date') {
+      return {
+        label: document.getElementById('st-date-label').value,
+        date: document.getElementById('st-date-value').value,
+        byline: document.getElementById('st-date-byline').value,
+        color: document.getElementById('st-date-color').value,
+      };
+    }
+    return {
+      text: document.getElementById('st-rubber-text').value,
+      color: document.getElementById('st-rubber-color').value,
+      shape: document.getElementById('st-rubber-shape').value,
+    };
+  }
+
+  function render() {
+    previewEl.innerHTML = currentSvg();
+  }
+
+  // Wire every input to re-render.
+  root.querySelectorAll('input, select, textarea').forEach(function (el) {
+    el.addEventListener('input', render);
+    el.addEventListener('change', render);
+  });
+
+  // Load existing layout if editing.
+  var initLayout = null;
+  try { initLayout = JSON.parse(root.dataset.stampLayout); } catch (e) { initLayout = null; }
+  if (initLayout && kindSel.value === 'seal') {
+    document.getElementById('st-top-text').value = initLayout.top || '';
+    document.getElementById('st-bottom-text').value = initLayout.bottom || '';
+    document.getElementById('st-center-lines').value = (initLayout.center || []).join('\n');
+    if (initLayout.color) document.getElementById('st-color').value = initLayout.color;
+    if (initLayout.border_style) document.getElementById('st-border-style').value = initLayout.border_style;
+  } else if (initLayout && kindSel.value === 'date') {
+    document.getElementById('st-date-label').value = initLayout.label || 'RECEIVED';
+    document.getElementById('st-date-value').value = initLayout.date || '';
+    document.getElementById('st-date-byline').value = initLayout.byline || '';
+    if (initLayout.color) document.getElementById('st-date-color').value = initLayout.color;
+  } else if (initLayout && kindSel.value === 'rubber') {
+    document.getElementById('st-rubber-text').value = initLayout.text || '';
+    if (initLayout.color) document.getElementById('st-rubber-color').value = initLayout.color;
+    if (initLayout.shape) document.getElementById('st-rubber-shape').value = initLayout.shape;
+  }
+  syncFieldsets();
+
+  // Save / register.
+  document.getElementById('st-save').addEventListener('click', function () {
+    var name = (document.getElementById('st-name').value || '').trim();
+    if (!name) {
+      statusEl.style.color = 'var(--ts-danger)';
+      statusEl.textContent = 'Name is required.';
+      return;
+    }
+    var payload = {
+      name: name,
+      kind: kindSel.value,
+      layout: currentLayout(),
+      svg: currentSvg(),
+    };
+    statusEl.style.color = 'var(--ts-text-muted)';
+    statusEl.textContent = 'Saving…';
+    var method = stampId ? 'PUT' : 'POST';
+    var url = stampId ? ('/api/tsd-stamps/' + stampId) : '/api/tsd-stamps/';
+    fetch(url, {
+      method: method, credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify(payload),
+    }).then(function (r) {
+      if (r.status === 409) throw new Error('A stamp with that name already exists.');
+      if (!r.ok) return r.json().then(function (j) { throw new Error(j.message || j.error || ('HTTP ' + r.status)); });
+      return r.json();
+    }).then(function (data) {
+      statusEl.style.color = 'var(--ts-brand-green)';
+      statusEl.textContent = 'Saved as "' + data.name + '".';
+      if (!stampId) {
+        setTimeout(function () { window.location = '/stamps/studio/' + data.id; }, 500);
+      }
+    }).catch(function (e) {
+      statusEl.style.color = 'var(--ts-danger)';
+      statusEl.textContent = e.message;
+    });
+  });
+
+  render();
+})();
+</script>
+{% endblock %}

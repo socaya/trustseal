@@ -1,0 +1,139 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'stamps' %}
+
+{% block title %}Stamps · TRUSTSEAL{% endblock %}
+{% block page_title %}Stamps{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Design and register organizational stamps — seals, date stamps,
+    rubber stamps or custom SVG. Any stamp here can be inserted into
+    a TrustSeal Document via <strong>Insert ▸ Stamp</strong>. These
+    are visual marks for inline document use and are distinct from
+    the cryptographically-attested PDF seals under
+    <em>Trust ▸ Managed stamps</em>.
+  </p>
+{% endblock %}
+{% block page_actions %}
+  <a class="ts-btn ts-btn--primary" href="{{ url_for('tsd_stamps_views.studio_new') }}">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    New stamp
+  </a>
+{% endblock %}
+
+{% block content %}
+<section class="ts-metric-strip" style="margin-bottom: var(--ts-space-5);">
+  <div class="ts-metric">
+    <span class="ts-metric__label">Registered</span>
+    <span class="ts-metric__value">{{ stamps|length }}</span>
+    <span class="ts-metric__sub">tenant stamps</span>
+  </div>
+  <div class="ts-metric">
+    <span class="ts-metric__label">Seals</span>
+    <span class="ts-metric__value">{{ stamps|selectattr('kind','equalto','seal')|list|length }}</span>
+    <span class="ts-metric__sub">round seals</span>
+  </div>
+  <div class="ts-metric">
+    <span class="ts-metric__label">Date</span>
+    <span class="ts-metric__value">{{ stamps|selectattr('kind','equalto','date')|list|length }}</span>
+    <span class="ts-metric__sub">date stamps</span>
+  </div>
+  <div class="ts-metric">
+    <span class="ts-metric__label">Rubber</span>
+    <span class="ts-metric__value">{{ stamps|selectattr('kind','equalto','rubber')|list|length }}</span>
+    <span class="ts-metric__sub">rubber stamps</span>
+  </div>
+</section>
+
+{% if stamps %}
+<ul class="ts-stamp-grid">
+  {% for s in stamps %}
+  <li class="ts-stamp-card">
+    <a class="ts-stamp-card__preview" href="{{ url_for('tsd_stamps_views.studio_edit', stamp_id=s.id) }}">
+      {{ s.svg|safe }}
+    </a>
+    <div class="ts-stamp-card__meta">
+      <div class="ts-stamp-card__name">{{ s.name }}</div>
+      <div class="ts-stamp-card__kind">{{ s.kind|upper }} · updated {{ s.updated_at.strftime('%Y-%m-%d') }}</div>
+    </div>
+    <div class="ts-stamp-card__actions">
+      <a class="ts-btn ts-btn--text ts-btn--sm" href="{{ url_for('tsd_stamps_views.studio_edit', stamp_id=s.id) }}">Edit</a>
+      <button type="button" class="ts-btn ts-btn--text ts-btn--sm" data-delete-stamp="{{ s.id }}">Delete</button>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<section class="ts-panel" style="padding: 0;">
+  <div class="ts-empty">
+    <div class="ts-empty__title">No stamps registered yet</div>
+    <p class="ts-empty__hint">
+      Design your first stamp — a round organisation seal, a dated
+      RECEIVED/APPROVED stamp, or a freeform rubber stamp. Everything
+      renders as SVG and inserts cleanly into any TrustSeal Document.
+    </p>
+    <div class="ts-empty__actions">
+      <a class="ts-btn ts-btn--primary ts-btn--lg" href="{{ url_for('tsd_stamps_views.studio_new') }}">
+        Open Stamp Studio
+      </a>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<style>
+.ts-stamp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--ts-space-4);
+  list-style: none; margin: 0; padding: 0;
+}
+.ts-stamp-card {
+  background: var(--ts-surface);
+  border: 1px solid var(--ts-border);
+}
+.ts-stamp-card__preview {
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--ts-space-5);
+  background: var(--ts-surface-alt);
+  border-bottom: 1px solid var(--ts-border);
+  min-height: 200px;
+  text-decoration: none;
+}
+.ts-stamp-card__preview svg { max-width: 160px; max-height: 160px; }
+.ts-stamp-card__meta {
+  padding: var(--ts-space-3) var(--ts-space-4);
+}
+.ts-stamp-card__name {
+  font-weight: var(--ts-fw-semibold); color: var(--ts-text);
+  font-size: var(--ts-fs-body);
+}
+.ts-stamp-card__kind {
+  font-size: var(--ts-fs-meta); color: var(--ts-text-muted);
+  letter-spacing: 0.06em; margin-top: 2px;
+}
+.ts-stamp-card__actions {
+  display: flex; gap: var(--ts-space-2);
+  padding: 0 var(--ts-space-3) var(--ts-space-3);
+  border-top: 1px dashed var(--ts-border);
+  padding-top: var(--ts-space-2);
+}
+</style>
+
+<script>
+document.querySelectorAll('[data-delete-stamp]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var id = b.getAttribute('data-delete-stamp');
+    if (!confirm('Delete this stamp? Documents that already contain it keep their inline SVG.')) return;
+    fetch('/api/tsd-stamps/' + id, {
+      method: 'DELETE', credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'fetch' },
+    }).then(function (r) {
+      if (r.status === 204) window.location.reload();
+      else alert('Delete failed: HTTP ' + r.status);
+    });
+  });
+});
+</script>
+{% endblock %}
