@@ -1,7 +1,51 @@
 # TSD real-time multi-cursor collab — architecture plan
 
-**Status (2026-11-18):** Not implemented. Presence avatars (polling-based)
-ship as the awareness layer that a future co-editing engine will reuse.
+**Status (2026-11-18):** Awareness channel shipped. Full co-editing
+(conflict-free text merging) still requires CRDT engine integration —
+see §Recommended path below.
+
+## What ships today
+
+* **Transport:** Flask-SocketIO 5.x with `async_mode='threading'` and
+  `simple-websocket` as the WSGI-compatible WebSocket adapter. True
+  WebSocket in dev with `flask run`; gunicorn + gevent/eventlet in
+  production.
+* **Namespace:** `/tsd`. Per-document rooms keyed as `tsd:<id>`.
+* **Auth:** inherits the HTTP session (`flask_login.current_user`).
+  Every `join` re-runs the same `_can_access` check as the HTTP
+  endpoints (tenant membership or active share grant).
+* **Protocol events:**
+  - `hello` on connect — server tells client its own identity +
+    stable color.
+  - `join` `{tsd_id}` — join the document room; server emits
+    `peer_joined` to everyone else and `whois` back to the room so
+    existing peers reply with `whoami` → `peer_joined` pointed at
+    the newcomer.
+  - `cursor` `{tsd_id, position}` — position carries caret rect
+    (top/left/width/height relative to the page element) and
+    optional selection rects. Server broadcasts `peer_cursor` to
+    the room except the sender.
+  - `typing` `{tsd_id}` — transient typing indicator,
+    broadcast as `peer_typing`.
+  - `leave` + `disconnect` — broadcast `peer_left`.
+* **UI:** editor renders colored vertical cursor lines with labeled
+  name chips for every active peer. Selection rects render as
+  semi-transparent highlights. A green "● live" badge in the title
+  bar flips to "● offline" on disconnect. A "<name> typing" pill
+  appears for 2.5 s next to the presence avatars.
+
+Realistic test coverage ships in `tests/documents/test_tsd_realtime.py`
+(colour stability, access check parity, outsider denial). The socket
+round-trip itself is proven via a live smoke script (see §Smoke).
+
+## What is still deferred
+
+**Conflict-free co-editing.** Two users editing the same paragraph
+simultaneously still need the Y.js / Automerge CRDT or an OT engine
+— the awareness channel moves cursors, not text. Today the existing
+`If-Match` optimistic-concurrency guard prevents silent clobbering;
+the losing write gets `412 version_conflict` and the loser's version
+is accessible from the append-only `ts_document_versions` snapshot.
 
 ## Why not shipped yet
 
@@ -38,12 +82,22 @@ architecture decisions that have not yet been taken:
    already renders avatar pills that a WebSocket awareness stream can
    feed.
 
-## What ships now (same iteration as this doc)
+## What ships now
+
+### Polling-based (first iteration)
 
 - `TSDPresence` row per `(tsd_id, user_id)` with `last_ping_at`.
 - `POST /api/tsd/<id>/presence` — pinged by the editor every 15 s.
 - `GET /api/tsd/<id>/presence` — returns viewers active in the last 45 s.
 - Avatar pills in the editor title bar refresh every 15 s.
+
+### WebSocket awareness channel (this iteration)
+
+- Flask-SocketIO on `/socket.io/` with the `/tsd` namespace.
+- Live cursor + selection broadcast under per-document rooms.
+- Session-cookie auth; same tenant / share check as the HTTP layer.
+- Editor renders peers' colored cursors with name labels and
+  semi-transparent selection highlights inside the paper page.
 
 ## Recommended path for a real implementation
 

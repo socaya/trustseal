@@ -416,6 +416,11 @@ def create_app(config_class=None):
     from .errors.problem import register_problem_handlers
     register_problem_handlers(app)
 
+    # Real-time collab awareness channel (WebSocket /tsd namespace).
+    # Dev: Werkzeug + threading. Prod: gunicorn with -k gevent/eventlet.
+    from .services.tsd_realtime import init_app as _init_realtime
+    _init_realtime(app)
+
     app.logger.info(
         "application_started",
         extra={"config": config_name, "env": app.config.get("FLASK_ENV")},

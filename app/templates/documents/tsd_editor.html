@@ -15,6 +15,7 @@
   /* Editor runs edge-to-edge inside the main content area. */
   .ts-page { padding: 0 !important; max-width: none !important; }
 </style>
+<script src="{{ url_for('static', filename='js/vendor/socket.io.min.js') }}"></script>
 {% endblock %}
 
 {% block content %}
@@ -37,6 +38,7 @@
     <span id="tsd-save-state" class="ts-ed__savestate">● New draft — not saved yet</span>
     <div class="ts-ed__spacer"></div>
     <span id="tsd-presence" class="ts-ed__presence" aria-label="Currently viewing"></span>
+    <span id="tsd-rt-badge" class="ts-ed__rt-badge ts-ed__rt-badge--off" title="Real-time awareness">● offline</span>
     <span class="ts-ed__class-mark">Classification: <b id="tsd-class-top">Internal</b></span>
     <button type="button" class="ts-ed__btn ts-ed__btn--ghost" id="tsd-security-open" aria-expanded="false" aria-controls="tsd-security-panel">
       ◈ Security
@@ -876,6 +878,65 @@
 .ts-ed__hist-ver { font-family: var(--ts-font-mono); color: var(--ed-brand); font-weight: 600; }
 .ts-ed__hist-meta { color: var(--ed-muted); font-size: 11px; margin-top: 2px; }
 .ts-ed__hist-acts { display: flex; gap: 6px; margin-top: 6px; }
+
+/* ---------- Remote cursor overlays (realtime awareness) ---------- */
+.ts-ed__page {
+  /* The absolutely-positioned cursor overlays live inside the paper
+     page so they scroll with content. */
+}
+.ts-ed__peer-cursor {
+  position: absolute;
+  pointer-events: none;
+  z-index: 3;
+  width: 2px;
+  background: currentColor;
+  will-change: transform;
+  transition: top 80ms ease-out, left 80ms ease-out, height 80ms ease-out;
+}
+.ts-ed__peer-cursor__label {
+  position: absolute;
+  top: -16px; left: 0;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  background: currentColor;
+  border-radius: 2px;
+  white-space: nowrap;
+  font-family: Arial, sans-serif;
+  letter-spacing: 0.02em;
+}
+.ts-ed__peer-cursor__label span { color: #fff; }
+.ts-ed__peer-selection {
+  position: absolute;
+  pointer-events: none;
+  z-index: 2;
+  background: currentColor;
+  opacity: 0.18;
+  border-radius: 1px;
+  mix-blend-mode: multiply;
+}
+.ts-ed__peer-typing {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 6px;
+  margin-left: 8px;
+  font-size: 10px;
+  color: var(--ed-brand);
+  background: var(--ed-brand-soft);
+  border-radius: var(--ts-radius-pill);
+}
+.ts-ed__peer-typing::before { content: '●'; animation: tsd-blink 1.2s infinite; }
+@keyframes tsd-blink { 0%, 60%, 100% { opacity: 1; } 30% { opacity: .35; } }
+
+.ts-ed__rt-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 6px;
+  font-size: 9px; font-weight: 600;
+  background: var(--ts-green-soft); color: var(--ts-brand-green);
+  border: 1px solid #c6dfd1; border-radius: var(--ts-radius-pill);
+  margin-left: 8px;
+}
+.ts-ed__rt-badge--off { background: var(--ed-subline); color: var(--ed-muted); border-color: var(--ed-line); }
 
 /* ---------- Presence avatars ---------- */
 .ts-ed__presence {
@@ -2435,6 +2496,191 @@
   // Re-wire handles after each redraw.
   var origDrawRulers = drawRulers;
   drawRulers = function () { origDrawRulers(); setTimeout(wireRulerDrag, 10); };
+
+  // ===================================================================== REALTIME AWARENESS (Socket.IO)
+  var rtBadge = document.getElementById('tsd-rt-badge');
+  var rtPeers = {};  // sid → { color, name, cursorEl, selEl, typingTimer }
+
+  function setRtBadge(state) {
+    if (!rtBadge) return;
+    if (state === 'live') {
+      rtBadge.textContent = '● live';
+      rtBadge.className = 'ts-ed__rt-badge';
+      rtBadge.title = 'Real-time awareness connected';
+    } else {
+      rtBadge.textContent = '● offline';
+      rtBadge.className = 'ts-ed__rt-badge ts-ed__rt-badge--off';
+      rtBadge.title = 'Real-time awareness disconnected';
+    }
+  }
+
+  function pageRelativeRect(domRect) {
+    // Translate a viewport-relative DOMRect into coordinates inside
+    // the .ts-ed__page element (so the overlay scrolls with content).
+    if (!page) return null;
+    var pageRect = page.getBoundingClientRect();
+    return {
+      top:    domRect.top    - pageRect.top,
+      left:   domRect.left   - pageRect.left,
+      width:  domRect.width,
+      height: domRect.height,
+    };
+  }
+
+  function captureCursor() {
+    var sel = window.getSelection();
+    if (!sel.rangeCount) return null;
+    var range = sel.getRangeAt(0);
+    if (!editor.contains(range.startContainer)) return null;
+    // Caret position: a zero-width range at the current end.
+    var caret = range.cloneRange();
+    caret.collapse(false);
+    var caretRect = caret.getClientRects()[0] || caret.getBoundingClientRect();
+    if (!caretRect || caretRect.width === 0 && caretRect.height === 0) {
+      // Browsers sometimes return a zero rect when the caret sits
+      // between block elements; fall back to the range itself.
+      caretRect = range.getBoundingClientRect();
+    }
+    var payload = { caret: pageRelativeRect(caretRect) };
+    if (!range.collapsed) {
+      // Build selection rects (DOMRectList), translate each.
+      var rects = [];
+      var list = range.getClientRects();
+      for (var i = 0; i < list.length; i++) rects.push(pageRelativeRect(list[i]));
+      payload.selectionRects = rects;
+    }
+    return payload;
+  }
+
+  function renderPeerCursor(sid, info) {
+    var peer = rtPeers[sid];
+    if (!peer) {
+      peer = rtPeers[sid] = { color: info.color || '#0f3b82', name: info.name || 'Peer' };
+    }
+    // Lazily create DOM nodes.
+    if (!peer.cursorEl) {
+      peer.cursorEl = document.createElement('div');
+      peer.cursorEl.className = 'ts-ed__peer-cursor';
+      peer.cursorEl.style.color = peer.color;
+      var label = document.createElement('span');
+      label.className = 'ts-ed__peer-cursor__label';
+      label.innerHTML = '<span>' + (peer.name || 'Peer') + '</span>';
+      peer.cursorEl.appendChild(label);
+      page.appendChild(peer.cursorEl);
+    }
+    if (info.position && info.position.caret) {
+      var c = info.position.caret;
+      peer.cursorEl.style.top = c.top + 'px';
+      peer.cursorEl.style.left = c.left + 'px';
+      peer.cursorEl.style.height = Math.max(14, c.height || 14) + 'px';
+      peer.cursorEl.style.display = '';
+    }
+    // Selection rects.
+    if (peer.selEls) peer.selEls.forEach(function (n) { n.remove(); });
+    peer.selEls = [];
+    var sels = info.position && info.position.selectionRects;
+    if (sels && sels.length) {
+      sels.forEach(function (r) {
+        if (!r) return;
+        var s = document.createElement('div');
+        s.className = 'ts-ed__peer-selection';
+        s.style.color = peer.color;
+        s.style.top = r.top + 'px'; s.style.left = r.left + 'px';
+        s.style.width = r.width + 'px'; s.style.height = r.height + 'px';
+        page.appendChild(s);
+        peer.selEls.push(s);
+      });
+    }
+  }
+
+  function dropPeer(sid) {
+    var peer = rtPeers[sid]; if (!peer) return;
+    if (peer.cursorEl) peer.cursorEl.remove();
+    if (peer.selEls) peer.selEls.forEach(function (n) { n.remove(); });
+    if (peer.typingEl) peer.typingEl.remove();
+    delete rtPeers[sid];
+  }
+
+  function markTyping(sid, info) {
+    var peer = rtPeers[sid] || (rtPeers[sid] = { color: info.color || '#0f3b82', name: info.name || 'Peer' });
+    if (!peer.typingEl) {
+      peer.typingEl = document.createElement('span');
+      peer.typingEl.className = 'ts-ed__peer-typing';
+      peer.typingEl.textContent = peer.name + ' typing';
+      presenceEl.appendChild(peer.typingEl);
+    }
+    clearTimeout(peer.typingTimer);
+    peer.typingTimer = setTimeout(function () {
+      if (peer.typingEl) { peer.typingEl.remove(); peer.typingEl = null; }
+    }, 2500);
+  }
+
+  var rtSocket = null;
+  function initRealtime() {
+    if (!tsdId || typeof io !== 'function') return;
+    try {
+      rtSocket = io('/tsd', {
+        path: '/socket.io',
+        transports: ['websocket', 'polling'],
+        withCredentials: true,
+      });
+    } catch (e) { setRtBadge('off'); return; }
+
+    rtSocket.on('connect', function () {
+      setRtBadge('live');
+      rtSocket.emit('join', { tsd_id: tsdId });
+    });
+    rtSocket.on('disconnect', function () { setRtBadge('off'); });
+    rtSocket.on('connect_error', function () { setRtBadge('off'); });
+
+    rtSocket.on('peer_joined', function (info) {
+      if (!info || !info.sid) return;
+      rtPeers[info.sid] = { color: info.color, name: info.name };
+      // Nothing to render until they move; just stash identity.
+    });
+    rtSocket.on('peer_left', function (info) {
+      if (info && info.sid) dropPeer(info.sid);
+    });
+    rtSocket.on('peer_cursor', function (info) {
+      if (!info || !info.sid) return;
+      renderPeerCursor(info.sid, info);
+    });
+    rtSocket.on('peer_typing', function (info) {
+      if (info && info.sid) markTyping(info.sid, info);
+    });
+    rtSocket.on('whois', function (data) {
+      // Someone just joined and wants to know who's already here.
+      rtSocket.emit('whoami', { tsd_id: tsdId, asker_sid: data.asker_sid });
+    });
+
+    // Broadcast cursor on every selection change (debounced).
+    var selTimer = null;
+    document.addEventListener('selectionchange', function () {
+      if (document.activeElement !== editor) return;
+      clearTimeout(selTimer);
+      selTimer = setTimeout(function () {
+        var payload = captureCursor();
+        if (payload) rtSocket.emit('cursor', { tsd_id: tsdId, position: payload });
+      }, 80);
+    });
+
+    // Broadcast "typing" on keystrokes (throttled).
+    var lastTypingBroadcast = 0;
+    editor.addEventListener('input', function () {
+      var now = Date.now();
+      if (now - lastTypingBroadcast < 1500) return;
+      lastTypingBroadcast = now;
+      rtSocket.emit('typing', { tsd_id: tsdId });
+    });
+
+    // Explicit leave on page hide so peers drop us faster than the
+    // disconnect timeout.
+    window.addEventListener('beforeunload', function () {
+      try { rtSocket.emit('leave', { tsd_id: tsdId }); } catch (e) {}
+    });
+  }
+  // Initialise once the editor has a persisted id.
+  setTimeout(initRealtime, 700);
 
   // ===================================================================== GLOBAL SHORTCUTS
   document.addEventListener('keydown', function (e) {
