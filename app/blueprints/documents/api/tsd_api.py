@@ -42,6 +42,7 @@ from app.services.tsd_format import (
 )
 from app.services.tsd_ingest import IngestError, ingest
 from app.services.tsd_pdf import PdfExportError, render_html_to_pdf
+from app.services import tsd_templates
 
 
 tsd_api = Blueprint("tsd_api", __name__, url_prefix="/api/tsd")
@@ -507,6 +508,65 @@ def ingest_tsd():
     db.session.commit()
 
     record_tsd_ingest(meta.get("source_type", "unknown"))
+    record_tsd_plaintext(len(plaintext))
+    return jsonify(row.to_dict()), 201
+
+
+# ============================================================ templates
+
+
+@tsd_api.route("/templates", methods=["GET"])
+@login_required
+def list_templates():
+    _actor()
+    return jsonify(tsd_templates.list_templates())
+
+
+@tsd_api.route("/from-template/<slug>", methods=["POST"])
+@login_required
+def create_from_template(slug: str):
+    """Instantiate a new TSD from a built-in template."""
+    actor = _actor()
+    tpl = tsd_templates.get_template(slug)
+    if tpl is None:
+        return jsonify({"error": "template_not_found", "slug": slug}), 404
+
+    payload = request.get_json(silent=True) or {}
+    title = (payload.get("title") or tpl.title).strip()[:255]
+    tags = (payload.get("tags") or tpl.tags or "").strip() or None
+
+    safe_html = sanitize_html(tpl.body_html)
+    try:
+        plaintext = pack_content(
+            html=safe_html,
+            description=f"Created from template: {tpl.name}",
+            tags=[t.strip() for t in (tags or "").split(",") if t.strip()],
+            extras={"template_slug": tpl.slug, "template_category": tpl.category},
+        )
+        ciphertext = encrypt_content_envelope(
+            plaintext, organization_id=actor.organization_id
+        )
+    except TSDError as exc:
+        return jsonify({"error": "encrypt_failed", "message": str(exc)}), 400
+
+    row = TSDocument(
+        organization_id=actor.organization_id,
+        created_by_id=actor.id,
+        title=title,
+        description=f"From template: {tpl.name}"[:1000],
+        tags=tags,
+        export_policy=payload.get("export_policy", "pdf_allowed"),
+        status="draft",
+        ciphertext=ciphertext,
+        ciphertext_sha256=sha256_hex(ciphertext),
+        plaintext_bytes=len(plaintext),
+    )
+    db.session.add(row)
+    db.session.flush()
+    _emit(actor_id=actor.id, organization_id=actor.organization_id,
+          action="tsd.from_template", resource_id=row.id, outcome=tpl.slug)
+    db.session.commit()
+    record_tsd_operation("from_template")
     record_tsd_plaintext(len(plaintext))
     return jsonify(row.to_dict()), 201
 

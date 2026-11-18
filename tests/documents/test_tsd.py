@@ -322,6 +322,52 @@ def test_api_emits_security_events(pg_app, tenant_pair):
     assert "tsd.create" in actions
 
 
+# ================================================================ templates
+
+
+def test_list_built_in_templates(pg_app, tenant_pair):
+    user = db.session.get(User, tenant_pair["user_a"])
+    client = pg_app.test_client()
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(user.id); sess["_fresh"] = True; sess["_id"] = "s"
+    r = client.get("/api/tsd/templates")
+    assert r.status_code == 200
+    items = r.get_json()
+    slugs = {t["slug"] for t in items}
+    assert {"nda", "services-agreement", "memo", "letter", "board-resolution",
+            "meeting-minutes", "policy", "blank"}.issubset(slugs)
+
+
+def test_instantiate_from_template(pg_app, tenant_pair):
+    user = db.session.get(User, tenant_pair["user_a"])
+    client = pg_app.test_client()
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(user.id); sess["_fresh"] = True; sess["_id"] = "s"
+
+    r = client.post("/api/tsd/from-template/nda",
+                    json={}, headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 201
+    doc = r.get_json()
+    assert doc["title"] == "Mutual Non-Disclosure Agreement"
+
+    # Fetch decrypted content — must contain template body + placeholder fields.
+    r = client.get(f"/api/tsd/{doc['id']}/content")
+    html = r.get_json()["content"]["html"]
+    assert "MUTUAL NON-DISCLOSURE AGREEMENT" in html
+    assert "{{effective_date}}" in html
+    assert "{{party_a}}" in html
+
+
+def test_instantiate_unknown_template_404(pg_app, tenant_pair):
+    user = db.session.get(User, tenant_pair["user_a"])
+    client = pg_app.test_client()
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(user.id); sess["_fresh"] = True; sess["_id"] = "s"
+    r = client.post("/api/tsd/from-template/nope",
+                    json={}, headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 404
+
+
 # ================================================================ versions
 
 
