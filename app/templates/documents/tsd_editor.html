@@ -233,6 +233,54 @@
     <div id="tsd-history-body"><p>Loading…</p></div>
   </aside>
 
+  {# ======================= Share dialog ======================= #}
+  <div id="tsd-share-overlay" class="ts-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="tsd-share-title">
+    <div class="ts-modal" style="max-width: 540px;">
+      <h2 class="ts-modal__title" id="tsd-share-title">Share document</h2>
+      <p class="ts-panel__meta" style="margin-bottom: var(--ts-space-4);">
+        Grant another user in this workspace access to this TSD. Grants
+        are tenant-scoped; external email sharing ships in a later phase.
+      </p>
+
+      <div class="ts-form-row ts-form-row--split">
+        <div class="ts-field">
+          <label class="ts-field__label" for="tsd-share-email">Email</label>
+          <input type="email" id="tsd-share-email" class="ts-input"
+                 placeholder="teammate@company.com" autocomplete="off">
+        </div>
+        <div class="ts-field">
+          <label class="ts-field__label" for="tsd-share-perm">Permission</label>
+          <select id="tsd-share-perm" class="ts-select">
+            <option value="view">Can view</option>
+            <option value="comment">Can comment</option>
+            <option value="edit">Can edit</option>
+          </select>
+        </div>
+      </div>
+      <div class="ts-field" style="margin-top: var(--ts-space-3);">
+        <label class="ts-field__label" for="tsd-share-exp">Expires in (days, optional)</label>
+        <input type="number" id="tsd-share-exp" class="ts-input"
+               min="1" max="365" placeholder="e.g. 30">
+      </div>
+      <p class="ts-field__hint" style="margin-top: 6px;">
+        Leave blank for no expiry. 1–365 days.
+      </p>
+
+      <div class="ts-form-actions">
+        <button type="button" class="ts-btn ts-btn--ghost" id="tsd-share-close">Close</button>
+        <button type="button" class="ts-btn ts-btn--primary" id="tsd-share-submit">Grant access</button>
+      </div>
+      <p class="ts-panel__meta" id="tsd-share-status" style="margin-top: var(--ts-space-3); display: none;"></p>
+
+      <h3 style="margin: var(--ts-space-5) 0 var(--ts-space-2); font-size: var(--ts-fs-subsection);">
+        Active shares
+      </h3>
+      <div id="tsd-share-list" class="ts-ed__share-list">
+        <p class="ts-panel__meta">Loading…</p>
+      </div>
+    </div>
+  </div>
+
   {# ======================= Export-PDF dialog ======================= #}
   <div id="tsd-pdf-overlay" class="ts-overlay" hidden role="dialog" aria-modal="true">
     <div class="ts-modal" style="max-width: 460px;">
@@ -786,6 +834,37 @@
 .ts-ed__hist-ver { font-family: var(--ts-font-mono); color: var(--ed-brand); font-weight: 600; }
 .ts-ed__hist-meta { color: var(--ed-muted); font-size: 11px; margin-top: 2px; }
 .ts-ed__hist-acts { display: flex; gap: 6px; margin-top: 6px; }
+
+/* ---------- Share list ---------- */
+.ts-ed__share-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--ed-line);
+  background: var(--ed-subline);
+}
+.ts-ed__share-row {
+  display: flex; align-items: center; gap: var(--ts-space-3);
+  padding: var(--ts-space-3) var(--ts-space-4);
+  border-bottom: 1px solid var(--ed-line);
+  background: #fff;
+}
+.ts-ed__share-row:last-child { border-bottom: 0; }
+.ts-ed__share-row__who {
+  flex: 1 1 auto; min-width: 0;
+  font-size: var(--ts-fs-label);
+}
+.ts-ed__share-row__who strong { color: var(--ed-ink); }
+.ts-ed__share-row__who span { color: var(--ed-muted); display: block; font-size: var(--ts-fs-meta); }
+.ts-ed__share-row__perm {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  font-size: var(--ts-fs-micro); font-weight: var(--ts-fw-semibold);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  background: var(--ts-brand-primary-soft); color: var(--ts-brand-primary);
+  border-radius: var(--ts-radius-pill);
+}
+.ts-ed__share-row__perm--expired { background: var(--ts-warning-soft); color: var(--ts-warning); }
+.ts-ed__share-row__perm--revoked { background: var(--ts-danger-soft); color: var(--ts-danger); }
 
 /* Lock editing state (disables input cursor cues). */
 .ts-ed__editorwrap.ts-is-locked .ts-ed__editable { cursor: default; background: repeating-linear-gradient(135deg, transparent 0 8px, rgba(0,0,0,.015) 8px 9px); }
@@ -1860,9 +1939,94 @@
   document.getElementById('tsd-privacy-toggle').addEventListener('click', togglePrivacy);
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSecurity(); });
 
-  // Share button placeholder (wires to document_share_api in a later phase).
-  document.getElementById('tsd-share-btn').addEventListener('click', function () {
-    showToast('Share routes through the TrustSeal tenant-scoped document-shares API (phase upcoming).');
+  // ============================================================ Share
+  var shareOverlay = document.getElementById('tsd-share-overlay');
+  var shareEmail   = document.getElementById('tsd-share-email');
+  var sharePerm    = document.getElementById('tsd-share-perm');
+  var shareExp     = document.getElementById('tsd-share-exp');
+  var shareSubmit  = document.getElementById('tsd-share-submit');
+  var shareStatus  = document.getElementById('tsd-share-status');
+  var shareList    = document.getElementById('tsd-share-list');
+
+  function showShare() {
+    if (!tsdId) { showToast('Save the document first — shares attach to a stored TSD.'); return; }
+    shareOverlay.removeAttribute('hidden'); shareOverlay.style.display = 'flex';
+    shareEmail.value = ''; sharePerm.value = 'view'; shareExp.value = '';
+    shareStatus.style.display = 'none';
+    loadShares();
+    setTimeout(function () { shareEmail.focus(); }, 0);
+  }
+  function hideShare() { shareOverlay.setAttribute('hidden', ''); shareOverlay.style.display = 'none'; }
+
+  function renderShares(items) {
+    if (!items || !items.length) {
+      shareList.innerHTML = '<p class="ts-panel__meta" style="padding:12px">No shares yet.</p>';
+      return;
+    }
+    shareList.innerHTML = items.map(function (s) {
+      var permCls = s.active ? '' : (s.revoked_at ? 'ts-ed__share-row__perm--revoked' : 'ts-ed__share-row__perm--expired');
+      var permLabel = s.active ? s.permission : (s.revoked_at ? 'revoked' : 'expired');
+      var who = s.grantee_name || s.grantee_email_resolved || s.grantee_email || 'Unknown';
+      var sub = (s.grantee_email_resolved || s.grantee_email || '') + (s.expires_at ? ' · expires ' + s.expires_at.substring(0, 10) : '');
+      return '<div class="ts-ed__share-row">' +
+        '<div class="ts-ed__share-row__who"><strong>' + who + '</strong><span>' + sub + '</span></div>' +
+        '<span class="ts-ed__share-row__perm ' + permCls + '">' + permLabel + '</span>' +
+        (s.active ? '<button type="button" class="ts-ed__btn ts-ed__btn--ghost" data-revoke="' + s.id + '">Revoke</button>' : '') +
+        '</div>';
+    }).join('');
+    shareList.querySelectorAll('[data-revoke]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!confirm('Revoke this share? The row is kept for audit; access ends immediately.')) return;
+        fetch('/api/tsd/' + tsdId + '/shares/' + b.getAttribute('data-revoke'), {
+          method: 'DELETE', credentials: 'same-origin',
+          headers: { 'X-Requested-With': 'fetch' },
+        }).then(function (r) {
+          if (r.status !== 204) throw new Error('HTTP ' + r.status);
+          loadShares();
+        }).catch(function (e) {
+          shareStatus.style.display = ''; shareStatus.style.color = 'var(--ts-danger)';
+          shareStatus.textContent = 'Revoke failed: ' + e.message;
+        });
+      });
+    });
+  }
+
+  function loadShares() {
+    shareList.innerHTML = '<p class="ts-panel__meta" style="padding:12px">Loading…</p>';
+    fetch('/api/tsd/' + tsdId + '/shares', { credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(renderShares)
+      .catch(function (e) {
+        shareList.innerHTML = '<p class="ts-panel__meta" style="padding:12px;color:var(--ts-danger)">Failed: ' + e.message + '</p>';
+      });
+  }
+
+  document.getElementById('tsd-share-btn').addEventListener('click', showShare);
+  document.getElementById('tsd-share-close').addEventListener('click', hideShare);
+  shareOverlay.addEventListener('click', function (e) { if (e.target === shareOverlay) hideShare(); });
+  shareSubmit.addEventListener('click', function () {
+    var email = (shareEmail.value || '').trim();
+    if (!email) { shareStatus.style.display = ''; shareStatus.style.color = 'var(--ts-danger)'; shareStatus.textContent = 'Email is required.'; return; }
+    shareStatus.style.display = ''; shareStatus.style.color = 'var(--ed-muted)'; shareStatus.textContent = 'Granting access…';
+    var body = { email: email, permission: sharePerm.value };
+    var days = parseInt(shareExp.value, 10);
+    if (!isNaN(days) && days > 0) body.expires_in_days = days;
+    fetch('/api/tsd/' + tsdId + '/shares', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify(body),
+    }).then(function (r) {
+      if (!r.ok) return r.json().then(function (j) { throw new Error(j.message || j.error || ('HTTP ' + r.status)); });
+      return r.json();
+    }).then(function () {
+      shareStatus.style.color = 'var(--ts-brand-green)';
+      shareStatus.textContent = 'Shared with ' + email + '.';
+      shareEmail.value = ''; shareExp.value = '';
+      loadShares();
+    }).catch(function (e) {
+      shareStatus.style.color = 'var(--ts-danger)';
+      shareStatus.textContent = 'Share failed: ' + e.message;
+    });
   });
 
   // ===================================================================== GLOBAL SHORTCUTS

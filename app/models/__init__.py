@@ -18,6 +18,7 @@ from .revoked_token import RevokedToken
 from .event_delivery import SecurityEvent, OutboxEvent
 from .tsd_document import TSDocument
 from .tsd_document_version import TSDocumentVersion
+from .tsd_share import TSDShare
 from .tenant_key import TenantKey
 from .signing_envelope import SigningEnvelope, EnvelopeParticipant
 from .signer_decision import SignerChallenge, SignerDecision

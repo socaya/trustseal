@@ -322,6 +322,103 @@ def test_api_emits_security_events(pg_app, tenant_pair):
     assert "tsd.create" in actions
 
 
+# ================================================================ shares
+
+
+@pytest.fixture
+def same_tenant_pair(pg_app):
+    """Two users in the SAME org (unlike tenant_pair which separates them)."""
+    org = Organization(name="ShareCo")
+    db.session.add(org); db.session.flush()
+    owner = User(username="owner", email="owner@share.test", first_name="O",
+                 last_name="W", is_active=True, organization_id=org.id)
+    owner.set_password("owner-password-for-tests-only")
+    mate = User(username="mate", email="mate@share.test", first_name="M",
+                last_name="T", is_active=True, organization_id=org.id)
+    mate.set_password("mate-password-for-tests-only")
+    db.session.add_all([owner, mate]); db.session.commit()
+    return {"org": org.id, "owner": owner.id, "mate": mate.id,
+            "owner_email": owner.email, "mate_email": mate.email}
+
+
+def _client_as(pg_app, user_id):
+    c = pg_app.test_client()
+    with c.session_transaction() as sess:
+        sess["_user_id"] = str(user_id); sess["_fresh"] = True; sess["_id"] = "s"
+    return c
+
+
+def test_create_and_list_share(pg_app, same_tenant_pair):
+    c = _client_as(pg_app, same_tenant_pair["owner"])
+    doc = c.post("/api/tsd/", json={"title": "sharable", "content_html": "<p>ok</p>"},
+                 headers={"X-Requested-With": "fetch"}).get_json()
+    r = c.post(f"/api/tsd/{doc['id']}/shares",
+               json={"email": same_tenant_pair["mate_email"], "permission": "view"},
+               headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 201
+    share = r.get_json()
+    assert share["permission"] == "view"
+    assert share["grantee_user_id"] == same_tenant_pair["mate"]
+
+    r = c.get(f"/api/tsd/{doc['id']}/shares")
+    assert r.status_code == 200
+    items = r.get_json()
+    assert len(items) == 1
+    assert items[0]["active"] is True
+
+
+def test_share_rejects_non_tenant_email(pg_app, same_tenant_pair):
+    c = _client_as(pg_app, same_tenant_pair["owner"])
+    doc = c.post("/api/tsd/", json={"title": "x", "content_html": "<p>a</p>"},
+                 headers={"X-Requested-With": "fetch"}).get_json()
+    r = c.post(f"/api/tsd/{doc['id']}/shares",
+               json={"email": "outsider@nope.test", "permission": "view"},
+               headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 404
+    assert r.get_json()["error"] == "grantee_not_in_tenant"
+
+
+def test_share_rejects_invalid_permission(pg_app, same_tenant_pair):
+    c = _client_as(pg_app, same_tenant_pair["owner"])
+    doc = c.post("/api/tsd/", json={"title": "x", "content_html": "<p>a</p>"},
+                 headers={"X-Requested-With": "fetch"}).get_json()
+    r = c.post(f"/api/tsd/{doc['id']}/shares",
+               json={"email": same_tenant_pair["mate_email"], "permission": "admin"},
+               headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 400
+    assert r.get_json()["error"] == "invalid_permission"
+
+
+def test_revoke_share(pg_app, same_tenant_pair):
+    c = _client_as(pg_app, same_tenant_pair["owner"])
+    doc = c.post("/api/tsd/", json={"title": "x", "content_html": "<p>a</p>"},
+                 headers={"X-Requested-With": "fetch"}).get_json()
+    share = c.post(f"/api/tsd/{doc['id']}/shares",
+                   json={"email": same_tenant_pair["mate_email"], "permission": "edit"},
+                   headers={"X-Requested-With": "fetch"}).get_json()
+
+    r = c.delete(f"/api/tsd/{doc['id']}/shares/{share['id']}",
+                 headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 204
+
+    # Second revoke must 409 — row is kept for audit.
+    r = c.delete(f"/api/tsd/{doc['id']}/shares/{share['id']}",
+                 headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 409
+
+
+def test_share_with_expiry(pg_app, same_tenant_pair):
+    c = _client_as(pg_app, same_tenant_pair["owner"])
+    doc = c.post("/api/tsd/", json={"title": "x", "content_html": "<p>a</p>"},
+                 headers={"X-Requested-With": "fetch"}).get_json()
+    r = c.post(f"/api/tsd/{doc['id']}/shares",
+               json={"email": same_tenant_pair["mate_email"], "permission": "view",
+                     "expires_in_days": 7},
+               headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 201
+    assert r.get_json()["expires_at"] is not None
+
+
 # ================================================================ templates
 
 

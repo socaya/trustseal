@@ -17,7 +17,7 @@ counter.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import Blueprint, Response, abort, jsonify, request
 from flask_login import current_user, login_required
@@ -31,6 +31,8 @@ from app.metrics import (
 from app.models.event_delivery import SecurityEvent
 from app.models.tsd_document import EXPORT_POLICIES, TSD_STATUSES, TSDocument
 from app.models.tsd_document_version import TSDocumentVersion
+from app.models.tsd_share import TSD_SHARE_PERMISSIONS, TSDShare
+from app.models.user import User
 from app.services.tsd_format import (
     TSDError,
     decrypt_content_envelope,
@@ -60,6 +62,47 @@ def _actor():
 
 
 def _owned(doc_id: int) -> TSDocument:
+    """Fetch a TSD if the caller owns it OR has an active share grant.
+
+    Owner = any user in the same organization (tenant-scoped).
+    Grantee = user with an unrevoked, unexpired TSDShare row.
+    """
+    actor = _actor()
+    row = (
+        TSDocument.query
+        .filter(
+            TSDocument.id == doc_id,
+            TSDocument.organization_id == actor.organization_id,
+            TSDocument.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if row is not None:
+        return row
+    # Fall back to a share grant (same tenant, same user, still active).
+    row = (
+        TSDocument.query
+        .join(TSDShare, TSDShare.tsd_id == TSDocument.id)
+        .filter(
+            TSDocument.id == doc_id,
+            TSDocument.deleted_at.is_(None),
+            TSDShare.grantee_user_id == actor.id,
+            TSDShare.revoked_at.is_(None),
+            db.or_(TSDShare.expires_at.is_(None),
+                   TSDShare.expires_at > datetime.utcnow()),
+        )
+        .first()
+    )
+    if row is None:
+        abort(404)
+    return row
+
+
+def _owner_only(doc_id: int) -> TSDocument:
+    """Fetch a TSD only if the caller is in the owning tenant.
+
+    Used for share management, delete and other owner-scoped operations.
+    """
     actor = _actor()
     row = (
         TSDocument.query
@@ -73,6 +116,25 @@ def _owned(doc_id: int) -> TSDocument:
     if row is None:
         abort(404)
     return row
+
+
+def _share_permission(doc: TSDocument) -> str:
+    """Return the acting user's permission on the doc: owner / edit / comment / view."""
+    actor = _actor()
+    if doc.organization_id == actor.organization_id:
+        return "owner"
+    share = (
+        TSDShare.query
+        .filter(
+            TSDShare.tsd_id == doc.id,
+            TSDShare.grantee_user_id == actor.id,
+            TSDShare.revoked_at.is_(None),
+        )
+        .first()
+    )
+    if share is None or not share.is_active():
+        abort(403)
+    return share.permission
 
 
 def _emit(
@@ -237,6 +299,10 @@ def get_tsd_content(tsd_id: int):
 @login_required
 def update_tsd(tsd_id: int):
     row = _owned(tsd_id)
+    # View-only / comment-only grantees cannot mutate content.
+    perm = _share_permission(row)
+    if perm not in ("owner", "edit"):
+        return jsonify({"error": "permission_denied", "permission": perm}), 403
 
     if_match = request.headers.get("If-Match", "").strip('"')
     if if_match and if_match != str(row.version):
@@ -682,13 +748,151 @@ def restore_version(tsd_id: int, version: int):
     return jsonify(row.to_dict())
 
 
+# ============================================================ shares
+
+
+@tsd_api.route("/<int:tsd_id>/shares", methods=["GET"])
+@login_required
+def list_shares(tsd_id: int):
+    """List share grants on a TSD. Owner-only."""
+    row = _owner_only(tsd_id)
+    shares = (
+        TSDShare.query
+        .filter_by(tsd_id=row.id)
+        .order_by(TSDShare.created_at.desc())
+        .all()
+    )
+    # Include the grantee's display name where we have the user record.
+    user_ids = [s.grantee_user_id for s in shares if s.grantee_user_id]
+    users = {
+        u.id: u for u in User.query.filter(User.id.in_(user_ids)).all()
+    } if user_ids else {}
+
+    def _with_user(s):
+        d = s.to_dict()
+        u = users.get(s.grantee_user_id)
+        if u:
+            d["grantee_name"] = ((u.first_name or "") + " " + (u.last_name or "")).strip() or u.username
+            d["grantee_email_resolved"] = u.email
+        return d
+    return jsonify([_with_user(s) for s in shares])
+
+
+@tsd_api.route("/<int:tsd_id>/shares", methods=["POST"])
+@login_required
+def create_share(tsd_id: int):
+    """Grant access to another user in the same organization by email."""
+    row = _owner_only(tsd_id)
+    actor = _actor()
+
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get("email") or "").strip().lower()
+    permission = (payload.get("permission") or "view").lower()
+    expires_in_days = payload.get("expires_in_days")
+
+    if not email:
+        return jsonify({"error": "email_required"}), 400
+    if permission not in TSD_SHARE_PERMISSIONS:
+        return jsonify({"error": "invalid_permission",
+                        "allowed": list(TSD_SHARE_PERMISSIONS)}), 400
+
+    # Resolve grantee user (same tenant only).
+    grantee = (
+        User.query
+        .filter(User.email == email,
+                User.organization_id == row.organization_id,
+                User.is_active.is_(True))
+        .first()
+    )
+
+    if grantee is None:
+        return jsonify({
+            "error": "grantee_not_in_tenant",
+            "message": f"No active user with email {email!r} in this workspace. "
+                       f"External sharing is not enabled in this phase.",
+        }), 404
+    if grantee.id == actor.id:
+        return jsonify({"error": "cannot_share_with_self"}), 400
+
+    expires_at = None
+    if expires_in_days is not None:
+        try:
+            days = int(expires_in_days)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid_expires_in_days"}), 400
+        if days < 1 or days > 365:
+            return jsonify({"error": "expires_in_days_out_of_range",
+                            "min": 1, "max": 365}), 400
+        expires_at = datetime.utcnow() + timedelta(days=days)
+
+    # Upsert: if a share already exists for this grantee, reactivate it.
+    existing = (
+        TSDShare.query
+        .filter_by(tsd_id=row.id, grantee_user_id=grantee.id)
+        .first()
+    )
+    if existing is not None:
+        existing.permission = permission
+        existing.expires_at = expires_at
+        existing.revoked_at = None
+        existing.created_by_id = actor.id
+        share = existing
+    else:
+        share = TSDShare(
+            tsd_id=row.id,
+            organization_id=row.organization_id,
+            grantee_user_id=grantee.id,
+            grantee_email=grantee.email,
+            permission=permission,
+            created_by_id=actor.id,
+            expires_at=expires_at,
+        )
+        db.session.add(share)
+
+    _emit(actor_id=actor.id, organization_id=row.organization_id,
+          action="tsd.share", resource_id=row.id,
+          outcome=f"{permission}:user_{grantee.id}")
+    db.session.commit()
+    record_tsd_operation("share")
+
+    d = share.to_dict()
+    d["grantee_name"] = ((grantee.first_name or "") + " " + (grantee.last_name or "")).strip() or grantee.username
+    d["grantee_email_resolved"] = grantee.email
+    return jsonify(d), 201
+
+
+@tsd_api.route("/<int:tsd_id>/shares/<int:share_id>", methods=["DELETE"])
+@login_required
+def revoke_share(tsd_id: int, share_id: int):
+    """Revoke a share grant. Owner-only. Row is kept for audit — only
+    ``revoked_at`` is set."""
+    row = _owner_only(tsd_id)
+    actor = _actor()
+    share = (
+        TSDShare.query
+        .filter_by(id=share_id, tsd_id=row.id)
+        .first()
+    )
+    if share is None:
+        abort(404)
+    if share.revoked_at is not None:
+        return jsonify({"error": "already_revoked"}), 409
+    share.revoked_at = datetime.utcnow()
+    _emit(actor_id=actor.id, organization_id=row.organization_id,
+          action="tsd.share_revoke", resource_id=row.id,
+          outcome=f"share_{share.id}")
+    db.session.commit()
+    record_tsd_operation("share_revoke")
+    return "", 204
+
+
 # ============================================================ delete
 
 
 @tsd_api.route("/<int:tsd_id>", methods=["DELETE"])
 @login_required
 def delete_tsd(tsd_id: int):
-    row = _owned(tsd_id)
+    row = _owner_only(tsd_id)
 
     if_match = request.headers.get("If-Match", "").strip('"')
     if if_match and if_match != str(row.version):
