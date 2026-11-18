@@ -1,0 +1,15 @@
+{% extends "layouts/public.html" %}
+
+{% block title %}Access denied · TRUSTSEAL{% endblock %}
+
+{% block content %}
+<section class="ts-public-main ts-public-main--narrow" style="text-align: center; padding-top: var(--ts-space-9);">
+  <h1 style="font-size: var(--ts-fs-display); margin-bottom: var(--ts-space-4);">
+    This share link is no longer active
+  </h1>
+  <p class="ts-panel__meta">
+    The link has been {{ reason }} by the document owner.
+    Please contact the sender to request a new share.
+  </p>
+</section>
+{% endblock %}

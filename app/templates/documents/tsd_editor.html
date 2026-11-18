@@ -36,6 +36,7 @@
            aria-label="Document title">
     <span id="tsd-save-state" class="ts-ed__savestate">● New draft — not saved yet</span>
     <div class="ts-ed__spacer"></div>
+    <span id="tsd-presence" class="ts-ed__presence" aria-label="Currently viewing"></span>
     <span class="ts-ed__class-mark">Classification: <b id="tsd-class-top">Internal</b></span>
     <button type="button" class="ts-ed__btn ts-ed__btn--ghost" id="tsd-security-open" aria-expanded="false" aria-controls="tsd-security-panel">
       ◈ Security
@@ -233,6 +234,21 @@
     <div id="tsd-history-body"><p>Loading…</p></div>
   </aside>
 
+  {# ======================= Comments side panel ======================= #}
+  <aside id="tsd-comments-panel" class="ts-ed__comments-panel" hidden aria-label="Comments">
+    <header>
+      <h3>Comments</h3>
+      <button type="button" class="ts-ed__btn ts-ed__btn--ghost" id="tsd-comments-close">Close</button>
+    </header>
+    <div class="ts-ed__comments-list" id="tsd-comments-list">
+      <p class="ts-ed__comments-empty">Select text and press the 💬 in the selection bubble to comment.</p>
+    </div>
+    <footer>
+      <textarea id="tsd-comment-input" placeholder="Add a general comment on this document…"></textarea>
+      <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" id="tsd-comment-submit">Post comment</button>
+    </footer>
+  </aside>
+
   {# ======================= Share dialog ======================= #}
   <div id="tsd-share-overlay" class="ts-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="tsd-share-title">
     <div class="ts-modal" style="max-width: 540px;">
@@ -278,6 +294,32 @@
       <div id="tsd-share-list" class="ts-ed__share-list">
         <p class="ts-panel__meta">Loading…</p>
       </div>
+
+      <hr style="margin: var(--ts-space-5) 0; border: 0; border-top: 1px solid var(--ts-border);">
+
+      <h3 style="margin: 0 0 var(--ts-space-2); font-size: var(--ts-fs-subsection);">
+        Invite external recipient (email)
+      </h3>
+      <p class="ts-panel__meta" style="margin-bottom: var(--ts-space-3);">
+        Sends a magic-link email to a non-tenant address. The recipient
+        opens the document read-only; the link expires and can be
+        revoked. Token is hashed server-side.
+      </p>
+      <div class="ts-form-row ts-form-row--split">
+        <div class="ts-field">
+          <label class="ts-field__label" for="tsd-ext-email">Email</label>
+          <input type="email" id="tsd-ext-email" class="ts-input" placeholder="outsider@example.com">
+        </div>
+        <div class="ts-field">
+          <label class="ts-field__label" for="tsd-ext-exp">Expires in (days, 1–90)</label>
+          <input type="number" id="tsd-ext-exp" class="ts-input" min="1" max="90" value="14">
+        </div>
+      </div>
+      <div class="ts-form-actions" style="padding-top: var(--ts-space-3);">
+        <button type="button" class="ts-btn ts-btn--secondary" id="tsd-ext-submit">Send magic link</button>
+      </div>
+      <p class="ts-panel__meta" id="tsd-ext-status" style="display:none; margin-top: var(--ts-space-2);"></p>
+      <div id="tsd-ext-list" class="ts-ed__share-list" style="margin-top: var(--ts-space-3);"></div>
     </div>
   </div>
 
@@ -834,6 +876,83 @@
 .ts-ed__hist-ver { font-family: var(--ts-font-mono); color: var(--ed-brand); font-weight: 600; }
 .ts-ed__hist-meta { color: var(--ed-muted); font-size: 11px; margin-top: 2px; }
 .ts-ed__hist-acts { display: flex; gap: 6px; margin-top: 6px; }
+
+/* ---------- Presence avatars ---------- */
+.ts-ed__presence {
+  display: inline-flex; align-items: center; gap: -4px;
+  padding-left: 10px; border-left: 1px solid var(--ed-line);
+}
+.ts-ed__presence__pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px;
+  margin-left: -6px;
+  font-size: 10px; font-weight: 600;
+  color: #fff; background: var(--ed-brand);
+  border: 2px solid #fff;
+  border-radius: 50%;
+}
+.ts-ed__presence__pill:first-child { margin-left: 0; }
+.ts-ed__presence__pill--muted { background: var(--ed-muted); }
+
+/* ---------- Draggable ruler handles ---------- */
+.ts-ed__hruler svg .ts-ed__ruler-handle,
+.ts-ed__vruler svg .ts-ed__ruler-handle {
+  cursor: ew-resize;
+}
+.ts-ed__vruler svg .ts-ed__ruler-handle { cursor: ns-resize; }
+
+/* ---------- Comments panel ---------- */
+.ts-ed__comments-panel {
+  position: fixed;
+  top: var(--ts-topbar-h);
+  right: 0;
+  width: 360px; max-width: 90vw;
+  height: calc(100vh - var(--ts-topbar-h));
+  background: #fff;
+  border-left: 1px solid var(--ed-line);
+  box-shadow: 0 11px 26px rgba(18,38,54,.17);
+  z-index: 38;
+  display: flex; flex-direction: column;
+}
+.ts-ed__comments-panel header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--ed-line);
+}
+.ts-ed__comments-panel header h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.ts-ed__comments-list { flex: 1 1 auto; overflow-y: auto; padding: 8px 0; }
+.ts-ed__comments-empty { padding: 20px; color: var(--ed-muted); font-size: 12px; }
+.ts-ed__comment {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ed-line);
+}
+.ts-ed__comment--reply { padding-left: 32px; background: var(--ed-subline); }
+.ts-ed__comment__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.ts-ed__comment__author { font-weight: 600; font-size: 12px; color: var(--ed-ink); }
+.ts-ed__comment__when   { font-size: 10px; color: var(--ed-subtle); font-variant-numeric: tabular-nums; }
+.ts-ed__comment__anchor { font-size: 10px; color: var(--ed-muted); font-style: italic; margin-bottom: 4px; }
+.ts-ed__comment__body   { font-size: 12.5px; color: var(--ed-ink); line-height: 1.5; white-space: pre-wrap; }
+.ts-ed__comment__actions { display: flex; gap: 6px; margin-top: 6px; }
+.ts-ed__comment--resolved .ts-ed__comment__body { color: var(--ed-muted); text-decoration: line-through; }
+.ts-ed__comments-panel footer {
+  border-top: 1px solid var(--ed-line);
+  padding: 10px 14px;
+  background: var(--ed-subline);
+}
+.ts-ed__comments-panel footer textarea {
+  width: 100%; min-height: 60px;
+  border: 1px solid var(--ts-border-strong);
+  padding: 6px 8px; font-size: 12px; font-family: inherit;
+  border-radius: var(--ts-radius-sm);
+  resize: vertical;
+}
+.ts-ed__comments-panel footer button {
+  margin-top: 6px;
+}
+.ts-ed__comment-anchor-chip {
+  background: #fff3b0;
+  border-bottom: 2px dotted #835a0c;
+  cursor: pointer;
+}
 
 /* ---------- Share list ---------- */
 .ts-ed__share-list {
@@ -2028,6 +2147,294 @@
       shareStatus.textContent = 'Share failed: ' + e.message;
     });
   });
+
+  // ===================================================================== EXTERNAL SHARES
+  var extEmail  = document.getElementById('tsd-ext-email');
+  var extExp    = document.getElementById('tsd-ext-exp');
+  var extSubmit = document.getElementById('tsd-ext-submit');
+  var extStatus = document.getElementById('tsd-ext-status');
+  var extList   = document.getElementById('tsd-ext-list');
+
+  function renderExtShares(items) {
+    if (!items || !items.length) { extList.innerHTML = '<p class="ts-panel__meta" style="padding:8px">No external shares yet.</p>'; return; }
+    extList.innerHTML = items.map(function (s) {
+      var permCls = s.active ? '' : (s.revoked_at ? 'ts-ed__share-row__perm--revoked' : 'ts-ed__share-row__perm--expired');
+      var perm = s.active ? s.permission : (s.revoked_at ? 'revoked' : 'expired');
+      var hits = s.access_count > 0 ? ' · ' + s.access_count + ' view' + (s.access_count === 1 ? '' : 's') : ' · never opened';
+      return '<div class="ts-ed__share-row">' +
+        '<div class="ts-ed__share-row__who"><strong>' + s.recipient_email + '</strong><span>' +
+        'expires ' + (s.expires_at || '').substring(0, 10) + hits + '</span></div>' +
+        '<span class="ts-ed__share-row__perm ' + permCls + '">' + perm + '</span>' +
+        (s.active ? '<button type="button" class="ts-ed__btn ts-ed__btn--ghost" data-ext-revoke="' + s.id + '">Revoke</button>' : '') +
+        '</div>';
+    }).join('');
+    extList.querySelectorAll('[data-ext-revoke]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!confirm('Revoke this external share? The link stops working immediately.')) return;
+        fetch('/api/tsd/' + tsdId + '/external-shares/' + b.getAttribute('data-ext-revoke'),
+          { method: 'DELETE', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })
+          .then(function () { loadExtShares(); });
+      });
+    });
+  }
+
+  function loadExtShares() {
+    if (!tsdId) return;
+    fetch('/api/tsd/' + tsdId + '/external-shares', { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(renderExtShares);
+  }
+
+  if (extSubmit) extSubmit.addEventListener('click', function () {
+    var email = (extEmail.value || '').trim();
+    var days = parseInt(extExp.value, 10) || 14;
+    if (!email) { extStatus.style.display = ''; extStatus.style.color = 'var(--ts-danger)'; extStatus.textContent = 'Email required.'; return; }
+    extStatus.style.display = ''; extStatus.style.color = 'var(--ed-muted)'; extStatus.textContent = 'Sending magic link…';
+    fetch('/api/tsd/' + tsdId + '/external-shares', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify({ email: email, permission: 'view', expires_in_days: days }),
+    }).then(function (r) {
+      if (!r.ok) return r.json().then(function (j) { throw new Error(j.message || j.error || ('HTTP ' + r.status)); });
+      return r.json();
+    }).then(function (data) {
+      extStatus.style.color = 'var(--ts-brand-green)';
+      extStatus.innerHTML = 'Link sent to <strong>' + email + '</strong>. Copy for backup: ' +
+        '<code style="font-size:10px;background:var(--ed-subline);padding:1px 4px;">' +
+        data.link.substring(0, 60) + '…</code>';
+      extEmail.value = '';
+      loadExtShares();
+    }).catch(function (e) {
+      extStatus.style.color = 'var(--ts-danger)';
+      extStatus.textContent = 'Failed: ' + e.message;
+    });
+  });
+
+  // Wire external-share load whenever the share dialog is opened.
+  var origShow = showShare;
+  showShare = function () { origShow(); loadExtShares(); };
+
+  // ===================================================================== COMMENTS
+  var commentsPanel = document.getElementById('tsd-comments-panel');
+  var commentsList  = document.getElementById('tsd-comments-list');
+  var commentInput  = document.getElementById('tsd-comment-input');
+  var commentSubmit = document.getElementById('tsd-comment-submit');
+  var pendingAnchorId = null, pendingAnchorText = null;
+
+  function openComments() {
+    if (!tsdId) { showToast('Save first — comments attach to a stored TSD.'); return; }
+    commentsPanel.removeAttribute('hidden');
+    loadComments();
+  }
+  function closeComments() { commentsPanel.setAttribute('hidden', ''); }
+  document.getElementById('tsd-comments-close').addEventListener('click', closeComments);
+
+  // Bubble-menu comment — overrides the earlier insertComment handler
+  // so the selected text becomes an anchored span + an open thread.
+  function createAnchorAndComment() {
+    var sel = window.getSelection();
+    if (!sel.rangeCount || sel.isCollapsed) { openComments(); return; }
+    var text = sel.toString();
+    var anchorId = 'tc-' + Math.random().toString(36).slice(2, 10);
+    document.execCommand('insertHTML', false,
+      '<span class="ts-ed__comment-anchor-chip" id="' + anchorId + '">' +
+      text.replace(/</g, '&lt;') + '</span>');
+    pendingAnchorId = anchorId;
+    pendingAnchorText = text.length > 500 ? text.slice(0, 500) : text;
+    openComments();
+    setTimeout(function () { commentInput.focus(); }, 0);
+  }
+  // Rebind the bubble-menu comment button to the new flow.
+  var bcBtn = document.getElementById('tsd-bubble-comment');
+  if (bcBtn) {
+    var replacement = bcBtn.cloneNode(true);
+    bcBtn.parentNode.replaceChild(replacement, bcBtn);
+    replacement.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    replacement.addEventListener('click', createAnchorAndComment);
+  }
+
+  function renderComments(items) {
+    if (!items || !items.length) {
+      commentsList.innerHTML = '<p class="ts-ed__comments-empty">No comments yet. Select text then click 💬 in the selection bubble.</p>';
+      return;
+    }
+    // Tree: root comments first; replies nested below their parent.
+    var byParent = {};
+    items.forEach(function (c) {
+      var k = c.parent_comment_id || 'root';
+      (byParent[k] = byParent[k] || []).push(c);
+    });
+    var out = '';
+    function renderOne(c, depth) {
+      var when = (c.created_at || '').replace('T', ' ').substring(0, 16);
+      var resolvedCls = c.resolved_at ? ' ts-ed__comment--resolved' : '';
+      var replyCls = depth ? ' ts-ed__comment--reply' : '';
+      out += '<div class="ts-ed__comment' + resolvedCls + replyCls + '" data-cid="' + c.id + '"' +
+             (c.anchor_id ? ' data-anchor="' + c.anchor_id + '"' : '') + '>' +
+        '<div class="ts-ed__comment__head">' +
+        '<span class="ts-ed__comment__author">' + (c.author_name || ('User ' + c.author_id)) + '</span>' +
+        '<span class="ts-ed__comment__when">' + when + '</span>' +
+        '</div>' +
+        (c.anchor_text ? '<div class="ts-ed__comment__anchor">on: "' + (c.anchor_text.length > 70 ? c.anchor_text.slice(0, 70) + '…' : c.anchor_text).replace(/</g,'&lt;') + '"</div>' : '') +
+        '<div class="ts-ed__comment__body">' + c.body.replace(/</g, '&lt;').replace(/\n/g,'<br>') + '</div>' +
+        '<div class="ts-ed__comment__actions">' +
+          (!depth ? '<button type="button" class="ts-ed__btn ts-ed__btn--ghost" data-reply="' + c.id + '">Reply</button>' : '') +
+          '<button type="button" class="ts-ed__btn ts-ed__btn--ghost" data-' + (c.resolved_at ? 'reopen' : 'resolve') + '="' + c.id + '">' +
+            (c.resolved_at ? 'Reopen' : 'Resolve') + '</button>' +
+        '</div>' +
+        '</div>';
+      (byParent[c.id] || []).forEach(function (reply) { renderOne(reply, depth + 1); });
+    }
+    (byParent['root'] || []).forEach(function (c) { renderOne(c, 0); });
+    commentsList.innerHTML = out;
+
+    commentsList.querySelectorAll('[data-anchor]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var anc = el.getAttribute('data-anchor');
+        var target = document.getElementById(anc);
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
+    commentsList.querySelectorAll('[data-resolve]').forEach(function (b) {
+      b.addEventListener('click', function (e) { e.stopPropagation();
+        fetch('/api/tsd/' + tsdId + '/comments/' + b.getAttribute('data-resolve') + '/resolve',
+          { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })
+          .then(loadComments);
+      });
+    });
+    commentsList.querySelectorAll('[data-reopen]').forEach(function (b) {
+      b.addEventListener('click', function (e) { e.stopPropagation();
+        fetch('/api/tsd/' + tsdId + '/comments/' + b.getAttribute('data-reopen') + '/reopen',
+          { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })
+          .then(loadComments);
+      });
+    });
+    commentsList.querySelectorAll('[data-reply]').forEach(function (b) {
+      b.addEventListener('click', function (e) { e.stopPropagation();
+        var cid = b.getAttribute('data-reply');
+        var body = prompt('Reply'); if (!body) return;
+        postComment(body, cid);
+      });
+    });
+  }
+
+  function loadComments() {
+    commentsList.innerHTML = '<p class="ts-ed__comments-empty">Loading…</p>';
+    fetch('/api/tsd/' + tsdId + '/comments', { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(renderComments);
+  }
+
+  function postComment(body, parentId) {
+    var payload = { body: body };
+    if (parentId) payload.parent_comment_id = parseInt(parentId, 10);
+    if (!parentId && pendingAnchorId) {
+      payload.anchor_id = pendingAnchorId;
+      payload.anchor_text = pendingAnchorText;
+    }
+    return fetch('/api/tsd/' + tsdId + '/comments', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify(payload),
+    }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function () { pendingAnchorId = null; pendingAnchorText = null; loadComments(); scheduleSave(); });
+  }
+
+  commentSubmit.addEventListener('click', function () {
+    var body = (commentInput.value || '').trim();
+    if (!body) return;
+    postComment(body, null).then(function () { commentInput.value = ''; });
+  });
+
+  // Add a Review-tab shortcut.
+  var origReview = tabReview;
+  tabReview = function () {
+    var groups = origReview();
+    groups.splice(0, 0, makeGroup('Discussion', [
+      { name: 'Comments', icon: 'comment', fn: openComments },
+    ]));
+    return groups;
+  };
+
+  // ===================================================================== PRESENCE
+  var presenceEl = document.getElementById('tsd-presence');
+  function pingPresence() {
+    if (!tsdId) return;
+    fetch('/api/tsd/' + tsdId + '/presence', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } });
+    fetch('/api/tsd/' + tsdId + '/presence', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (viewers) {
+        if (!presenceEl) return;
+        presenceEl.innerHTML = viewers.slice(0, 5).map(function (v, i) {
+          return '<span class="ts-ed__presence__pill' + (i > 0 ? ' ts-ed__presence__pill--muted' : '') +
+                 '" title="' + v.name + ' (' + v.email + ')">' + v.initials + '</span>';
+        }).join('');
+      });
+  }
+  setInterval(pingPresence, 15000);
+  setTimeout(pingPresence, 500);
+
+  // ===================================================================== DRAGGABLE RULERS
+  function wireRulerDrag() {
+    var hs = hruler.querySelector('svg'); if (!hs) return;
+    var vs = vruler.querySelector('svg'); if (!vs) return;
+    var rectH = page.getBoundingClientRect();
+    var w = rectH.width, h = rectH.height;
+
+    // Wrap the margin-marker triangles to attach drag handlers.
+    var triangles = hs.querySelectorAll('path[fill="var(--ed-brand)"]');
+    triangles.forEach(function (t) { t.classList.add('ts-ed__ruler-handle'); });
+    var vtri = vs.querySelectorAll('path[fill="var(--ed-brand)"]');
+    vtri.forEach(function (t) { t.classList.add('ts-ed__ruler-handle'); });
+
+    var dragging = null;
+    function onDown(e) {
+      e.preventDefault();
+      dragging = { which: this.getAttribute('data-which'), axis: this.getAttribute('data-axis') };
+    }
+    function pxToCm(px) { return px / 37.8; }
+    function cmRound(cm, step) { return Math.round(cm / step) * step; }
+
+    function onMove(e) {
+      if (!dragging) return;
+      if (dragging.axis === 'x') {
+        var hRect = hruler.getBoundingClientRect();
+        var localX = e.clientX - hRect.left;
+        var pageW = pxToCm(parseFloat(getComputedStyle(page).width));
+        var marginCm = dragging.which === 'left' ? pxToCm(localX) : pageW - pxToCm(localX);
+        marginCm = Math.max(0.5, Math.min(pageW / 2 - 1, cmRound(marginCm, 0.25)));
+        pageMargin = marginCm;
+        applyMargins();
+      } else {
+        var vRect = vruler.getBoundingClientRect();
+        var localY = e.clientY - vRect.top;
+        var pageH = pxToCm(parseFloat(getComputedStyle(page).height));
+        var marginCm = dragging.which === 'top' ? pxToCm(localY) : pageH - pxToCm(localY);
+        marginCm = Math.max(0.5, Math.min(pageH / 2 - 1, cmRound(marginCm, 0.25)));
+        pageMarginY = marginCm;
+        applyMargins();
+      }
+    }
+    function onUp() { dragging = null; }
+
+    // Assign which marker is which, then attach drag listeners.
+    triangles[0] && triangles[0].setAttribute('data-which', 'left');
+    triangles[0] && triangles[0].setAttribute('data-axis', 'x');
+    triangles[1] && triangles[1].setAttribute('data-which', 'right');
+    triangles[1] && triangles[1].setAttribute('data-axis', 'x');
+    vtri[0] && vtri[0].setAttribute('data-which', 'top');
+    vtri[0] && vtri[0].setAttribute('data-axis', 'y');
+    vtri[1] && vtri[1].setAttribute('data-which', 'bottom');
+    vtri[1] && vtri[1].setAttribute('data-axis', 'y');
+
+    triangles.forEach(function (t) { t.addEventListener('mousedown', onDown); });
+    vtri.forEach(function (t) { t.addEventListener('mousedown', onDown); });
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
+  // Re-wire handles after each redraw.
+  var origDrawRulers = drawRulers;
+  drawRulers = function () { origDrawRulers(); setTimeout(wireRulerDrag, 10); };
 
   // ===================================================================== GLOBAL SHORTCUTS
   document.addEventListener('keydown', function (e) {

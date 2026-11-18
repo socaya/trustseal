@@ -32,6 +32,12 @@ from app.models.event_delivery import SecurityEvent
 from app.models.tsd_document import EXPORT_POLICIES, TSD_STATUSES, TSDocument
 from app.models.tsd_document_version import TSDocumentVersion
 from app.models.tsd_share import TSD_SHARE_PERMISSIONS, TSDShare
+from app.models.tsd_external_share import (
+    EXTERNAL_SHARE_PERMISSIONS, TSDExternalShare, hash_token, new_token,
+)
+from app.models.tsd_comment import TSDComment
+from app.models.tsd_approval import APPROVAL_DECISIONS, TSDApproval
+from app.models.tsd_presence import TSDPresence
 from app.models.user import User
 from app.services.tsd_format import (
     TSDError,
@@ -884,6 +890,451 @@ def revoke_share(tsd_id: int, share_id: int):
     db.session.commit()
     record_tsd_operation("share_revoke")
     return "", 204
+
+
+# ============================================================ comments
+
+
+@tsd_api.route("/<int:tsd_id>/comments", methods=["GET"])
+@login_required
+def list_comments(tsd_id: int):
+    """List all comments on a TSD, including resolved ones for context."""
+    row = _owned(tsd_id)
+    comments = (
+        TSDComment.query
+        .filter_by(tsd_id=row.id)
+        .order_by(TSDComment.created_at.asc())
+        .all()
+    )
+    authors = {}
+    author_ids = {c.author_id for c in comments}
+    if author_ids:
+        authors = {u.id: u for u in User.query.filter(User.id.in_(author_ids)).all()}
+
+    def _with_author(c):
+        d = c.to_dict()
+        u = authors.get(c.author_id)
+        if u:
+            d["author_name"] = ((u.first_name or "") + " " + (u.last_name or "")).strip() or u.username
+        return d
+    return jsonify([_with_author(c) for c in comments])
+
+
+@tsd_api.route("/<int:tsd_id>/comments", methods=["POST"])
+@login_required
+def create_comment(tsd_id: int):
+    """Create a new comment thread or a reply."""
+    row = _owned(tsd_id)
+    perm = _share_permission(row)
+    if perm not in ("owner", "edit", "comment"):
+        return jsonify({"error": "permission_denied"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    body = (payload.get("body") or "").strip()
+    if not body:
+        return jsonify({"error": "body_required"}), 400
+    if len(body) > 4000:
+        return jsonify({"error": "body_too_long", "max": 4000}), 400
+
+    parent_id = payload.get("parent_comment_id")
+    if parent_id is not None:
+        parent = TSDComment.query.filter_by(id=parent_id, tsd_id=row.id).first()
+        if parent is None:
+            return jsonify({"error": "parent_comment_not_found"}), 404
+
+    comment = TSDComment(
+        tsd_id=row.id,
+        parent_comment_id=parent_id,
+        author_id=current_user.id,
+        body=sanitize_html(body) if '<' in body else body,
+        anchor_id=(payload.get("anchor_id") or None),
+        anchor_text=(payload.get("anchor_text") or "")[:500] or None,
+    )
+    db.session.add(comment)
+    db.session.flush()
+    _emit(actor_id=current_user.id, organization_id=row.organization_id,
+          action="tsd.comment", resource_id=row.id,
+          outcome=f"comment_{comment.id}")
+    db.session.commit()
+    record_tsd_operation("comment")
+    return jsonify(comment.to_dict()), 201
+
+
+@tsd_api.route("/<int:tsd_id>/comments/<int:comment_id>/resolve", methods=["POST"])
+@login_required
+def resolve_comment(tsd_id: int, comment_id: int):
+    """Resolve a comment thread (idempotent)."""
+    row = _owned(tsd_id)
+    perm = _share_permission(row)
+    if perm not in ("owner", "edit", "comment"):
+        return jsonify({"error": "permission_denied"}), 403
+
+    c = TSDComment.query.filter_by(id=comment_id, tsd_id=row.id).first()
+    if c is None:
+        abort(404)
+    if c.resolved_at is None:
+        c.resolved_at = datetime.utcnow()
+        c.resolved_by_id = current_user.id
+        _emit(actor_id=current_user.id, organization_id=row.organization_id,
+              action="tsd.comment_resolve", resource_id=row.id,
+              outcome=f"comment_{c.id}")
+        db.session.commit()
+        record_tsd_operation("comment_resolve")
+    return jsonify(c.to_dict())
+
+
+@tsd_api.route("/<int:tsd_id>/comments/<int:comment_id>/reopen", methods=["POST"])
+@login_required
+def reopen_comment(tsd_id: int, comment_id: int):
+    row = _owned(tsd_id)
+    perm = _share_permission(row)
+    if perm not in ("owner", "edit", "comment"):
+        return jsonify({"error": "permission_denied"}), 403
+    c = TSDComment.query.filter_by(id=comment_id, tsd_id=row.id).first()
+    if c is None:
+        abort(404)
+    c.resolved_at = None
+    c.resolved_by_id = None
+    db.session.commit()
+    return jsonify(c.to_dict())
+
+
+@tsd_api.route("/<int:tsd_id>/comments/<int:comment_id>", methods=["DELETE"])
+@login_required
+def delete_comment(tsd_id: int, comment_id: int):
+    """Delete a comment. Only the author or the document owner may delete."""
+    row = _owned(tsd_id)
+    c = TSDComment.query.filter_by(id=comment_id, tsd_id=row.id).first()
+    if c is None:
+        abort(404)
+    is_owner = (row.organization_id == current_user.organization_id)
+    if c.author_id != current_user.id and not is_owner:
+        return jsonify({"error": "permission_denied"}), 403
+    db.session.delete(c)
+    db.session.commit()
+    return "", 204
+
+
+# ============================================================ external shares
+
+
+@tsd_api.route("/<int:tsd_id>/external-shares", methods=["GET"])
+@login_required
+def list_external_shares(tsd_id: int):
+    row = _owner_only(tsd_id)
+    items = (
+        TSDExternalShare.query
+        .filter_by(tsd_id=row.id)
+        .order_by(TSDExternalShare.created_at.desc())
+        .all()
+    )
+    return jsonify([s.to_dict() for s in items])
+
+
+@tsd_api.route("/<int:tsd_id>/external-shares", methods=["POST"])
+@login_required
+def create_external_share(tsd_id: int):
+    """Create a magic-link grant for a non-tenant email."""
+    row = _owner_only(tsd_id)
+    actor = _actor()
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get("email") or "").strip().lower()
+    permission = (payload.get("permission") or "view").lower()
+    expires_in_days = payload.get("expires_in_days") or 14
+
+    if not email:
+        return jsonify({"error": "email_required"}), 400
+    if permission not in EXTERNAL_SHARE_PERMISSIONS:
+        return jsonify({"error": "invalid_permission",
+                        "allowed": list(EXTERNAL_SHARE_PERMISSIONS)}), 400
+    try:
+        days = int(expires_in_days)
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid_expires_in_days"}), 400
+    if days < 1 or days > 90:
+        return jsonify({"error": "expires_in_days_out_of_range",
+                        "min": 1, "max": 90}), 400
+
+    token = new_token()
+    share = TSDExternalShare(
+        tsd_id=row.id,
+        organization_id=row.organization_id,
+        recipient_email=email,
+        permission=permission,
+        token_hash=hash_token(token),
+        expires_at=datetime.utcnow() + timedelta(days=days),
+        created_by_id=actor.id,
+    )
+    db.session.add(share)
+    db.session.flush()
+
+    # Dispatch the magic link via the configured mail transport.
+    from flask import url_for
+    from app.services.email import send, EmailMessage
+    link = url_for("tsd_external_views.landing",
+                   share_id=share.id, token=token, _external=True)
+    try:
+        send(EmailMessage(
+            to=email,
+            subject=f"{row.title} — shared with you on TRUSTSEAL",
+            body_text=(
+                f"A TRUSTSEAL document has been shared with you:\n\n"
+                f"  {row.title}\n\n"
+                f"Open the document (link expires in {days} day{'s' if days != 1 else ''}):\n"
+                f"  {link}\n\n"
+                f"This grant is view-only unless the sender chose 'comment'.\n"
+                f"If you believe you received this in error, ignore this email."
+            ),
+        ))
+    except Exception as exc:
+        # Still commit the grant — the admin can re-share if the email failed.
+        current_app.logger.warning("tsd external share email failed: %s", exc)
+
+    _emit(actor_id=actor.id, organization_id=row.organization_id,
+          action="tsd.external_share", resource_id=row.id,
+          outcome=f"{permission}:{email}")
+    db.session.commit()
+    record_tsd_operation("external_share")
+
+    # Return the RAW token exactly once; the DB only stores its hash.
+    result = share.to_dict()
+    result["token"] = token
+    result["link"] = link
+    return jsonify(result), 201
+
+
+@tsd_api.route("/<int:tsd_id>/external-shares/<int:share_id>", methods=["DELETE"])
+@login_required
+def revoke_external_share(tsd_id: int, share_id: int):
+    row = _owner_only(tsd_id)
+    s = TSDExternalShare.query.filter_by(id=share_id, tsd_id=row.id).first()
+    if s is None:
+        abort(404)
+    if s.revoked_at is not None:
+        return jsonify({"error": "already_revoked"}), 409
+    s.revoked_at = datetime.utcnow()
+    _emit(actor_id=current_user.id, organization_id=row.organization_id,
+          action="tsd.external_share_revoke", resource_id=row.id,
+          outcome=f"external_share_{s.id}")
+    db.session.commit()
+    record_tsd_operation("external_share_revoke")
+    return "", 204
+
+
+# ============================================================ approvals
+
+
+@tsd_api.route("/<int:tsd_id>/approvals", methods=["GET"])
+@login_required
+def list_approvals(tsd_id: int):
+    row = _owned(tsd_id)
+    items = (
+        TSDApproval.query
+        .filter_by(tsd_id=row.id)
+        .order_by(TSDApproval.order_index.asc(), TSDApproval.id.asc())
+        .all()
+    )
+    approver_ids = {a.approver_id for a in items}
+    users = {u.id: u for u in User.query.filter(User.id.in_(approver_ids)).all()} if approver_ids else {}
+
+    def _with_user(a):
+        d = a.to_dict()
+        u = users.get(a.approver_id)
+        if u:
+            d["approver_name"] = ((u.first_name or "") + " " + (u.last_name or "")).strip() or u.username
+            d["approver_email"] = u.email
+        return d
+
+    # Derive the overall workflow state (see model docstring).
+    statuses = [a.status for a in items]
+    if not items:
+        wf_state = "none"
+    elif any(s == "rejected" for s in statuses):
+        wf_state = "rejected"
+    elif any(s == "changes_requested" for s in statuses):
+        wf_state = "changes_requested"
+    elif all(s == "approved" for s in statuses):
+        wf_state = "approved"
+    elif all(s == "pending" for s in statuses):
+        wf_state = "awaiting_first"
+    else:
+        wf_state = "in_progress"
+
+    return jsonify({
+        "workflow_state": wf_state,
+        "approvals": [_with_user(a) for a in items],
+    })
+
+
+@tsd_api.route("/<int:tsd_id>/approvals", methods=["POST"])
+@login_required
+def request_approvals(tsd_id: int):
+    """Owner adds one or more approvers at a given step.
+
+    Body: ``{"approver_emails": ["a@x", "b@x"], "order_index": 0}``
+    Approvers with the same ``order_index`` act in parallel; higher
+    indices run after lower ones complete.
+    """
+    row = _owner_only(tsd_id)
+    actor = _actor()
+    payload = request.get_json(silent=True) or {}
+    emails = payload.get("approver_emails") or []
+    try:
+        order_index = int(payload.get("order_index", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid_order_index"}), 400
+    if not isinstance(emails, list) or not emails:
+        return jsonify({"error": "approver_emails_required"}), 400
+
+    created = []
+    for raw in emails:
+        email = (raw or "").strip().lower()
+        if not email:
+            continue
+        user = (
+            User.query
+            .filter(User.email == email,
+                    User.organization_id == row.organization_id,
+                    User.is_active.is_(True))
+            .first()
+        )
+        if user is None:
+            return jsonify({"error": "approver_not_in_tenant", "email": email}), 404
+        # Skip if already an approver (uq constraint).
+        if TSDApproval.query.filter_by(tsd_id=row.id, approver_id=user.id).first():
+            continue
+        a = TSDApproval(
+            tsd_id=row.id,
+            organization_id=row.organization_id,
+            approver_id=user.id,
+            order_index=order_index,
+            created_by_id=actor.id,
+        )
+        db.session.add(a)
+        db.session.flush()
+        created.append(a.id)
+        # Mail the approver.
+        try:
+            from app.services.email import send, EmailMessage
+            from flask import url_for
+            link = url_for("tsd_views.edit", tsd_id=row.id, _external=True)
+            send(EmailMessage(
+                to=user.email,
+                subject=f"Approval requested: {row.title}",
+                body_text=(
+                    f"{actor.email} has requested your approval on a TRUSTSEAL document:\n\n"
+                    f"  {row.title}\n\n"
+                    f"Review and decide:\n  {link}"
+                ),
+            ))
+        except Exception as exc:
+            current_app.logger.warning("approval email failed: %s", exc)
+
+    _emit(actor_id=actor.id, organization_id=row.organization_id,
+          action="tsd.approvals_requested", resource_id=row.id,
+          outcome=f"created_{len(created)}")
+    db.session.commit()
+    record_tsd_operation("approvals_requested")
+    return jsonify({"created": created}), 201
+
+
+@tsd_api.route("/<int:tsd_id>/approvals/<int:approval_id>/decide", methods=["POST"])
+@login_required
+def decide_approval(tsd_id: int, approval_id: int):
+    """Approver records their decision.
+
+    Body: ``{"decision": "approved"|"rejected"|"changes_requested",
+              "note": "optional free-text"}``
+    """
+    row = _owned(tsd_id)
+    a = TSDApproval.query.filter_by(id=approval_id, tsd_id=row.id).first()
+    if a is None:
+        abort(404)
+    if a.approver_id != current_user.id:
+        return jsonify({"error": "not_your_approval"}), 403
+    if a.status != "pending":
+        return jsonify({"error": "already_decided", "status": a.status}), 409
+
+    # Sequential enforcement: all approvals at lower order_index must be
+    # completed (any non-pending status) before this step can decide.
+    blocking = (
+        TSDApproval.query
+        .filter(TSDApproval.tsd_id == row.id,
+                TSDApproval.order_index < a.order_index,
+                TSDApproval.status == "pending")
+        .first()
+    )
+    if blocking is not None:
+        return jsonify({"error": "earlier_step_pending",
+                        "blocking_step": blocking.order_index}), 409
+
+    payload = request.get_json(silent=True) or {}
+    decision = payload.get("decision")
+    if decision not in ("approved", "rejected", "changes_requested"):
+        return jsonify({"error": "invalid_decision",
+                        "allowed": ["approved", "rejected", "changes_requested"]}), 400
+    note = (payload.get("note") or "").strip() or None
+    if note and len(note) > 1000:
+        note = note[:1000]
+
+    a.status = decision
+    a.note = note
+    a.decided_at = datetime.utcnow()
+    _emit(actor_id=current_user.id, organization_id=row.organization_id,
+          action="tsd.approval_decide", resource_id=row.id,
+          outcome=f"{decision}_approval_{a.id}")
+    db.session.commit()
+    record_tsd_operation("approval_decide")
+    return jsonify(a.to_dict())
+
+
+# ============================================================ presence
+
+
+@tsd_api.route("/<int:tsd_id>/presence", methods=["POST"])
+@login_required
+def ping_presence(tsd_id: int):
+    """Mark the caller as currently viewing this TSD.
+
+    Call every 15 s from the editor; a viewer is considered active while
+    their last ping is within the last 45 s.
+    """
+    row = _owned(tsd_id)
+    actor = _actor()
+    p = db.session.get(TSDPresence, (row.id, actor.id))
+    if p is None:
+        p = TSDPresence(tsd_id=row.id, user_id=actor.id)
+        db.session.add(p)
+    else:
+        p.last_ping_at = datetime.utcnow()
+    db.session.commit()
+    return "", 204
+
+
+@tsd_api.route("/<int:tsd_id>/presence", methods=["GET"])
+@login_required
+def list_presence(tsd_id: int):
+    """List users active in the last 45 seconds."""
+    row = _owned(tsd_id)
+    threshold = datetime.utcnow() - timedelta(seconds=45)
+    rows = (
+        db.session.query(TSDPresence, User)
+        .join(User, User.id == TSDPresence.user_id)
+        .filter(TSDPresence.tsd_id == row.id,
+                TSDPresence.last_ping_at >= threshold)
+        .order_by(TSDPresence.last_ping_at.desc())
+        .all()
+    )
+    return jsonify([
+        {
+            "user_id": u.id,
+            "name": ((u.first_name or "") + " " + (u.last_name or "")).strip() or u.username,
+            "email": u.email,
+            "initials": ((u.first_name or u.username or "?")[:1] + (u.last_name or "")[:1]).upper(),
+            "last_ping_at": p.last_ping_at.isoformat() if p.last_ping_at else None,
+        }
+        for (p, u) in rows
+    ])
 
 
 # ============================================================ delete

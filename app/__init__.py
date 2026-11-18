@@ -149,6 +149,9 @@ def create_app(config_class=None):
             'sign_views.download',
             'sign_views.upload_attachment',
             'sign_views.status',
+            # External TSD share magic-link landing — anonymous by
+            # design, authorized by the one-shot token in the URL.
+            'tsd_external_views.landing',
             # Public landing + root hit are explicitly anonymous.
             # The endpoint is nested under the parent 'system' blueprint.
             'system.main_views.home',
@@ -372,6 +375,8 @@ def create_app(config_class=None):
     blueprints.append(tsd_api)
     from .blueprints.documents.views.tsd_views import tsd_views
     blueprints.append(tsd_views)
+    from .blueprints.documents.views.tsd_external_views import tsd_external_views
+    blueprints.append(tsd_external_views)
     from .blueprints.documents.api.document_label_api import (
         document_label_api,
     )

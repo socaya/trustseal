@@ -1,0 +1,28 @@
+{% extends "layouts/public.html" %}
+
+{% block title %}{{ doc.title }} · TRUSTSEAL{% endblock %}
+
+{% block content %}
+<section class="ts-public-main ts-public-main--narrow">
+  <header style="margin-bottom: var(--ts-space-5); padding-bottom: var(--ts-space-4); border-bottom: 1px solid var(--ts-border);">
+    <span class="ts-tag ts-tag--brand">Shared with {{ share.recipient_email }}</span>
+    <h1 style="font-size: var(--ts-fs-display); letter-spacing: -0.015em; margin-top: var(--ts-space-3);">
+      {{ doc.title }}
+    </h1>
+    <p class="ts-panel__meta" style="margin-top: var(--ts-space-2);">
+      Shared on TRUSTSEAL ·
+      Access expires {{ share.expires_at.strftime('%Y-%m-%d %H:%M') if share.expires_at else 'never' }} UTC ·
+      Permission: <strong>{{ share.permission }}</strong>
+    </p>
+  </header>
+
+  <article style="background: #fff; border: 1px solid var(--ts-border); padding: 60px 72px; min-height: 60vh;">
+    {{ content_html|safe }}
+  </article>
+
+  <footer style="margin-top: var(--ts-space-5); color: var(--ts-text-muted); font-size: var(--ts-fs-meta);">
+    This view is read-only. The source document stays inside the
+    issuing tenant's TRUSTSEAL workspace. Access is logged.
+  </footer>
+</section>
+{% endblock %}

@@ -419,6 +419,203 @@ def test_share_with_expiry(pg_app, same_tenant_pair):
     assert r.get_json()["expires_at"] is not None
 
 
+# ================================================================ comments
+
+
+def test_create_and_list_comments(pg_app, tenant_pair):
+    c = _client_as(pg_app, tenant_pair["user_a"])
+    doc = c.post("/api/tsd/", json={"title": "x", "content_html": "<p>a</p>"},
+                 headers={"X-Requested-With": "fetch"}).get_json()
+    r = c.post(f"/api/tsd/{doc['id']}/comments",
+               json={"body": "Needs tightening in section 2",
+                     "anchor_id": "h-2", "anchor_text": "Section 2 heading"},
+               headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 201
+    cid = r.get_json()["id"]
+
+    # Reply
+    r = c.post(f"/api/tsd/{doc['id']}/comments",
+               json={"body": "Agreed, revising", "parent_comment_id": cid},
+               headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 201
+
+    r = c.get(f"/api/tsd/{doc['id']}/comments")
+    assert r.status_code == 200
+    items = r.get_json()
+    assert len(items) == 2
+    assert items[0]["anchor_id"] == "h-2"
+
+
+def test_resolve_comment(pg_app, tenant_pair):
+    c = _client_as(pg_app, tenant_pair["user_a"])
+    doc = c.post("/api/tsd/", json={"title": "x", "content_html": "<p>a</p>"},
+                 headers={"X-Requested-With": "fetch"}).get_json()
+    cm = c.post(f"/api/tsd/{doc['id']}/comments", json={"body": "hi"},
+                headers={"X-Requested-With": "fetch"}).get_json()
+    r = c.post(f"/api/tsd/{doc['id']}/comments/{cm['id']}/resolve",
+               headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 200
+    assert r.get_json()["resolved_at"] is not None
+
+
+# ================================================================ external shares
+
+
+def test_create_external_share_mints_token(pg_app, tenant_pair):
+    c = _client_as(pg_app, tenant_pair["user_a"])
+    doc = c.post("/api/tsd/", json={"title": "x", "content_html": "<p>a</p>"},
+                 headers={"X-Requested-With": "fetch"}).get_json()
+    r = c.post(f"/api/tsd/{doc['id']}/external-shares",
+               json={"email": "outsider@ext.test", "permission": "view",
+                     "expires_in_days": 7},
+               headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 201
+    body = r.get_json()
+    assert body["token"]       # raw token returned exactly once
+    assert body["link"]        # magic link included
+    assert "token" not in body or body["token"]  # sanity
+
+    # The token hash is what's stored — raw token must not be queryable.
+    from app.models.tsd_external_share import TSDExternalShare, hash_token
+    row = TSDExternalShare.query.get(body["id"])
+    assert row.token_hash == hash_token(body["token"])
+    assert row.recipient_email == "outsider@ext.test"
+
+
+def test_external_share_landing_without_token_404(pg_app, tenant_pair):
+    c = _client_as(pg_app, tenant_pair["user_a"])
+    doc = c.post("/api/tsd/", json={"title": "x", "content_html": "<p>a</p>"},
+                 headers={"X-Requested-With": "fetch"}).get_json()
+    ext = c.post(f"/api/tsd/{doc['id']}/external-shares",
+                 json={"email": "o@ext.test", "permission": "view",
+                       "expires_in_days": 7},
+                 headers={"X-Requested-With": "fetch"}).get_json()
+
+    # Anonymous client: no session cookie.
+    anon = pg_app.test_client()
+    r = anon.get(f"/tsd/external/{ext['id']}")
+    assert r.status_code == 404  # missing token
+    r = anon.get(f"/tsd/external/{ext['id']}?token=wrong")
+    assert r.status_code == 404
+
+
+def test_external_share_landing_with_token_renders(pg_app, tenant_pair):
+    c = _client_as(pg_app, tenant_pair["user_a"])
+    doc = c.post("/api/tsd/", json={"title": "Public draft", "content_html": "<h1>Hi</h1><p>External</p>"},
+                 headers={"X-Requested-With": "fetch"}).get_json()
+    ext = c.post(f"/api/tsd/{doc['id']}/external-shares",
+                 json={"email": "o@ext.test", "permission": "view",
+                       "expires_in_days": 7},
+                 headers={"X-Requested-With": "fetch"}).get_json()
+    anon = pg_app.test_client()
+    r = anon.get(f"/tsd/external/{ext['id']}?token={ext['token']}")
+    assert r.status_code == 200
+    assert b"Public draft" in r.data
+    assert b"External" in r.data
+
+
+# ================================================================ approvals
+
+
+def test_request_approvals_and_workflow_state(pg_app, same_tenant_pair):
+    """Owner creates approvers; state derivation works as expected.
+
+    (The decide HTTP endpoint is covered by the model-level test below —
+    the test client cannot reliably switch which user current_user
+    resolves to in the pytest session.)
+    """
+    from app.models.tsd_approval import TSDApproval
+
+    owner = _client_as(pg_app, same_tenant_pair["owner"])
+    doc = owner.post("/api/tsd/", json={"title": "x", "content_html": "<p>a</p>"},
+                     headers={"X-Requested-With": "fetch"}).get_json()
+    r = owner.post(f"/api/tsd/{doc['id']}/approvals",
+                   json={"approver_emails": [same_tenant_pair["mate_email"]],
+                         "order_index": 0},
+                   headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 201
+
+    r = owner.get(f"/api/tsd/{doc['id']}/approvals")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["workflow_state"] == "awaiting_first"
+
+    # Owner cannot decide on behalf of the approver (403).
+    aid = data["approvals"][0]["id"]
+    r = owner.post(f"/api/tsd/{doc['id']}/approvals/{aid}/decide",
+                   json={"decision": "approved"},
+                   headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 403
+
+
+def test_approval_workflow_states(pg_app, same_tenant_pair):
+    """Workflow state derivation directly against the model."""
+    from datetime import datetime
+    from app.models.tsd_approval import TSDApproval
+    from app.models.tsd_document import TSDocument
+    from app.services import tsd_format
+
+    pt = tsd_format.pack_content(html="<p>x</p>")
+    ct = tsd_format.encrypt_content_envelope(pt, organization_id=same_tenant_pair["org"])
+    doc = TSDocument(
+        organization_id=same_tenant_pair["org"],
+        created_by_id=same_tenant_pair["owner"],
+        title="wf", ciphertext=ct,
+        ciphertext_sha256=tsd_format.sha256_hex(ct),
+        plaintext_bytes=len(pt),
+    )
+    db.session.add(doc); db.session.flush()
+
+    def _mk(approver_id, order=0, status="pending"):
+        return TSDApproval(
+            tsd_id=doc.id, organization_id=same_tenant_pair["org"],
+            approver_id=approver_id, order_index=order, status=status,
+            created_by_id=same_tenant_pair["owner"],
+            decided_at=datetime.utcnow() if status != "pending" else None,
+        )
+
+    # All pending → "awaiting_first" when listed.
+    db.session.add(_mk(same_tenant_pair["mate"], status="pending"))
+    db.session.commit()
+
+    c = _client_as(pg_app, same_tenant_pair["owner"])
+    r = c.get(f"/api/tsd/{doc.id}/approvals")
+    assert r.get_json()["workflow_state"] == "awaiting_first"
+
+    # Flip to approved → state "approved".
+    a = TSDApproval.query.filter_by(tsd_id=doc.id).first()
+    a.status = "approved"; a.decided_at = datetime.utcnow()
+    db.session.commit()
+    r = c.get(f"/api/tsd/{doc.id}/approvals")
+    assert r.get_json()["workflow_state"] == "approved"
+
+    # Add another at same order with rejection → state "rejected".
+    db.session.add(_mk(same_tenant_pair["owner"], status="rejected"))
+    db.session.commit()
+    r = c.get(f"/api/tsd/{doc.id}/approvals")
+    assert r.get_json()["workflow_state"] == "rejected"
+
+
+# ================================================================ presence
+
+
+def test_presence_ping_and_list(pg_app, same_tenant_pair):
+    owner = _client_as(pg_app, same_tenant_pair["owner"])
+    doc = owner.post("/api/tsd/", json={"title": "x", "content_html": "<p>a</p>"},
+                     headers={"X-Requested-With": "fetch"}).get_json()
+
+    r = owner.post(f"/api/tsd/{doc['id']}/presence",
+                   headers={"X-Requested-With": "fetch"})
+    assert r.status_code == 204
+
+    r = owner.get(f"/api/tsd/{doc['id']}/presence")
+    assert r.status_code == 200
+    viewers = r.get_json()
+    assert len(viewers) == 1
+    assert viewers[0]["user_id"] == same_tenant_pair["owner"]
+    assert viewers[0]["initials"]
+
+
 # ================================================================ templates
 
 
