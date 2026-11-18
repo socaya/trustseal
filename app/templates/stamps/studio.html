@@ -4,657 +4,794 @@
 {% block title %}
   {% if stamp %}Edit stamp · {{ stamp.name }}{% else %}Stamp Studio{% endif %} · TRUSTSEAL
 {% endblock %}
-{% block page_title %}
-  {% if stamp %}Edit {{ stamp.name }}{% else %}Stamp Studio{% endif %}
-{% endblock %}
-{% block page_description %}
-  <p class="ts-page-header__description">
-    Compose a stamp from parameters — tune the preview on the right in
-    real-time. Save to register it under the tenant and make it
-    insertable from <em>Documents ▸ Insert ▸ Stamp</em>.
-  </p>
-{% endblock %}
-{% block page_actions %}
-  <a class="ts-btn ts-btn--ghost" href="{{ url_for('tsd_stamps_views.library') }}">Back to library</a>
+{% block page_header %}{% endblock %}
+{% block page_title %}{% endblock %}
+{% block page_description %}{% endblock %}
+{% block page_actions %}{% endblock %}
+{% block breadcrumbs %}{% endblock %}
+
+{% block extra_head %}
+<style>.ts-page { padding: 0 !important; max-width: none !important; }</style>
 {% endblock %}
 
 {% block content %}
-<div class="ts-studio"
+<div id="st-shell" class="ts-ed"
      data-stamp-id="{{ stamp.id if stamp else '' }}"
      data-stamp-layout='{{ stamp.layout|tojson if stamp else "null" }}'
      data-stamp-kind="{{ stamp.kind if stamp else 'seal' }}"
-     data-stamp-name="{{ stamp.name if stamp else '' }}">
+     data-stamp-name="{{ stamp.name if stamp else '' }}"
+     data-stamp-svg="{{ stamp.svg if stamp else '' }}">
 
-  <aside class="ts-studio__controls">
-    <div class="ts-field">
-      <label class="ts-field__label" for="st-name">Stamp name (unique in tenant)</label>
-      <input type="text" id="st-name" class="ts-input" placeholder="e.g. Acme Co. Official Seal"
-             value="{{ stamp.name if stamp else '' }}">
+  {# ======================= Application bar ======================= #}
+  <header class="ts-ed__appbar">
+    <div class="ts-ed__brand">
+      <strong>STAMP</strong><small>STUDIO</small>
     </div>
+    <span class="ts-ed__divider" aria-hidden="true"></span>
+    <input type="text" id="st-name" class="ts-ed__filename"
+           value="{{ stamp.name if stamp else '' }}"
+           placeholder="Untitled stamp"
+           aria-label="Stamp name">
+    <span id="st-savestate" class="ts-ed__savestate">● Not saved yet</span>
+    <div class="ts-ed__spacer"></div>
+    <span class="ts-ed__class-mark">
+      Kind: <b id="st-kind-badge">Round seal</b>
+    </span>
+    <a class="ts-ed__btn ts-ed__btn--ghost" href="{{ url_for('tsd_stamps_views.library') }}">Back to library</a>
+    <button type="button" id="st-save" class="ts-ed__btn ts-ed__btn--primary">
+      {% if stamp %}Save changes{% else %}Register stamp{% endif %}
+    </button>
+  </header>
 
-    <div class="ts-field">
-      <label class="ts-field__label" for="st-kind">Stamp kind</label>
-      <select id="st-kind" class="ts-select">
-        <option value="seal"          {% if stamp and stamp.kind == 'seal'          %}selected{% endif %}>Round seal</option>
-        <option value="company_dated" {% if stamp and stamp.kind == 'company_dated' %}selected{% endif %}>Company stamp (dated)</option>
-        <option value="date"          {% if stamp and stamp.kind == 'date'          %}selected{% endif %}>Date stamp (RECEIVED / APPROVED…)</option>
-        <option value="rubber"        {% if stamp and stamp.kind == 'rubber'        %}selected{% endif %}>Rubber stamp</option>
-      </select>
-      <span class="ts-field__hint">Each kind exposes different fields below.</span>
-    </div>
+  {# ======================= Ribbon tabs ======================= #}
+  <nav class="ts-ed__tabs" role="tablist" aria-label="Studio tabs">
+    <button type="button" role="tab" class="ts-ed__tab ts-is-active" data-tab="design"  aria-selected="true">Design</button>
+    <button type="button" role="tab" class="ts-ed__tab"               data-tab="logo"   aria-selected="false">Logo</button>
+    <button type="button" role="tab" class="ts-ed__tab"               data-tab="size"   aria-selected="false">Size</button>
+    <button type="button" role="tab" class="ts-ed__tab"               data-tab="export" aria-selected="false">Export</button>
+  </nav>
 
-    <fieldset class="ts-studio__group" id="st-size-fields">
-      <legend>Physical size</legend>
-      <div class="ts-form-row ts-form-row--split">
-        <div class="ts-field" id="st-size-round-wrap">
-          <label class="ts-field__label" for="st-size-round">Diameter (round stamps)</label>
-          <select id="st-size-round" class="ts-select">
-            <option value="25">25 mm (compact)</option>
-            <option value="28">28 mm</option>
-            <option value="32">32 mm</option>
-            <option value="38">38 mm</option>
-            <option value="42" selected>42 mm (standard seal)</option>
-            <option value="45">45 mm</option>
-            <option value="50">50 mm (corporate)</option>
-            <option value="55">55 mm (notary)</option>
-            <option value="custom">Custom…</option>
-          </select>
-        </div>
-        <div class="ts-field" id="st-size-rect-wrap" hidden>
-          <label class="ts-field__label" for="st-size-rect">Rectangular stamp</label>
-          <select id="st-size-rect" class="ts-select">
-            <option value="38x14">38 × 14 mm (label)</option>
-            <option value="50x20">50 × 20 mm</option>
-            <option value="59x23" selected>59 × 23 mm (self-inking)</option>
-            <option value="60x30">60 × 30 mm</option>
-            <option value="69x23">69 × 23 mm</option>
-            <option value="70x25">70 × 25 mm</option>
-            <option value="50x30">50 × 30 mm (date)</option>
-            <option value="80x35">80 × 35 mm (header)</option>
-            <option value="custom">Custom…</option>
-          </select>
-        </div>
-      </div>
-      <div class="ts-form-row ts-form-row--split" id="st-custom-size-wrap" hidden>
-        <div class="ts-field">
-          <label class="ts-field__label" for="st-custom-w">Width (mm)</label>
-          <input type="number" id="st-custom-w" class="ts-input" min="10" max="120" value="42" step="1">
-        </div>
-        <div class="ts-field">
-          <label class="ts-field__label" for="st-custom-h">Height (mm)</label>
-          <input type="number" id="st-custom-h" class="ts-input" min="10" max="120" value="42" step="1">
-          <span class="ts-field__hint">Ignored for round stamps.</span>
-        </div>
-      </div>
-    </fieldset>
+  {# ======================= Ribbon body ======================= #}
+  <div class="ts-ed__ribbon" id="st-ribbon" role="toolbar"></div>
 
-    <fieldset class="ts-studio__group" id="st-logo-fields">
-      <legend>Company logo (optional)</legend>
-      <div class="ts-field">
-        <label class="ts-field__label" for="st-logo-file">Upload logo (PNG, JPG, SVG — max 200 KB)</label>
-        <input type="file" id="st-logo-file" accept="image/png,image/jpeg,image/svg+xml,image/webp" class="ts-input">
-        <span class="ts-field__hint">
-          Auto-embedded into the stamp SVG. Move by dragging in the
-          preview or using the sliders; clear to remove.
-        </span>
-      </div>
-      <div style="display:flex; align-items:center; gap:var(--ts-space-3);">
-        <div id="st-logo-preview" style="width:64px;height:64px;border:1px solid var(--ts-border);display:flex;align-items:center;justify-content:center;background:#fafbfc;overflow:hidden;">
-          <span style="color:var(--ts-text-subtle);font-size:10px;">no logo</span>
-        </div>
-        <div>
-          <label style="display:inline-flex;align-items:center;gap:6px;font-size:var(--ts-fs-label);">
-            <input type="checkbox" id="st-logo-watermark" checked>
-            Watermark (faint behind text)
-          </label>
-          <br>
-          <button type="button" id="st-logo-clear" class="ts-btn ts-btn--text ts-btn--sm" style="padding-left:0;">Clear logo</button>
-        </div>
-      </div>
-      <div id="st-logo-controls" style="margin-top: var(--ts-space-3);" hidden>
-        <div class="ts-field">
-          <label class="ts-field__label" for="st-logo-x">
-            Horizontal offset <span id="st-logo-x-value" style="font-family: var(--ts-font-mono); color: var(--ts-text-muted);">0%</span>
-          </label>
-          <input type="range" id="st-logo-x" min="-50" max="50" step="1" value="0" style="width: 100%;">
-        </div>
-        <div class="ts-field">
-          <label class="ts-field__label" for="st-logo-y">
-            Vertical offset <span id="st-logo-y-value" style="font-family: var(--ts-font-mono); color: var(--ts-text-muted);">0%</span>
-          </label>
-          <input type="range" id="st-logo-y" min="-50" max="50" step="1" value="0" style="width: 100%;">
-        </div>
-        <div class="ts-field">
-          <label class="ts-field__label" for="st-logo-size">
-            Size <span id="st-logo-size-value" style="font-family: var(--ts-font-mono); color: var(--ts-text-muted);">60%</span>
-          </label>
-          <input type="range" id="st-logo-size" min="10" max="100" step="1" value="60" style="width: 100%;">
-        </div>
-        <div class="ts-field">
-          <label class="ts-field__label" for="st-logo-opacity">
-            Opacity <span id="st-logo-opacity-value" style="font-family: var(--ts-font-mono); color: var(--ts-text-muted);">100%</span>
-          </label>
-          <input type="range" id="st-logo-opacity" min="5" max="100" step="5" value="100" style="width: 100%;">
-        </div>
-        <button type="button" id="st-logo-reset" class="ts-btn ts-btn--text ts-btn--sm" style="padding-left:0;">Reset position &amp; size</button>
-      </div>
-    </fieldset>
-
-    <div class="ts-divider"></div>
-
-    <fieldset class="ts-studio__group" id="st-seal-fields">
-      <legend>Round seal</legend>
-      <div class="ts-field">
-        <label class="ts-field__label" for="st-top-text">Top arc text</label>
-        <input type="text" id="st-top-text" class="ts-input" value="OFFICIAL SEAL" maxlength="40">
-      </div>
-      <div class="ts-field">
-        <label class="ts-field__label" for="st-bottom-text">Bottom arc text</label>
-        <input type="text" id="st-bottom-text" class="ts-input" value="VITALWORKS LIMITED" maxlength="40">
-      </div>
-      <div class="ts-field">
-        <label class="ts-field__label" for="st-center-lines">Center text (one line each)</label>
-        <textarea id="st-center-lines" class="ts-textarea" rows="3">★★★
-APPROVED
-2026</textarea>
-      </div>
-      <div class="ts-form-row ts-form-row--split">
-        <div class="ts-field">
-          <label class="ts-field__label" for="st-color">Ink colour</label>
-          <input type="color" id="st-color" class="ts-input" value="#0f3b82">
-        </div>
-        <div class="ts-field">
-          <label class="ts-field__label" for="st-border-style">Border</label>
-          <select id="st-border-style" class="ts-select">
-            <option value="single">Single ring</option>
-            <option value="double">Double ring</option>
-            <option value="dashed">Dashed ring</option>
-          </select>
-        </div>
-      </div>
-    </fieldset>
-
-    <fieldset class="ts-studio__group" id="st-company-fields" hidden>
-      <legend>Company stamp (dated)</legend>
-      <div class="ts-field">
-        <label class="ts-field__label" for="st-cd-company">Company name (top arc)</label>
-        <input type="text" id="st-cd-company" class="ts-input" value="VITALWORKS LIMITED" maxlength="48">
-      </div>
-      <div class="ts-field">
-        <label class="ts-field__label" for="st-cd-tagline">Tagline / registration (bottom arc)</label>
-        <input type="text" id="st-cd-tagline" class="ts-input" value="REG. NO. 12345 · NAIROBI" maxlength="64">
-      </div>
-      <div class="ts-form-row ts-form-row--split">
-        <div class="ts-field">
-          <label class="ts-field__label" for="st-cd-date-format">Date format</label>
-          <select id="st-cd-date-format" class="ts-select">
-            <option value="DD MMM YYYY">DD MMM YYYY (17 NOV 2026)</option>
-            <option value="YYYY-MM-DD">YYYY-MM-DD (2026-11-17)</option>
-            <option value="DD/MM/YYYY">DD/MM/YYYY (17/11/2026)</option>
-            <option value="MMM DD, YYYY">MMM DD, YYYY (NOV 17, 2026)</option>
-            <option value="FIXED">Fixed date (set below)</option>
-          </select>
-        </div>
-        <div class="ts-field">
-          <label class="ts-field__label" for="st-cd-fixed-date">Fixed date (if chosen)</label>
-          <input type="text" id="st-cd-fixed-date" class="ts-input" placeholder="auto" value="">
-        </div>
-      </div>
-      <div class="ts-form-row ts-form-row--split">
-        <div class="ts-field">
-          <label class="ts-field__label" for="st-cd-tag-label">Verb (small, above date)</label>
-          <select id="st-cd-tag-label" class="ts-select">
-            <option value="">(none)</option>
-            <option>DATED</option>
-            <option>ISSUED</option>
-            <option>APPROVED ON</option>
-            <option>CERTIFIED ON</option>
-            <option>RECEIVED</option>
-            <option>SEALED</option>
-          </select>
-        </div>
-        <div class="ts-field">
-          <label class="ts-field__label" for="st-cd-color">Ink colour</label>
-          <input type="color" id="st-cd-color" class="ts-input" value="#0f3b82">
-        </div>
-      </div>
-      <div class="ts-field">
-        <label class="ts-field__label" for="st-cd-border-style">Border</label>
-        <select id="st-cd-border-style" class="ts-select">
-          <option value="double" selected>Double ring (formal)</option>
-          <option value="single">Single ring</option>
-          <option value="rope">Rope (hatched)</option>
-        </select>
-      </div>
-    </fieldset>
-
-    <fieldset class="ts-studio__group" id="st-date-fields" hidden>
-      <legend>Date stamp</legend>
-      <div class="ts-field">
-        <label class="ts-field__label" for="st-date-label">Label (top ribbon)</label>
-        <select id="st-date-label" class="ts-select">
-          <option>RECEIVED</option>
-          <option>APPROVED</option>
-          <option>PAID</option>
-          <option>REJECTED</option>
-          <option>DRAFT</option>
-          <option>FILED</option>
-          <option>URGENT</option>
-          <option>COPY</option>
-          <option>CONFIDENTIAL</option>
-          <option>VOID</option>
-        </select>
-      </div>
-      <div class="ts-field">
-        <label class="ts-field__label" for="st-date-value">Date value</label>
-        <input type="text" id="st-date-value" class="ts-input" value="" placeholder="auto (today) if blank">
-        <span class="ts-field__hint">Leave blank to auto-fill today's date each time the stamp is inserted.</span>
-      </div>
-      <div class="ts-field">
-        <label class="ts-field__label" for="st-date-byline">By / ref (optional bottom line)</label>
-        <input type="text" id="st-date-byline" class="ts-input" value="" placeholder="e.g. VW/ADM/2026/001">
-      </div>
-      <div class="ts-field">
-        <label class="ts-field__label" for="st-date-color">Ink colour</label>
-        <input type="color" id="st-date-color" class="ts-input" value="#9e2f36">
-      </div>
-    </fieldset>
-
-    <fieldset class="ts-studio__group" id="st-rubber-fields" hidden>
-      <legend>Rubber stamp</legend>
-      <div class="ts-field">
-        <label class="ts-field__label" for="st-rubber-text">Text (one or two lines)</label>
-        <textarea id="st-rubber-text" class="ts-textarea" rows="2">ORIGINAL</textarea>
-      </div>
-      <div class="ts-form-row ts-form-row--split">
-        <div class="ts-field">
-          <label class="ts-field__label" for="st-rubber-color">Ink colour</label>
-          <input type="color" id="st-rubber-color" class="ts-input" value="#0f3b82">
-        </div>
-        <div class="ts-field">
-          <label class="ts-field__label" for="st-rubber-shape">Shape</label>
-          <select id="st-rubber-shape" class="ts-select">
-            <option value="rect">Rectangle</option>
-            <option value="rounded">Rounded rectangle</option>
-            <option value="oval">Oval</option>
-          </select>
-        </div>
-      </div>
-    </fieldset>
-
-    <div class="ts-form-actions">
-      <button type="button" class="ts-btn ts-btn--primary" id="st-save">
-        {% if stamp %}Save changes{% else %}Register stamp{% endif %}
+  {# ======================= Studio canvas ======================= #}
+  <main class="st-canvas" id="st-canvas">
+    <div class="st-canvas__rail">
+      <button type="button" class="st-kind-card ts-is-active" data-set-kind="seal">
+        <svg viewBox="-28 -28 56 56" width="56" height="56" aria-hidden="true">
+          <circle r="24" fill="none" stroke="currentColor" stroke-width="2"/>
+          <circle r="20" fill="none" stroke="currentColor" stroke-width="0.75"/>
+          <text y="2" text-anchor="middle" font-size="7" fill="currentColor">SEAL</text>
+        </svg>
+        <span>Round seal</span>
       </button>
-      <span class="ts-panel__meta" id="st-status"></span>
+      <button type="button" class="st-kind-card" data-set-kind="company_dated">
+        <svg viewBox="-28 -28 56 56" width="56" height="56" aria-hidden="true">
+          <circle r="24" fill="none" stroke="currentColor" stroke-width="2"/>
+          <circle r="20" fill="none" stroke="currentColor" stroke-width="0.75"/>
+          <text y="-2" text-anchor="middle" font-size="5" fill="currentColor">DATED</text>
+          <text y="6" text-anchor="middle" font-size="5" fill="currentColor">2026</text>
+        </svg>
+        <span>Company (dated)</span>
+      </button>
+      <button type="button" class="st-kind-card" data-set-kind="date">
+        <svg viewBox="0 0 56 32" width="56" height="32" aria-hidden="true">
+          <rect x="1.5" y="1.5" width="53" height="29" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="4" y="4" width="48" height="8" fill="currentColor"/>
+          <text x="28" y="26" text-anchor="middle" font-size="7" fill="currentColor" font-family="monospace">2026-11-18</text>
+        </svg>
+        <span>Date stamp</span>
+      </button>
+      <button type="button" class="st-kind-card" data-set-kind="rubber">
+        <svg viewBox="0 0 56 32" width="56" height="32" aria-hidden="true">
+          <rect x="1.5" y="1.5" width="53" height="29" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+          <text x="28" y="21" text-anchor="middle" font-size="12" font-weight="900" fill="currentColor">OK</text>
+        </svg>
+        <span>Rubber stamp</span>
+      </button>
     </div>
-  </aside>
 
-  <section class="ts-studio__preview" id="st-preview-pane">
-    <div class="ts-studio__preview-canvas">
-      <div id="st-preview"></div>
+    <section class="st-canvas__stage" id="st-stage">
+      <div class="st-canvas__paper">
+        <div id="st-preview" class="st-preview"></div>
+        <div id="st-handles" class="st-handles" hidden>
+          <div class="st-handle st-handle--move" data-h="move" title="Drag to move logo"></div>
+          <div class="st-handle st-handle--nw" data-h="nw" title="Resize"></div>
+          <div class="st-handle st-handle--ne" data-h="ne" title="Resize"></div>
+          <div class="st-handle st-handle--sw" data-h="sw" title="Resize"></div>
+          <div class="st-handle st-handle--se" data-h="se" title="Resize"></div>
+        </div>
+      </div>
+      <div class="st-canvas__hint" id="st-canvas-hint">
+        Drag the logo to position · drag corner handles to resize ·
+        tune the ribbon for everything else
+      </div>
+    </section>
+
+    <aside class="st-canvas__meta">
+      <div class="st-meta-row"><span>Kind</span><b id="st-meta-kind">Round seal</b></div>
+      <div class="st-meta-row"><span>Physical size</span><b id="st-meta-size">42 mm</b></div>
+      <div class="st-meta-row"><span>Logo</span><b id="st-meta-logo">—</b></div>
+      <div class="st-meta-row"><span>Dimensions</span><b id="st-meta-viewbox">320 × 320 px</b></div>
+    </aside>
+  </main>
+
+  {# ======================= Status bar ======================= #}
+  <footer class="ts-ed__statusbar">
+    <div>
+      <span id="st-sb-kind">Round seal</span>
+      <span>·</span>
+      <span id="st-sb-size">42 mm diameter</span>
     </div>
-    <p class="ts-panel__meta" style="text-align:center;margin-top:var(--ts-space-3);">
-      Physical size: <strong id="st-size-badge" style="color:var(--ts-text);">—</strong> ·
-      drag the logo to position · use sliders for fine control.
-    </p>
-  </section>
+    <div>
+      <span id="st-sb-logo">no logo</span>
+      <span>·</span>
+      <span id="st-sb-dirty" class="ts-status-chip ts-status-chip--draft">Draft</span>
+    </div>
+  </footer>
 </div>
 
 <style>
-.ts-studio {
+/* Studio reuses the editor shell tokens. */
+#st-shell { min-height: calc(100vh - var(--ts-topbar-h)); display: flex; flex-direction: column; }
+
+/* App-bar kind badge. */
+.ts-ed__class-mark b { color: var(--ts-brand-primary); }
+
+/* Ribbon group tweaks for compact controls. */
+#st-ribbon .ts-ed__grp--labeled { gap: 3px; padding: 0 var(--ts-space-3); min-width: 160px; }
+#st-ribbon .ts-ed__combo        { min-width: 140px; }
+#st-ribbon input[type="text"],
+#st-ribbon input[type="color"],
+#st-ribbon input[type="number"] {
+  height: 26px; padding: 2px 6px; font-size: 11px;
+  border: 1px solid var(--ts-border-strong); background: #fff;
+  border-radius: var(--ts-radius-sm); color: var(--ts-text);
+}
+#st-ribbon textarea {
+  min-width: 180px; height: 48px; padding: 4px 6px; font-size: 11px;
+  border: 1px solid var(--ts-border-strong); background: #fff;
+  border-radius: var(--ts-radius-sm); color: var(--ts-text); resize: vertical;
+}
+#st-ribbon input[type="color"] { width: 42px; padding: 2px; cursor: pointer; }
+#st-ribbon input[type="range"] { width: 120px; accent-color: var(--ts-brand-primary); }
+#st-ribbon input[type="file"]  { font-size: 10px; max-width: 160px; }
+#st-ribbon label               { font-size: 10px; color: var(--ts-text-subtle); text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* Main canvas: 3-column (rail | stage | meta). */
+.st-canvas {
+  flex: 1 1 auto; min-height: 0;
   display: grid;
-  grid-template-columns: 420px minmax(0, 1fr);
-  gap: var(--ts-space-5);
+  grid-template-columns: 152px minmax(0, 1fr) 240px;
+  background: var(--ts-surface-sunken);
+  overflow: hidden;
 }
-.ts-studio__controls {
+
+/* Left rail — kind switcher as pressable cards. */
+.st-canvas__rail {
   background: var(--ts-surface);
-  border: 1px solid var(--ts-border);
-  padding: var(--ts-space-5);
+  border-right: 1px solid var(--ts-border);
+  padding: var(--ts-space-3);
+  display: flex; flex-direction: column; gap: var(--ts-space-2);
+  overflow-y: auto;
 }
-.ts-studio__controls .ts-field { margin-bottom: var(--ts-space-3); }
-.ts-studio__controls input[type="color"] { height: 36px; padding: 2px; }
-.ts-studio__group {
+.st-kind-card {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: var(--ts-space-3) var(--ts-space-2);
+  background: transparent;
   border: 1px solid var(--ts-border);
-  padding: var(--ts-space-4) var(--ts-space-4) 0;
-  margin-bottom: var(--ts-space-4);
+  color: var(--ts-text-muted);
+  cursor: pointer;
+  border-radius: var(--ts-radius);
+  font-size: 10px; line-height: 1.2; text-align: center;
+  transition: all var(--ts-dur-fast) var(--ts-ease);
 }
-.ts-studio__group legend {
-  padding: 0 var(--ts-space-2);
-  font-size: var(--ts-fs-label);
-  font-weight: var(--ts-fw-semibold);
+.st-kind-card:hover { border-color: var(--ts-brand-primary); color: var(--ts-brand-primary); }
+.st-kind-card.ts-is-active {
+  border-color: var(--ts-brand-primary);
+  background: var(--ts-brand-primary-soft);
   color: var(--ts-brand-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-weight: var(--ts-fw-semibold);
 }
-.ts-studio__preview {
-  background: var(--ts-surface);
-  border: 1px solid var(--ts-border);
-  padding: var(--ts-space-5);
-  display: flex; flex-direction: column;
-  justify-content: center;
-  min-height: 420px;
-}
-.ts-studio__preview-canvas {
-  display: flex; align-items: center; justify-content: center;
-  background: #fafbfc;
-  border: 1px dashed var(--ts-border);
+.st-kind-card svg { stroke-width: 1.5; color: inherit; }
+
+/* Centre stage. */
+.st-canvas__stage {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--ts-space-4);
   padding: var(--ts-space-7);
-  min-height: 300px;
+  overflow: auto;
 }
-#st-preview svg { max-width: 320px; max-height: 320px; }
-@media (max-width: 900px) {
-  .ts-studio { grid-template-columns: 1fr; }
+.st-canvas__paper {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--ts-border);
+  padding: var(--ts-space-7);
+  box-shadow: 0 8px 24px rgba(18,26,38,.06);
+  min-width: 360px; min-height: 280px;
+  display: flex; align-items: center; justify-content: center;
+}
+.st-preview svg[data-stamp-root="1"] { display: block; }
+
+/* Logo manipulation handles — overlaid on top of the preview. */
+.st-handles {
+  position: absolute; pointer-events: none;
+  outline: 1px dashed var(--ts-brand-primary);
+  outline-offset: -1px;
+}
+.st-handle {
+  position: absolute; width: 10px; height: 10px;
+  background: #fff; border: 2px solid var(--ts-brand-primary);
+  border-radius: 2px;
+  pointer-events: auto;
+}
+.st-handle--move {
+  inset: 0; width: auto; height: auto;
+  border: 0; background: transparent;
+  cursor: move;
+}
+.st-handle--nw { top: -5px;    left: -5px;    cursor: nw-resize; }
+.st-handle--ne { top: -5px;    right: -5px;   cursor: ne-resize; }
+.st-handle--sw { bottom: -5px; left: -5px;    cursor: sw-resize; }
+.st-handle--se { bottom: -5px; right: -5px;   cursor: se-resize; }
+
+.st-canvas__hint { color: var(--ts-text-muted); font-size: var(--ts-fs-meta); text-align: center; }
+
+/* Right meta rail. */
+.st-canvas__meta {
+  background: var(--ts-surface);
+  border-left: 1px solid var(--ts-border);
+  padding: var(--ts-space-4);
+  overflow-y: auto;
+}
+.st-meta-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: var(--ts-space-2) 0;
+  border-bottom: 1px solid var(--ts-border);
+  font-size: var(--ts-fs-meta);
+}
+.st-meta-row:last-child { border-bottom: 0; }
+.st-meta-row span { color: var(--ts-text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; }
+.st-meta-row b { color: var(--ts-text); font-weight: var(--ts-fw-semibold); }
+
+@media (max-width: 1100px) {
+  .st-canvas { grid-template-columns: 1fr; }
+  .st-canvas__rail { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--ts-border); }
+  .st-canvas__meta { display: none; }
 }
 </style>
 
 <script>
 (function () {
-  var root = document.querySelector('.ts-studio');
-  var stampId = root.dataset.stampId ? parseInt(root.dataset.stampId, 10) : null;
-  var previewEl = document.getElementById('st-preview');
-  var statusEl = document.getElementById('st-status');
+  var shell    = document.getElementById('st-shell');
+  var stampId  = shell.dataset.stampId ? parseInt(shell.dataset.stampId, 10) : null;
+  var ribbon   = document.getElementById('st-ribbon');
+  var previewEl= document.getElementById('st-preview');
+  var handlesEl= document.getElementById('st-handles');
+  var saveEl   = document.getElementById('st-savestate');
+  var kindBadge= document.getElementById('st-kind-badge');
+  var dirtyEl  = document.getElementById('st-sb-dirty');
 
-  // ---- Hide / show per-kind field groups ----
-  var fieldsets = {
-    seal:          document.getElementById('st-seal-fields'),
-    company_dated: document.getElementById('st-company-fields'),
-    date:          document.getElementById('st-date-fields'),
-    rubber:        document.getElementById('st-rubber-fields'),
+  var MM_TO_PX = 3.78;
+  var KIND_LABEL = {
+    seal: 'Round seal', company_dated: 'Company (dated)',
+    date: 'Date stamp', rubber: 'Rubber stamp',
   };
-  var kindSel = document.getElementById('st-kind');
-  function syncFieldsets() {
-    Object.keys(fieldsets).forEach(function (k) {
-      if (k === kindSel.value) fieldsets[k].removeAttribute('hidden');
-      else fieldsets[k].setAttribute('hidden', '');
+
+  // ------------------- shared design state --------------------------------
+  var state = {
+    kind: shell.dataset.stampKind || 'seal',
+    name: shell.dataset.stampName || '',
+    // Shared
+    color: '#0f3b82',
+    // seal
+    seal: { top: 'OFFICIAL SEAL', bottom: 'VITALWORKS LIMITED',
+            center: '★★★\nAPPROVED\n2026', border: 'single' },
+    // company_dated
+    cd: { company: 'VITALWORKS LIMITED', tagline: 'REG. NO. 12345 · NAIROBI',
+          date_format: 'DD MMM YYYY', fixed_date: '',
+          verb: '', color: '#0f3b82', border: 'double' },
+    // date
+    date: { label: 'RECEIVED', value: '', byline: '', color: '#9e2f36' },
+    // rubber
+    rubber: { text: 'ORIGINAL', color: '#0f3b82', shape: 'rect' },
+    // logo
+    logo: { data: '', watermark: true, x: 0, y: 0, size: 95, opacity: 0.08 },
+    // physical size
+    size: { round: '42', rect: '59x23', custom_w: 42, custom_h: 42 },
+    dirty: false,
+  };
+
+  // Hydrate from existing stamp.
+  try {
+    var init = JSON.parse(shell.dataset.stampLayout);
+    if (init) {
+      if (init.logo_data_uri) state.logo.data = init.logo_data_uri;
+      if (typeof init.logo_watermark === 'boolean') state.logo.watermark = init.logo_watermark;
+      if (typeof init.logo_x === 'number') state.logo.x = init.logo_x;
+      if (typeof init.logo_y === 'number') state.logo.y = init.logo_y;
+      if (typeof init.logo_size === 'number') state.logo.size = init.logo_size;
+      if (typeof init.logo_opacity === 'number') state.logo.opacity = init.logo_opacity;
+      if (init.size_value) {
+        var round = state.kind === 'seal' || state.kind === 'company_dated';
+        if (round) state.size.round = init.size_value; else state.size.rect = init.size_value;
+      }
+      if (init.custom_w) state.size.custom_w = init.custom_w;
+      if (init.custom_h) state.size.custom_h = init.custom_h;
+      if (state.kind === 'seal') {
+        if (init.top !== undefined) state.seal.top = init.top;
+        if (init.bottom !== undefined) state.seal.bottom = init.bottom;
+        if (init.center) state.seal.center = (init.center || []).join('\n');
+        if (init.color) state.seal.color = init.color;
+        if (init.border_style) state.seal.border = init.border_style;
+        if (init.color) state.color = init.color;
+      } else if (state.kind === 'company_dated') {
+        if (init.company) state.cd.company = init.company;
+        if (init.tagline) state.cd.tagline = init.tagline;
+        if (init.date_format) state.cd.date_format = init.date_format;
+        if (init.fixed_date) state.cd.fixed_date = init.fixed_date;
+        if (init.verb !== undefined) state.cd.verb = init.verb;
+        if (init.color) state.cd.color = init.color;
+        if (init.border_style) state.cd.border = init.border_style;
+      } else if (state.kind === 'date') {
+        if (init.label) state.date.label = init.label;
+        if (init.date) state.date.value = init.date;
+        if (init.byline !== undefined) state.date.byline = init.byline;
+        if (init.color) state.date.color = init.color;
+      } else if (state.kind === 'rubber') {
+        if (init.text !== undefined) state.rubber.text = init.text;
+        if (init.color) state.rubber.color = init.color;
+        if (init.shape) state.rubber.shape = init.shape;
+      }
+    }
+  } catch (e) {}
+
+  // Seed seal defaults with its own color if the hydration didn't set state.color.
+  state.color = state[state.kind] && state[state.kind].color ? state[state.kind].color : state.color;
+
+  // ------------------- ribbon tab wiring ---------------------------------
+  function makeFieldWrap(label, input) {
+    var w = document.createElement('div');
+    w.className = 'ts-ed__grp--labeled';
+    w.style.display = 'flex'; w.style.flexDirection = 'column'; w.style.gap = '2px'; w.style.padding = '0 10px';
+    if (label) {
+      var l = document.createElement('label'); l.textContent = label; w.appendChild(l);
+    }
+    w.appendChild(input);
+    return w;
+  }
+  function makeGroup(label, children) {
+    var g = document.createElement('div');
+    g.className = 'ts-ed__grp'; g.style.gap = '0';
+    children.forEach(function (c) { g.appendChild(c); });
+    var l = document.createElement('span');
+    l.className = 'ts-ed__grp-label'; l.textContent = label;
+    g.appendChild(l);
+    return g;
+  }
+  function textInput(value, onInput, placeholder, type) {
+    var i = document.createElement('input');
+    i.type = type || 'text'; i.value = value || '';
+    if (placeholder) i.placeholder = placeholder;
+    i.addEventListener('input', function () { onInput(i.value); markDirty(); render(); });
+    return i;
+  }
+  function colorInput(value, onInput) {
+    var i = document.createElement('input');
+    i.type = 'color'; i.value = value;
+    i.addEventListener('input', function () { onInput(i.value); markDirty(); render(); });
+    return i;
+  }
+  function selectInput(opts, selected, onChange) {
+    var s = document.createElement('select');
+    s.className = 'ts-ed__combo';
+    opts.forEach(function (o) {
+      var op = document.createElement('option');
+      op.value = (typeof o === 'string') ? o : o.value;
+      op.textContent = (typeof o === 'string') ? o : o.label;
+      if (op.value === selected) op.selected = true;
+      s.appendChild(op);
     });
-    syncSizeVisibility();
-    render();
+    s.addEventListener('change', function () { onChange(s.value); markDirty(); render(); });
+    return s;
   }
-  kindSel.addEventListener('change', syncFieldsets);
+  function textareaInput(value, onInput) {
+    var t = document.createElement('textarea');
+    t.value = value || '';
+    t.addEventListener('input', function () { onInput(t.value); markDirty(); render(); });
+    return t;
+  }
+  function rangeInput(min, max, value, onInput) {
+    var r = document.createElement('input');
+    r.type = 'range'; r.min = min; r.max = max; r.value = value;
+    r.addEventListener('input', function () { onInput(parseFloat(r.value)); render(); });
+    r.addEventListener('change', markDirty);
+    return r;
+  }
+  function fileInput(onPick) {
+    var f = document.createElement('input');
+    f.type = 'file'; f.accept = 'image/png,image/jpeg,image/svg+xml,image/webp';
+    f.addEventListener('change', function () {
+      var fl = f.files && f.files[0]; if (!fl) return;
+      if (fl.size > 200 * 1024) { alert('Logo too large (max 200 KB).'); f.value = ''; return; }
+      var rd = new FileReader();
+      rd.onload = function () { onPick(rd.result); markDirty(); render(); };
+      rd.readAsDataURL(fl);
+    });
+    return f;
+  }
 
-  // ---- SVG renderers ----
-  function textOnArc(id, text, r, side, color) {
-    // side: 'top' or 'bottom'. Draws an invisible arc path then
-    // positions the text along it.
-    var path, startAngle, endAngle;
-    if (side === 'top') {
-      // Top half, left-to-right
-      path = 'M ' + (-r) + ' 0 A ' + r + ' ' + r + ' 0 0 1 ' + r + ' 0';
+  // Each tab builds its own ribbon layout based on the current kind.
+  function buildDesignRibbon() {
+    var k = state.kind;
+    if (k === 'seal') {
+      return [
+        makeGroup('Arc text', [
+          makeFieldWrap('Top',    textInput(state.seal.top, function (v) { state.seal.top = v; }, 'OFFICIAL SEAL')),
+          makeFieldWrap('Bottom', textInput(state.seal.bottom, function (v) { state.seal.bottom = v; }, 'ORGANISATION')),
+        ]),
+        makeGroup('Center', [
+          makeFieldWrap('Lines (one per line)', textareaInput(state.seal.center, function (v) { state.seal.center = v; })),
+        ]),
+        makeGroup('Style', [
+          makeFieldWrap('Ink',    colorInput(state.seal.color, function (v) { state.seal.color = v; state.color = v; })),
+          makeFieldWrap('Border', selectInput(
+            [{value:'single',label:'Single ring'},{value:'double',label:'Double ring'},{value:'dashed',label:'Dashed ring'}],
+            state.seal.border, function (v) { state.seal.border = v; }
+          )),
+        ]),
+      ];
+    }
+    if (k === 'company_dated') {
+      return [
+        makeGroup('Arc text', [
+          makeFieldWrap('Company', textInput(state.cd.company, function (v) { state.cd.company = v; })),
+          makeFieldWrap('Tagline', textInput(state.cd.tagline, function (v) { state.cd.tagline = v; })),
+        ]),
+        makeGroup('Date', [
+          makeFieldWrap('Format', selectInput(
+            [{value:'DD MMM YYYY',label:'DD MMM YYYY'},
+             {value:'YYYY-MM-DD',label:'YYYY-MM-DD'},
+             {value:'DD/MM/YYYY',label:'DD/MM/YYYY'},
+             {value:'MMM DD, YYYY',label:'MMM DD, YYYY'},
+             {value:'FIXED',label:'Fixed value…'}],
+            state.cd.date_format, function (v) { state.cd.date_format = v; }
+          )),
+          makeFieldWrap('Fixed', textInput(state.cd.fixed_date, function (v) { state.cd.fixed_date = v; }, 'auto')),
+          makeFieldWrap('Verb', selectInput(
+            ['','DATED','ISSUED','APPROVED ON','CERTIFIED ON','RECEIVED','SEALED'],
+            state.cd.verb, function (v) { state.cd.verb = v; }
+          )),
+        ]),
+        makeGroup('Style', [
+          makeFieldWrap('Ink',    colorInput(state.cd.color, function (v) { state.cd.color = v; state.color = v; })),
+          makeFieldWrap('Border', selectInput(
+            [{value:'double',label:'Double ring'},{value:'single',label:'Single ring'},{value:'rope',label:'Rope (hatched)'}],
+            state.cd.border, function (v) { state.cd.border = v; }
+          )),
+        ]),
+      ];
+    }
+    if (k === 'date') {
+      return [
+        makeGroup('Label', [
+          makeFieldWrap('Verb', selectInput(
+            ['RECEIVED','APPROVED','PAID','REJECTED','DRAFT','FILED','URGENT','COPY','CONFIDENTIAL','VOID'],
+            state.date.label, function (v) { state.date.label = v; }
+          )),
+        ]),
+        makeGroup('Date', [
+          makeFieldWrap('Value', textInput(state.date.value, function (v) { state.date.value = v; }, 'auto today')),
+          makeFieldWrap('Byline (optional)', textInput(state.date.byline, function (v) { state.date.byline = v; }, 'ref. no.')),
+        ]),
+        makeGroup('Style', [
+          makeFieldWrap('Ink', colorInput(state.date.color, function (v) { state.date.color = v; state.color = v; })),
+        ]),
+      ];
+    }
+    // rubber
+    return [
+      makeGroup('Text', [
+        makeFieldWrap('Lines (1–2)', textareaInput(state.rubber.text, function (v) { state.rubber.text = v; })),
+      ]),
+      makeGroup('Style', [
+        makeFieldWrap('Ink',   colorInput(state.rubber.color, function (v) { state.rubber.color = v; state.color = v; })),
+        makeFieldWrap('Shape', selectInput(
+          [{value:'rect',label:'Rectangle'},{value:'rounded',label:'Rounded'},{value:'oval',label:'Oval'}],
+          state.rubber.shape, function (v) { state.rubber.shape = v; }
+        )),
+      ]),
+    ];
+  }
+
+  function buildLogoRibbon() {
+    var picker = fileInput(function (uri) { state.logo.data = uri; });
+    var clear = document.createElement('button');
+    clear.type = 'button'; clear.className = 'ts-ed__btn';
+    clear.textContent = 'Clear logo';
+    clear.addEventListener('click', function () { state.logo.data = ''; markDirty(); render(); });
+
+    var wmChk = document.createElement('input');
+    wmChk.type = 'checkbox'; wmChk.checked = state.logo.watermark;
+    wmChk.addEventListener('change', function () {
+      state.logo.watermark = wmChk.checked;
+      // Sane defaults for the flip.
+      if (wmChk.checked) { state.logo.size = 95; state.logo.opacity = 0.08; }
+      else               { state.logo.size = 40; state.logo.opacity = 1; }
+      markDirty(); render();
+    });
+    var wmLbl = document.createElement('label');
+    wmLbl.style.textTransform = 'none'; wmLbl.style.letterSpacing = '0';
+    wmLbl.style.display = 'inline-flex'; wmLbl.style.alignItems = 'center'; wmLbl.style.gap = '4px';
+    wmLbl.appendChild(wmChk);
+    wmLbl.appendChild(document.createTextNode(' Faint watermark'));
+
+    var reset = document.createElement('button');
+    reset.type = 'button'; reset.className = 'ts-ed__btn';
+    reset.textContent = 'Reset position';
+    reset.addEventListener('click', function () {
+      state.logo.x = 0; state.logo.y = 0;
+      state.logo.size = state.logo.watermark ? 95 : 40;
+      state.logo.opacity = state.logo.watermark ? 0.08 : 1;
+      markDirty(); render();
+    });
+
+    return [
+      makeGroup('Upload', [
+        makeFieldWrap('File (PNG / JPG / SVG · ≤200 KB)', picker),
+        makeFieldWrap('', clear),
+      ]),
+      makeGroup('Placement', [
+        makeFieldWrap('Horizontal', rangeInput(-50, 50, state.logo.x, function (v) { state.logo.x = v; })),
+        makeFieldWrap('Vertical',   rangeInput(-50, 50, state.logo.y, function (v) { state.logo.y = v; })),
+      ]),
+      makeGroup('Appearance', [
+        makeFieldWrap('Size %',    rangeInput(10, 100, state.logo.size, function (v) { state.logo.size = v; })),
+        makeFieldWrap('Opacity %', rangeInput(5, 100, Math.round(state.logo.opacity * 100), function (v) { state.logo.opacity = v / 100; })),
+        makeFieldWrap('', wmLbl),
+        makeFieldWrap('', reset),
+      ]),
+    ];
+  }
+
+  function buildSizeRibbon() {
+    var round = (state.kind === 'seal' || state.kind === 'company_dated');
+    var sizeSel;
+    if (round) {
+      sizeSel = selectInput(
+        [{value:'25',label:'25 mm compact'},{value:'28',label:'28 mm'},
+         {value:'32',label:'32 mm'},{value:'38',label:'38 mm'},
+         {value:'42',label:'42 mm standard'},{value:'45',label:'45 mm'},
+         {value:'50',label:'50 mm corporate'},{value:'55',label:'55 mm notary'},
+         {value:'custom',label:'Custom…'}],
+        state.size.round, function (v) { state.size.round = v; }
+      );
     } else {
-      // Bottom half, right-to-left so letters read left-to-right
-      path = 'M ' + r + ' 0 A ' + r + ' ' + r + ' 0 0 1 ' + (-r) + ' 0';
+      sizeSel = selectInput(
+        [{value:'38x14',label:'38×14 label'},{value:'50x20',label:'50×20'},
+         {value:'59x23',label:'59×23 self-inking'},{value:'60x30',label:'60×30'},
+         {value:'69x23',label:'69×23'},{value:'70x25',label:'70×25'},
+         {value:'50x30',label:'50×30 date'},{value:'80x35',label:'80×35 header'},
+         {value:'custom',label:'Custom…'}],
+        state.size.rect, function (v) { state.size.rect = v; }
+      );
     }
-    var tr = side === 'top' ? '' : 'transform="translate(0,20)"';
-    return (
-      '<defs><path id="' + id + '" d="' + path + '" fill="none"/></defs>' +
-      '<text font-family="Georgia, serif" font-size="18" font-weight="700" letter-spacing="2" fill="' + color + '" ' + tr + '>' +
-      '<textPath href="#' + id + '" startOffset="50%" text-anchor="middle">' + (text || '').toUpperCase() + '</textPath>' +
-      '</text>'
-    );
+    return [
+      makeGroup(round ? 'Round presets' : 'Rectangular presets', [
+        makeFieldWrap('Preset', sizeSel),
+      ]),
+      makeGroup('Custom', [
+        makeFieldWrap('Width (mm)',  textInput(state.size.custom_w, function (v) { state.size.custom_w = parseFloat(v) || 42; }, '42', 'number')),
+        makeFieldWrap('Height (mm)', textInput(state.size.custom_h, function (v) { state.size.custom_h = parseFloat(v) || 42; }, '42', 'number')),
+      ]),
+    ];
   }
 
-  function renderSeal() {
-    var top = document.getElementById('st-top-text').value || '';
-    var bot = document.getElementById('st-bottom-text').value || '';
-    var center = (document.getElementById('st-center-lines').value || '').split(/\n/).slice(0, 4);
-    var color = document.getElementById('st-color').value;
-    var borderStyle = document.getElementById('st-border-style').value;
-
-    var outer = borderStyle === 'single'
-      ? '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3"/>'
-      : borderStyle === 'double'
-        ? '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3"/>' +
-          '<circle r="128" fill="none" stroke="' + color + '" stroke-width="1"/>'
-        : '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3" stroke-dasharray="6,4"/>';
-
-    var centerY = center.length === 1 ? 6 : (center.length === 2 ? -4 : -18);
-    var centerText = center.map(function (line, i) {
-      var y = centerY + i * 24;
-      var size = (line.length > 12) ? 14 : 20;
-      return '<text y="' + y + '" text-anchor="middle" font-family="Georgia, serif" font-size="' + size + '" font-weight="700" fill="' + color + '">' + escapeXml(line) + '</text>';
-    }).join('');
-
-    var wmLogo = logoDataUri ? logoImage(320, 320, -160, -160) : '';
-    var dims = currentPhysicalDims('round');   // { w_mm, h_mm, viewBox }
-    return (
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-160 -160 320 320" width="' + dims.display + '" height="' + dims.display + '" data-stamp-root="1">' +
-      '<g>' +
-        wmLogo + outer +
-        textOnArc('seal-top-' + Date.now(), top, 115, 'top', color) +
-        textOnArc('seal-bot-' + Date.now(), bot, 115, 'bottom', color) +
-        centerText +
-      '</g>' +
-      '</svg>'
-    );
+  function buildExportRibbon() {
+    var downloadBtn = document.createElement('button');
+    downloadBtn.type = 'button'; downloadBtn.className = 'ts-ed__btn';
+    downloadBtn.textContent = 'Download SVG';
+    downloadBtn.addEventListener('click', function () {
+      var blob = new Blob([currentSvg()], { type: 'image/svg+xml' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = (state.name || 'stamp') + '.svg';
+      document.body.appendChild(a); a.click(); a.remove();
+    });
+    return [
+      makeGroup('Save', [
+        makeFieldWrap('', (function () {
+          var b = document.createElement('button');
+          b.type = 'button'; b.className = 'ts-ed__btn ts-ed__btn--primary';
+          b.textContent = stampId ? 'Save changes' : 'Register stamp';
+          b.addEventListener('click', doSave);
+          return b;
+        })()),
+      ]),
+      makeGroup('Download', [
+        makeFieldWrap('', downloadBtn),
+      ]),
+    ];
   }
 
-  function renderDate() {
-    var label = document.getElementById('st-date-label').value;
-    var dateVal = (document.getElementById('st-date-value').value || '').trim();
-    var byline = (document.getElementById('st-date-byline').value || '').trim();
-    var color = document.getElementById('st-date-color').value;
-    if (!dateVal) {
-      var d = new Date();
-      dateVal = d.getDate().toString().padStart(2, '0') + ' ' +
-                ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][d.getMonth()] + ' ' +
-                d.getFullYear();
+  function renderRibbon(tab) {
+    ribbon.innerHTML = '';
+    var groups = { design: buildDesignRibbon, logo: buildLogoRibbon, size: buildSizeRibbon, export: buildExportRibbon }[tab]();
+    groups.forEach(function (g) { ribbon.appendChild(g); });
+    document.querySelectorAll('.ts-ed__tab').forEach(function (t) {
+      t.classList.toggle('ts-is-active', t.getAttribute('data-tab') === tab);
+      t.setAttribute('aria-selected', String(t.getAttribute('data-tab') === tab));
+    });
+  }
+  document.querySelectorAll('.ts-ed__tab').forEach(function (t) {
+    t.addEventListener('click', function () { renderRibbon(t.getAttribute('data-tab')); });
+  });
+
+  // Left rail kind switcher.
+  document.querySelectorAll('.st-kind-card').forEach(function (btn) {
+    if (btn.getAttribute('data-set-kind') === state.kind) btn.classList.add('ts-is-active');
+    else btn.classList.remove('ts-is-active');
+    btn.addEventListener('click', function () {
+      state.kind = btn.getAttribute('data-set-kind');
+      document.querySelectorAll('.st-kind-card').forEach(function (b) {
+        b.classList.toggle('ts-is-active', b === btn);
+      });
+      kindBadge.textContent = KIND_LABEL[state.kind] || state.kind;
+      markDirty();
+      renderRibbon(document.querySelector('.ts-ed__tab.ts-is-active').getAttribute('data-tab'));
+      render();
+    });
+  });
+
+  // ------------------- renderers -----------------------------------------
+  function escapeXml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  function physDims(shape) {
+    if (shape === 'round') {
+      var mm = state.size.round === 'custom' ? state.size.custom_w : parseFloat(state.size.round);
+      return { w_mm: mm, h_mm: mm, display: Math.round(mm * MM_TO_PX) };
     }
-    var dims = currentPhysicalDims('rect');
-    var optionalLogo = logoDataUri ? logoImage(320, 170, 0, 0) : '';
-    return (
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 170" width="' + dims.displayW + '" height="' + dims.displayH + '" data-stamp-root="1">' +
-      optionalLogo +
-      '<rect x="4" y="4" width="312" height="162" fill="none" stroke="' + color + '" stroke-width="3" rx="4"/>' +
-      '<rect x="12" y="14" width="296" height="40" fill="' + color + '"/>' +
-      '<text x="160" y="42" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="26" fill="#fff" letter-spacing="3">' + escapeXml(label) + '</text>' +
-      '<text x="160" y="100" text-anchor="middle" font-family="Courier New, monospace" font-size="28" font-weight="700" fill="' + color + '">' + escapeXml(dateVal) + '</text>' +
-      (byline
-        ? '<text x="160" y="140" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="' + color + '" letter-spacing="2">' + escapeXml(byline) + '</text>'
-        : '<line x1="40" y1="130" x2="280" y2="130" stroke="' + color + '" stroke-width="1"/>' +
-          '<text x="160" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="' + color + '" letter-spacing="2">BY ____________________________</text>') +
-      '</svg>'
-    );
+    var val = state.size.rect;
+    var w, h;
+    if (val === 'custom') { w = state.size.custom_w; h = state.size.custom_h; }
+    else { var m = val.match(/(\d+)x(\d+)/); w = +m[1]; h = +m[2]; }
+    return { w_mm: w, h_mm: h, displayW: Math.round(w * MM_TO_PX), displayH: Math.round(h * MM_TO_PX) };
   }
 
-  function renderRubber() {
-    var lines = (document.getElementById('st-rubber-text').value || '').split(/\n/).slice(0, 2);
-    var color = document.getElementById('st-rubber-color').value;
-    var shape = document.getElementById('st-rubber-shape').value;
-    var outer;
-    if (shape === 'oval') {
-      outer = '<ellipse cx="160" cy="70" rx="150" ry="55" fill="none" stroke="' + color + '" stroke-width="4"/>';
-    } else if (shape === 'rounded') {
-      outer = '<rect x="10" y="15" width="300" height="110" rx="18" fill="none" stroke="' + color + '" stroke-width="4"/>';
-    } else {
-      outer = '<rect x="10" y="15" width="300" height="110" fill="none" stroke="' + color + '" stroke-width="4"/>';
-    }
-    var textBlock = lines.length === 1
-      ? '<text x="160" y="85" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="42" font-weight="900" fill="' + color + '" letter-spacing="4">' + escapeXml(lines[0]) + '</text>'
-      : '<text x="160" y="60" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="26" font-weight="900" fill="' + color + '" letter-spacing="2">' + escapeXml(lines[0]) + '</text>' +
-        '<text x="160" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="' + color + '" letter-spacing="2">' + escapeXml(lines[1]) + '</text>';
-    var badge = logoDataUri ? logoImage(320, 140, 0, 0) : '';
-    // If a logo is embedded as a non-watermark, nudge the text right
-    // so it doesn't overlap.
-    if (logoDataUri && !logoWM.checked && logoX < -20) {
-      textBlock = textBlock.replace(/x="160"/g, 'x="200"');
-    }
-    var dims = currentPhysicalDims('rect');
-    return (
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 140" width="' + dims.displayW + '" height="' + dims.displayH + '" data-stamp-root="1">' +
-      outer + badge + textBlock +
-      '</svg>'
-    );
-  }
-
-  function escapeXml(s) {
-    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-
-  // ---- Logo state + upload ----
-  var logoDataUri = '';            // e.g. "data:image/png;base64,…"
-  // Position/size as percentages of the stamp viewBox so they scale
-  // cleanly across physical sizes. 0/0 = centered; size % of the
-  // smaller viewBox dimension; opacity is 0..1.
-  var logoX = 0, logoY = 0, logoSize = 60, logoOpacity = 1;
-
-  var logoPreview = document.getElementById('st-logo-preview');
-  var logoFile    = document.getElementById('st-logo-file');
-  var logoWM      = document.getElementById('st-logo-watermark');
-  var logoClear   = document.getElementById('st-logo-clear');
-  var logoControls = document.getElementById('st-logo-controls');
-  var logoXSlider   = document.getElementById('st-logo-x');
-  var logoYSlider   = document.getElementById('st-logo-y');
-  var logoSizeSlider= document.getElementById('st-logo-size');
-  var logoOpSlider  = document.getElementById('st-logo-opacity');
-  var logoReset     = document.getElementById('st-logo-reset');
-
-  function syncLogoLabels() {
-    document.getElementById('st-logo-x-value').textContent = logoX + '%';
-    document.getElementById('st-logo-y-value').textContent = logoY + '%';
-    document.getElementById('st-logo-size-value').textContent = logoSize + '%';
-    document.getElementById('st-logo-opacity-value').textContent = Math.round(logoOpacity * 100) + '%';
-  }
-
-  function setLogo(uri) {
-    logoDataUri = uri || '';
-    logoPreview.innerHTML = logoDataUri
-      ? '<img src="' + logoDataUri + '" style="max-width:100%;max-height:100%;">'
-      : '<span style="color:var(--ts-text-subtle);font-size:10px;">no logo</span>';
-    if (logoDataUri) logoControls.removeAttribute('hidden');
-    else             logoControls.setAttribute('hidden', '');
-    // Whenever the watermark toggle flips, pick sensible defaults so
-    // the first render doesn't look wrong.
-    syncLogoLabels();
-    render();
-  }
-  logoFile.addEventListener('change', function () {
-    var f = logoFile.files && logoFile.files[0]; if (!f) return;
-    if (f.size > 200 * 1024) { alert('Logo too large (max 200 KB).'); logoFile.value = ''; return; }
-    var r = new FileReader();
-    r.onload = function () { setLogo(r.result); };
-    r.readAsDataURL(f);
-  });
-  logoClear.addEventListener('click', function () {
-    logoFile.value = '';
-    setLogo('');
-  });
-  logoWM.addEventListener('change', function () {
-    // When toggling watermark, auto-adjust opacity so it looks right.
-    if (logoWM.checked) { logoOpacity = 0.08; logoSize = 95; }
-    else                { logoOpacity = 1;    logoSize = 40; }
-    logoSizeSlider.value = logoSize;
-    logoOpSlider.value = Math.round(logoOpacity * 100);
-    syncLogoLabels(); render();
-  });
-  logoXSlider.addEventListener('input', function () {
-    logoX = parseInt(logoXSlider.value, 10); syncLogoLabels(); render();
-  });
-  logoYSlider.addEventListener('input', function () {
-    logoY = parseInt(logoYSlider.value, 10); syncLogoLabels(); render();
-  });
-  logoSizeSlider.addEventListener('input', function () {
-    logoSize = parseInt(logoSizeSlider.value, 10); syncLogoLabels(); render();
-  });
-  logoOpSlider.addEventListener('input', function () {
-    logoOpacity = parseInt(logoOpSlider.value, 10) / 100; syncLogoLabels(); render();
-  });
-  logoReset.addEventListener('click', function () {
-    logoX = 0; logoY = 0;
-    logoSize = logoWM.checked ? 95 : 40;
-    logoOpacity = logoWM.checked ? 0.08 : 1;
-    logoXSlider.value = 0; logoYSlider.value = 0;
-    logoSizeSlider.value = logoSize; logoOpSlider.value = Math.round(logoOpacity * 100);
-    syncLogoLabels(); render();
-  });
-
-  // Logo renderer: positions + scales the logo inside the current
-  // stamp viewBox. All inputs are percentages so the same layout
-  // works at any physical size.
   function logoImage(viewBoxW, viewBoxH, cxOffset, cyOffset) {
-    if (!logoDataUri) return '';
-    cxOffset = cxOffset || 0;
-    cyOffset = cyOffset || 0;
-    // Base dimensions: size slider is % of the smaller viewBox side.
+    if (!state.logo.data) return '';
     var base = Math.min(viewBoxW, viewBoxH);
-    var size = base * (logoSize / 100);
-    // Position: offset % of the viewBox side away from centre.
-    var cx = cxOffset + (viewBoxW * logoX / 100);
-    var cy = cyOffset + (viewBoxH * logoY / 100);
+    var size = base * (state.logo.size / 100);
+    var cx = cxOffset + (viewBoxW * state.logo.x / 100);
+    var cy = cyOffset + (viewBoxH * state.logo.y / 100);
     return (
-      '<image class="ts-stamp-logo" data-logo="1" href="' + logoDataUri + '" ' +
+      '<image data-logo="1" href="' + state.logo.data + '" ' +
       'x="' + (cx - size / 2) + '" y="' + (cy - size / 2) + '" ' +
       'width="' + size + '" height="' + size + '" ' +
-      'opacity="' + logoOpacity + '" ' +
+      'opacity="' + state.logo.opacity + '" ' +
       'preserveAspectRatio="xMidYMid meet" style="cursor:move;"/>'
     );
   }
 
-  // ---- Company Dated renderer ----
-  function renderCompanyDated() {
-    var company = document.getElementById('st-cd-company').value;
-    var tagline = document.getElementById('st-cd-tagline').value;
-    var fmt     = document.getElementById('st-cd-date-format').value;
-    var fixed   = (document.getElementById('st-cd-fixed-date').value || '').trim();
-    var verb    = document.getElementById('st-cd-tag-label').value;
-    var color   = document.getElementById('st-cd-color').value;
-    var border  = document.getElementById('st-cd-border-style').value;
+  function textOnArc(id, text, r, side, color) {
+    var path = (side === 'top')
+      ? 'M ' + (-r) + ' 0 A ' + r + ' ' + r + ' 0 0 1 ' + r + ' 0'
+      : 'M ' + r + ' 0 A ' + r + ' ' + r + ' 0 0 1 ' + (-r) + ' 0';
+    var tr = (side === 'top') ? '' : 'transform="translate(0,20)"';
+    return '<defs><path id="' + id + '" d="' + path + '" fill="none"/></defs>' +
+      '<text font-family="Georgia, serif" font-size="18" font-weight="700" letter-spacing="2" fill="' + color + '" ' + tr + '>' +
+      '<textPath href="#' + id + '" startOffset="50%" text-anchor="middle">' + escapeXml((text || '').toUpperCase()) + '</textPath>' +
+      '</text>';
+  }
 
+  function renderSeal() {
+    var dims = physDims('round');
+    var color = state.seal.color;
+    var outer = state.seal.border === 'single'
+      ? '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3"/>'
+      : state.seal.border === 'double'
+        ? '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3"/>' +
+          '<circle r="128" fill="none" stroke="' + color + '" stroke-width="1"/>'
+        : '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3" stroke-dasharray="6,4"/>';
+    var lines = (state.seal.center || '').split('\n').slice(0, 4);
+    var cy0 = lines.length === 1 ? 6 : (lines.length === 2 ? -4 : -18);
+    var centerText = lines.map(function (line, i) {
+      var y = cy0 + i * 24;
+      var size = line.length > 12 ? 14 : 20;
+      return '<text y="' + y + '" text-anchor="middle" font-family="Georgia, serif" font-size="' + size + '" font-weight="700" fill="' + color + '">' + escapeXml(line) + '</text>';
+    }).join('');
+    var logo = state.logo.data ? logoImage(320, 320, -160, -160) : '';
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-160 -160 320 320" width="' + dims.display + '" height="' + dims.display + '" data-stamp-root="1">' +
+      logo + outer +
+      textOnArc('s-top-' + Date.now(), state.seal.top, 115, 'top', color) +
+      textOnArc('s-bot-' + Date.now(), state.seal.bottom, 115, 'bottom', color) +
+      centerText + '</svg>';
+  }
+
+  function renderCompanyDated() {
+    var dims = physDims('round');
+    var color = state.cd.color;
     var dateStr;
-    if (fmt === 'FIXED' && fixed) {
-      dateStr = fixed;
+    if (state.cd.date_format === 'FIXED' && state.cd.fixed_date) {
+      dateStr = state.cd.fixed_date;
     } else {
       var d = new Date();
       var dd = String(d.getDate()).padStart(2, '0');
       var mm = String(d.getMonth() + 1).padStart(2, '0');
       var mmm = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][d.getMonth()];
       var yyyy = d.getFullYear();
-      switch (fmt) {
-        case 'YYYY-MM-DD':  dateStr = yyyy + '-' + mm + '-' + dd; break;
-        case 'DD/MM/YYYY':  dateStr = dd + '/' + mm + '/' + yyyy; break;
+      switch (state.cd.date_format) {
+        case 'YYYY-MM-DD':   dateStr = yyyy + '-' + mm + '-' + dd; break;
+        case 'DD/MM/YYYY':   dateStr = dd + '/' + mm + '/' + yyyy; break;
         case 'MMM DD, YYYY': dateStr = mmm + ' ' + dd + ', ' + yyyy; break;
-        default:            dateStr = dd + ' ' + mmm + ' ' + yyyy;
+        default:             dateStr = dd + ' ' + mmm + ' ' + yyyy;
       }
     }
-
     var outer;
-    if (border === 'single') {
-      outer = '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3"/>';
-    } else if (border === 'rope') {
-      outer = '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3"/>' +
-              '<circle r="132" fill="none" stroke="' + color + '" stroke-width="1" stroke-dasharray="2,2"/>' +
-              '<circle r="124" fill="none" stroke="' + color + '" stroke-width="0.75"/>';
-    } else {
-      outer = '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3"/>' +
-              '<circle r="128" fill="none" stroke="' + color + '" stroke-width="1"/>';
+    if (state.cd.border === 'single')      outer = '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3"/>';
+    else if (state.cd.border === 'rope')   outer = '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3"/>' +
+                                                   '<circle r="132" fill="none" stroke="' + color + '" stroke-width="1" stroke-dasharray="2,2"/>' +
+                                                   '<circle r="124" fill="none" stroke="' + color + '" stroke-width="0.75"/>';
+    else                                   outer = '<circle r="140" fill="none" stroke="' + color + '" stroke-width="3"/>' +
+                                                   '<circle r="128" fill="none" stroke="' + color + '" stroke-width="1"/>';
+    var logo = state.logo.data ? logoImage(320, 320, -160, -160) : '';
+    var verbY = state.logo.data && !state.logo.watermark ? -2 : -12;
+    var dateY = state.logo.data && !state.logo.watermark ? 28 : 18;
+    var verbText = state.cd.verb
+      ? '<text y="' + verbY + '" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="' + color + '" letter-spacing="3">' + escapeXml(state.cd.verb) + '</text>'
+      : '';
+    var midLine = (!state.cd.verb && !state.logo.data)
+      ? '<line x1="-70" y1="-14" x2="70" y2="-14" stroke="' + color + '" stroke-width="1"/>' : '';
+    var dateText = '<text y="' + dateY + '" text-anchor="middle" font-family="Courier New, monospace" font-size="20" font-weight="700" fill="' + color + '">' + escapeXml(dateStr) + '</text>';
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-160 -160 320 320" width="' + dims.display + '" height="' + dims.display + '" data-stamp-root="1">' +
+      logo + outer +
+      textOnArc('cd-top-' + Date.now(), state.cd.company, 115, 'top', color) +
+      textOnArc('cd-bot-' + Date.now(), state.cd.tagline, 115, 'bottom', color) +
+      verbText + midLine + dateText + '</svg>';
+  }
+
+  function renderDate() {
+    var dims = physDims('rect');
+    var color = state.date.color;
+    var dateVal = (state.date.value || '').trim();
+    if (!dateVal) {
+      var d = new Date();
+      dateVal = String(d.getDate()).padStart(2, '0') + ' ' +
+                ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][d.getMonth()] + ' ' + d.getFullYear();
     }
+    var logo = state.logo.data ? logoImage(320, 170, 0, 0) : '';
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 170" width="' + dims.displayW + '" height="' + dims.displayH + '" data-stamp-root="1">' +
+      logo +
+      '<rect x="4" y="4" width="312" height="162" fill="none" stroke="' + color + '" stroke-width="3" rx="4"/>' +
+      '<rect x="12" y="14" width="296" height="40" fill="' + color + '"/>' +
+      '<text x="160" y="42" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="26" fill="#fff" letter-spacing="3">' + escapeXml(state.date.label) + '</text>' +
+      '<text x="160" y="100" text-anchor="middle" font-family="Courier New, monospace" font-size="28" font-weight="700" fill="' + color + '">' + escapeXml(dateVal) + '</text>' +
+      (state.date.byline
+        ? '<text x="160" y="140" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="' + color + '" letter-spacing="2">' + escapeXml(state.date.byline) + '</text>'
+        : '<line x1="40" y1="130" x2="280" y2="130" stroke="' + color + '" stroke-width="1"/>' +
+          '<text x="160" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="' + color + '" letter-spacing="2">BY ____________________________</text>') +
+      '</svg>';
+  }
 
-    var inlineLogo = logoDataUri ? logoImage(320, 320, -160, -160) : '';
-    var verbY = logoDataUri && !logoWM.checked ? -2 : -12;
-    var dateY = logoDataUri && !logoWM.checked ? 28 : 18;
-
-    var verbText = verb
-      ? '<text y="' + verbY + '" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="' + color + '" letter-spacing="3">' + escapeXml(verb) + '</text>'
-      : '';
-    var midLine = !verb && !logoDataUri
-      ? '<line x1="-70" y1="-14" x2="70" y2="-14" stroke="' + color + '" stroke-width="1"/>'
-      : '';
-    var dateText =
-      '<text y="' + dateY + '" text-anchor="middle" font-family="Courier New, monospace" font-size="20" font-weight="700" fill="' + color + '">' + escapeXml(dateStr) + '</text>';
-
-    var dims = currentPhysicalDims('round');
-    return (
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-160 -160 320 320" width="' + dims.display + '" height="' + dims.display + '" data-stamp-root="1">' +
-        inlineLogo + outer +
-        textOnArc('cd-top-' + Date.now(), company, 115, 'top', color) +
-        textOnArc('cd-bot-' + Date.now(), tagline, 115, 'bottom', color) +
-        verbText + midLine + dateText +
-      '</svg>'
-    );
+  function renderRubber() {
+    var dims = physDims('rect');
+    var color = state.rubber.color;
+    var lines = (state.rubber.text || '').split('\n').slice(0, 2);
+    var outer;
+    if (state.rubber.shape === 'oval')         outer = '<ellipse cx="160" cy="70" rx="150" ry="55" fill="none" stroke="' + color + '" stroke-width="4"/>';
+    else if (state.rubber.shape === 'rounded') outer = '<rect x="10" y="15" width="300" height="110" rx="18" fill="none" stroke="' + color + '" stroke-width="4"/>';
+    else                                       outer = '<rect x="10" y="15" width="300" height="110" fill="none" stroke="' + color + '" stroke-width="4"/>';
+    var textBlock = lines.length === 1
+      ? '<text x="160" y="85" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="42" font-weight="900" fill="' + color + '" letter-spacing="4">' + escapeXml(lines[0]) + '</text>'
+      : '<text x="160" y="60" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="26" font-weight="900" fill="' + color + '" letter-spacing="2">' + escapeXml(lines[0]) + '</text>' +
+        '<text x="160" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="' + color + '" letter-spacing="2">' + escapeXml(lines[1]) + '</text>';
+    var logo = state.logo.data ? logoImage(320, 140, 0, 0) : '';
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 140" width="' + dims.displayW + '" height="' + dims.displayH + '" data-stamp-root="1">' +
+      outer + logo + textBlock + '</svg>';
   }
 
   function currentSvg() {
-    switch (kindSel.value) {
+    switch (state.kind) {
       case 'date':          return renderDate();
       case 'rubber':        return renderRubber();
       case 'company_dated': return renderCompanyDated();
@@ -662,214 +799,151 @@ APPROVED
     }
   }
 
-  function currentLayout() {
-    var roundKinds = (kindSel.value === 'seal' || kindSel.value === 'company_dated');
-    var sz = roundKinds
-      ? { size_value: sizeRoundSel().value, custom_w: customW(), custom_h: customH() }
-      : { size_value: sizeRectSel().value, custom_w: customW(), custom_h: customH() };
-    var base = {
-      logo_data_uri: logoDataUri || null,
-      logo_watermark: !!logoWM.checked,
-      logo_x: logoX, logo_y: logoY,
-      logo_size: logoSize, logo_opacity: logoOpacity,
-      ...sz,
-    };
-    if (kindSel.value === 'seal') {
-      return { ...base,
-        top: document.getElementById('st-top-text').value,
-        bottom: document.getElementById('st-bottom-text').value,
-        center: (document.getElementById('st-center-lines').value || '').split('\n'),
-        color: document.getElementById('st-color').value,
-        border_style: document.getElementById('st-border-style').value,
-      };
+  // ------------------- preview + direct manipulation ----------------------
+  function markDirty() {
+    state.dirty = true;
+    if (dirtyEl) {
+      dirtyEl.textContent = 'Modified';
+      dirtyEl.classList.remove('ts-status-chip--finalized');
+      dirtyEl.classList.add('ts-status-chip--draft');
     }
-    if (kindSel.value === 'company_dated') {
-      return { ...base,
-        company: document.getElementById('st-cd-company').value,
-        tagline: document.getElementById('st-cd-tagline').value,
-        date_format: document.getElementById('st-cd-date-format').value,
-        fixed_date: document.getElementById('st-cd-fixed-date').value,
-        verb: document.getElementById('st-cd-tag-label').value,
-        color: document.getElementById('st-cd-color').value,
-        border_style: document.getElementById('st-cd-border-style').value,
-      };
+  }
+  function markClean() {
+    state.dirty = false;
+    if (dirtyEl) {
+      dirtyEl.textContent = 'Saved';
+      dirtyEl.classList.remove('ts-status-chip--draft');
+      dirtyEl.classList.add('ts-status-chip--finalized');
     }
-    if (kindSel.value === 'date') {
-      return { ...base,
-        label: document.getElementById('st-date-label').value,
-        date: document.getElementById('st-date-value').value,
-        byline: document.getElementById('st-date-byline').value,
-        color: document.getElementById('st-date-color').value,
-      };
-    }
-    return { ...base,
-      text: document.getElementById('st-rubber-text').value,
-      color: document.getElementById('st-rubber-color').value,
-      shape: document.getElementById('st-rubber-shape').value,
-    };
   }
 
-  // ---- Physical size state ----
-  // Max display width inside the preview pane (SVG attribute width/height
-  // are set in CSS px, scaled from the chosen mm value at 3.78 px/mm).
-  var MM_TO_PX = 3.78;
-  var DISPLAY_SCALE = 5;   // visual preview scale factor on top of mm→px
-
-  function sizeRoundSel()  { return document.getElementById('st-size-round'); }
-  function sizeRectSel()   { return document.getElementById('st-size-rect'); }
-  function customW()       { return parseFloat(document.getElementById('st-custom-w').value) || 42; }
-  function customH()       { return parseFloat(document.getElementById('st-custom-h').value) || 42; }
-
-  function currentPhysicalDims(kindShape) {
-    var badge = document.getElementById('st-size-badge');
-    if (kindShape === 'round') {
-      var val = sizeRoundSel().value;
-      var mm = (val === 'custom') ? customW() : parseFloat(val);
-      var display = Math.round(mm * MM_TO_PX * (DISPLAY_SCALE / 5));
-      if (badge) badge.textContent = mm + ' mm diameter';
-      return { w_mm: mm, h_mm: mm, display: display };
+  function updateMeta() {
+    document.getElementById('st-meta-kind').textContent = KIND_LABEL[state.kind];
+    document.getElementById('st-sb-kind').textContent = KIND_LABEL[state.kind];
+    var round = state.kind === 'seal' || state.kind === 'company_dated';
+    var dims = physDims(round ? 'round' : 'rect');
+    var sizeStr = round ? (dims.w_mm + ' mm diameter') : (dims.w_mm + ' × ' + dims.h_mm + ' mm');
+    document.getElementById('st-meta-size').textContent = sizeStr;
+    document.getElementById('st-sb-size').textContent = sizeStr;
+    document.getElementById('st-meta-logo').textContent = state.logo.data
+      ? (state.logo.watermark ? 'watermark' : 'inline') + ' · ' + state.logo.size + '%' : '—';
+    document.getElementById('st-sb-logo').textContent = state.logo.data ? 'logo attached' : 'no logo';
+    var svg = previewEl.querySelector('svg[data-stamp-root]');
+    if (svg) {
+      document.getElementById('st-meta-viewbox').textContent =
+        Math.round(svg.getBoundingClientRect().width) + ' × ' +
+        Math.round(svg.getBoundingClientRect().height) + ' px';
     }
-    var val = sizeRectSel().value;
-    var w, h;
-    if (val === 'custom') { w = customW(); h = customH(); }
-    else { var m = val.match(/(\d+)x(\d+)/); w = +m[1]; h = +m[2]; }
-    if (badge) badge.textContent = w + ' × ' + h + ' mm';
-    return { w_mm: w, h_mm: h, displayW: Math.round(w * MM_TO_PX), displayH: Math.round(h * MM_TO_PX) };
   }
 
-  // Show round-size for seal / company_dated; rect-size for date / rubber.
-  function syncSizeVisibility() {
-    var roundKinds = (kindSel.value === 'seal' || kindSel.value === 'company_dated');
-    document.getElementById('st-size-round-wrap').hidden = !roundKinds;
-    document.getElementById('st-size-rect-wrap').hidden  = roundKinds;
+  function positionHandles() {
+    var svg = previewEl.querySelector('svg[data-stamp-root]');
+    var logo = svg && svg.querySelector('[data-logo="1"]');
+    if (!svg || !logo || !state.logo.data) {
+      handlesEl.setAttribute('hidden', '');
+      return;
+    }
+    handlesEl.removeAttribute('hidden');
+    var pRect = previewEl.getBoundingClientRect();
+    var lRect = logo.getBoundingClientRect();
+    handlesEl.style.top    = (lRect.top    - pRect.top)    + 'px';
+    handlesEl.style.left   = (lRect.left   - pRect.left)   + 'px';
+    handlesEl.style.width  = lRect.width  + 'px';
+    handlesEl.style.height = lRect.height + 'px';
   }
-  sizeRoundSel().addEventListener('change', function () {
-    document.getElementById('st-custom-size-wrap').hidden = (sizeRoundSel().value !== 'custom');
-    render();
-  });
-  sizeRectSel().addEventListener('change', function () {
-    document.getElementById('st-custom-size-wrap').hidden = (sizeRectSel().value !== 'custom');
-    render();
-  });
-  document.getElementById('st-custom-w').addEventListener('input', render);
-  document.getElementById('st-custom-h').addEventListener('input', render);
 
   function render() {
     previewEl.innerHTML = currentSvg();
-    // Attach drag handler to the logo <image> if present.
-    var svg = previewEl.querySelector('svg[data-stamp-root]');
-    var logoEl = svg && svg.querySelector('[data-logo="1"]');
-    if (!svg || !logoEl) return;
-    var dragging = false, startClient = null, startLogo = null;
-    logoEl.addEventListener('mousedown', function (e) {
-      e.preventDefault();
-      dragging = true;
-      startClient = { x: e.clientX, y: e.clientY };
-      startLogo = { x: logoX, y: logoY };
-      document.body.style.userSelect = 'none';
-    });
-    function onMove(e) {
-      if (!dragging) return;
-      var rect = svg.getBoundingClientRect();
-      var vbW = svg.viewBox.baseVal.width, vbH = svg.viewBox.baseVal.height;
-      // Mouse delta → viewBox delta → % of viewBox.
-      var dx = ((e.clientX - startClient.x) / rect.width)  * 100;
-      var dy = ((e.clientY - startClient.y) / rect.height) * 100;
-      logoX = Math.max(-50, Math.min(50, Math.round(startLogo.x + dx)));
-      logoY = Math.max(-50, Math.min(50, Math.round(startLogo.y + dy)));
-      logoXSlider.value = logoX; logoYSlider.value = logoY;
-      syncLogoLabels();
-      // Re-render but preserve drag state by re-attaching after insertion.
-      previewEl.innerHTML = currentSvg();
-      var newSvg = previewEl.querySelector('svg[data-stamp-root]');
-      var newLogo = newSvg && newSvg.querySelector('[data-logo="1"]');
-      if (newLogo) {
-        // Keep the drag going by cloning the event target reference.
-        logoEl = newLogo;
-      }
-    }
-    function onUp() {
-      if (!dragging) return;
-      dragging = false; document.body.style.userSelect = '';
-      // Final rerender (drags already rerendered on each move but
-      // this cleans up event bindings deterministically).
-      render();
-    }
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp, { once: true });
+    updateMeta();
+    positionHandles();
   }
 
-  // Wire every input to re-render.
-  root.querySelectorAll('input, select, textarea').forEach(function (el) {
-    el.addEventListener('input', render);
-    el.addEventListener('change', render);
+  // Direct manipulation: drag the logo to move, drag corner handles to resize.
+  var drag = null;
+  handlesEl.addEventListener('mousedown', function (e) {
+    var h = e.target.closest('.st-handle'); if (!h) return;
+    e.preventDefault();
+    drag = {
+      kind: h.getAttribute('data-h'),
+      startClient: { x: e.clientX, y: e.clientY },
+      startLogo: { x: state.logo.x, y: state.logo.y, size: state.logo.size },
+    };
+    document.body.style.userSelect = 'none';
+  });
+  document.addEventListener('mousemove', function (e) {
+    if (!drag) return;
+    var svg = previewEl.querySelector('svg[data-stamp-root]'); if (!svg) return;
+    var sRect = svg.getBoundingClientRect();
+    var dx = (e.clientX - drag.startClient.x) / sRect.width * 100;
+    var dy = (e.clientY - drag.startClient.y) / sRect.height * 100;
+    if (drag.kind === 'move') {
+      state.logo.x = Math.max(-50, Math.min(50, Math.round(drag.startLogo.x + dx)));
+      state.logo.y = Math.max(-50, Math.min(50, Math.round(drag.startLogo.y + dy)));
+    } else {
+      // Resize: average of dx/dy, scaled.
+      var delta = (Math.abs(dx) > Math.abs(dy) ? dx : dy);
+      if (drag.kind === 'nw' || drag.kind === 'sw') delta = -delta;
+      if (drag.kind === 'nw' || drag.kind === 'ne') delta = -delta;
+      state.logo.size = Math.max(10, Math.min(100, Math.round(drag.startLogo.size + delta)));
+    }
+    render();
+  });
+  document.addEventListener('mouseup', function () {
+    if (!drag) return;
+    drag = null; document.body.style.userSelect = '';
+    markDirty();
+  });
+  // Also drag the <image> directly, not just the handles.
+  previewEl.addEventListener('mousedown', function (e) {
+    var img = e.target.closest('[data-logo="1"]'); if (!img) return;
+    e.preventDefault();
+    drag = {
+      kind: 'move',
+      startClient: { x: e.clientX, y: e.clientY },
+      startLogo: { x: state.logo.x, y: state.logo.y, size: state.logo.size },
+    };
+    document.body.style.userSelect = 'none';
   });
 
-  // Load existing layout if editing.
-  var initLayout = null;
-  try { initLayout = JSON.parse(root.dataset.stampLayout); } catch (e) { initLayout = null; }
-  if (initLayout) {
-    if (initLayout.logo_data_uri) setLogo(initLayout.logo_data_uri);
-    if (typeof initLayout.logo_watermark === 'boolean') logoWM.checked = initLayout.logo_watermark;
-    if (typeof initLayout.logo_x === 'number')   { logoX = initLayout.logo_x;       logoXSlider.value = logoX; }
-    if (typeof initLayout.logo_y === 'number')   { logoY = initLayout.logo_y;       logoYSlider.value = logoY; }
-    if (typeof initLayout.logo_size === 'number'){ logoSize = initLayout.logo_size; logoSizeSlider.value = logoSize; }
-    if (typeof initLayout.logo_opacity === 'number') { logoOpacity = initLayout.logo_opacity; logoOpSlider.value = Math.round(logoOpacity * 100); }
-    if (initLayout.size_value) {
-      var roundKinds = (kindSel.value === 'seal' || kindSel.value === 'company_dated');
-      (roundKinds ? sizeRoundSel() : sizeRectSel()).value = initLayout.size_value;
-      if (initLayout.size_value === 'custom') {
-        document.getElementById('st-custom-size-wrap').hidden = false;
-        if (initLayout.custom_w) document.getElementById('st-custom-w').value = initLayout.custom_w;
-        if (initLayout.custom_h) document.getElementById('st-custom-h').value = initLayout.custom_h;
-      }
-    }
-    syncLogoLabels();
-  }
-  if (initLayout && kindSel.value === 'seal') {
-    document.getElementById('st-top-text').value = initLayout.top || '';
-    document.getElementById('st-bottom-text').value = initLayout.bottom || '';
-    document.getElementById('st-center-lines').value = (initLayout.center || []).join('\n');
-    if (initLayout.color) document.getElementById('st-color').value = initLayout.color;
-    if (initLayout.border_style) document.getElementById('st-border-style').value = initLayout.border_style;
-  } else if (initLayout && kindSel.value === 'company_dated') {
-    document.getElementById('st-cd-company').value = initLayout.company || '';
-    document.getElementById('st-cd-tagline').value = initLayout.tagline || '';
-    document.getElementById('st-cd-date-format').value = initLayout.date_format || 'DD MMM YYYY';
-    document.getElementById('st-cd-fixed-date').value = initLayout.fixed_date || '';
-    document.getElementById('st-cd-tag-label').value = initLayout.verb || '';
-    if (initLayout.color) document.getElementById('st-cd-color').value = initLayout.color;
-    if (initLayout.border_style) document.getElementById('st-cd-border-style').value = initLayout.border_style;
-  } else if (initLayout && kindSel.value === 'date') {
-    document.getElementById('st-date-label').value = initLayout.label || 'RECEIVED';
-    document.getElementById('st-date-value').value = initLayout.date || '';
-    document.getElementById('st-date-byline').value = initLayout.byline || '';
-    if (initLayout.color) document.getElementById('st-date-color').value = initLayout.color;
-  } else if (initLayout && kindSel.value === 'rubber') {
-    document.getElementById('st-rubber-text').value = initLayout.text || '';
-    if (initLayout.color) document.getElementById('st-rubber-color').value = initLayout.color;
-    if (initLayout.shape) document.getElementById('st-rubber-shape').value = initLayout.shape;
-  }
-  syncFieldsets();
-
-  // Save / register.
-  document.getElementById('st-save').addEventListener('click', function () {
-    var name = (document.getElementById('st-name').value || '').trim();
-    if (!name) {
-      statusEl.style.color = 'var(--ts-danger)';
-      statusEl.textContent = 'Name is required.';
-      return;
-    }
-    var payload = {
-      name: name,
-      kind: kindSel.value,
-      layout: currentLayout(),
-      svg: currentSvg(),
+  // ------------------- persistence ----------------------------------------
+  function currentLayout() {
+    var round = (state.kind === 'seal' || state.kind === 'company_dated');
+    var base = {
+      logo_data_uri: state.logo.data || null,
+      logo_watermark: !!state.logo.watermark,
+      logo_x: state.logo.x, logo_y: state.logo.y,
+      logo_size: state.logo.size, logo_opacity: state.logo.opacity,
+      size_value: round ? state.size.round : state.size.rect,
+      custom_w: state.size.custom_w, custom_h: state.size.custom_h,
     };
-    statusEl.style.color = 'var(--ts-text-muted)';
-    statusEl.textContent = 'Saving…';
-    var method = stampId ? 'PUT' : 'POST';
+    if (state.kind === 'seal') return { ...base,
+      top: state.seal.top, bottom: state.seal.bottom,
+      center: (state.seal.center || '').split('\n'),
+      color: state.seal.color, border_style: state.seal.border };
+    if (state.kind === 'company_dated') return { ...base,
+      company: state.cd.company, tagline: state.cd.tagline,
+      date_format: state.cd.date_format, fixed_date: state.cd.fixed_date,
+      verb: state.cd.verb, color: state.cd.color, border_style: state.cd.border };
+    if (state.kind === 'date') return { ...base,
+      label: state.date.label, date: state.date.value,
+      byline: state.date.byline, color: state.date.color };
+    return { ...base,
+      text: state.rubber.text, color: state.rubber.color, shape: state.rubber.shape };
+  }
+
+  function setSaveStatus(msg, cls) {
+    saveEl.textContent = msg;
+    saveEl.className = 'ts-ed__savestate ts-ed__savestate--' + (cls || 'saving');
+  }
+
+  function doSave() {
+    var name = (document.getElementById('st-name').value || '').trim();
+    if (!name) { setSaveStatus('● Name is required', 'error'); return; }
+    state.name = name;
+    setSaveStatus('● Saving…', 'saving');
+    var payload = { name: name, kind: state.kind, layout: currentLayout(), svg: currentSvg() };
     var url = stampId ? ('/api/tsd-stamps/' + stampId) : '/api/tsd-stamps/';
+    var method = stampId ? 'PUT' : 'POST';
     fetch(url, {
       method: method, credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
@@ -879,18 +953,24 @@ APPROVED
       if (!r.ok) return r.json().then(function (j) { throw new Error(j.message || j.error || ('HTTP ' + r.status)); });
       return r.json();
     }).then(function (data) {
-      statusEl.style.color = 'var(--ts-brand-green)';
-      statusEl.textContent = 'Saved as "' + data.name + '".';
-      if (!stampId) {
-        setTimeout(function () { window.location = '/stamps/studio/' + data.id; }, 500);
-      }
-    }).catch(function (e) {
-      statusEl.style.color = 'var(--ts-danger)';
-      statusEl.textContent = e.message;
-    });
+      setSaveStatus('● Saved — ' + data.name, 'saved');
+      markClean();
+      if (!stampId) { stampId = data.id; history.replaceState({}, '', '/stamps/studio/' + stampId); }
+    }).catch(function (e) { setSaveStatus(e.message, 'error'); });
+  }
+  document.getElementById('st-save').addEventListener('click', doSave);
+  document.getElementById('st-name').addEventListener('input', function () {
+    state.name = document.getElementById('st-name').value; markDirty();
   });
 
+  // Reposition handles when the window resizes (preview width changes).
+  window.addEventListener('resize', function () { setTimeout(positionHandles, 0); });
+
+  // ------------------- initial render -------------------------------------
+  kindBadge.textContent = KIND_LABEL[state.kind] || state.kind;
+  renderRibbon('design');
   render();
+  if (!stampId) markDirty();
 })();
 </script>
 {% endblock %}
