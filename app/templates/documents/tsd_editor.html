@@ -16,7 +16,7 @@
   .ts-page { padding: 0 !important; max-width: none !important; }
 </style>
 <script src="{{ url_for('static', filename='js/vendor/socket.io.min.js') }}"></script>
-<script type="module" src="{{ url_for('static', filename='js/vendor/yjs-bootstrap.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vendor/pm-bundle.js') }}"></script>
 {% endblock %}
 
 {% block content %}
@@ -597,6 +597,35 @@
   padding: 10px 14px; border: 1px solid var(--ed-line);
 }
 .ts-ed__editable { outline: 0; min-height: 250px; font-size: 13px; line-height: 1.7; color: var(--ed-ink); }
+.ts-ed__pm-mount { min-height: 250px; }
+.ts-ed__pm-mount .ProseMirror { outline: none; min-height: 250px; }
+.ts-ed__pm-mount .ProseMirror p.is-empty::before,
+.ts-ed__pm-mount .ProseMirror [data-placeholder]::before {
+  content: attr(data-placeholder); color: var(--ed-subtle); pointer-events: none;
+}
+.ts-ed__pm-mount .ProseMirror [data-align="center"] { text-align: center; }
+.ts-ed__pm-mount .ProseMirror [data-align="right"]  { text-align: right; }
+.ts-ed__pm-mount .ProseMirror [data-align="justify"] { text-align: justify; }
+/* y-prosemirror remote cursor overlay */
+.ts-ed__pm-mount .ProseMirror .ProseMirror-yjs-cursor {
+  position: absolute;
+  border-left: 2px solid currentColor;
+  border-right: none;
+  margin-left: -1px; margin-right: -1px;
+  pointer-events: none;
+  word-break: normal;
+}
+.ts-ed__pm-mount .ProseMirror .ProseMirror-yjs-cursor > div {
+  position: absolute;
+  top: -1.2em; left: -1px;
+  font-size: 9px; font-weight: 600;
+  background-color: currentColor;
+  color: #fff;
+  padding: 1px 4px;
+  border-radius: 2px;
+  white-space: nowrap;
+  font-family: Arial;
+}
 .ts-ed__editable:empty::before {
   content: attr(data-placeholder);
   color: var(--ed-subtle);
@@ -1712,7 +1741,9 @@
     fetch('/api/tsd/' + tsdId + '/content', { credentials: 'same-origin' })
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function (data) {
-        editor.innerHTML = (data.content && data.content.html) || '';
+        var html = (data.content && data.content.html) || '';
+        editor.innerHTML = html;
+        editor._initialHtml = html;   // handed to the PM init as fallback seed
         updateWords(); rebuildOutline();
         setSave('● Saved · v' + data.version, 'saved');
       }).catch(function (e) { setSave('Load failed: ' + e.message, 'error'); });
@@ -2683,136 +2714,298 @@
   // Initialise once the editor has a persisted id.
   setTimeout(initRealtime, 700);
 
-  // ===================================================================== CRDT CO-EDITING (Y.js)
-  // Y.js is loaded as an ESM bootstrap. We wait for the yjs-ready event
-  // then attach a Y.Text CRDT to the editor surface:
-  //   * Local edits debounced → Y.Text full replace (last-write-wins at
-  //     the character level inside the string).
-  //   * Y.Text observe → apply to editor.innerHTML, preserving caret.
-  //   * ydoc.on('update') → emit "y-update" over the socket.
-  //   * Incoming "y-update" → Y.applyUpdate on the local doc.
-  //   * On first join → emit "y-sync-request" to seed from server state.
+  // ===================================================================== STRUCTURAL CRDT (ProseMirror + y-prosemirror)
+  // Replaces the contentEditable surface with a ProseMirror EditorView
+  // bound to a Y.XmlFragment via y-prosemirror. The schema covers the
+  // ribbon's format + insert commands; ribbon buttons dispatch PM
+  // transactions instead of document.execCommand.
   //
-  // This is an HTML-string-level CRDT. Two users typing in different
-  // paragraphs merge cleanly; two users typing the same position may
-  // interleave characters. Full structural CRDT (ProseMirror +
-  // y-prosemirror) is still deferred — see collab plan doc.
-  var yDoc = null, yText = null, yApplyingRemote = false;
-  var CRDT_DEBOUNCE_MS = 120;
+  // CRDT transport is unchanged: y-update binary payloads flow over
+  // the existing /tsd Socket.IO namespace; the server merges them in
+  // its pycrdt.Doc and snapshots back to the encrypted TSD.
+  var pmView = null, yDoc = null, yFragment = null;
 
-  function initCrdt() {
-    if (!tsdId || !window.Y || !rtSocket) return;
-    yDoc = new window.Y.Doc();
-    yText = yDoc.getText('content');
+  function initPMCrdt() {
+    if (!tsdId || !window.PM || !rtSocket || pmView) return;
+    var P = window.PM;
+    var Schema = P.model.Schema;
+    var DOMParser = P.model.DOMParser;
+    var DOMSerializer = P.model.DOMSerializer;
+    var EditorState = P.state.EditorState;
+    var EditorView = P.view.EditorView;
+    var baseSchema = P.schemaBasic.schema;
+    var addListNodes = P.schemaList.addListNodes;
+    var toggleMark = P.commands.toggleMark;
+    var setBlockType = P.commands.setBlockType;
+    var wrapIn = P.commands.wrapIn;
+    var lift = P.commands.lift;
+    var baseKeymap = P.commands.baseKeymap;
+    var keymap = P.keymap.keymap;
+    var history = P.history.history;
+    var undo = P.history.undo;
+    var redo = P.history.redo;
+    var wrapInList = P.schemaList.wrapInList;
+    var splitListItem = P.schemaList.splitListItem;
+    var liftListItem = P.schemaList.liftListItem;
+    var sinkListItem = P.schemaList.sinkListItem;
+    var dropCursor = P.dropcursor.dropCursor;
+    var gapCursor = P.gapcursor.gapCursor;
+    var ySyncPlugin = P.yProsemirror.ySyncPlugin;
+    var yCursorPlugin = P.yProsemirror.yCursorPlugin;
+    var yUndoPlugin = P.yProsemirror.yUndoPlugin;
+    var Awareness = P.awareness.Awareness;
+    var Y = P.Y;
 
-    // Local change → full-string replace into Y.Text (debounced).
-    var localTimer = null;
-    editor.addEventListener('input', function () {
-      if (yApplyingRemote) return;
-      clearTimeout(localTimer);
-      localTimer = setTimeout(function () {
-        var newContent = editor.innerHTML || '';
-        var oldContent = yText.toString();
-        if (newContent === oldContent) return;
-        // Minimal diff: replace entire text in a single Y.js transaction.
-        yDoc.transact(function () {
-          if (oldContent.length) yText.delete(0, oldContent.length);
-          yText.insert(0, newContent);
-        }, 'local');
-      }, CRDT_DEBOUNCE_MS);
+    // Compose the schema: start from basic (doc / paragraph / headings /
+    // blockquote / horizontal_rule / code_block / text / strong / em /
+    // link / code), add list nodes (bullet_list / ordered_list /
+    // list_item), then layer underline + strikethrough marks + an
+    // alignment attribute on paragraph.
+    var nodes = addListNodes(baseSchema.spec.nodes, 'paragraph block*', 'block');
+    // Patch paragraph + heading to carry an alignment attribute.
+    function withAlign(spec) {
+      return {
+        ...spec,
+        attrs: { ...(spec.attrs || {}), align: { default: null } },
+        parseDOM: (spec.parseDOM || []).map(function (rule) {
+          return { ...rule, getAttrs: function (dom) {
+            var base = typeof rule.getAttrs === 'function' ? (rule.getAttrs(dom) || {}) : (rule.attrs || {});
+            var a = dom && dom.getAttribute && dom.getAttribute('data-align');
+            return { ...base, align: a || null };
+          }};
+        }),
+        toDOM: function (node) {
+          var orig = spec.toDOM(node);
+          if (!Array.isArray(orig)) return orig;
+          var attrs = orig[1] && typeof orig[1] === 'object' && !Array.isArray(orig[1]) ? orig[1] : {};
+          if (node.attrs.align) {
+            attrs = { ...attrs, 'data-align': node.attrs.align,
+                      style: 'text-align: ' + node.attrs.align + ';' + (attrs.style || '') };
+            if (Array.isArray(orig[1]) || !orig[1]) return [orig[0], attrs, ...orig.slice(1)];
+            return [orig[0], attrs, ...orig.slice(2)];
+          }
+          return orig;
+        },
+      };
+    }
+    nodes = nodes.update('paragraph', withAlign(nodes.get('paragraph')));
+    nodes = nodes.update('heading',   withAlign(nodes.get('heading')));
+
+    var marks = baseSchema.spec.marks
+      .addToEnd('underline', {
+        parseDOM: [{ tag: 'u' }, { style: 'text-decoration=underline' }],
+        toDOM: function () { return ['u', 0]; },
+      })
+      .addToEnd('strikethrough', {
+        parseDOM: [{ tag: 's' }, { tag: 'strike' },
+                   { style: 'text-decoration=line-through' }],
+        toDOM: function () { return ['s', 0]; },
+      });
+    var schema = new Schema({ nodes: nodes, marks: marks });
+
+    // Build the Y.Doc + XmlFragment that y-prosemirror binds to.
+    yDoc = new Y.Doc();
+    yFragment = yDoc.get('prosemirror', Y.XmlFragment);
+    var awareness = new Awareness(yDoc);
+    awareness.setLocalStateField('user', { name: 'You', color: '#0f3b82' });
+
+    // Replace the contentEditable surface with a ProseMirror view.
+    // We rebuild the DOM: the pm view mounts on a fresh child inside
+    // the existing .ts-ed__editable so our ribbon + outline wiring
+    // (which references `editor`) still points at the container.
+    editor.setAttribute('contenteditable', 'false');
+    editor.innerHTML = '';
+    var pmMount = document.createElement('div');
+    pmMount.className = 'ts-ed__pm-mount';
+    editor.appendChild(pmMount);
+
+    var state_ = EditorState.create({
+      schema: schema,
+      plugins: [
+        ySyncPlugin(yFragment),
+        yCursorPlugin(awareness),
+        yUndoPlugin(),
+        keymap({
+          'Mod-z': undo, 'Mod-y': redo, 'Mod-Shift-z': redo,
+          'Mod-b': toggleMark(schema.marks.strong),
+          'Mod-i': toggleMark(schema.marks.em),
+          'Mod-u': toggleMark(schema.marks.underline),
+          'Enter': splitListItem(schema.nodes.list_item),
+          'Tab': sinkListItem(schema.nodes.list_item),
+          'Shift-Tab': liftListItem(schema.nodes.list_item),
+        }),
+        keymap(baseKeymap),
+        dropCursor(),
+        gapCursor(),
+        history(),
+      ],
     });
+    pmView = new EditorView(pmMount, { state: state_ });
+    window._pmView = pmView;  // debug handle
+    window._pmSchema = schema;
 
-    // Remote update → rebuild editor from Y.Text, preserving caret.
-    yText.observe(function (event, tx) {
-      if (tx.origin === 'local') return;
-      var newContent = yText.toString();
-      if (newContent === editor.innerHTML) return;
-      yApplyingRemote = true;
-      var caret = saveCaretTextOffset();
-      editor.innerHTML = newContent;
-      if (caret !== null) restoreCaretTextOffset(caret);
-      yApplyingRemote = false;
-      wordstats();
-      rebuildOutline();
-    });
+    // Plug ProseMirror commands into the existing ribbon. The ribbon
+    // handlers call editor.focus() + document.execCommand; override
+    // the exec() helper so mark toggles and block setters route to PM.
+    var marksMap = {
+      bold: schema.marks.strong, italic: schema.marks.em,
+      underline: schema.marks.underline, strikeThrough: schema.marks.strikethrough,
+    };
+    var alignCommands = {
+      justifyLeft:   'left',   justifyCenter: 'center',
+      justifyRight:  'right',  justifyFull:   'justify',
+    };
+    window.exec = function (cmd, value) {
+      pmView.focus();
+      if (marksMap[cmd]) {
+        toggleMark(marksMap[cmd])(pmView.state, pmView.dispatch);
+      } else if (cmd === 'undo') {
+        undo(pmView.state, pmView.dispatch);
+      } else if (cmd === 'redo') {
+        redo(pmView.state, pmView.dispatch);
+      } else if (cmd === 'insertUnorderedList') {
+        wrapInList(schema.nodes.bullet_list)(pmView.state, pmView.dispatch);
+      } else if (cmd === 'insertOrderedList') {
+        wrapInList(schema.nodes.ordered_list)(pmView.state, pmView.dispatch);
+      } else if (cmd === 'outdent') {
+        liftListItem(schema.nodes.list_item)(pmView.state, pmView.dispatch);
+      } else if (cmd === 'indent') {
+        sinkListItem(schema.nodes.list_item)(pmView.state, pmView.dispatch);
+      } else if (cmd === 'formatBlock') {
+        var tag = (value || 'P').toUpperCase();
+        if (tag === 'P' || tag === 'DIV') {
+          setBlockType(schema.nodes.paragraph)(pmView.state, pmView.dispatch);
+        } else if (tag === 'BLOCKQUOTE') {
+          wrapIn(schema.nodes.blockquote)(pmView.state, pmView.dispatch);
+        } else if (tag === 'PRE') {
+          setBlockType(schema.nodes.code_block)(pmView.state, pmView.dispatch);
+        } else if (/^H[1-6]$/.test(tag)) {
+          setBlockType(schema.nodes.heading, { level: parseInt(tag[1], 10) })
+            (pmView.state, pmView.dispatch);
+        }
+      } else if (alignCommands[cmd]) {
+        var align = alignCommands[cmd];
+        var tr = pmView.state.tr;
+        pmView.state.doc.nodesBetween(
+          pmView.state.selection.from, pmView.state.selection.to,
+          function (node, pos) {
+            if (node.type === schema.nodes.paragraph || node.type === schema.nodes.heading) {
+              tr.setNodeMarkup(pos, undefined, { ...node.attrs, align: align });
+            }
+          }
+        );
+        pmView.dispatch(tr);
+      } else if (cmd === 'createLink') {
+        var url = value || window.prompt('Link URL', 'https://');
+        if (url) {
+          var mark = schema.marks.link.create({ href: url });
+          pmView.dispatch(pmView.state.tr.addMark(
+            pmView.state.selection.from, pmView.state.selection.to, mark
+          ));
+        }
+      } else if (cmd === 'removeFormat') {
+        var tr2 = pmView.state.tr;
+        Object.values(schema.marks).forEach(function (m) {
+          tr2.removeMark(pmView.state.selection.from, pmView.state.selection.to, m);
+        });
+        pmView.dispatch(tr2);
+      }
+      scheduleSave();
+    };
 
-    // Broadcast every update to the room.
+    // insertHTML: parse through DOMParser, insert nodes at the cursor.
+    window.insertHTML = function (html) {
+      pmView.focus();
+      var tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      var slice = DOMParser.fromSchema(schema).parseSlice(tmp);
+      pmView.dispatch(pmView.state.tr.replaceSelection(slice).scrollIntoView());
+      scheduleSave();
+    };
+
+    // Redirect the existing save() hook to serialize PM document → HTML.
+    var origSave = save;
+    save = function () {
+      var title = (titleInput.value || '').trim();
+      if (!title) { setSave('Title required', 'error'); return; }
+      setSave('● Encrypting & saving…', 'saving');
+      // Serialize ProseMirror doc back to HTML.
+      var tmp = document.createElement('div');
+      var serializer = DOMSerializer.fromSchema(schema);
+      tmp.appendChild(serializer.serializeFragment(pmView.state.doc.content));
+      var htmlNow = tmp.innerHTML;
+      var payload = {
+        title: title,
+        tags: (tagsInput && tagsInput.value) || '',
+        export_policy: (exportSel && exportSel.value) || 'pdf_allowed',
+        content_html: htmlNow,
+      };
+      var url = tsdId ? '/api/tsd/' + tsdId : '/api/tsd/';
+      var method = tsdId ? 'PUT' : 'POST';
+      fetch(url, { method: method, credentials: 'same-origin', headers: headers(), body: JSON.stringify(payload) })
+        .then(function (r) {
+          if (r.status === 412) throw new Error('Someone else saved a newer version. Reload to merge.');
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function (data) {
+          tsdId = data.id; version = data.version;
+          if (!shell.dataset.tsdId) { shell.dataset.tsdId = tsdId; history.replaceState({}, '', '/documents/library/' + tsdId); }
+          setSave('● Saved · v' + data.version + ' · ' + data.ciphertext_sha256.substring(0, 12) + '…', 'saved');
+        })
+        .catch(function (e) { setSave('Save failed: ' + e.message, 'error'); });
+    };
+
+    // --- CRDT transport ---
     yDoc.on('update', function (update, origin) {
-      if (origin === 'remote') return;   // don't echo updates we just applied
+      if (origin === 'remote') return;
       rtSocket.emit('y-update', {
         tsd_id: tsdId,
         update: update.buffer ? update : new Uint8Array(update),
       });
     });
-
-    // Receive updates from peers (merged by the server first).
     rtSocket.on('y-update', function (data) {
       if (!data || !data.update) return;
       var buf = data.update;
       if (buf instanceof ArrayBuffer) buf = new Uint8Array(buf);
       else if (!(buf instanceof Uint8Array)) buf = new Uint8Array(buf);
-      window.Y.applyUpdate(yDoc, buf, 'remote');
+      Y.applyUpdate(yDoc, buf, 'remote');
     });
-
-    // Bootstrap: pull the server's accumulated state before we start sending.
     rtSocket.on('y-sync-reply', function (data) {
       if (!data || !data.state) return;
       var buf = data.state;
       if (buf instanceof ArrayBuffer) buf = new Uint8Array(buf);
       else if (!(buf instanceof Uint8Array)) buf = new Uint8Array(buf);
-      try {
-        window.Y.applyUpdate(yDoc, buf, 'remote');
-      } catch (e) { /* malformed state — fall back to local content */ }
+      try { Y.applyUpdate(yDoc, buf, 'remote'); }
+      catch (e) { /* malformed state — keep local */ }
     });
-    // Ask once we're sure we're in the room.
     setTimeout(function () {
       rtSocket.emit('y-sync-request', { tsd_id: tsdId });
     }, 350);
-  }
 
-  // Caret preservation across an innerHTML replace. We walk the DOM to
-  // compute a plain-text offset, then walk again after the replace to
-  // find the matching character position.
-  function saveCaretTextOffset() {
-    var sel = window.getSelection();
-    if (!sel.rangeCount) return null;
-    var range = sel.getRangeAt(0);
-    if (!editor.contains(range.startContainer)) return null;
-    var pre = document.createRange();
-    pre.selectNodeContents(editor);
-    pre.setEnd(range.startContainer, range.startOffset);
-    return pre.toString().length;
-  }
-  function restoreCaretTextOffset(offset) {
-    var walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
-    var n, pos = 0;
-    while ((n = walker.nextNode())) {
-      var len = n.nodeValue.length;
-      if (pos + len >= offset) {
-        var range = document.createRange();
-        range.setStart(n, Math.max(0, offset - pos));
-        range.collapse(true);
-        var sel = window.getSelection();
-        sel.removeAllRanges(); sel.addRange(range);
-        return;
-      }
-      pos += len;
+    // Load the current server HTML into the Y.Doc via the sync reply.
+    // If no reply arrives within 600ms, fall back to inserting the
+    // existing TSD content so the editor isn't empty.
+    if (editor._initialHtml) {
+      setTimeout(function () {
+        if (yFragment.length === 0 && editor._initialHtml) {
+          var tmp = document.createElement('div');
+          tmp.innerHTML = editor._initialHtml;
+          var slice = DOMParser.fromSchema(schema).parseSlice(tmp);
+          pmView.dispatch(pmView.state.tr.replaceSelection(slice));
+        }
+      }, 700);
     }
   }
 
-  // Wait for both Y.js and the socket to be ready, then attach.
-  function tryStartCrdt() {
-    if (window.Y && rtSocket && rtSocket.connected) {
-      initCrdt();
+  function tryStartPM() {
+    if (window.PM && rtSocket && rtSocket.connected) {
+      initPMCrdt();
     } else {
-      setTimeout(tryStartCrdt, 150);
+      setTimeout(tryStartPM, 150);
     }
   }
-  if (window.Y) {
-    setTimeout(tryStartCrdt, 800);
-  } else {
-    window.addEventListener('yjs-ready', function () { setTimeout(tryStartCrdt, 800); });
-  }
+  setTimeout(tryStartPM, 800);
 
   // ===================================================================== GLOBAL SHORTCUTS
   document.addEventListener('keydown', function (e) {

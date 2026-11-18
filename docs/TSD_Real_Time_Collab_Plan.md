@@ -1,10 +1,10 @@
 # TSD real-time multi-cursor collab — architecture plan
 
-**Status (2026-11-18):** Both awareness and CRDT co-editing are shipped
-as a single-string Y.Text model over Flask-SocketIO, with server-side
-pycrdt and snapshot-to-encrypted-TSD persistence. Structural
-(ProseMirror-level) CRDT remains an upgrade path when the HTML string
-model becomes insufficient — see §Future work.
+**Status (2026-11-18, revised):** Full structural CRDT shipped.
+The editor surface is now ProseMirror bound to a `Y.XmlFragment` via
+`y-prosemirror`; updates ride the existing `/tsd` Socket.IO namespace;
+server merges in `pycrdt` and snapshots the structured fragment back
+to the encrypted TSD. Y.Text (single-string) is history.
 
 ## What ships today
 

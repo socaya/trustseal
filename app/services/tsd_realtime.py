@@ -128,25 +128,37 @@ SNAPSHOT_DEBOUNCE_SECONDS = 4
 
 
 class CrdtSession:
-    """In-memory Y.Doc + metadata for a single active TSD."""
+    """In-memory Y.Doc + metadata for a single active TSD.
 
-    __slots__ = ("tsd_id", "ydoc", "ytext", "ref_count", "dirty",
-                 "last_snapshot_at", "last_update_at")
+    The document state is held as ``Y.XmlFragment`` named ``prosemirror``
+    — the same fragment name y-prosemirror binds to on the client. The
+    snapshot path walks the fragment's XML tree and emits an HTML
+    string so the existing TSD autosave can sanitize + encrypt it.
+    """
+
+    __slots__ = ("tsd_id", "ydoc", "yfragment", "ref_count", "dirty",
+                 "last_snapshot_at", "last_update_at", "_initial_html")
 
     def __init__(self, tsd_id: int):
-        from pycrdt import Doc, Text
+        from pycrdt import Doc, XmlFragment
         self.tsd_id = tsd_id
         self.ydoc = Doc()
-        self.ytext: Text = self.ydoc.get("content", type=Text)
+        self.yfragment: XmlFragment = self.ydoc.get("prosemirror", type=XmlFragment)
         self.ref_count = 0
         self.dirty = False
         self.last_snapshot_at = datetime.utcnow()
         self.last_update_at = datetime.utcnow()
+        # Snapshots fall back to this if the fragment is still empty
+        # (e.g. first join → bootstrap in flight → snapshot debounce
+        # fires before the client has synced the initial state).
+        self._initial_html: str = ""
 
     def bootstrap_from_tsd(self, tsd_html: str) -> None:
-        """Initialise the empty Y.Doc with the current TSD HTML."""
-        if tsd_html and len(str(self.ytext)) == 0:
-            self.ytext += tsd_html
+        """Remember the initial HTML. We deliberately do NOT seed the
+        Y.XmlFragment server-side — the first client to connect pushes
+        its parsed ProseMirror state via ``y-update``, and that
+        structured update is what every peer consumes."""
+        self._initial_html = tsd_html or ""
 
     def apply_update(self, update: bytes) -> None:
         self.ydoc.apply_update(update)
@@ -157,7 +169,53 @@ class CrdtSession:
         return self.ydoc.get_update()
 
     def current_html(self) -> str:
-        return str(self.ytext)
+        """Serialize the Y.XmlFragment tree to an HTML string.
+
+        Walks each top-level XmlElement and emits open/close tags +
+        children. Attributes are preserved. Plain text nodes are HTML-
+        escaped. If the fragment is empty we fall back to the initial
+        HTML so a snapshot never writes an empty document over existing
+        content.
+        """
+        try:
+            if len(self.yfragment) == 0:
+                return self._initial_html
+            out = []
+            for child in self.yfragment.children:
+                out.append(_xml_node_to_html(child))
+            return "".join(out) or self._initial_html
+        except Exception:
+            return self._initial_html
+
+
+def _xml_node_to_html(node) -> str:
+    """Convert a Y.XmlElement / Y.XmlText into an HTML string."""
+    import html as _html
+    # Y.XmlText → escaped text
+    name = getattr(node, "tag", None) or getattr(node, "name", None)
+    if name is None:
+        # XmlText
+        return _html.escape(str(node))
+    attrs = {}
+    try:
+        for k, v in dict(node.attributes).items():
+            attrs[k] = v
+    except Exception:
+        pass
+    attr_str = "".join(
+        ' %s="%s"' % (k, _html.escape(str(v), quote=True))
+        for k, v in attrs.items()
+    )
+    void = name.lower() in ("br", "hr", "img")
+    if void:
+        return f"<{name}{attr_str}/>"
+    inner = []
+    try:
+        for child in node.children:
+            inner.append(_xml_node_to_html(child))
+    except Exception:
+        pass
+    return f"<{name}{attr_str}>" + "".join(inner) + f"</{name}>"
 
 
 def _get_or_create_session(tsd_id: int) -> CrdtSession:
