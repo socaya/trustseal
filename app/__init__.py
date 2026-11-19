@@ -152,6 +152,10 @@ def create_app(config_class=None):
             # External TSD share magic-link landing — anonymous by
             # design, authorized by the one-shot token in the URL.
             'tsd_external_views.landing',
+            # Public stamp verification — anyone with a receipt id + nonce
+            # can validate a stamp impression without logging in.
+            'stamp_verify_public.verify_public',
+            'stamp_verify_public.qr_svg',
             # Public landing + root hit are explicitly anonymous.
             # The endpoint is nested under the parent 'system' blueprint.
             'system.main_views.home',
@@ -381,6 +385,8 @@ def create_app(config_class=None):
     blueprints.append(tsd_stamps_api)
     from .blueprints.estamp.tsd_stamps_views import tsd_stamps_views
     blueprints.append(tsd_stamps_views)
+    from .blueprints.estamp.stamp_verify_public import stamp_verify_public
+    blueprints.append(stamp_verify_public)
     from .blueprints.documents.api.document_label_api import (
         document_label_api,
     )

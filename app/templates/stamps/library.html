@@ -7,13 +7,17 @@
   <p class="ts-page-header__description">
     Design and register organizational stamps — seals, date stamps,
     rubber stamps or custom SVG. Any stamp here can be inserted into
-    a TrustSeal Document via <strong>Insert ▸ Stamp</strong>. These
+    a TrustSeal Document via <strong>Insert ▸ Stamp</strong> and is
+    cryptographically receipt-signed against the tenant key. These
     are visual marks for inline document use and are distinct from
     the cryptographically-attested PDF seals under
     <em>Trust ▸ Managed stamps</em>.
   </p>
 {% endblock %}
 {% block page_actions %}
+  <button type="button" class="ts-btn" id="st-open-templates">
+    From template…
+  </button>
   <a class="ts-btn ts-btn--primary" href="{{ url_for('tsd_stamps_views.studio_new') }}">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -36,29 +40,73 @@
   </div>
   <div class="ts-metric">
     <span class="ts-metric__label">Company</span>
-    <span class="ts-metric__value">{{ stamps|selectattr('kind','equalto','company_dated')|list|length }}</span>
-    <span class="ts-metric__sub">dated seals</span>
+    <span class="ts-metric__value">{{ (stamps|selectattr('kind','equalto','company_dated')|list|length) + (stamps|selectattr('kind','equalto','company_rect')|list|length) }}</span>
+    <span class="ts-metric__sub">round · rect</span>
   </div>
   <div class="ts-metric">
     <span class="ts-metric__label">Date / Rubber</span>
-    <span class="ts-metric__value">{{ stamps|rejectattr('kind','equalto','seal')|rejectattr('kind','equalto','company_dated')|list|length }}</span>
+    <span class="ts-metric__value">{{ stamps|rejectattr('kind','equalto','seal')|rejectattr('kind','equalto','company_dated')|rejectattr('kind','equalto','company_rect')|list|length }}</span>
     <span class="ts-metric__sub">RECEIVED · rubber</span>
   </div>
 </section>
 
+{# Controls bar: search · filter · sort · view-toggle · bulk #}
+<section class="ts-stamp-controls">
+  <div class="ts-stamp-controls__search">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+      <path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <input type="search" id="st-search" placeholder="Search stamps by name…">
+  </div>
+  <div class="ts-stamp-controls__filters" role="tablist" aria-label="Filter by kind">
+    <button type="button" class="ts-chip ts-is-active" data-filter="all">All</button>
+    <button type="button" class="ts-chip" data-filter="seal">Seal</button>
+    <button type="button" class="ts-chip" data-filter="company_dated">Company · round</button>
+    <button type="button" class="ts-chip" data-filter="company_rect">Company · rect</button>
+    <button type="button" class="ts-chip" data-filter="date">Date</button>
+    <button type="button" class="ts-chip" data-filter="rubber">Rubber</button>
+    <button type="button" class="ts-chip" data-filter="signature">Signature</button>
+  </div>
+  <div class="ts-stamp-controls__right">
+    <select id="st-sort" class="ts-stamp-controls__sort" aria-label="Sort">
+      <option value="recent">Most recent</option>
+      <option value="name">A–Z</option>
+      <option value="usage">Most used</option>
+    </select>
+    <div class="ts-stamp-controls__view" role="tablist" aria-label="View">
+      <button type="button" class="ts-view-btn ts-is-active" data-view="grid" aria-pressed="true" title="Grid">▦</button>
+      <button type="button" class="ts-view-btn" data-view="list" aria-pressed="false" title="List">≣</button>
+    </div>
+  </div>
+  <div class="ts-stamp-controls__bulk" id="st-bulk" hidden>
+    <span id="st-bulk-count">0 selected</span>
+    <button type="button" class="ts-btn ts-btn--text ts-btn--sm" id="st-bulk-cancel">Cancel</button>
+    <button type="button" class="ts-btn ts-btn--danger ts-btn--sm" id="st-bulk-delete">Delete</button>
+  </div>
+</section>
+
 {% if stamps %}
-<ul class="ts-stamp-grid">
+<ul class="ts-stamp-grid" id="st-grid">
   {% for s in stamps %}
-  <li class="ts-stamp-card">
+  <li class="ts-stamp-card" data-kind="{{ s.kind }}" data-name="{{ s.name|lower }}" data-id="{{ s.id }}" data-updated="{{ s.updated_at.isoformat() }}">
+    <label class="ts-stamp-card__check">
+      <input type="checkbox" class="st-check" data-id="{{ s.id }}">
+    </label>
     <a class="ts-stamp-card__preview" href="{{ url_for('tsd_stamps_views.studio_edit', stamp_id=s.id) }}">
       {{ s.svg|safe }}
     </a>
     <div class="ts-stamp-card__meta">
       <div class="ts-stamp-card__name">{{ s.name }}</div>
-      <div class="ts-stamp-card__kind">{{ s.kind|upper }} · updated {{ s.updated_at.strftime('%Y-%m-%d') }}</div>
+      <div class="ts-stamp-card__kind">
+        {{ s.kind|upper }} · updated {{ s.updated_at.strftime('%Y-%m-%d') }}
+        {% set stat = s.status or 'draft' %}
+        <span class="ts-status-chip ts-status-chip--{% if stat == 'published' %}finalized{% elif stat == 'archived' %}archived{% else %}draft{% endif %}" style="margin-left:4px;font-size:9px;">{{ stat|capitalize }}</span>
+      </div>
     </div>
     <div class="ts-stamp-card__actions">
       <a class="ts-btn ts-btn--text ts-btn--sm" href="{{ url_for('tsd_stamps_views.studio_edit', stamp_id=s.id) }}">Edit</a>
+      <button type="button" class="ts-btn ts-btn--text ts-btn--sm" data-duplicate-stamp="{{ s.id }}">Duplicate</button>
       <button type="button" class="ts-btn ts-btn--text ts-btn--sm" data-delete-stamp="{{ s.id }}">Delete</button>
     </div>
   </li>
@@ -70,10 +118,11 @@
     <div class="ts-empty__title">No stamps registered yet</div>
     <p class="ts-empty__hint">
       Design your first stamp — a round organisation seal, a dated
-      RECEIVED/APPROVED stamp, or a freeform rubber stamp. Everything
-      renders as SVG and inserts cleanly into any TrustSeal Document.
+      RECEIVED/APPROVED stamp, or a freeform rubber stamp. Or start
+      from a built-in template and tweak it in the Studio.
     </p>
     <div class="ts-empty__actions">
+      <button type="button" class="ts-btn ts-btn--lg" id="st-empty-templates">Browse templates</button>
       <a class="ts-btn ts-btn--primary ts-btn--lg" href="{{ url_for('tsd_stamps_views.studio_new') }}">
         Open Stamp Studio
       </a>
@@ -82,58 +131,405 @@
 </section>
 {% endif %}
 
+{# Templates modal #}
+<div id="st-templates-overlay" class="st-overlay" hidden>
+  <div class="st-overlay__dialog">
+    <div class="st-overlay__header">
+      <div>
+        <h2 class="st-overlay__title">Stamp templates</h2>
+        <p class="st-overlay__sub">Ten starter stamps — click to add a copy to your library, then open it in the Studio to customise.</p>
+      </div>
+      <button type="button" class="st-overlay__close" id="st-templates-close" aria-label="Close">×</button>
+    </div>
+    <div class="st-overlay__body">
+      <div class="st-templates-grid" id="st-templates-grid">
+        <div class="st-templates-loading">Loading templates…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <style>
+/* --- Controls bar --------------------------------------------------- */
+.ts-stamp-controls {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: var(--ts-space-3);
+  align-items: center;
+  margin-bottom: var(--ts-space-4);
+}
+.ts-stamp-controls__search {
+  position: relative;
+  display: inline-flex; align-items: center;
+  background: var(--ts-surface); border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius);
+  padding: 0 var(--ts-space-3);
+  min-width: 280px;
+}
+.ts-stamp-controls__search svg { color: var(--ts-text-muted); flex: 0 0 auto; }
+.ts-stamp-controls__search input {
+  border: 0; background: transparent; padding: 8px 10px;
+  font-size: var(--ts-fs-body); outline: none; width: 100%;
+  color: var(--ts-text);
+}
+.ts-stamp-controls__filters {
+  display: inline-flex; gap: 4px;
+}
+.ts-chip {
+  background: var(--ts-surface);
+  border: 1px solid var(--ts-border);
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--ts-text-muted);
+  cursor: pointer;
+  border-radius: var(--ts-radius-pill);
+}
+.ts-chip:hover { color: var(--ts-text); border-color: var(--ts-border-strong); }
+.ts-chip.ts-is-active {
+  color: var(--ts-brand-primary);
+  background: var(--ts-brand-primary-soft);
+  border-color: var(--ts-brand-primary);
+  font-weight: 600;
+}
+.ts-stamp-controls__right {
+  display: inline-flex; gap: var(--ts-space-2); align-items: center;
+}
+.ts-stamp-controls__sort {
+  height: 32px; padding: 0 8px;
+  border: 1px solid var(--ts-border);
+  background: var(--ts-surface);
+  border-radius: var(--ts-radius-sm);
+  font-size: 12px; color: var(--ts-text);
+}
+.ts-stamp-controls__view {
+  display: inline-flex;
+  background: var(--ts-surface);
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-sm);
+  overflow: hidden;
+}
+.ts-view-btn {
+  background: transparent; border: 0;
+  padding: 6px 10px; font-size: 14px;
+  color: var(--ts-text-muted); cursor: pointer;
+}
+.ts-view-btn:hover { color: var(--ts-text); background: var(--ts-surface-alt); }
+.ts-view-btn.ts-is-active {
+  background: var(--ts-brand-primary-soft);
+  color: var(--ts-brand-primary);
+}
+.ts-stamp-controls__bulk {
+  grid-column: 1 / -1;
+  display: inline-flex; align-items: center; gap: var(--ts-space-3);
+  padding: var(--ts-space-2) var(--ts-space-3);
+  background: var(--ts-brand-primary-soft);
+  border: 1px solid var(--ts-brand-primary);
+  border-radius: var(--ts-radius-sm);
+  font-size: 12px; color: var(--ts-brand-primary);
+  font-weight: 600;
+}
+
+/* --- Grid view ----------------------------------------------------- */
 .ts-stamp-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: var(--ts-space-4);
   list-style: none; margin: 0; padding: 0;
 }
+.ts-stamp-grid.ts-view-list {
+  display: flex; flex-direction: column; gap: 6px;
+}
 .ts-stamp-card {
+  position: relative;
   background: var(--ts-surface);
   border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius);
+  transition: all var(--ts-dur-fast) var(--ts-ease);
 }
+.ts-stamp-card:hover { border-color: var(--ts-brand-primary); box-shadow: 0 4px 12px rgba(18,26,38,0.05); }
+.ts-stamp-card.ts-is-selected {
+  border-color: var(--ts-brand-primary);
+  box-shadow: 0 0 0 2px var(--ts-brand-primary-soft);
+}
+.ts-stamp-card__check {
+  position: absolute; top: 8px; left: 8px; z-index: 2;
+  opacity: 0; transition: opacity var(--ts-dur-fast);
+}
+.ts-stamp-card:hover .ts-stamp-card__check,
+.ts-stamp-card.ts-is-selected .ts-stamp-card__check,
+body.st-bulk-mode .ts-stamp-card__check { opacity: 1; }
 .ts-stamp-card__preview {
   display: flex; align-items: center; justify-content: center;
   padding: var(--ts-space-5);
   background: var(--ts-surface-alt);
   border-bottom: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius) var(--ts-radius) 0 0;
   min-height: 200px;
   text-decoration: none;
 }
 .ts-stamp-card__preview svg { max-width: 160px; max-height: 160px; }
-.ts-stamp-card__meta {
-  padding: var(--ts-space-3) var(--ts-space-4);
-}
-.ts-stamp-card__name {
-  font-weight: var(--ts-fw-semibold); color: var(--ts-text);
-  font-size: var(--ts-fs-body);
-}
-.ts-stamp-card__kind {
-  font-size: var(--ts-fs-meta); color: var(--ts-text-muted);
-  letter-spacing: 0.06em; margin-top: 2px;
-}
+.ts-stamp-card__meta { padding: var(--ts-space-3) var(--ts-space-4); }
+.ts-stamp-card__name { font-weight: var(--ts-fw-semibold); color: var(--ts-text); font-size: var(--ts-fs-body); }
+.ts-stamp-card__kind { font-size: var(--ts-fs-meta); color: var(--ts-text-muted); letter-spacing: 0.06em; margin-top: 2px; }
 .ts-stamp-card__actions {
   display: flex; gap: var(--ts-space-2);
-  padding: 0 var(--ts-space-3) var(--ts-space-3);
+  padding: var(--ts-space-2) var(--ts-space-3) var(--ts-space-3);
   border-top: 1px dashed var(--ts-border);
-  padding-top: var(--ts-space-2);
 }
+
+/* --- List variant -------------------------------------------------- */
+.ts-view-list .ts-stamp-card {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  padding: 8px 12px;
+  gap: var(--ts-space-3);
+}
+.ts-view-list .ts-stamp-card__check  { position: static; opacity: 1; }
+.ts-view-list .ts-stamp-card__preview {
+  padding: 4px; min-height: 48px; border: 0; background: transparent;
+}
+.ts-view-list .ts-stamp-card__preview svg { max-width: 44px; max-height: 44px; }
+.ts-view-list .ts-stamp-card__meta    { padding: 0; }
+.ts-view-list .ts-stamp-card__actions { padding: 0; border: 0; }
+
+/* --- Templates modal ---------------------------------------------- */
+.st-overlay {
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(10,14,22,0.45);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 40px 20px;
+  overflow-y: auto;
+}
+.st-overlay__dialog {
+  background: var(--ts-surface);
+  border-radius: var(--ts-radius-lg);
+  max-width: 920px; width: 100%;
+  box-shadow: 0 20px 50px rgba(18,26,38,0.3);
+}
+.st-overlay__header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: var(--ts-space-4) var(--ts-space-5);
+  border-bottom: 1px solid var(--ts-border);
+}
+.st-overlay__title { font-size: var(--ts-fs-h2); margin: 0; color: var(--ts-text); font-weight: 700; }
+.st-overlay__sub { color: var(--ts-text-muted); font-size: var(--ts-fs-body); margin: 4px 0 0; }
+.st-overlay__close {
+  background: transparent; border: 0; font-size: 24px; cursor: pointer;
+  color: var(--ts-text-muted); line-height: 1; padding: 4px 8px;
+}
+.st-overlay__close:hover { color: var(--ts-text); }
+.st-overlay__body { padding: var(--ts-space-5); max-height: calc(100vh - 220px); overflow-y: auto; }
+
+.st-templates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--ts-space-4);
+}
+.st-templates-loading { grid-column: 1 / -1; padding: 40px; text-align: center; color: var(--ts-text-muted); }
+.st-template {
+  background: var(--ts-surface);
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all var(--ts-dur-fast) var(--ts-ease);
+  display: flex; flex-direction: column;
+}
+.st-template:hover {
+  border-color: var(--ts-brand-primary);
+  box-shadow: 0 6px 16px rgba(55,120,212,0.12);
+  transform: translateY(-1px);
+}
+.st-template__preview {
+  background: var(--ts-surface-alt);
+  padding: var(--ts-space-5);
+  min-height: 160px;
+  display: flex; align-items: center; justify-content: center;
+}
+.st-template__preview svg { max-width: 140px; max-height: 140px; }
+.st-template__meta { padding: var(--ts-space-3); flex: 1; }
+.st-template__name { font-weight: 600; color: var(--ts-text); font-size: var(--ts-fs-body); }
+.st-template__cat  { font-size: 10px; color: var(--ts-brand-primary); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
+.st-template__desc { font-size: var(--ts-fs-meta); color: var(--ts-text-muted); margin-top: 4px; }
 </style>
 
 <script>
-document.querySelectorAll('[data-delete-stamp]').forEach(function (b) {
-  b.addEventListener('click', function () {
-    var id = b.getAttribute('data-delete-stamp');
-    if (!confirm('Delete this stamp? Documents that already contain it keep their inline SVG.')) return;
-    fetch('/api/tsd-stamps/' + id, {
-      method: 'DELETE', credentials: 'same-origin',
-      headers: { 'X-Requested-With': 'fetch' },
-    }).then(function (r) {
-      if (r.status === 204) window.location.reload();
-      else alert('Delete failed: HTTP ' + r.status);
+(function () {
+  var grid = document.getElementById('st-grid');
+  var searchEl = document.getElementById('st-search');
+  var sortEl = document.getElementById('st-sort');
+  var bulkBar = document.getElementById('st-bulk');
+  var bulkCount = document.getElementById('st-bulk-count');
+
+  var filter = 'all', query = '', sort = 'recent', view = 'grid';
+
+  function applyAll() {
+    if (!grid) return;
+    var cards = Array.prototype.slice.call(grid.querySelectorAll('.ts-stamp-card'));
+    cards.forEach(function (c) {
+      var hide = (filter !== 'all' && c.dataset.kind !== filter) ||
+                 (query && c.dataset.name.indexOf(query) === -1);
+      c.style.display = hide ? 'none' : '';
+    });
+    cards.sort(function (a, b) {
+      if (sort === 'name') return a.dataset.name.localeCompare(b.dataset.name);
+      return (a.dataset.updated < b.dataset.updated ? 1 : -1);
+    });
+    cards.forEach(function (c) { grid.appendChild(c); });
+  }
+
+  // Search + filters + sort.
+  searchEl && searchEl.addEventListener('input', function () {
+    query = searchEl.value.trim().toLowerCase(); applyAll();
+  });
+  document.querySelectorAll('[data-filter]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('[data-filter]').forEach(function (x) { x.classList.remove('ts-is-active'); });
+      b.classList.add('ts-is-active');
+      filter = b.getAttribute('data-filter'); applyAll();
     });
   });
-});
+  sortEl && sortEl.addEventListener('change', function () { sort = sortEl.value; applyAll(); });
+
+  // Grid / List view toggle.
+  document.querySelectorAll('[data-view]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('[data-view]').forEach(function (x) {
+        x.classList.remove('ts-is-active'); x.setAttribute('aria-pressed','false');
+      });
+      b.classList.add('ts-is-active'); b.setAttribute('aria-pressed','true');
+      view = b.getAttribute('data-view');
+      if (grid) grid.classList.toggle('ts-view-list', view === 'list');
+    });
+  });
+
+  // Bulk selection.
+  var selected = new Set();
+  function updateBulkBar() {
+    if (!bulkBar) return;
+    bulkCount.textContent = selected.size + ' selected';
+    if (selected.size) { bulkBar.removeAttribute('hidden'); document.body.classList.add('st-bulk-mode'); }
+    else { bulkBar.setAttribute('hidden',''); document.body.classList.remove('st-bulk-mode'); }
+  }
+  document.querySelectorAll('.st-check').forEach(function (chk) {
+    chk.addEventListener('click', function (e) { e.stopPropagation(); });
+    chk.addEventListener('change', function () {
+      var id = chk.getAttribute('data-id');
+      var card = chk.closest('.ts-stamp-card');
+      if (chk.checked) { selected.add(id); card.classList.add('ts-is-selected'); }
+      else { selected.delete(id); card.classList.remove('ts-is-selected'); }
+      updateBulkBar();
+    });
+  });
+  var bulkCancel = document.getElementById('st-bulk-cancel');
+  bulkCancel && bulkCancel.addEventListener('click', function () {
+    selected.clear();
+    document.querySelectorAll('.st-check').forEach(function (c) { c.checked = false; });
+    document.querySelectorAll('.ts-stamp-card.ts-is-selected').forEach(function (c) { c.classList.remove('ts-is-selected'); });
+    updateBulkBar();
+  });
+  var bulkDelete = document.getElementById('st-bulk-delete');
+  bulkDelete && bulkDelete.addEventListener('click', function () {
+    if (!selected.size) return;
+    if (!confirm('Delete ' + selected.size + ' stamp(s)? Documents that already contain these stamps keep their inline SVG.')) return;
+    Promise.all(Array.from(selected).map(function (id) {
+      return fetch('/api/tsd-stamps/' + id, {
+        method: 'DELETE', credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'fetch' },
+      });
+    })).then(function () { window.location.reload(); });
+  });
+
+  // Row actions.
+  document.querySelectorAll('[data-delete-stamp]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var id = b.getAttribute('data-delete-stamp');
+      if (!confirm('Delete this stamp? Documents that already contain it keep their inline SVG.')) return;
+      fetch('/api/tsd-stamps/' + id, {
+        method: 'DELETE', credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'fetch' },
+      }).then(function (r) {
+        if (r.status === 204) window.location.reload();
+        else alert('Delete failed: HTTP ' + r.status);
+      });
+    });
+  });
+  document.querySelectorAll('[data-duplicate-stamp]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var id = b.getAttribute('data-duplicate-stamp');
+      fetch('/api/tsd-stamps/' + id + '/duplicate', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: '{}',
+      }).then(function (r) {
+        if (r.status === 201) window.location.reload();
+        else alert('Duplicate failed: HTTP ' + r.status);
+      });
+    });
+  });
+
+  // -------- Templates modal ----------
+  function openTemplates() {
+    var ov = document.getElementById('st-templates-overlay');
+    var container = document.getElementById('st-templates-grid');
+    ov.removeAttribute('hidden'); ov.style.display = 'flex';
+    container.innerHTML = '<div class="st-templates-loading">Loading templates…</div>';
+    fetch('/api/tsd-stamps/templates', { credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (data) {
+        var cards = (data.templates || []).map(function (t) {
+          return '<div class="st-template" data-slug="' + t.slug + '">' +
+            '<div class="st-template__preview">' + t.svg + '</div>' +
+            '<div class="st-template__meta">' +
+              '<div class="st-template__cat">' + t.category + ' · ' + t.kind.toUpperCase() + '</div>' +
+              '<div class="st-template__name">' + t.name + '</div>' +
+              '<div class="st-template__desc">' + t.description + '</div>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+        container.innerHTML = cards || '<div class="st-templates-loading">No templates available.</div>';
+        container.querySelectorAll('[data-slug]').forEach(function (card) {
+          card.addEventListener('click', function () {
+            var slug = card.getAttribute('data-slug');
+            card.style.opacity = '0.6';
+            fetch('/api/tsd-stamps/from-template/' + slug, {
+              method: 'POST', credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+              body: '{}',
+            }).then(function (r) {
+              if (r.status === 409) {
+                alert('You already have a stamp with that name. Rename the existing one or duplicate this template manually.');
+                card.style.opacity = '';
+                return;
+              }
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+              return r.json();
+            }).then(function (stamp) {
+              if (stamp && stamp.id) window.location = '/stamps/studio/' + stamp.id;
+            }).catch(function (e) {
+              card.style.opacity = '';
+              alert('Create failed: ' + e.message);
+            });
+          });
+        });
+      })
+      .catch(function (e) {
+        container.innerHTML = '<div class="st-templates-loading">Failed to load: ' + e.message + '</div>';
+      });
+  }
+  function closeTemplates() {
+    var ov = document.getElementById('st-templates-overlay');
+    ov.setAttribute('hidden',''); ov.style.display = 'none';
+  }
+  var openBtn = document.getElementById('st-open-templates');
+  if (openBtn) openBtn.addEventListener('click', openTemplates);
+  var emptyBtn = document.getElementById('st-empty-templates');
+  if (emptyBtn) emptyBtn.addEventListener('click', openTemplates);
+  var closeBtn = document.getElementById('st-templates-close');
+  if (closeBtn) closeBtn.addEventListener('click', closeTemplates);
+  var ov = document.getElementById('st-templates-overlay');
+  if (ov) ov.addEventListener('click', function (e) { if (e.target === ov) closeTemplates(); });
+})();
 </script>
 {% endblock %}

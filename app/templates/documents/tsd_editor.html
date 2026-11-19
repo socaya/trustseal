@@ -250,9 +250,34 @@
         </div>
         <button type="button" class="ts-btn ts-btn--text" id="tsd-stamp-close" aria-label="Close">✕</button>
       </header>
-      <ul id="tsd-stamp-grid" class="ts-stamp-picker-grid">
-        <li class="ts-stamp-picker-empty">Loading…</li>
-      </ul>
+      <div class="ts-stamp-picker-controls">
+        <div class="ts-stamp-picker-search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+            <path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <input type="search" id="tsd-stamp-search" placeholder="Search your stamps…" autofocus>
+        </div>
+        <div class="ts-stamp-picker-filters" role="tablist" aria-label="Filter by kind">
+          <button type="button" class="ts-chip-mini ts-is-active" data-stamp-kind="all">All</button>
+          <button type="button" class="ts-chip-mini" data-stamp-kind="seal">Seal</button>
+          <button type="button" class="ts-chip-mini" data-stamp-kind="company_dated">Company · round</button>
+          <button type="button" class="ts-chip-mini" data-stamp-kind="company_rect">Company · rect</button>
+          <button type="button" class="ts-chip-mini" data-stamp-kind="date">Date</button>
+          <button type="button" class="ts-chip-mini" data-stamp-kind="rubber">Rubber</button>
+          <button type="button" class="ts-chip-mini" data-stamp-kind="signature">Signature</button>
+        </div>
+      </div>
+      <section id="tsd-stamp-recents" class="ts-stamp-picker-section" hidden>
+        <h3 class="ts-stamp-picker-section__title">Recent</h3>
+        <ul class="ts-stamp-picker-grid" id="tsd-stamp-recents-grid"></ul>
+      </section>
+      <section class="ts-stamp-picker-section">
+        <h3 class="ts-stamp-picker-section__title" id="tsd-stamp-all-title">All stamps</h3>
+        <ul id="tsd-stamp-grid" class="ts-stamp-picker-grid">
+          <li class="ts-stamp-picker-empty">Loading…</li>
+        </ul>
+      </section>
     </div>
   </div>
 
@@ -940,13 +965,47 @@
   padding: var(--ts-space-5) var(--ts-space-6);
   border-bottom: 1px solid var(--ts-border);
 }
+.ts-stamp-picker-controls {
+  display: grid; grid-template-columns: 1fr auto;
+  align-items: center; gap: var(--ts-space-3);
+  padding: var(--ts-space-3) var(--ts-space-5);
+  border-bottom: 1px solid var(--ts-border);
+  background: #fafbfc;
+}
+.ts-stamp-picker-search {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #fff; border: 1px solid var(--ts-border);
+  border-radius: 6px; padding: 0 10px;
+}
+.ts-stamp-picker-search svg  { color: var(--ts-text-muted); flex: 0 0 auto; }
+.ts-stamp-picker-search input {
+  border: 0; outline: none; background: transparent;
+  padding: 7px 4px; font-size: 13px; width: 260px;
+}
+.ts-stamp-picker-filters { display: inline-flex; gap: 4px; }
+.ts-chip-mini {
+  background: #fff; border: 1px solid var(--ts-border);
+  padding: 4px 10px; font-size: 11px; color: var(--ts-text-muted);
+  cursor: pointer; border-radius: 99px;
+}
+.ts-chip-mini:hover { color: var(--ts-text); border-color: var(--ts-border-strong); }
+.ts-chip-mini.ts-is-active {
+  color: var(--ts-brand-primary); background: var(--ts-brand-primary-soft);
+  border-color: var(--ts-brand-primary); font-weight: 600;
+}
+.ts-stamp-picker-section { padding: var(--ts-space-3) var(--ts-space-5) 0; }
+.ts-stamp-picker-section:last-child { padding-bottom: var(--ts-space-4); }
+.ts-stamp-picker-section__title {
+  font-size: 10px; font-weight: 700; color: var(--ts-text-muted);
+  letter-spacing: 0.1em; text-transform: uppercase;
+  margin: 0 0 8px;
+}
 .ts-stamp-picker-grid {
-  overflow-y: auto; flex: 1 1 auto;
-  padding: var(--ts-space-5);
+  overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: var(--ts-space-4);
-  list-style: none; margin: 0;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--ts-space-3);
+  list-style: none; margin: 0 0 var(--ts-space-3); padding: 0;
 }
 .ts-stamp-picker-item {
   cursor: pointer;
@@ -967,7 +1026,13 @@
   margin-bottom: var(--ts-space-2);
   padding: var(--ts-space-3);
 }
-.ts-stamp-picker-item__preview svg { max-width: 120px; max-height: 120px; }
+.ts-stamp-picker-item__preview svg {
+  max-width: 100px; max-height: 100px;
+  transition: transform 0.15s ease;
+}
+.ts-stamp-picker-item:hover .ts-stamp-picker-item__preview svg {
+  transform: scale(1.35);
+}
 .ts-stamp-picker-item__name {
   font-size: var(--ts-fs-label); font-weight: var(--ts-fw-semibold);
 }
@@ -1161,6 +1226,49 @@
   .ts-ed__page { margin: 0; box-shadow: none; border: 0; }
   body { background: #fff; }
 }
+
+/* ========== Stamp mark + verifier overlay ========== */
+.tsd-stamp-mark {
+  outline: 1px dotted transparent;
+  outline-offset: 2px;
+  transition: outline-color 0.3s;
+}
+.tsd-stamp-mark:hover { outline-color: rgba(55,120,212,0.45); }
+.tsd-stamp-mark--unsigned { outline-color: rgba(158,47,54,0.55); }
+.tsd-stamp-mark.tsd-verify-flash {
+  animation: tsd-verify-flash 0.9s ease-out;
+}
+@keyframes tsd-verify-flash {
+  0%   { box-shadow: 0 0 0 0 rgba(55,120,212,0.5); }
+  100% { box-shadow: 0 0 0 10px rgba(55,120,212,0); }
+}
+.tsd-verify-list { display: flex; flex-direction: column; gap: 8px; }
+.tsd-verify-row {
+  display: grid; grid-template-columns: 28px 1fr;
+  gap: 10px; align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #d9dfe6;
+  border-radius: 6px;
+  background: #fafbfc;
+  font-size: 12px;
+}
+.tsd-verify-badge {
+  width: 24px; height: 24px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+  color: #fff; background: #7a8494;
+}
+.tsd-verify-row--ok      { background: #f3f9f5; border-color: #c6dfd1; }
+.tsd-verify-row--ok      .tsd-verify-badge { background: #0e664d; }
+.tsd-verify-row--warn    { background: #fff8e8; border-color: #e8d7a9; }
+.tsd-verify-row--warn    .tsd-verify-badge { background: #b4821f; }
+.tsd-verify-row--bad,
+.tsd-verify-row--unsigned{ background: #fcf1f1; border-color: #e6c0c3; }
+.tsd-verify-row--bad     .tsd-verify-badge,
+.tsd-verify-row--unsigned.tsd-verify-badge,
+.tsd-verify-row--unsigned .tsd-verify-badge { background: #9e2f36; }
+.tsd-verify-row--pending .tsd-verify-badge { background: #5a6676; }
+.tsd-verify-empty { padding: 20px; text-align: center; color: #5a6676; font-size: 12px; }
 </style>
 
 <script>
@@ -1576,6 +1684,9 @@
         { name: 'Track',    icon: 'page', fn: function () { showToast('Track-changes ships with suggestions mode.'); } },
         { name: 'Compare',  icon: 'copy', fn: openHistory },
       ]),
+      makeGroup('Trust', [
+        { name: 'Verify stamps', icon: 'check', fn: openStampVerifier },
+      ]),
       makeGroup('Approvals', [
         { name: 'Request review', icon: 'check', fn: function () { showToast('Review routing wires to the workflow engine.'); } },
         { name: 'Lock version',   icon: 'lock',  fn: function () { showToast('Lock a version to prepare it for signature.'); } },
@@ -1701,46 +1812,264 @@
   }
 
   // ---- Stamp picker (Insert ▸ Stamp) ----
+  var _stampCache = null;
+  var _stampFilter = { query: '', kind: 'all' };
+  var _RECENTS_KEY = 'tsd.stamp.recents';
+  var _RECENTS_MAX = 6;
+
+  function _loadRecents() {
+    try { return JSON.parse(localStorage.getItem(_RECENTS_KEY) || '[]'); }
+    catch (e) { return []; }
+  }
+  function _saveRecent(stampId) {
+    try {
+      var list = _loadRecents().filter(function (id) { return id !== stampId; });
+      list.unshift(stampId);
+      localStorage.setItem(_RECENTS_KEY, JSON.stringify(list.slice(0, _RECENTS_MAX)));
+    } catch (e) {}
+  }
+
+  function _renderStampPicker() {
+    var allGrid = document.getElementById('tsd-stamp-grid');
+    var rcGrid  = document.getElementById('tsd-stamp-recents-grid');
+    var rcSec   = document.getElementById('tsd-stamp-recents');
+    if (!_stampCache || !_stampCache.length) {
+      allGrid.innerHTML = '<li class="ts-stamp-picker-empty">No stamps registered yet. ' +
+        '<a href="/stamps/studio" target="_blank">Open the Stamp Studio</a> to design one.</li>';
+      rcSec.setAttribute('hidden', '');
+      return;
+    }
+    // Filter
+    var q = _stampFilter.query;
+    var k = _stampFilter.kind;
+    var filtered = _stampCache.filter(function (s) {
+      if (k !== 'all' && s.kind !== k) return false;
+      if (q && (s.name || '').toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    });
+    // Recents (only when no filter so we don't confuse context)
+    var recentIds = _loadRecents();
+    var recents = [];
+    if (!q && k === 'all') {
+      recentIds.forEach(function (id) {
+        var hit = _stampCache.find(function (s) { return s.id === id; });
+        if (hit) recents.push(hit);
+      });
+    }
+    function card(s) {
+      return '<li class="ts-stamp-picker-item" data-sid="' + s.id + '" title="' + (s.name || '').replace(/"/g,'&quot;') + '">' +
+        '<div class="ts-stamp-picker-item__preview">' + s.svg + '</div>' +
+        '<div class="ts-stamp-picker-item__name">' + s.name + '</div>' +
+        '<div class="ts-stamp-picker-item__kind">' + (s.kind || '').toUpperCase() + '</div>' +
+      '</li>';
+    }
+    if (recents.length) {
+      rcGrid.innerHTML = recents.map(card).join('');
+      rcSec.removeAttribute('hidden');
+    } else {
+      rcSec.setAttribute('hidden', '');
+    }
+    if (filtered.length) {
+      allGrid.innerHTML = filtered.map(card).join('');
+    } else {
+      allGrid.innerHTML = '<li class="ts-stamp-picker-empty">No matches. Clear search or try another kind.</li>';
+    }
+    // Wire clicks across both grids (dedupe since one stamp may appear in Recents + All).
+    var wired = new WeakSet();
+    document.querySelectorAll('#tsd-stamp-overlay [data-sid]').forEach(function (el) {
+      if (wired.has(el)) return;
+      wired.add(el);
+      el.addEventListener('click', function () { _insertStampFromCard(el); });
+    });
+  }
+
+  function _insertStampFromCard(el) {
+    var svg = el.querySelector('svg');
+    if (!svg) return;
+    var sid = parseInt(el.getAttribute('data-sid'), 10);
+    var svgMarkup = svg.outerHTML;
+    fetch('/api/tsd-stamps/' + sid + '/receipt', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify({
+        document_id: tsdId || null,
+        svg: svgMarkup,
+        context_label: (shell.dataset.tsdTitle || 'TSD document').slice(0, 120),
+      }),
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (receipt) {
+      var stamped = svgMarkup.replace(
+        /^<svg\b/,
+        '<svg data-stamp-receipt-id="' + receipt.receipt_id + '"' +
+        ' data-stamp-receipt-nonce="' + receipt.nonce + '"' +
+        ' data-stamp-placed-at="' + receipt.placed_at + '"' +
+        ' data-stamp-placed-by="' + receipt.placed_by_id + '"'
+      );
+      var wrapper =
+        '<span class="tsd-stamp-mark" data-tsd-stamp-receipt="' + receipt.receipt_id + '"' +
+        ' data-tsd-stamp-nonce="' + receipt.nonce + '"' +
+        ' style="display:inline-block;vertical-align:middle;margin:0 6pt;max-width:220px;"' +
+        ' contenteditable="false" title="Signed stamp · receipt #' + receipt.receipt_id + '">' +
+        stamped + '</span>';
+      insertHTML(wrapper);
+      _saveRecent(sid);
+      closeStampPicker();
+      if (typeof showToast === 'function') showToast('Stamp inserted · receipt #' + receipt.receipt_id);
+    }).catch(function (e) {
+      var wrapper =
+        '<span class="tsd-stamp-mark tsd-stamp-mark--unsigned"' +
+        ' style="display:inline-block;vertical-align:middle;margin:0 6pt;max-width:220px;"' +
+        ' contenteditable="false" title="Unsigned stamp — signing service unavailable">' +
+        svgMarkup + '</span>';
+      insertHTML(wrapper);
+      _saveRecent(sid);
+      closeStampPicker();
+      if (typeof showToast === 'function') showToast('Stamp inserted unsigned: ' + e.message);
+    });
+  }
+
   function openStampPicker() {
     var overlay = document.getElementById('tsd-stamp-overlay');
-    var grid = document.getElementById('tsd-stamp-grid');
     if (!overlay) return;
     overlay.removeAttribute('hidden'); overlay.style.display = 'flex';
-    grid.innerHTML = '<li class="ts-stamp-picker-empty">Loading…</li>';
+    // Reset filter state each open so the user sees the full picker.
+    _stampFilter = { query: '', kind: 'all' };
+    var search = document.getElementById('tsd-stamp-search');
+    if (search) search.value = '';
+    document.querySelectorAll('#tsd-stamp-overlay [data-stamp-kind]').forEach(function (b) {
+      b.classList.toggle('ts-is-active', b.getAttribute('data-stamp-kind') === 'all');
+    });
+    document.getElementById('tsd-stamp-grid').innerHTML =
+      '<li class="ts-stamp-picker-empty">Loading…</li>';
     fetch('/api/tsd-stamps/', { credentials: 'same-origin' })
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(function (items) {
-        if (!items.length) {
-          grid.innerHTML = '<li class="ts-stamp-picker-empty">No stamps registered yet. ' +
-            '<a href="/stamps/studio" target="_blank">Open the Stamp Studio</a> to design one.</li>';
-          return;
-        }
-        grid.innerHTML = items.map(function (s) {
-          return '<li class="ts-stamp-picker-item" data-sid="' + s.id + '">' +
-            '<div class="ts-stamp-picker-item__preview">' + s.svg + '</div>' +
-            '<div class="ts-stamp-picker-item__name">' + s.name + '</div>' +
-            '<div class="ts-stamp-picker-item__kind">' + s.kind.toUpperCase() + '</div>' +
-          '</li>';
-        }).join('');
-        grid.querySelectorAll('[data-sid]').forEach(function (el) {
-          el.addEventListener('click', function () {
-            var svg = el.querySelector('svg');
-            if (!svg) return;
-            // Wrap the SVG in an inline block so it flows nicely with text.
-            var wrapper = '<span style="display:inline-block;vertical-align:middle;margin:0 6pt;max-width:220px;" contenteditable="false">' + svg.outerHTML + '</span>';
-            insertHTML(wrapper);
-            closeStampPicker();
-          });
-        });
-      })
+      .then(function (items) { _stampCache = items; _renderStampPicker(); })
       .catch(function (e) {
-        grid.innerHTML = '<li class="ts-stamp-picker-empty">Failed to load: ' + e.message + '</li>';
+        document.getElementById('tsd-stamp-grid').innerHTML =
+          '<li class="ts-stamp-picker-empty">Failed to load: ' + e.message + '</li>';
       });
+    if (search) setTimeout(function () { search.focus(); }, 30);
   }
   function closeStampPicker() {
     var o = document.getElementById('tsd-stamp-overlay');
     if (!o) return;
     o.setAttribute('hidden', ''); o.style.display = 'none';
+  }
+
+  // Wire the picker's search + filter controls once (DOM exists at load).
+  (function _wireStampPickerControls() {
+    var search = document.getElementById('tsd-stamp-search');
+    if (search) {
+      search.addEventListener('input', function () {
+        _stampFilter.query = search.value.trim().toLowerCase();
+        if (_stampCache) _renderStampPicker();
+      });
+      search.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeStampPicker();
+      });
+    }
+    document.querySelectorAll('#tsd-stamp-overlay [data-stamp-kind]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        document.querySelectorAll('#tsd-stamp-overlay [data-stamp-kind]').forEach(function (x) {
+          x.classList.remove('ts-is-active');
+        });
+        b.classList.add('ts-is-active');
+        _stampFilter.kind = b.getAttribute('data-stamp-kind');
+        if (_stampCache) _renderStampPicker();
+      });
+    });
+  })();
+
+  // ===================================================================== STAMP VERIFIER
+  function openStampVerifier() {
+    var marks = editor.querySelectorAll('.tsd-stamp-mark, [data-tsd-stamp-receipt], [data-stamp-receipt-id]');
+    var overlay = ensureVerifierOverlay();
+    var panel = overlay.querySelector('.tsd-verify-list');
+    overlay.style.display = 'flex';
+
+    if (!marks.length) {
+      panel.innerHTML = '<div class="tsd-verify-empty">No stamps found in this document.</div>';
+      return;
+    }
+
+    var items = Array.prototype.map.call(marks, function (el, i) {
+      var svg = el.tagName === 'SVG' ? el : el.querySelector('svg');
+      var receiptId = el.getAttribute('data-tsd-stamp-receipt') ||
+                      (svg && svg.getAttribute('data-stamp-receipt-id'));
+      var nonce     = el.getAttribute('data-tsd-stamp-nonce') ||
+                      (svg && svg.getAttribute('data-stamp-receipt-nonce'));
+      return { idx: i, el: el, svgMarkup: svg ? svg.outerHTML : '', receiptId: receiptId, nonce: nonce };
+    });
+
+    panel.innerHTML = items.map(function (it) {
+      if (!it.receiptId) {
+        return '<div class="tsd-verify-row tsd-verify-row--unsigned" data-i="' + it.idx + '">' +
+               '<span class="tsd-verify-badge">✗</span>' +
+               '<div><b>Unsigned impression</b><br><small>No receipt attached — inserted outside the signed flow.</small></div></div>';
+      }
+      return '<div class="tsd-verify-row tsd-verify-row--pending" data-i="' + it.idx + '">' +
+             '<span class="tsd-verify-badge">…</span>' +
+             '<div><b>Receipt #' + it.receiptId + '</b><br><small class="tsd-verify-detail">Verifying…</small></div></div>';
+    }).join('');
+
+    items.forEach(function (it) {
+      if (!it.receiptId) return;
+      var row = panel.querySelector('[data-i="' + it.idx + '"]');
+      fetch('/api/tsd-stamps/verify-receipt', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({ receipt_id: it.receiptId, nonce: it.nonce, svg: it.svgMarkup }),
+      }).then(function (r) { return r.json(); })
+        .then(function (res) {
+          var status, cls, detail;
+          if (!res.valid) { status = '✗'; cls = 'bad'; detail = 'Invalid — ' + (res.reason || 'unknown'); }
+          else if (res.revoked) { status = '⚠'; cls = 'warn'; detail = 'Revoked · ' + (res.revoked_reason || '—'); }
+          else if (res.context_intact === false) { status = '⚠'; cls = 'warn'; detail = 'Receipt valid but stamp mark edited after insertion.'; }
+          else { status = '✓'; cls = 'ok'; detail = (res.stamp_name || '') + ' · placed ' + (res.placed_at || '') + ' by user #' + (res.placed_by_id || '?'); }
+          row.className = 'tsd-verify-row tsd-verify-row--' + cls;
+          row.querySelector('.tsd-verify-badge').textContent = status;
+          row.querySelector('.tsd-verify-detail').textContent = detail;
+          // Add a public-share link for valid receipts.
+          if (res.valid) {
+            var publicUrl = location.origin + '/verify/stamp/' + it.receiptId + '/' + it.nonce;
+            var a = document.createElement('a');
+            a.href = publicUrl; a.target = '_blank'; a.rel = 'noopener';
+            a.textContent = 'Public link';
+            a.style.cssText = 'margin-left:auto;font-size:11px;color:#3778d4;text-decoration:underline;';
+            row.querySelector('.tsd-verify-detail').parentNode.appendChild(a);
+          }
+          it.el.classList.remove('tsd-verify-flash');
+          void it.el.offsetWidth;
+          it.el.classList.add('tsd-verify-flash');
+        })
+        .catch(function (e) {
+          row.className = 'tsd-verify-row tsd-verify-row--bad';
+          row.querySelector('.tsd-verify-badge').textContent = '✗';
+          row.querySelector('.tsd-verify-detail').textContent = 'Verify failed: ' + e.message;
+        });
+    });
+  }
+  function ensureVerifierOverlay() {
+    var existing = document.getElementById('tsd-verifier-overlay');
+    if (existing) return existing;
+    var o = document.createElement('div');
+    o.id = 'tsd-verifier-overlay';
+    o.className = 'tsd-overlay';
+    o.innerHTML =
+      '<div class="tsd-overlay__dialog" style="max-width:520px">' +
+      '  <div class="tsd-overlay__header">' +
+      '    <h2 class="tsd-overlay__title">Verify stamps</h2>' +
+      '    <button type="button" class="tsd-overlay__close" aria-label="Close">×</button>' +
+      '  </div>' +
+      '  <div class="tsd-overlay__body"><div class="tsd-verify-list"></div></div>' +
+      '  <div class="tsd-overlay__footer"><small style="color:#5a6676">Signatures validate against the issuing tenant key.</small></div>' +
+      '</div>';
+    document.body.appendChild(o);
+    o.addEventListener('click', function (e) { if (e.target === o) o.style.display = 'none'; });
+    o.querySelector('.tsd-overlay__close').addEventListener('click', function () { o.style.display = 'none'; });
+    return o;
   }
   document.getElementById('tsd-stamp-close') && document.getElementById('tsd-stamp-close').addEventListener('click', closeStampPicker);
   var _stOv = document.getElementById('tsd-stamp-overlay');
@@ -1885,8 +2214,30 @@
         editor.innerHTML = html;
         editor._initialHtml = html;   // handed to the PM init as fallback seed
         updateWords(); rebuildOutline();
+        refreshDynamicStampDates();
         setSave('● Saved · v' + data.version, 'saved');
       }).catch(function (e) { setSave('Load failed: ' + e.message, 'error'); });
+  }
+
+  // Dynamic date stamps — rewrite [data-stamp-date] text to today's date
+  // on every document open, so a "Company Dated" seal is current at read time.
+  function refreshDynamicStampDates() {
+    var d = new Date();
+    var dd  = String(d.getDate()).padStart(2, '0');
+    var mm  = String(d.getMonth() + 1).padStart(2, '0');
+    var mmm = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][d.getMonth()];
+    var yyyy = d.getFullYear();
+    editor.querySelectorAll('[data-stamp-date]').forEach(function (el) {
+      var fmt = (el.getAttribute('data-stamp-date') || 'DD MMM YYYY').toUpperCase();
+      var out;
+      switch (fmt) {
+        case 'YYYY-MM-DD':   out = yyyy + '-' + mm + '-' + dd; break;
+        case 'DD/MM/YYYY':   out = dd + '/' + mm + '/' + yyyy; break;
+        case 'MMM DD, YYYY': out = mmm + ' ' + dd + ', ' + yyyy; break;
+        default:             out = dd + ' ' + mmm + ' ' + yyyy;
+      }
+      el.textContent = out;
+    });
   }
 
   var saveTimer = null;

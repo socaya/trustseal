@@ -141,6 +141,25 @@ def ensure_tenant_key(organization_id: int) -> None:
     db.session.commit()
 
 
+def tenant_signing_key(organization_id: int, *, label: str) -> bytes:
+    """Return a 32-byte HMAC key derived from the tenant DEK + a label.
+
+    Used for signing non-document artefacts (stamp receipts, share
+    tokens) without exposing the raw DEK and with domain separation
+    per use case. Different ``label`` values produce different keys
+    even for the same tenant.
+    """
+    from app.models.tenant_key import TenantKey
+
+    row = db.session.get(TenantKey, organization_id)
+    if row is None:
+        _tenant_fernet(organization_id)
+        row = db.session.get(TenantKey, organization_id)
+    dek = _unwrap_dek(row.wrapped_key)
+    return hashlib.sha256(b"trustseal/v1/" + label.encode("utf-8")
+                          + b"\x00" + dek).digest()
+
+
 # ============================================================ content envelope
 
 

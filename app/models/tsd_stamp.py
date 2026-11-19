@@ -29,7 +29,10 @@ from datetime import datetime
 from app.extensions import db
 
 
-TSD_STAMP_KINDS = ("seal", "date", "company_dated", "rubber", "custom")
+TSD_STAMP_KINDS = (
+    "seal", "date", "company_dated", "company_rect",
+    "rubber", "signature", "custom",
+)
 
 
 class TSDStamp(db.Model):
@@ -53,10 +56,26 @@ class TSDStamp(db.Model):
     )
     deleted_at = db.Column(db.DateTime, index=True)
 
+    # Approval workflow (§14) — draft/review/published/archived.
+    # Published stamps are immutable; edits must duplicate to a new draft.
+    status = db.Column(db.String(16), nullable=False, default="draft")
+    published_at = db.Column(db.DateTime)
+    published_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+
+    # Optional device-profile link (§5) — drives production validation.
+    device_profile_id = db.Column(
+        db.Integer, db.ForeignKey("device_profiles.id"), nullable=True,
+    )
+
     __table_args__ = (
         db.CheckConstraint(
-            "kind IN ('seal','date','company_dated','rubber','custom')",
+            "kind IN ('seal','date','company_dated','company_rect',"
+            "'rubber','signature','custom')",
             name="ck_tsd_stamp_kind",
+        ),
+        db.CheckConstraint(
+            "status IN ('draft','review','published','archived')",
+            name="ck_tsd_stamp_status",
         ),
         db.UniqueConstraint(
             "organization_id", "name",
@@ -72,6 +91,10 @@ class TSDStamp(db.Model):
             "name": self.name,
             "kind": self.kind,
             "layout": self.layout,
+            "status": self.status or "draft",
+            "published_at": self.published_at.isoformat() if self.published_at else None,
+            "published_by_id": self.published_by_id,
+            "device_profile_id": self.device_profile_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

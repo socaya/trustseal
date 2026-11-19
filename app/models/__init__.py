@@ -24,6 +24,9 @@ from .tsd_comment import TSDComment
 from .tsd_approval import TSDApproval
 from .tsd_presence import TSDPresence
 from .tsd_stamp import TSDStamp
+from .tsd_stamp_insertion import TSDStampInsertion
+from .tsd_stamp_revision import TSDStampRevision
+from .device_profile import DeviceProfile
 from .tenant_key import TenantKey
 from .signing_envelope import SigningEnvelope, EnvelopeParticipant
 from .signer_decision import SignerChallenge, SignerDecision
