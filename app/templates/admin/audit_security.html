@@ -1,220 +1,260 @@
 {% extends "layouts/app.html" %}
 {% set active_nav_item = 'audit' %}
 
-{% block title %}Audit &amp; security · TRUSTSEAL{% endblock %}
-{% block page_title %}Audit &amp; security{% endblock %}
-{% block page_description %}
-  <p class="ts-page-header__description">
-    Chained-hash audit log of attributable security events plus the
-    transactional outbox that delivers signed webhooks. Each row carries
-    its canonical hash and the previous hash — tamper-evident and
-    exportable from <code>/api/security-events/export</code>.
-  </p>
+{% block title %}Audit &amp; Security · TRUSTSEAL{% endblock %}
+{% block page_title %}Audit &amp; Security{% endblock %}
+{% block page_description %}{% endblock %}
+{% block page_actions %}
+  <button type="button" class="ts-btn" id="aud-export-csv">Export CSV</button>
 {% endblock %}
 
 {% block content %}
+<div class="st-flat">
+  {% include "stamps/_flat_ui.html" %}
 
-<section class="ts-metric-strip" style="margin-bottom: var(--ts-space-5);">
-  <div class="ts-metric">
-    <span class="ts-metric__label">Events shown</span>
-    <span class="ts-metric__value">{{ events|length }}</span>
-    <span class="ts-metric__sub">of latest {{ limit }}</span>
-  </div>
-  {% for state_label, state_key in [
-      ('Pending outbox', 'pending'),
-      ('Processing',     'processing'),
-      ('Completed',      'completed'),
-      ('Dead-lettered',  'dead'),
-  ] %}
-  <div class="ts-metric">
-    <span class="ts-metric__label">{{ state_label }}</span>
-    <span class="ts-metric__value">{{ counts_by_state.get(state_key, 0) }}</span>
-    <span class="ts-metric__sub">outbox</span>
-  </div>
-  {% endfor %}
-</section>
+  <nav class="st-subnav" aria-label="Audit sections">
+    <button type="button" class="st-subnav__link is-active aud-tab" data-tab="events">
+      Security Events ({{ events|length }})
+    </button>
+    <button type="button" class="st-subnav__link aud-tab" data-tab="outbox">
+      Webhook Outbox ({{ outbox|length }})
+    </button>
+  </nav>
 
-<section class="ts-panel" style="margin-bottom: var(--ts-space-5);">
-  <header class="ts-section-head">
-    <h2>Filters</h2>
-  </header>
-  <form method="get" class="ts-form-row ts-form-row--split" style="align-items: flex-end;">
-    <div class="ts-field">
-      <label class="ts-field__label" for="action">Action</label>
-      <input id="action" name="action" type="text"
-             value="{{ action_filter }}" class="ts-input"
-             placeholder="e.g. document.sign">
-    </div>
-    <div class="ts-field">
-      <label class="ts-field__label" for="outcome">Outcome</label>
-      <input id="outcome" name="outcome" type="text"
-             value="{{ outcome_filter }}" class="ts-input"
-             placeholder="success / denied / error">
-    </div>
-    <div class="ts-field">
-      <label class="ts-field__label" for="limit">Limit</label>
-      <input id="limit" name="limit" type="number" min="10" max="500"
-             value="{{ limit }}" class="ts-input">
-    </div>
-    <div class="ts-form-actions" style="margin-top: 0;">
-      <button type="submit" class="ts-btn ts-btn--primary">Apply</button>
-      <a href="{{ url_for('audit_security_views.index') }}"
-         class="ts-btn ts-btn--ghost">Reset</a>
-    </div>
-  </form>
-</section>
+  <!-- TAB 1: Security Events -->
+  <div id="aud-panel-events">
+    <form method="get" class="st-toolbar">
+      <div class="st-search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+          <path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <input id="action" name="action" type="search" value="{{ action_filter }}" placeholder="Filter action (e.g. tsd.create, document.sign)…">
+      </div>
+      <div class="st-toolbar__right">
+        <select id="outcome" name="outcome" class="st-select" aria-label="Outcome">
+          <option value="" {% if not outcome_filter %}selected{% endif %}>All outcomes</option>
+          <option value="success" {% if outcome_filter == 'success' %}selected{% endif %}>Success</option>
+          <option value="denied" {% if outcome_filter == 'denied' %}selected{% endif %}>Denied</option>
+          <option value="error" {% if outcome_filter == 'error' %}selected{% endif %}>Error</option>
+        </select>
+        <select id="limit" name="limit" class="st-select" aria-label="Limit">
+          {% for n in (50, 100, 250, 500) %}
+          <option value="{{ n }}" {% if limit == n %}selected{% endif %}>{{ n }} rows</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="ts-btn ts-btn--primary">Apply</button>
+        {% if action_filter or outcome_filter %}
+        <a href="{{ url_for('audit_security_views.index') }}" class="ts-btn">Reset</a>
+        {% endif %}
+      </div>
+    </form>
 
-<section>
-  <header class="ts-section-head">
-    <h2>Security events</h2>
-    <span class="ts-panel__meta">
-      {{ events|length }} event{% if events|length != 1 %}s{% endif %}
-      — chained by SHA-256(prev_hash || payload)
-    </span>
-  </header>
-  <div class="ts-table-shell">
-    <div class="ts-table-scroll">
-      <table class="ts-table">
+    {% if events %}
+    <section class="st-panel" style="overflow-x:auto;">
+      <table class="st-table" id="aud-events-table">
         <thead>
           <tr>
-            <th scope="col" style="width:  6%;">#</th>
-            <th scope="col" style="width: 16%;">When (UTC)</th>
-            <th scope="col" style="width: 16%;">Actor</th>
-            <th scope="col" style="width: 16%;">Action</th>
-            <th scope="col" style="width: 16%;">Resource</th>
-            <th scope="col" style="width:  8%;">Outcome</th>
-            <th scope="col" style="width: 22%;">Correlation / hash</th>
+            <th style="width:56px;">#</th>
+            <th>When (UTC)</th>
+            <th>Actor</th>
+            <th>Action</th>
+            <th>Resource</th>
+            <th>Outcome</th>
+            <th>Event Hash</th>
+            <th style="width:44px;text-align:right;"></th>
           </tr>
         </thead>
-        <tbody>
-        {% if events %}
+        <tbody id="aud-tbody">
           {% for e in events %}
-          <tr>
-            <td data-label="#"><code>{{ e.id }}</code></td>
-            <td data-label="When">{{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') if e.created_at else '—' }}</td>
-            <td data-label="Actor">
-              {% set actor = actors.get(e.actor_id) %}
-              {% if actor %}
-                <span class="ts-cell-title">{{ (actor.first_name ~ ' ' ~ actor.last_name)|trim or actor.username }}</span>
-                <span class="ts-cell-sub">id #{{ actor.id }}</span>
-              {% elif e.actor_id %}
-                <span class="ts-panel__meta">id #{{ e.actor_id }}</span>
-              {% else %}
-                <span class="ts-panel__meta">system</span>
-              {% endif %}
-            </td>
-            <td data-label="Action"><code>{{ e.action }}</code></td>
-            <td data-label="Resource">
-              {{ e.resource_type }}{% if e.resource_id is not none %}
-                <span class="ts-panel__meta">#{{ e.resource_id }}</span>
-              {% endif %}
-            </td>
-            <td data-label="Outcome">
+            {% set actor = actors.get(e.actor_id) %}
+            {% set actor_label = ((actor.first_name ~ ' ' ~ actor.last_name)|trim or actor.username) if actor else (('User #' ~ e.actor_id) if e.actor_id else 'system') %}
+          <tr data-action="{{ e.action }}"
+              data-corr="{{ e.correlation_id or '' }}"
+              data-hash="{{ e.event_hash or '' }}">
+            <td style="font-family:var(--ts-font-mono);color:#64748b;">{{ e.id }}</td>
+            <td style="color:#42526e;">{{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') if e.created_at else '—' }}</td>
+            <td style="font-weight:600;">{{ actor_label }}</td>
+            <td style="font-family:var(--ts-font-mono);font-size:12px;color:#1e4b9e;">{{ e.action }}</td>
+            <td style="color:#42526e;">{{ e.resource_type }}{% if e.resource_id is not none %} #{{ e.resource_id }}{% endif %}</td>
+            <td>
               {% if e.outcome == 'success' %}
-                <span class="ts-status ts-status--success">Success</span>
+                <span class="st-tag st-tag--ok">Success</span>
               {% elif e.outcome in ('denied', 'forbidden') %}
-                <span class="ts-status ts-status--warning">{{ e.outcome|title }}</span>
+                <span class="st-tag st-tag--warn">{{ e.outcome|title }}</span>
               {% else %}
-                <span class="ts-status ts-status--danger">{{ e.outcome|title }}</span>
+                <span class="st-tag st-tag--bad">{{ e.outcome|title }}</span>
               {% endif %}
             </td>
-            <td data-label="Correlation">
-              <span class="ts-cell-sub"><code>{{ e.correlation_id[:16] }}…</code></span>
-              {% if e.event_hash %}
-                <span class="ts-cell-sub"><code>{{ e.event_hash[:16] }}…</code></span>
-              {% endif %}
+            <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#64748b;" title="{{ e.event_hash or e.correlation_id }}">
+              {{ (e.event_hash or e.correlation_id or '—')[:16] }}{% if e.event_hash or e.correlation_id %}…{% endif %}
+            </td>
+            <td style="text-align:right;">
+              <button type="button" class="aud-more" aria-label="Event actions">⋮</button>
             </td>
           </tr>
           {% endfor %}
-        {% else %}
-          <tr>
-            <td colspan="7">
-              <div class="ts-empty">
-                <div class="ts-empty__title">No security events in this workspace yet</div>
-                <p class="ts-empty__hint">
-                  Events are emitted automatically as users sign in,
-                  upload documents, manage roles, and sign envelopes.
-                </p>
-              </div>
-            </td>
-          </tr>
-        {% endif %}
         </tbody>
       </table>
-    </div>
+    </section>
+    {% else %}
+    <section class="st-empty">
+      <div class="st-empty__title">No security events match this filter</div>
+    </section>
+    {% endif %}
   </div>
-</section>
 
-<section style="margin-top: var(--ts-space-6);">
-  <header class="ts-section-head">
-    <h2>Outbox (latest 50)</h2>
-    <span class="ts-panel__meta">
-      Transactional outbox — at-least-once delivery, idempotent downstream.
-    </span>
-  </header>
-  <div class="ts-table-shell">
-    <div class="ts-table-scroll">
-      <table class="ts-table">
+  <!-- TAB 2: Webhook Outbox -->
+  <div id="aud-panel-outbox" hidden>
+    {% if outbox %}
+    <section class="st-panel" style="overflow-x:auto;">
+      <table class="st-table">
         <thead>
           <tr>
-            <th scope="col" style="width:  6%;">#</th>
-            <th scope="col" style="width: 18%;">Event type</th>
-            <th scope="col" style="width: 18%;">Aggregate</th>
-            <th scope="col" style="width: 10%;">State</th>
-            <th scope="col" style="width:  8%;">Attempts</th>
-            <th scope="col" style="width: 16%;">Next attempt</th>
-            <th scope="col" style="width: 24%;">Last error</th>
+            <th style="width:56px;">#</th>
+            <th>Event Type</th>
+            <th>Aggregate</th>
+            <th>State</th>
+            <th>Attempts</th>
+            <th>Next Attempt</th>
+            <th>Last Error</th>
           </tr>
         </thead>
         <tbody>
-        {% if outbox %}
           {% for o in outbox %}
           <tr>
-            <td data-label="#"><code>{{ o.id }}</code></td>
-            <td data-label="Event type"><code>{{ o.event_type }}</code></td>
-            <td data-label="Aggregate">
-              {{ o.aggregate_type }}
-              <span class="ts-panel__meta">#{{ o.aggregate_id }}</span>
-            </td>
-            <td data-label="State">
+            <td style="font-family:var(--ts-font-mono);color:#64748b;">{{ o.id }}</td>
+            <td style="font-family:var(--ts-font-mono);font-size:12px;">{{ o.event_type }}</td>
+            <td style="color:#42526e;">{{ o.aggregate_type }} #{{ o.aggregate_id }}</td>
+            <td>
               {% if o.state == 'completed' %}
-                <span class="ts-status ts-status--success">Completed</span>
+                <span class="st-tag st-tag--ok">Completed</span>
               {% elif o.state == 'pending' %}
-                <span class="ts-status ts-status--pending">Pending</span>
+                <span class="st-tag st-tag--warn">Pending</span>
               {% elif o.state == 'processing' %}
-                <span class="ts-status ts-status--info">Processing</span>
+                <span class="st-tag st-tag--info">Processing</span>
               {% else %}
-                <span class="ts-status ts-status--danger">{{ o.state|title }}</span>
+                <span class="st-tag st-tag--bad">{{ o.state|title }}</span>
               {% endif %}
             </td>
-            <td data-label="Attempts">{{ o.attempts }}</td>
-            <td data-label="Next attempt">
-              {{ o.next_attempt_at.strftime('%Y-%m-%d %H:%M') if o.next_attempt_at else '—' }}
-            </td>
-            <td data-label="Last error">
-              {% if o.last_error %}
-                <span class="ts-cell-sub"><code>{{ o.last_error|truncate(60) }}</code></span>
-              {% else %}
-                <span class="ts-panel__meta">—</span>
-              {% endif %}
-            </td>
+            <td style="color:#42526e;">{{ o.attempts }}</td>
+            <td style="color:#64748b;">{{ o.next_attempt_at.strftime('%Y-%m-%d %H:%M') if o.next_attempt_at else '—' }}</td>
+            <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#9b2c2c;" title="{{ o.last_error or '' }}">{{ o.last_error or '—' }}</td>
           </tr>
           {% endfor %}
-        {% else %}
-          <tr>
-            <td colspan="7">
-              <div class="ts-empty">
-                <div class="ts-empty__title">Outbox is empty</div>
-                <p class="ts-empty__hint">
-                  Nothing has been queued for webhook delivery yet.
-                </p>
-              </div>
-            </td>
-          </tr>
-        {% endif %}
         </tbody>
       </table>
-    </div>
+    </section>
+    {% else %}
+    <section class="st-empty">
+      <div class="st-empty__title">Webhook outbox is empty</div>
+    </section>
+    {% endif %}
   </div>
-</section>
+</div>
+
+<div id="aud-ctx" class="aud-ctx" hidden role="menu">
+  <button type="button" class="aud-ctx__item" data-act="filter">Filter by this action</button>
+  <button type="button" class="aud-ctx__item" data-act="hash">Copy Event Hash</button>
+  <button type="button" class="aud-ctx__item" data-act="corr">Copy Correlation ID</button>
+</div>
+
+<style>
+  .aud-tab { border: 0; background: transparent; cursor: pointer; }
+  .aud-more { border: 0; background: transparent; color: #64748b; width: 28px; height: 28px; cursor: pointer; font-size: 15px; }
+  .aud-more:hover { background: #eef2f7; color: #091e42; }
+  .aud-ctx {
+    position: fixed; z-index: 1200; min-width: 185px;
+    background: #ffffff; box-shadow: 0 8px 24px rgba(9, 30, 66, 0.14);
+    padding: 4px 0;
+  }
+  .aud-ctx__item {
+    display: block; width: 100%; text-align: left; border: 0;
+    background: transparent; padding: 8px 14px; font-size: 12.5px;
+    color: #091e42; cursor: pointer;
+  }
+  .aud-ctx__item:hover { background: #f1f5f9; color: #1e4b9e; }
+</style>
+
+<script>
+(function () {
+  var tabs = document.querySelectorAll('.aud-tab');
+  var pEvents = document.getElementById('aud-panel-events');
+  var pOutbox = document.getElementById('aud-panel-outbox');
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+      tabs.forEach(function (x) { x.classList.remove('is-active'); });
+      t.classList.add('is-active');
+      var k = t.dataset.tab;
+      pEvents.hidden = (k !== 'events');
+      pOutbox.hidden = (k !== 'outbox');
+    });
+  });
+
+  var exportBtn = document.getElementById('aud-export-csv');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', function () {
+      var tbl = document.getElementById('aud-events-table');
+      if (!tbl) return;
+      var lines = ['id,when_utc,actor,action,resource,outcome,event_hash'];
+      tbl.querySelectorAll('tbody tr').forEach(function (tr) {
+        var cells = Array.from(tr.querySelectorAll('td')).slice(0, 6).map(function (td) {
+          return '"' + (td.textContent || '').trim().replace(/"/g, '""') + '"';
+        });
+        cells.push('"' + (tr.dataset.hash || '').replace(/"/g, '""') + '"');
+        lines.push(cells.join(','));
+      });
+      var blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'trustseal-audit-events.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  var tbody = document.getElementById('aud-tbody');
+  var menu = document.getElementById('aud-ctx');
+  var activeRow = null;
+  function hide() { if (menu) menu.hidden = true; activeRow = null; }
+  function openMenu(row, x, y) {
+    activeRow = row;
+    menu.hidden = false;
+    var mw = menu.offsetWidth || 185, mh = menu.offsetHeight || 110;
+    menu.style.left = Math.min(x, window.innerWidth - mw - 8) + 'px';
+    menu.style.top = Math.min(y, window.innerHeight - mh - 8) + 'px';
+  }
+  if (tbody && menu) {
+    tbody.addEventListener('click', function (e) {
+      var btn = e.target.closest('.aud-more');
+      if (!btn) return;
+      e.stopPropagation();
+      var r = btn.getBoundingClientRect();
+      openMenu(btn.closest('tr'), r.right - 185, r.bottom + 4);
+    });
+    tbody.addEventListener('contextmenu', function (e) {
+      var tr = e.target.closest('tr');
+      if (!tr) return;
+      e.preventDefault();
+      openMenu(tr, e.clientX, e.clientY);
+    });
+    menu.addEventListener('click', function (e) {
+      var item = e.target.closest('[data-act]');
+      if (!item || !activeRow) return;
+      var act = item.dataset.act;
+      if (act === 'filter') {
+        var inp = document.getElementById('action');
+        if (inp) { inp.value = activeRow.dataset.action || ''; inp.form.submit(); }
+      } else if (act === 'hash' && navigator.clipboard) {
+        navigator.clipboard.writeText(activeRow.dataset.hash || '');
+      } else if (act === 'corr' && navigator.clipboard) {
+        navigator.clipboard.writeText(activeRow.dataset.corr || '');
+      }
+      hide();
+    });
+    document.addEventListener('click', hide);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
+  }
+})();
+</script>
 {% endblock %}

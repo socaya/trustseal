@@ -1,0 +1,292 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'stamp-verify' %}
+
+{% block title %}Stamp Forensics · TRUSTSEAL{% endblock %}
+{% block page_title %}Stamp Forensics{% endblock %}
+{% block page_description %}{% endblock %}
+{% block page_actions %}
+  <a class="ts-btn" href="{{ url_for('tsd_stamps_views.usage_page') }}">Usage &amp; audit</a>
+  <a class="ts-btn" href="{{ url_for('tsd_stamps_views.library') }}">Back to library</a>
+{% endblock %}
+
+{% block content %}
+<div class="st-flat">
+  {% include "stamps/_flat_ui.html" %}
+
+  <div class="fv-layout">
+    <section class="st-panel">
+      <div class="st-panel__head">
+        <h2 class="st-panel__title">Inspect Artifact</h2>
+        <span class="st-tag st-tag--info">SVG · PNG · PDF</span>
+      </div>
+      <div class="fv-body">
+        <label class="fv-drop" id="fv-drop" for="fv-file">
+          <input type="file" id="fv-file" accept=".svg,.png,.pdf,image/svg+xml,image/png,application/pdf" hidden>
+          <div class="fv-drop__title" id="fv-file-label">Drop SVG, PNG, or PDF here — or click to browse</div>
+          <div class="fv-drop__sub">Extracts hidden tenant-keyed TSD forensic layers</div>
+        </label>
+
+        <div class="fv-sep"><span>or paste SVG markup</span></div>
+
+        <textarea id="fv-svg" class="fv-textarea" rows="6" placeholder="<svg ...>...</svg>"></textarea>
+
+        <div class="fv-actions">
+          <button type="button" class="ts-btn ts-btn--primary" id="fv-run">Scan &amp; Verify</button>
+          <button type="button" class="ts-btn" id="fv-clear">Clear</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="st-panel" id="fv-dossier">
+      <div class="st-panel__head">
+        <h2 class="st-panel__title">Verification Dossier</h2>
+        <span id="fv-fp" style="font-family:monospace;font-size:11.5px;color:#475569;"></span>
+      </div>
+      <div class="fv-body" id="fv-out">
+        <div style="padding:36px 12px;text-align:center;color:#64748b;font-size:13px;">
+          Upload a stamp file or paste SVG markup to run forensic verification.
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<style>
+.fv-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 420px) 1fr;
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .fv-layout { grid-template-columns: 1fr; }
+}
+.fv-body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.fv-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 32px 16px;
+  border: 1px dashed #94a3b8;
+  background: #f8fafc;
+  text-align: center;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.fv-drop:hover,
+.fv-drop.is-drag {
+  background: #eff6ff;
+  border-color: #2563eb;
+}
+.fv-drop__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+.fv-drop__sub {
+  font-size: 11.5px;
+  color: #64748b;
+}
+.fv-sep {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+.fv-sep::before,
+.fv-sep::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e2e8f0;
+}
+.fv-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  color: #0f172a;
+  resize: vertical;
+  outline: none;
+}
+.fv-textarea:focus {
+  border-color: #2563eb;
+  background: #ffffff;
+}
+.fv-actions {
+  display: flex;
+  gap: 8px;
+}
+.fv-verdict {
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.fv-verdict--ok   { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+.fv-verdict--warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+.fv-verdict--bad  { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+.fv-verdict__title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.fv-layers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+</style>
+
+<script>
+(function () {
+  var dropEl = document.getElementById('fv-drop');
+  var fileEl = document.getElementById('fv-file');
+  var fileLbl = document.getElementById('fv-file-label');
+  var svgEl = document.getElementById('fv-svg');
+  var runBtn = document.getElementById('fv-run');
+  var clearBtn = document.getElementById('fv-clear');
+  var outEl = document.getElementById('fv-out');
+  var fpEl = document.getElementById('fv-fp');
+  var droppedFile = null;
+
+  function escH(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  fileEl.addEventListener('change', function () {
+    droppedFile = fileEl.files && fileEl.files[0] ? fileEl.files[0] : null;
+    fileLbl.textContent = droppedFile ? droppedFile.name : 'Drop SVG, PNG, or PDF here — or click to browse';
+  });
+
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    dropEl.addEventListener(ev, function (e) {
+      e.preventDefault();
+      dropEl.classList.add('is-drag');
+    });
+  });
+  ['dragleave', 'drop'].forEach(function (ev) {
+    dropEl.addEventListener(ev, function (e) {
+      e.preventDefault();
+      dropEl.classList.remove('is-drag');
+    });
+  });
+  dropEl.addEventListener('drop', function (e) {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+      droppedFile = e.dataTransfer.files[0];
+      fileLbl.textContent = droppedFile.name;
+    }
+  });
+
+  clearBtn.addEventListener('click', function () {
+    droppedFile = null;
+    fileEl.value = '';
+    svgEl.value = '';
+    fpEl.textContent = '';
+    fileLbl.textContent = 'Drop SVG, PNG, or PDF here — or click to browse';
+    outEl.innerHTML = '<div style="padding:36px 12px;text-align:center;color:#64748b;font-size:13px;">Upload a stamp file or paste SVG markup to run forensic verification.</div>';
+  });
+
+  runBtn.addEventListener('click', function () {
+    var req;
+    if (droppedFile) {
+      var fd = new FormData();
+      fd.append('file', droppedFile);
+      req = fetch('/api/tsd-stamps/forensic-verify', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'fetch' },
+        body: fd,
+      });
+    } else if (svgEl.value.trim()) {
+      req = fetch('/api/tsd-stamps/forensic-verify', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({ svg: svgEl.value.trim() }),
+      });
+    } else {
+      outEl.innerHTML = '<div class="fv-verdict fv-verdict--bad"><span class="fv-verdict__title">Select a file or paste SVG markup first</span></div>';
+      return;
+    }
+
+    fpEl.textContent = '';
+    outEl.innerHTML = '<div style="padding:28px;text-align:center;color:#64748b;">Decrypting covert TSD security layers…</div>';
+
+    req.then(function (r) { return r.json(); }).then(function (d) {
+      fpEl.textContent = d.forensic_fingerprint || '';
+      var vCls = d.authentic ? 'fv-verdict--ok' : ((d.verdict === 'REVOKED' || d.verdict === 'TAMPERED') ? 'fv-verdict--warn' : 'fv-verdict--bad');
+      var vIcon = d.authentic ? '✓' : '✗';
+      var layersHtml = (d.layers_detected || []).map(function (l) {
+        return '<span class="st-tag st-tag--info">' + escH(l) + '</span>';
+      }).join('') || '<span class="st-tag">None detected</span>';
+
+      var html =
+        '<div class="fv-verdict ' + vCls + '">' +
+          '<span class="fv-verdict__title">' + vIcon + ' ' + escH(d.verdict || 'UNVERIFIED') + '</span>' +
+          '<span style="font-size:12px;">' + escH((d.file_kind || '').toUpperCase()) + '</span>' +
+        '</div>' +
+        '<div>' +
+          '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;margin-bottom:6px;">Detected Security Layers</div>' +
+          '<div class="fv-layers">' + layersHtml + '</div>' +
+        '</div>';
+
+      if (d.receipt) {
+        var integrity = d.context_intact === false
+          ? '<span class="st-tag st-tag--bad">TAMPERED</span>'
+          : (d.context_intact === true
+              ? '<span class="st-tag st-tag--ok">Intact · SHA-256 Verified</span>'
+              : '<span class="st-tag st-tag--ok">Covert Seal Verified</span>');
+        html +=
+          '<table class="st-table"><tbody>' +
+            '<tr><th style="width:170px;">Receipt</th><td><strong>#' + escH(d.receipt.id) + '</strong> · <span class="st-tag st-tag--info">' + escH(d.receipt.channel) + '</span>' +
+              (d.receipt.verify_url ? ' · <a href="' + escH(d.receipt.verify_url) + '" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:none;">Public verify ↗</a>' : '') + '</td></tr>' +
+            '<tr><th>Stamp</th><td><a href="/stamps/' + escH(d.stamp && d.stamp.id) + '/usage" style="color:#0f172a;font-weight:600;text-decoration:none;">' + escH(d.stamp && d.stamp.name) + '</a> · ' + escH((d.stamp && d.stamp.kind || '').toUpperCase()) + '</td></tr>' +
+            '<tr><th>Issued By</th><td>' + escH(d.actor && d.actor.name) + (d.actor && d.actor.email ? ' <span style="color:#64748b;">(' + escH(d.actor.email) + ')</span>' : '') + '</td></tr>' +
+            '<tr><th>Timestamp</th><td>' + escH((d.receipt.placed_at || '').replace('T', ' ').slice(0, 19)) + '</td></tr>' +
+            '<tr><th>Document / Context</th><td>' + escH((d.document && d.document.title) || d.receipt.context_label || '—') + '</td></tr>' +
+            '<tr><th>Artwork Integrity</th><td>' + integrity + '</td></tr>' +
+            (d.receipt.revoked ? '<tr><th>Revocation</th><td><span class="st-tag st-tag--bad">Revoked</span> ' + escH(d.receipt.revoked_at) + ' · ' + escH(d.receipt.revoked_reason) + '</td></tr>' : '') +
+          '</tbody></table>';
+
+        if (d.audit_trail && d.audit_trail.length) {
+          html +=
+            '<div>' +
+              '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;margin-bottom:6px;">Audit Trail</div>' +
+              '<table class="st-table"><thead><tr><th>When</th><th>Action</th><th>Actor</th><th>Outcome</th></tr></thead><tbody>' +
+              d.audit_trail.slice(0, 10).map(function (ev) {
+                return '<tr>' +
+                  '<td style="white-space:nowrap;">' + escH((ev.created_at || '').replace('T', ' ').slice(0, 19)) + '</td>' +
+                  '<td><code>' + escH(ev.action) + '</code></td>' +
+                  '<td>' + escH(ev.actor_name) + '</td>' +
+                  '<td style="font-size:11px;word-break:break-all;">' + escH(ev.outcome || '—') + '</td>' +
+                '</tr>';
+              }).join('') +
+              '</tbody></table>' +
+            '</div>';
+        }
+      } else if (d.reason) {
+        html += '<div style="font-size:12.5px;color:#991b1b;">Reason: <code>' + escH(d.reason) + '</code></div>';
+      }
+
+      outEl.innerHTML = html;
+    }).catch(function (e) {
+      outEl.innerHTML = '<div class="fv-verdict fv-verdict--bad"><span class="fv-verdict__title">Verification failed: ' + escH(e.message) + '</span></div>';
+    });
+  });
+})();
+</script>
+{% endblock %}

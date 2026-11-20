@@ -4,8 +4,8 @@
 
 .ts-table-shell {
   background: var(--ts-surface);
-  border: 1px solid var(--ts-border);
-  border-radius: var(--ts-radius-none);
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -14,9 +14,9 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--ts-space-3);
-  padding: var(--ts-space-3) var(--ts-space-4);
-  border-bottom: 1px solid var(--ts-border);
-  background: var(--ts-surface-alt);
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+  background: var(--ts-surface);
   flex-wrap: wrap;
 }
 .ts-table-toolbar__left,
@@ -35,29 +35,38 @@
 
 .ts-table {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: var(--ts-fs-body);
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
   color: var(--ts-text);
-  min-width: 720px;
+  min-width: 640px;
 }
 .ts-table th,
 .ts-table td {
-  padding: 14px 16px;
+  padding: 7px 12px;
   text-align: left;
-  vertical-align: top;
-  border-bottom: 1px solid var(--ts-border);
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+  line-height: 1.3;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
 }
+.ts-table td br { display: none; }
 .ts-table tbody tr:last-child td { border-bottom: 0; }
+.ts-table tbody tr:hover { background: #f8fafd; }
 
 .ts-table th {
   position: sticky;
   top: 0;
-  background: var(--ts-surface-alt);
-  color: var(--ts-text-muted);
-  font-size: var(--ts-fs-label);
+  background: var(--ts-surface);
+  color: var(--ts-text-subtle);
+  font-size: 11px;
   font-weight: var(--ts-fw-semibold);
-  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  letter-spacing: 0.055em;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
   white-space: nowrap;
   z-index: 1;
   padding-top: 11px;

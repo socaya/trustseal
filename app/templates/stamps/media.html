@@ -1,0 +1,314 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'media' %}
+
+{% block title %}Media Library · TRUSTSEAL{% endblock %}
+{% block page_title %}Media Library{% endblock %}
+{% block page_description %}{% endblock %}
+{% block page_actions %}
+  <a class="ts-btn" href="{{ url_for('workspace_assets_views.letterheads_page') }}">Letterheads</a>
+  <a class="ts-btn" href="{{ url_for('tsd_stamps_views.library') }}">Stamps</a>
+  <label class="ts-btn ts-btn--primary" for="ml-file-multi" style="cursor:pointer;">
+    Upload images
+    <input type="file" id="ml-file-multi" accept="image/png,image/jpeg,image/webp,image/svg+xml" multiple hidden>
+  </label>
+{% endblock %}
+
+{% block content %}
+<div class="st-flat">
+  {% include "stamps/_flat_ui.html" %}
+
+  <div id="ml-dropzone" class="ml-drop">
+    <span>Drop PNG, JPG, WEBP, or SVG files here to add to your shared library</span>
+    <select id="ml-upload-cat" class="st-select" style="height:30px;font-size:12px;" aria-label="Default upload category">
+      <option value="logo">Category: Logo</option>
+      <option value="emblem">Category: Emblem</option>
+      <option value="signature">Category: Signature</option>
+      <option value="letterhead">Category: Letterhead</option>
+      <option value="general">Category: General</option>
+    </select>
+    <span id="ml-upload-status" style="font-size:12px;color:#17633a;font-weight:600;"></span>
+  </div>
+
+  <section class="st-toolbar">
+    <div class="st-search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+        <path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <input type="search" id="ml-search" placeholder="Search assets…">
+    </div>
+    <div class="st-toolbar__right">
+      <select id="ml-filter-cat" class="st-select" aria-label="Filter category">
+        <option value="all">All categories</option>
+        <option value="logo">Logo</option>
+        <option value="emblem">Emblem</option>
+        <option value="signature">Signature</option>
+        <option value="letterhead">Letterhead</option>
+        <option value="general">General</option>
+      </select>
+      <div class="st-view-group" role="tablist" aria-label="View">
+        <button type="button" class="st-view-btn is-active" data-mview="grid" aria-pressed="true" title="Grid">▦</button>
+        <button type="button" class="st-view-btn" data-mview="list" aria-pressed="false" title="List">≣</button>
+      </div>
+      <span id="ml-count" style="font-size:12px;color:#7a869a;"></span>
+    </div>
+  </section>
+
+  <div id="ml-grid" class="ml-grid">
+    <div class="st-empty" style="grid-column:1/-1;">Loading media library…</div>
+  </div>
+</div>
+
+<div id="ml-ctx" class="ml-ctx" hidden role="menu">
+  <button type="button" id="ml-ctx-rename" class="ml-ctx__item" role="menuitem">Rename</button>
+  <button type="button" id="ml-ctx-cat" class="ml-ctx__item" role="menuitem">Change category</button>
+  <a id="ml-ctx-dl" class="ml-ctx__item" role="menuitem" href="#">Download</a>
+  <div class="ml-ctx__sep"></div>
+  <button type="button" id="ml-ctx-del" class="ml-ctx__item ml-ctx__item--danger" role="menuitem">Delete</button>
+</div>
+
+<style>
+.ml-drop {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px; margin-bottom: 16px;
+  background: #ffffff;
+  border: 1px dashed rgba(15, 23, 42, 0.16);
+  font-size: 12.5px; color: #42526e;
+  transition: background 110ms ease, border-color 110ms ease;
+}
+.ml-drop.is-drag { background: #eef5ff; border-color: #1e4b9e; color: #1e4b9e; }
+.ml-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px;
+}
+.ml-card {
+  position: relative;
+  background: #ffffff;
+  display: flex; flex-direction: column;
+  transition: box-shadow 130ms ease;
+}
+.ml-card:hover { box-shadow: 0 4px 14px rgba(9, 30, 66, 0.06); }
+.ml-card__dots {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  width: 26px; height: 26px; border: 0; background: transparent;
+  color: #7a869a; font-size: 15px; cursor: pointer;
+}
+.ml-card__dots:hover { background: rgba(15, 23, 42, 0.06); color: #091e42; }
+.ml-card__preview {
+  height: 150px; padding: 10px;
+  background: #fafbfd;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.ml-card__preview img { max-width: 100%; max-height: 130px; object-fit: contain; }
+.ml-card__meta { padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.ml-card__name {
+  font-size: 13px; font-weight: 600; color: #091e42;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ml-card__sub {
+  font-size: 11px; color: #7a869a;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.ml-ctx {
+  position: fixed; z-index: 9500; min-width: 168px;
+  background: #ffffff; border: 1px solid #d5dce6;
+  box-shadow: 0 6px 18px rgba(16, 24, 40, 0.10);
+  padding: 4px 0; display: flex; flex-direction: column;
+}
+.ml-ctx[hidden] { display: none; }
+.ml-ctx__item {
+  display: block; width: 100%; box-sizing: border-box;
+  border: 0; background: transparent; padding: 8px 14px; text-align: left;
+  font-size: 12.5px; color: #091e42; text-decoration: none; cursor: pointer;
+}
+.ml-ctx__item:hover { background: #f1f4f8; }
+.ml-ctx__item--danger { color: #9b2c2c; }
+.ml-ctx__item--danger:hover { background: #fff0f0; }
+.ml-ctx__sep { height: 1px; background: #ebeef2; margin: 4px 0; }
+</style>
+
+<script>
+(function () {
+  var grid = document.getElementById('ml-grid');
+  var dropEl = document.getElementById('ml-dropzone');
+  var fileMulti = document.getElementById('ml-file-multi');
+  var uploadCat = document.getElementById('ml-upload-cat');
+  var statusEl = document.getElementById('ml-upload-status');
+  var searchEl = document.getElementById('ml-search');
+  var filterCatEl = document.getElementById('ml-filter-cat');
+  var countEl = document.getElementById('ml-count');
+  var ctxMenu = document.getElementById('ml-ctx');
+  var assets = [];
+  var view = 'grid';
+  var ctxAsset = null;
+
+  function escH(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function fmtBytes(b) {
+    if (!b) return '0 B';
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(2) + ' MB';
+  }
+
+  function openCtx(asset, x, y) {
+    ctxAsset = asset;
+    document.getElementById('ml-ctx-dl').href = '/api/media-library/' + asset.id + '/download';
+    ctxMenu.hidden = false;
+    ctxMenu.style.left = Math.max(8, Math.min(x, window.innerWidth - 176)) + 'px';
+    ctxMenu.style.top = Math.max(8, Math.min(y, window.innerHeight - 160)) + 'px';
+  }
+  function closeCtx() { ctxMenu.hidden = true; ctxAsset = null; }
+  document.addEventListener('click', function (e) { if (!ctxMenu.hidden && !ctxMenu.contains(e.target)) closeCtx(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeCtx(); });
+
+  function render() {
+    var q = (searchEl.value || '').trim().toLowerCase();
+    var c = filterCatEl.value;
+    var list = assets.filter(function (a) {
+      if (c !== 'all' && a.category !== c) return false;
+      if (q && (a.name || '').toLowerCase().indexOf(q) === -1 && (a.category || '').toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    });
+    countEl.textContent = list.length + ' asset' + (list.length === 1 ? '' : 's');
+    if (!list.length) {
+      grid.className = 'ml-grid';
+      grid.innerHTML = '<div class="st-empty" style="grid-column:1/-1;">No media assets yet.</div>';
+      return;
+    }
+
+    if (view === 'list') {
+      grid.className = 'st-panel';
+      grid.innerHTML =
+        '<table class="st-table"><thead><tr><th style="width:52px;">Preview</th><th>Name</th><th>Category</th><th>Dimensions</th><th>Size</th><th>Uploaded</th><th style="width:36px;"></th></tr></thead><tbody>' +
+        list.map(function (a, i) {
+          var dims = (a.width && a.height) ? (a.width + '×' + a.height) : 'Vector';
+          return '<tr data-midx="' + i + '">' +
+            '<td><img src="' + a.data_uri + '" style="width:36px;height:28px;object-fit:contain;display:block;"></td>' +
+            '<td style="font-weight:600;">' + escH(a.name) + '</td>' +
+            '<td><span class="st-tag">' + escH(a.category) + '</span></td>' +
+            '<td>' + escH(dims) + '</td>' +
+            '<td>' + fmtBytes(a.size_bytes) + '</td>' +
+            '<td style="color:#7a869a;">' + escH((a.created_at || '').slice(0, 10)) + '</td>' +
+            '<td><button type="button" class="ml-card__dots" style="position:static;" data-mdots="' + i + '">⋮</button></td>' +
+          '</tr>';
+        }).join('') + '</tbody></table>';
+    } else {
+      grid.className = 'ml-grid';
+      grid.innerHTML = list.map(function (a, i) {
+        var dims = (a.width && a.height) ? (a.width + '×' + a.height) : 'Vector';
+        return '<div class="ml-card" data-midx="' + i + '">' +
+          '<button type="button" class="ml-card__dots" data-mdots="' + i + '" title="Actions">⋮</button>' +
+          '<div class="ml-card__preview"><img src="' + a.data_uri + '" alt="' + escH(a.name) + '"></div>' +
+          '<div class="ml-card__meta">' +
+            '<div class="ml-card__name" title="' + escH(a.name) + '">' + escH(a.name) + '</div>' +
+            '<div class="ml-card__sub"><span>' + escH(dims) + ' · ' + fmtBytes(a.size_bytes) + '</span><span class="st-tag">' + escH(a.category) + '</span></div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    grid.querySelectorAll('[data-midx]').forEach(function (el) {
+      el.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+        openCtx(list[parseInt(el.getAttribute('data-midx'), 10)], e.clientX, e.clientY);
+      });
+    });
+    grid.querySelectorAll('[data-mdots]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var r = btn.getBoundingClientRect();
+        openCtx(list[parseInt(btn.getAttribute('data-mdots'), 10)], r.right - 168, r.bottom + 4);
+      });
+    });
+  }
+
+  function load() {
+    fetch('/api/media-library/', { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { assets = d.assets || []; render(); });
+  }
+
+  function uploadFiles(fileList) {
+    var files = Array.prototype.slice.call(fileList || []);
+    if (!files.length) return;
+    statusEl.textContent = 'Uploading ' + files.length + ' file(s)…';
+    var cat = uploadCat.value || 'logo';
+    Promise.all(files.map(function (f) {
+      var fd = new FormData();
+      fd.append('file', f);
+      fd.append('name', f.name.replace(/\.[^.]+$/, ''));
+      fd.append('category', cat);
+      return fetch('/api/media-library/', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'fetch' },
+        body: fd,
+      });
+    })).then(function () {
+      statusEl.textContent = 'Uploaded ' + files.length + ' file(s)';
+      setTimeout(function () { statusEl.textContent = ''; }, 3000);
+      load();
+    }).catch(function () { statusEl.textContent = 'Upload failed'; });
+  }
+
+  fileMulti.addEventListener('change', function () { uploadFiles(fileMulti.files); fileMulti.value = ''; });
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    dropEl.addEventListener(ev, function (e) { e.preventDefault(); dropEl.classList.add('is-drag'); });
+  });
+  ['dragleave', 'drop'].forEach(function (ev) {
+    dropEl.addEventListener(ev, function (e) { e.preventDefault(); dropEl.classList.remove('is-drag'); });
+  });
+  dropEl.addEventListener('drop', function (e) {
+    if (e.dataTransfer && e.dataTransfer.files) uploadFiles(e.dataTransfer.files);
+  });
+
+  document.getElementById('ml-ctx-rename').addEventListener('click', function () {
+    var a = ctxAsset; closeCtx();
+    if (!a) return;
+    var next = prompt('Rename asset:', a.name);
+    if (!next || !next.trim()) return;
+    fetch('/api/media-library/' + a.id, {
+      method: 'PUT', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify({ name: next.trim() }),
+    }).then(load);
+  });
+  document.getElementById('ml-ctx-cat').addEventListener('click', function () {
+    var a = ctxAsset; closeCtx();
+    if (!a) return;
+    var next = prompt('Category (logo, emblem, signature, letterhead, general):', a.category);
+    if (!next || !next.trim()) return;
+    fetch('/api/media-library/' + a.id, {
+      method: 'PUT', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify({ category: next.trim().toLowerCase() }),
+    }).then(load);
+  });
+  document.getElementById('ml-ctx-del').addEventListener('click', function () {
+    var a = ctxAsset; closeCtx();
+    if (!a || !confirm('Delete "' + a.name + '"?')) return;
+    fetch('/api/media-library/' + a.id, {
+      method: 'DELETE', credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'fetch' },
+    }).then(load);
+  });
+
+  document.querySelectorAll('[data-mview]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('[data-mview]').forEach(function (x) {
+        x.classList.remove('is-active'); x.setAttribute('aria-pressed', 'false');
+      });
+      b.classList.add('is-active'); b.setAttribute('aria-pressed', 'true');
+      view = b.getAttribute('data-mview');
+      render();
+    });
+  });
+
+  searchEl.addEventListener('input', render);
+  filterCatEl.addEventListener('change', render);
+  load();
+})();
+</script>
+{% endblock %}

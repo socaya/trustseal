@@ -1,0 +1,771 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'signed-contracts' %}
+
+{% block title %}Contracts · TRUSTSEAL{% endblock %}
+{% block page_header %}{% endblock %}
+{% block page_title %}{% endblock %}
+{% block page_description %}{% endblock %}
+{% block page_actions %}{% endblock %}
+{% block breadcrumbs %}{% endblock %}
+
+{% block extra_head %}
+<style>.ts-page { padding: 0 !important; max-width: none !important; }</style>
+{% endblock %}
+
+{% block content %}
+<div class="ts-ed ct-studio st-flat" id="ct-shell">
+  {% include "stamps/_flat_ui.html" %}
+
+  {# ======================= 1. STUDIO APPLICATION BAR ======================= #}
+  <header class="ts-ed__appbar">
+    <div class="ts-ed__brand">
+      <strong>CONTRACTS</strong><small>LIFECYCLE</small>
+    </div>
+    <span class="ts-ed__divider" aria-hidden="true"></span>
+    <nav class="ct-nav-pills" id="ct-stage-tabs" role="tablist" aria-label="Contract lifecycle stages">
+      <button type="button" role="tab" class="ct-pill is-active" data-stage="all">All <span>{{ counts.all }}</span></button>
+      {% for key, lbl in stages %}
+      <button type="button" role="tab" class="ct-pill" data-stage="{{ key }}">{{ lbl }} <span>{{ counts[key] }}</span></button>
+      {% endfor %}
+    </nav>
+    <div class="ts-ed__spacer"></div>
+    <a class="ts-ed__btn ts-ed__btn--ghost" href="{{ url_for('workspace_assets_views.letterheads_page') }}">Letterheads</a>
+    <a class="ts-ed__btn ts-ed__btn--ghost" href="{{ url_for('tsd_stamps_views.verify_page') }}">Verify</a>
+    <button type="button" class="ts-ed__btn ts-ed__btn--primary" id="ct-open-new">+ New contract</button>
+  </header>
+
+  {# ======================= 2. MODERN RIBBON & MENU BAR ======================= #}
+  <nav class="ts-ed__tabs st-menubar-row ct-ribbon-bar" aria-label="Contracts ribbon">
+    <div class="st-menu" data-menu="file">
+      <button type="button" class="st-menu__btn" aria-haspopup="true" aria-expanded="false">File</button>
+      <div class="st-menu__panel" role="menu" hidden>
+        <button type="button" class="st-menu__item" data-mcmd="new">New contract</button>
+        <button type="button" class="st-menu__item" data-mcmd="letterheads">Letterhead Studio…</button>
+        <button type="button" class="st-menu__item" data-mcmd="stamps">Stamp Studio…</button>
+        <div class="st-menu__sep"></div>
+        <button type="button" class="st-menu__item" data-mcmd="verify">Forensic verify…</button>
+      </div>
+    </div>
+    <div class="st-menu" data-menu="view">
+      <button type="button" class="st-menu__btn" aria-haspopup="true" aria-expanded="false">View</button>
+      <div class="st-menu__panel" role="menu" hidden>
+        <button type="button" class="st-menu__item" data-vcmd="table">Table view</button>
+        <button type="button" class="st-menu__item" data-vcmd="board">Deal pipeline board</button>
+        <div class="st-menu__sep"></div>
+        <button type="button" class="st-menu__item" data-vcmd="pane">Toggle inspector pane</button>
+      </div>
+    </div>
+
+    <span class="ct-rib-sep" aria-hidden="true"></span>
+
+    <div class="ct-rib-search">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+        <path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <input type="search" id="ct-search" placeholder="Search contracts, counterparty, owner…">
+    </div>
+
+    <select id="ct-source" class="ct-rib-sel" aria-label="Filter source">
+      <option value="all">All sources</option>
+      <option value="tsd">TS Documents</option>
+      <option value="envelope">Signing Envelopes</option>
+    </select>
+
+    <select id="ct-sort" class="ct-rib-sel" aria-label="Sort">
+      <option value="recent">Most recent</option>
+      <option value="title">A–Z</option>
+      <option value="stage">Lifecycle stage</option>
+    </select>
+
+    <div class="ct-view-switch" role="group" aria-label="View mode">
+      <button type="button" class="ct-vbtn is-active" data-viewmode="table" title="Table view">☰ Table</button>
+      <button type="button" class="ct-vbtn" data-viewmode="board" title="Deal pipeline board">▦ Pipeline</button>
+    </div>
+  </nav>
+
+  {# ======================= 3. STUDIO WORKSPACE + DYNAMIC RIGHT PANE ======================= #}
+  <main class="st-canvas ct-workspace" id="ct-workspace">
+    <section class="st-canvas__stage ct-stage">
+      {# Sleek < > Pane Divider Rail #}
+      <button type="button" class="ct-pane-rail" id="ct-pane-toggle" aria-expanded="true" title="Collapse / expand inspector">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <div class="ct-stage-scroll">
+        {% if contracts %}
+        {# ---- TABLE VIEW ---- #}
+        <div id="ct-view-table" class="ct-table-card">
+          <table class="st-table ct-table" id="ct-table">
+            <thead>
+              <tr>
+                <th>Contract Title</th>
+                <th>Counterparty</th>
+                <th>Lifecycle Stage</th>
+                <th>Source</th>
+                <th>Owner</th>
+                <th>Stamps</th>
+                <th>Updated</th>
+                <th style="width:42px;"></th>
+              </tr>
+            </thead>
+            <tbody id="ct-tbody">
+              {% for c in contracts %}
+              <tr data-id="{{ c.id }}"
+                  data-source="{{ c.source }}"
+                  data-title="{{ c.title }}"
+                  data-title-lc="{{ c.title|lower }}"
+                  data-party="{{ c.counterparty or '' }}"
+                  data-value="{{ c.deal_value or '' }}"
+                  data-owner="{{ c.owner }}"
+                  data-owner-lc="{{ c.owner|lower }}"
+                  data-stage="{{ c.stage }}"
+                  data-stage-label="{{ c.stage_label }}"
+                  data-status="{{ c.status }}"
+                  data-stamps="{{ c.stamps }}"
+                  data-updated="{{ c.updated_at }}"
+                  data-date="{{ c.updated_iso }}"
+                  data-url="{{ c.open_url }}"
+                  data-wf-url="{{ c.workflow_url }}">
+                <td style="font-weight:600;max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                  <a href="{{ c.workflow_url }}" style="color:#1d3648;text-decoration:none;">{{ c.title }}</a>
+                </td>
+                <td style="color:#4c6273;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;">{{ c.counterparty or '—' }}</td>
+                <td style="white-space:nowrap;">
+                  <span class="ct-stage-dot ct-stage-dot--{{ c.stage }}">{{ c.stage_label }}</span>
+                </td>
+                <td style="color:#4c6273;white-space:nowrap;">{{ c.source_label }}</td>
+                <td style="color:#4c6273;white-space:nowrap;">{{ c.owner }}</td>
+                <td style="color:#1d3648;white-space:nowrap;">{{ c.stamps }}</td>
+                <td style="color:#718494;white-space:nowrap;">{{ c.updated_at }}</td>
+                <td style="text-align:right;white-space:nowrap;">
+                  <button type="button" class="ct-dots" data-ct-dots="{{ c.id }}" aria-label="Actions">⋮</button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {# ---- PIPELINE BOARD VIEW ---- #}
+        <div id="ct-view-board" class="ct-board" hidden>
+          {% for key, lbl in stages if key != 'closed' %}
+          <div class="ct-col" data-board-col="{{ key }}">
+            <div class="ct-col__head">
+              <span class="ct-stage-dot ct-stage-dot--{{ key }}">{{ lbl }}</span>
+              <span class="ct-col__cnt" data-col-cnt="{{ key }}">0</span>
+            </div>
+            <div class="ct-col__cards" data-col-cards="{{ key }}"></div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div id="ct-filter-empty" class="st-empty" hidden style="margin-top:20px;">
+          <div class="st-empty__title">No contracts match this filter</div>
+          <div class="st-empty__actions">
+            <button type="button" class="ts-btn ts-btn--primary" id="ct-empty-new">+ New contract</button>
+          </div>
+        </div>
+        {% else %}
+        <div class="st-empty" style="margin-top:40px;">
+          <div class="st-empty__title">No contracts yet</div>
+          <div class="st-empty__actions">
+            <button type="button" class="ts-btn ts-btn--primary" id="ct-empty-new">+ New contract</button>
+            <a class="ts-btn" href="{{ url_for('workspace_assets_views.letterheads_page') }}">Letterhead Studio</a>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+
+    {# ---- STAMP STUDIO DYNAMIC RIGHT PANE ---- #}
+    <aside class="st-canvas__meta ct-right-pane" id="ct-right-pane" aria-label="Contract inspector">
+      <nav class="st-props__tabs" role="tablist">
+        <button type="button" role="tab" class="ts-ed__tab ts-is-active" data-rtab="inspect">Inspector</button>
+        <button type="button" role="tab" class="ts-ed__tab" data-rtab="create">New Contract</button>
+      </nav>
+
+      <header class="st-props__header">
+        <h3 class="st-props__title" id="ct-rp-title">Inspector</h3>
+      </header>
+
+      <div class="st-props__body" id="ct-props">
+        {# TAB 1: SELECTED CONTRACT INSPECTOR #}
+        <div data-rpane="inspect">
+          <div id="ct-insp-empty" style="padding:28px 16px;text-align:center;font-size:12px;color:#718494;">
+            Select any contract row to inspect its lifecycle, transition stages, or launch its Deal Workflow.
+          </div>
+          <div id="ct-insp-card" hidden>
+            <section class="ts-ed__grp">
+              <div class="ts-ed__grp-label">Summary</div>
+              <div class="ts-ed__grp--labeled st-field-full">
+                <label>Contract Title</label>
+                <div id="ct-i-title" style="font-size:13px;font-weight:700;color:#1d3648;"></div>
+              </div>
+              <div class="ts-ed__grp--labeled">
+                <label>Counterparty</label>
+                <div id="ct-i-party" style="font-size:12px;color:#4c6273;">—</div>
+              </div>
+              <div class="ts-ed__grp--labeled">
+                <label>Deal Value</label>
+                <div id="ct-i-val" style="font-size:12px;color:#4c6273;">—</div>
+              </div>
+              <div class="ts-ed__grp--labeled">
+                <label>Owner</label>
+                <div id="ct-i-owner" style="font-size:12px;color:#4c6273;">—</div>
+              </div>
+              <div class="ts-ed__grp--labeled">
+                <label>Updated</label>
+                <div id="ct-i-updated" style="font-size:12px;color:#718494;">—</div>
+              </div>
+            </section>
+
+            <section class="ts-ed__grp" id="ct-i-stage-grp">
+              <div class="ts-ed__grp-label">Lifecycle Stage</div>
+              <div class="ts-ed__grp--labeled st-field-full">
+                <select id="ct-i-stage-sel">
+                  {% for key, lbl in stages %}
+                  <option value="{{ key }}">{{ lbl }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="ts-ed__grp--labeled st-field-full">
+                <button type="button" class="ts-ed__btn ts-ed__btn--primary" id="ct-i-stage-apply" style="width:100%;justify-content:center;">Update Stage</button>
+              </div>
+            </section>
+
+            <section class="ts-ed__grp">
+              <div class="ts-ed__grp-label">Actions</div>
+              <div class="ts-ed__grp--labeled st-field-full" style="gap:6px;">
+                <a id="ct-i-wf" href="#" class="ts-ed__btn ts-ed__btn--primary" style="justify-content:center;text-decoration:none;">Open Deal Workflow →</a>
+                <a id="ct-i-edit" href="#" class="ts-ed__btn" style="justify-content:center;text-decoration:none;">Open in Document Editor</a>
+                <a id="ct-i-pdf" href="#" target="_blank" class="ts-ed__btn" style="justify-content:center;text-decoration:none;">Preview PDF</a>
+                <a id="ct-i-tsd" href="#" class="ts-ed__btn" style="justify-content:center;text-decoration:none;">Download .tsd Backup</a>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        {# TAB 2: CREATE NEW CONTRACT #}
+        <div data-rpane="create" hidden>
+          <section class="ts-ed__grp">
+            <div class="ts-ed__grp-label">Agreement Details</div>
+            <div class="ts-ed__grp--labeled st-field-full">
+              <label for="ct-new-title">Contract Title</label>
+              <input type="text" id="ct-new-title" placeholder="Master Service Agreement — Acme Ltd">
+            </div>
+            <div class="ts-ed__grp--labeled st-field-full">
+              <label for="ct-new-party">Counterparty / Client</label>
+              <input type="text" id="ct-new-party" placeholder="Acme Holdings Limited">
+            </div>
+            <div class="ts-ed__grp--labeled st-field-full">
+              <label for="ct-new-tpl">Template</label>
+              <select id="ct-new-tpl">
+                <option value="msa">Master Service Agreement (MSA)</option>
+                <option value="nda">Mutual Non-Disclosure Agreement</option>
+                <option value="employment">Executive Employment Agreement</option>
+                <option value="lease">Commercial Lease Agreement</option>
+                <option value="supply">Vendor &amp; Supply Contract</option>
+                <option value="resolution">Board Resolution / Mandate</option>
+                <option value="blank">Blank Contract</option>
+              </select>
+            </div>
+          </section>
+
+          <section class="ts-ed__grp">
+            <div class="ts-ed__grp-label">Branding &amp; Workflow</div>
+            <div class="ts-ed__grp--labeled st-field-full">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <label for="ct-new-lh">Official Letterhead</label>
+                <a href="{{ url_for('workspace_assets_views.letterheads_page') }}" style="font-size:10px;color:#002769;text-decoration:none;font-weight:700;">Studio ↗</a>
+              </div>
+              <select id="ct-new-lh">
+                <option value="">Plain paper</option>
+                {% for lh in letterheads %}
+                <option value="{{ lh.id }}"{% if lh.is_default %} selected{% endif %}>{{ lh.name }}{% if lh.is_default %} (Default){% endif %}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="ts-ed__grp--labeled st-field-full">
+              <label for="ct-new-stage">Initial Stage</label>
+              <select id="ct-new-stage">
+                <option value="draft" selected>Draft</option>
+                <option value="review">Pending Review</option>
+                <option value="approval">Pending Approval</option>
+                <option value="signature">Agreement Signing (TS)</option>
+              </select>
+            </div>
+            <div class="ts-ed__grp--labeled st-field-full">
+              <button type="button" class="ts-ed__btn ts-ed__btn--primary" id="ct-create-submit" style="width:100%;justify-content:center;height:34px;">Create &amp; Open Workflow →</button>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="st-props__meta">
+        <div class="st-meta-row"><span>Total Contracts</span><b>{{ counts.all }}</b></div>
+        <div class="st-meta-row"><span>Executed Deals</span><b style="color:#02982e;">{{ counts.signed }}</b></div>
+        <div class="st-meta-row"><span>Pending Signing</span><b style="color:#002769;">{{ counts.signature }}</b></div>
+      </div>
+    </aside>
+  </main>
+
+  {# ======================= 4. STUDIO STATUS BAR ======================= #}
+  <footer class="ts-ed__statusbar">
+    <div>
+      <span>{{ counts.all }} contracts</span>
+      <span>·</span>
+      <span>{{ counts.review + counts.approval }} in review/approval</span>
+      <span>·</span>
+      <span>{{ counts.signature }} awaiting TrustSeal signing</span>
+    </div>
+    <div>
+      <span style="color:#02982e;font-weight:600;">{{ counts.signed }} executed</span>
+    </div>
+  </footer>
+</div>
+
+<div id="ct-ctx" class="ct-ctx" hidden role="menu">
+  <button type="button" class="ct-ctx__item" data-ct-act="workflow" role="menuitem" style="font-weight:600;color:#002769;">Open Deal Workflow →</button>
+  <button type="button" class="ct-ctx__item" data-ct-act="open" role="menuitem">Open in Document Editor</button>
+  <div class="ct-ctx__sep"></div>
+  <div class="ct-ctx__grp">Lifecycle Stage</div>
+  {% for key, lbl in stages %}
+  <button type="button" class="ct-ctx__item" data-ct-stage="{{ key }}" role="menuitem">{{ lbl }}</button>
+  {% endfor %}
+  <div class="ct-ctx__sep"></div>
+  <button type="button" class="ct-ctx__item" data-ct-act="download" role="menuitem">Download .tsd backup</button>
+  <button type="button" class="ct-ctx__item" data-ct-act="verify" role="menuitem">Forensic verify</button>
+</div>
+
+<style>
+#ct-shell {
+  height: calc(100vh - var(--ts-topbar-h, 54px));
+  max-height: calc(100vh - var(--ts-topbar-h, 54px));
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--ts-surface-sunken, #eef2f6);
+}
+#ct-shell > * { min-height: 0; }
+
+.ct-nav-pills { display: inline-flex; align-items: center; gap: 2px; overflow-x: auto; }
+.ct-pill {
+  border: 0; background: transparent; padding: 5px 9px; font-size: 11.5px; font-weight: 500;
+  color: #4c6273; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px;
+}
+.ct-pill:hover { color: #002769; background: #f4f6f9; }
+.ct-pill.is-active { color: #002769; font-weight: 600; background: rgba(0, 39, 105, 0.08); }
+.ct-pill span { font-size: 10.5px; color: #718494; font-variant-numeric: tabular-nums; }
+.ct-pill.is-active span { color: #002769; }
+
+/* Modern Ribbon */
+.ct-ribbon-bar {
+  position: relative; z-index: 600; overflow: visible !important;
+  display: flex; align-items: center; gap: 6px; padding: 0 12px; min-height: 38px;
+  background: #ffffff; border-bottom: 1px solid rgba(0, 39, 105, 0.06);
+}
+.st-menu { position: relative; }
+.st-menu__btn { background: transparent; border: 0; cursor: pointer; padding: 0 10px; height: 28px; font-size: 12px; color: #1d3648; }
+.st-menu__btn:hover, .st-menu.ts-is-open .st-menu__btn { background: #f1f4f8; color: #002769; }
+.st-menu__panel { position: absolute; top: 100%; left: 0; z-index: 1200; background: #fff; box-shadow: 0 10px 28px rgba(0, 39, 105, 0.14); padding: 4px; min-width: 200px; margin-top: 2px; }
+.st-menu__sep { height: 1px; background: rgba(0, 39, 105, 0.06); margin: 4px 0; }
+.st-menu__item { background: transparent; border: 0; cursor: pointer; display: flex; justify-content: space-between; width: 100%; text-align: left; padding: 6px 10px; font-size: 12px; color: #1d3648; }
+.st-menu__item:hover { background: #eef3fa; color: #002769; }
+.ct-rib-sep { width: 1px; height: 18px; background: rgba(0, 39, 105, 0.08); margin: 0 2px; }
+.ct-rib-search {
+  display: inline-flex; align-items: center; gap: 6px; background: #f4f6f9;
+  padding: 0 9px; height: 26px; width: 240px; color: #718494;
+}
+.ct-rib-search input { border: 0; background: transparent; outline: none; font-size: 11.5px; color: #1d3648; width: 100%; }
+.ct-rib-sel { height: 26px; padding: 0 7px; border: 0; background: #f4f6f9; font-size: 11.5px; color: #1d3648; outline: none; cursor: pointer; }
+.ct-view-switch { display: inline-flex; gap: 2px; margin-left: auto; }
+.ct-vbtn { height: 26px; padding: 0 9px; border: 0; background: #f4f6f9; font-size: 11.5px; color: #4c6273; cursor: pointer; font-weight: 500; }
+.ct-vbtn.is-active { background: #002769; color: #ffffff; font-weight: 600; }
+
+/* Workspace & Stage */
+.ct-workspace {
+  flex: 1 1 auto; min-height: 0; position: relative; overflow: hidden;
+  display: grid; grid-template-columns: minmax(0, 1fr) 326px;
+}
+.ct-workspace.is-pane-hidden { grid-template-columns: minmax(0, 1fr); }
+.ct-workspace.is-pane-hidden .ct-right-pane { display: none; }
+.ct-stage { position: relative; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.ct-stage-scroll { flex: 1 1 auto; overflow: auto; padding: 16px 20px 32px; }
+
+.ct-pane-rail {
+  position: absolute; top: 50%; right: 0; transform: translateY(-50%); z-index: 40;
+  width: 18px; height: 48px; border: 0; padding: 0; background: #ffffff; color: #4c6273;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: -2px 0 10px rgba(0, 39, 105, 0.08); transition: background 110ms ease, color 110ms ease;
+}
+.ct-pane-rail:hover { background: #002769; color: #ffffff; }
+.ct-workspace.is-pane-hidden .ct-pane-rail svg { transform: rotate(180deg); }
+
+.ct-table-card { background: #ffffff; overflow-x: auto; }
+.ct-table tbody tr { cursor: pointer; }
+.ct-table tbody tr.is-row-selected { background: #eef3fa !important; }
+
+.ct-stage-dot { font-size: 11.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.ct-stage-dot::before { content: ''; width: 6px; height: 6px; display: inline-block; }
+.ct-stage-dot--signed    { color: #02982e; }
+.ct-stage-dot--signed::before    { background: #02982e; }
+.ct-stage-dot--signature { color: #002769; }
+.ct-stage-dot--signature::before { background: #002769; }
+.ct-stage-dot--review, .ct-stage-dot--approval { color: #8a5300; }
+.ct-stage-dot--review::before, .ct-stage-dot--approval::before { background: #d97706; }
+.ct-stage-dot--draft     { color: #4c6273; }
+.ct-stage-dot--draft::before     { background: #94a3b8; }
+.ct-stage-dot--closed    { color: #718494; }
+.ct-stage-dot--closed::before    { background: #cbd5e1; }
+.ct-dots { border: 0; background: transparent; color: #718494; width: 26px; height: 26px; cursor: pointer; font-size: 15px; }
+.ct-dots:hover { background: #eef3fa; color: #002769; }
+
+/* Pipeline Board View */
+.ct-board { display: grid; grid-template-columns: repeat(5, minmax(210px, 1fr)); gap: 12px; align-items: start; }
+.ct-board[hidden] { display: none !important; }
+.ct-col { background: #ffffff; display: flex; flex-direction: column; }
+.ct-col__head {
+  padding: 10px 12px; border-bottom: 1px solid rgba(0, 39, 105, 0.06);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.ct-col__cnt { font-size: 11px; font-weight: 700; color: #718494; }
+.ct-col__cards { padding: 8px; display: flex; flex-direction: column; gap: 8px; min-height: 120px; }
+.ct-bcard {
+  background: #f6f8fb; padding: 10px 11px; cursor: pointer;
+  border-left: 2.5px solid #002769; transition: background 100ms ease;
+}
+.ct-bcard:hover { background: #eef3fa; }
+.ct-bcard--signed { border-left-color: #02982e; }
+.ct-bcard__title { font-size: 12px; font-weight: 600; color: #1d3648; line-height: 1.3; }
+.ct-bcard__meta { font-size: 10.5px; color: #718494; margin-top: 4px; }
+
+/* Stamp Studio Right Pane */
+.ct-right-pane { background: #ffffff; display: flex; flex-direction: column; overflow: hidden; }
+.st-props__tabs { flex: 0 0 auto; height: 36px; display: flex; background: #fafbfc; border-bottom: 1px solid rgba(0, 39, 105, 0.06); padding: 0 4px; }
+.st-props__tabs .ts-ed__tab { flex: 1; border: 0; background: transparent; font-size: 11.5px; color: #718494; cursor: pointer; border-bottom: 2px solid transparent; }
+.st-props__tabs .ts-ed__tab.ts-is-active { color: #002769; font-weight: 600; border-bottom-color: #002769; }
+.st-props__header { padding: 10px 14px; border-bottom: 1px solid rgba(0, 39, 105, 0.06); }
+.st-props__title { margin: 0; font-size: 13px; color: #002769; font-weight: 700; }
+.st-props__body { flex: 1 1 auto; overflow-y: auto; }
+#ct-props .ts-ed__grp { border-bottom: 1px solid rgba(0, 39, 105, 0.05); padding: 12px 14px 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 9px 10px; }
+#ct-props .ts-ed__grp:last-child { border-bottom: 0; }
+#ct-props .ts-ed__grp-label { grid-column: 1 / -1; font-size: 10px; font-weight: 700; color: #718494; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+#ct-props .ts-ed__grp-label::before { content: '▾'; font-size: 9px; }
+#ct-props .ts-ed__grp.st-is-collapsed .ts-ed__grp-label::before { transform: rotate(-90deg); }
+#ct-props .ts-ed__grp.st-is-collapsed > *:not(.ts-ed__grp-label) { display: none !important; }
+#ct-props .ts-ed__grp--labeled { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+#ct-props .ts-ed__grp--labeled.st-field-full { grid-column: 1 / -1; }
+#ct-props label { font-size: 10px; color: #718494; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+#ct-props input, #ct-props select { width: 100%; box-sizing: border-box; border: 0; background: #f4f6f9; padding: 7px 9px; font-size: 12px; color: #1d3648; outline: none; font-family: inherit; }
+#ct-props input:focus, #ct-props select:focus { background: #ffffff; box-shadow: inset 0 0 0 1.5px #002769; }
+.st-props__meta { flex: 0 0 auto; padding: 9px 14px; border-top: 1px solid rgba(0, 39, 105, 0.06); background: #fafbfc; }
+.st-meta-row { display: flex; justify-content: space-between; font-size: 11px; color: #718494; padding: 2px 0; }
+.st-meta-row b { color: #1d3648; font-weight: 600; }
+
+.ct-ctx { position: fixed; z-index: 1400; min-width: 205px; background: #ffffff; box-shadow: 0 10px 28px rgba(0, 39, 105, 0.14); padding: 4px 0; }
+.ct-ctx__grp { font-size: 9.5px; font-weight: 700; color: #718494; text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 14px 2px; }
+.ct-ctx__item { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 7px 14px; font-size: 12px; color: #1d3648; cursor: pointer; }
+.ct-ctx__item:hover { background: #eef3fa; color: #002769; }
+.ct-ctx__sep { height: 1px; background: rgba(0, 39, 105, 0.07); margin: 4px 0; }
+</style>
+
+<script>
+(function () {
+  var workspace = document.getElementById('ct-workspace');
+  var tbody = document.getElementById('ct-tbody');
+  var searchEl = document.getElementById('ct-search');
+  var sourceEl = document.getElementById('ct-source');
+  var sortEl = document.getElementById('ct-sort');
+  var filterEmpty = document.getElementById('ct-filter-empty');
+  var viewTable = document.getElementById('ct-view-table');
+  var viewBoard = document.getElementById('ct-view-board');
+  var rpTitle = document.getElementById('ct-rp-title');
+  var ctxMenu = document.getElementById('ct-ctx');
+  var activeStage = 'all';
+  var viewMode = 'table';
+  var selectedRow = null;
+  var ctxRow = null;
+
+  var STAGE_ORDER = { draft: 1, review: 2, approval: 3, signature: 4, signed: 5, closed: 6 };
+  var CONTRACT_BOILERPLATE = {
+    msa: '<h2>MASTER SERVICE AGREEMENT</h2><p>This Master Service Agreement ("Agreement") is entered into between the Organization and <strong>{{PARTY}}</strong>.</p><h3>1. Scope of Services</h3><p>Provider shall deliver services per each executed Statement of Work (SOW).</p><h3>2. Fees &amp; Payment</h3><p>Invoices are payable within thirty (30) calendar days of receipt.</p>',
+    nda: '<h2>MUTUAL NON-DISCLOSURE AGREEMENT</h2><p>This Mutual NDA is made between the Organization and <strong>{{PARTY}}</strong> to protect confidential disclosures for five (5) years.</p>',
+    employment: '<h2>EXECUTIVE EMPLOYMENT AGREEMENT</h2><p>This Employment Agreement is executed between the Organization and <strong>{{PARTY}}</strong>.</p>',
+    lease: '<h2>COMMERCIAL LEASE AGREEMENT</h2><p>This Commercial Lease Agreement is entered into between the Landlord and <strong>{{PARTY}}</strong>.</p>',
+    supply: '<h2>VENDOR &amp; SUPPLY CONTRACT</h2><p>This Supply Contract governs procurement and delivery milestones between the Organization and <strong>{{PARTY}}</strong>.</p>',
+    resolution: '<h2>CERTIFIED EXTRACT OF BOARD RESOLUTION</h2><p>IT IS HEREBY RESOLVED that Authorized Officers are empowered to execute instruments with <strong>{{PARTY}}</strong>.</p>',
+    blank: '<p></p>',
+  };
+
+  function escH(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function switchRightTab(tab) {
+    workspace.classList.remove('is-pane-hidden');
+    document.querySelectorAll('[data-rtab]').forEach(function (b) { b.classList.toggle('ts-is-active', b.getAttribute('data-rtab') === tab); });
+    document.querySelectorAll('[data-rpane]').forEach(function (p) { p.hidden = (p.getAttribute('data-rpane') !== tab); });
+    rpTitle.textContent = tab === 'create' ? 'New Contract' : (selectedRow ? selectedRow.dataset.title : 'Inspector');
+  }
+  document.querySelectorAll('[data-rtab]').forEach(function (b) {
+    b.addEventListener('click', function () { switchRightTab(b.getAttribute('data-rtab')); });
+  });
+  document.getElementById('ct-pane-toggle').addEventListener('click', function () {
+    workspace.classList.toggle('is-pane-hidden');
+  });
+  document.getElementById('ct-props').addEventListener('click', function (e) {
+    var lbl = e.target.closest('.ts-ed__grp-label');
+    if (lbl) lbl.closest('.ts-ed__grp').classList.toggle('st-is-collapsed');
+  });
+
+  function openNewContractTab() {
+    switchRightTab('create');
+    document.getElementById('ct-new-title').focus();
+  }
+  document.getElementById('ct-open-new').addEventListener('click', openNewContractTab);
+  var emptyNew = document.getElementById('ct-empty-new');
+  if (emptyNew) emptyNew.addEventListener('click', openNewContractTab);
+
+  /* Menus */
+  function closeMenus() {
+    document.querySelectorAll('.st-menu').forEach(function (m) {
+      m.classList.remove('ts-is-open');
+      var p = m.querySelector('.st-menu__panel');
+      if (p) p.hidden = true;
+    });
+  }
+  document.querySelectorAll('.st-menu__btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var menu = btn.closest('.st-menu');
+      var wasOpen = menu.classList.contains('ts-is-open');
+      closeMenus();
+      if (!wasOpen) { menu.classList.add('ts-is-open'); menu.querySelector('.st-menu__panel').hidden = false; }
+    });
+  });
+  document.addEventListener('click', function (e) { if (!e.target.closest('.st-menu')) closeMenus(); });
+  document.querySelectorAll('[data-mcmd]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var c = b.getAttribute('data-mcmd'); closeMenus();
+      if (c === 'new') openNewContractTab();
+      else if (c === 'letterheads') window.location.href = '{{ url_for("workspace_assets_views.letterheads_page") }}';
+      else if (c === 'stamps') window.location.href = '{{ url_for("tsd_stamps_views.studio_new") }}';
+      else if (c === 'verify') window.location.href = '{{ url_for("tsd_stamps_views.verify_page") }}';
+    });
+  });
+  document.querySelectorAll('[data-vcmd]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var c = b.getAttribute('data-vcmd'); closeMenus();
+      if (c === 'table' || c === 'board') setViewMode(c);
+      else if (c === 'pane') workspace.classList.toggle('is-pane-hidden');
+    });
+  });
+
+  function setViewMode(m) {
+    viewMode = m;
+    document.querySelectorAll('[data-viewmode]').forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-viewmode') === m); });
+    if (viewTable) viewTable.hidden = (m !== 'table');
+    if (viewBoard) viewBoard.hidden = (m !== 'board');
+    applyFilter();
+  }
+  document.querySelectorAll('[data-viewmode]').forEach(function (b) {
+    b.addEventListener('click', function () { setViewMode(b.getAttribute('data-viewmode')); });
+  });
+
+  function selectRow(tr) {
+    if (!tr) return;
+    selectedRow = tr;
+    document.querySelectorAll('#ct-tbody tr').forEach(function (r) { r.classList.toggle('is-row-selected', r === tr); });
+    document.getElementById('ct-insp-empty').hidden = true;
+    document.getElementById('ct-insp-card').hidden = false;
+    document.getElementById('ct-i-title').textContent = tr.dataset.title;
+    document.getElementById('ct-i-party').textContent = tr.dataset.party || '—';
+    document.getElementById('ct-i-val').textContent = tr.dataset.value || '—';
+    document.getElementById('ct-i-owner').textContent = tr.dataset.owner || '—';
+    document.getElementById('ct-i-updated').textContent = tr.dataset.updated || '—';
+    var isTsd = tr.dataset.source === 'tsd';
+    document.getElementById('ct-i-stage-grp').hidden = !isTsd;
+    document.getElementById('ct-i-stage-sel').value = tr.dataset.stage || 'draft';
+    document.getElementById('ct-i-wf').href = tr.dataset.wfUrl || tr.dataset.url;
+    document.getElementById('ct-i-edit').href = tr.dataset.url;
+    document.getElementById('ct-i-pdf').href = isTsd ? ('/api/tsd/' + tr.dataset.id + '/export.pdf') : tr.dataset.url;
+    document.getElementById('ct-i-tsd').href = isTsd ? ('/api/tsd/' + tr.dataset.id + '/download') : tr.dataset.url;
+    document.getElementById('ct-i-tsd').hidden = !isTsd;
+    switchRightTab('inspect');
+  }
+
+  function applyFilter() {
+    if (!tbody) return;
+    var q = (searchEl.value || '').trim().toLowerCase();
+    var src = sourceEl.value;
+    var srt = sortEl.value;
+    var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+    var visibleRows = [];
+    rows.forEach(function (r) {
+      var hay = (r.dataset.titleLc || '') + ' ' + (r.dataset.party || '').toLowerCase() + ' ' + (r.dataset.ownerLc || '') + ' ' + (r.dataset.stage || '');
+      var hide = (activeStage !== 'all' && r.dataset.stage !== activeStage)
+        || (src !== 'all' && r.dataset.source !== src)
+        || (q && hay.indexOf(q) === -1);
+      r.style.display = hide ? 'none' : '';
+      if (!hide) visibleRows.push(r);
+    });
+    rows.sort(function (a, b) {
+      if (srt === 'title') return (a.dataset.titleLc || '').localeCompare(b.dataset.titleLc || '');
+      if (srt === 'stage') return (STAGE_ORDER[a.dataset.stage] || 9) - (STAGE_ORDER[b.dataset.stage] || 9);
+      return (a.dataset.date < b.dataset.date ? 1 : -1);
+    });
+    rows.forEach(function (r) { tbody.appendChild(r); });
+    if (filterEmpty) filterEmpty.hidden = (visibleRows.length > 0);
+
+    if (viewMode === 'board' && viewBoard) {
+      ['draft', 'review', 'approval', 'signature', 'signed'].forEach(function (k) {
+        var col = viewBoard.querySelector('[data-col-cards="' + k + '"]');
+        var cnt = viewBoard.querySelector('[data-col-cnt="' + k + '"]');
+        var matches = visibleRows.filter(function (r) { return r.dataset.stage === k; });
+        if (cnt) cnt.textContent = String(matches.length);
+        if (col) {
+          col.innerHTML = matches.map(function (r) {
+            return '<div class="ct-bcard' + (k === 'signed' ? ' ct-bcard--signed' : '') + '" data-bcard-id="' + r.dataset.id + '">' +
+              '<div class="ct-bcard__title">' + escH(r.dataset.title) + '</div>' +
+              '<div class="ct-bcard__meta">' + escH(r.dataset.party || r.dataset.owner) + (r.dataset.value ? (' · ' + escH(r.dataset.value)) : '') + '</div>' +
+            '</div>';
+          }).join('') || '<div style="font-size:11px;color:#94a3b8;padding:8px 4px;">Empty</div>';
+        }
+      });
+    }
+  }
+
+  document.getElementById('ct-stage-tabs').addEventListener('click', function (e) {
+    var tab = e.target.closest('[data-stage]');
+    if (!tab) return;
+    activeStage = tab.getAttribute('data-stage');
+    document.querySelectorAll('#ct-stage-tabs .ct-pill').forEach(function (t) { t.classList.toggle('is-active', t === tab); });
+    applyFilter();
+  });
+  if (searchEl) searchEl.addEventListener('input', applyFilter);
+  if (sourceEl) sourceEl.addEventListener('change', applyFilter);
+  if (sortEl) sortEl.addEventListener('change', applyFilter);
+
+  if (tbody) {
+    tbody.addEventListener('click', function (e) {
+      var dots = e.target.closest('[data-ct-dots]');
+      if (dots) {
+        e.stopPropagation();
+        var r = dots.getBoundingClientRect();
+        openCtx(dots.closest('tr'), r.right - 205, r.bottom + 4);
+        return;
+      }
+      if (e.target.closest('a')) return;
+      var tr = e.target.closest('tr');
+      if (tr) selectRow(tr);
+    });
+    tbody.addEventListener('dblclick', function (e) {
+      var tr = e.target.closest('tr');
+      if (tr && tr.dataset.wfUrl) window.location.href = tr.dataset.wfUrl;
+    });
+    tbody.addEventListener('contextmenu', function (e) {
+      var tr = e.target.closest('tr');
+      if (!tr) return;
+      e.preventDefault();
+      openCtx(tr, e.clientX, e.clientY);
+    });
+  }
+
+  if (viewBoard) {
+    viewBoard.addEventListener('click', function (e) {
+      var card = e.target.closest('[data-bcard-id]');
+      if (!card || !tbody) return;
+      var tr = tbody.querySelector('tr[data-id="' + card.getAttribute('data-bcard-id') + '"]');
+      if (tr) selectRow(tr);
+    });
+    viewBoard.addEventListener('dblclick', function (e) {
+      var card = e.target.closest('[data-bcard-id]');
+      if (!card || !tbody) return;
+      var tr = tbody.querySelector('tr[data-id="' + card.getAttribute('data-bcard-id') + '"]');
+      if (tr && tr.dataset.wfUrl) window.location.href = tr.dataset.wfUrl;
+    });
+  }
+
+  function updateStage(docId, newStage) {
+    fetch('/contracts/' + docId + '/stage', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify({ stage: newStage }),
+    }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function () { window.location.reload(); })
+      .catch(function (err) { alert('Stage update failed: ' + err.message); });
+  }
+
+  document.getElementById('ct-i-stage-apply').addEventListener('click', function () {
+    if (!selectedRow || selectedRow.dataset.source !== 'tsd') return;
+    updateStage(selectedRow.dataset.id, document.getElementById('ct-i-stage-sel').value);
+  });
+
+  function openCtx(row, x, y) {
+    ctxRow = row;
+    var isTsd = row.dataset.source === 'tsd';
+    ctxMenu.querySelectorAll('[data-ct-stage], [data-ct-act="download"]').forEach(function (b) { b.style.display = isTsd ? '' : 'none'; });
+    ctxMenu.hidden = false;
+    var mw = ctxMenu.offsetWidth || 205, mh = ctxMenu.offsetHeight || 240;
+    ctxMenu.style.left = Math.min(x, window.innerWidth - mw - 8) + 'px';
+    ctxMenu.style.top = Math.min(y, window.innerHeight - mh - 8) + 'px';
+  }
+  function closeCtx() { ctxMenu.hidden = true; ctxRow = null; }
+  document.addEventListener('click', function (e) { if (!e.target.closest('#ct-ctx')) closeCtx(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeCtx(); closeMenus(); } });
+  ctxMenu.addEventListener('click', function (e) {
+    if (!ctxRow) return;
+    var row = ctxRow;
+    var stBtn = e.target.closest('[data-ct-stage]');
+    if (stBtn) { closeCtx(); updateStage(row.dataset.id, stBtn.getAttribute('data-ct-stage')); return; }
+    var actBtn = e.target.closest('[data-ct-act]');
+    if (!actBtn) return;
+    var act = actBtn.getAttribute('data-ct-act');
+    closeCtx();
+    if (act === 'workflow' && row.dataset.wfUrl) window.location.href = row.dataset.wfUrl;
+    else if (act === 'open' && row.dataset.url) window.location.href = row.dataset.url;
+    else if (act === 'download' && row.dataset.source === 'tsd') window.location.href = '/api/tsd/' + row.dataset.id + '/download';
+    else if (act === 'verify') window.location.href = '{{ url_for("tsd_stamps_views.verify_page") }}';
+  });
+
+  document.getElementById('ct-create-submit').addEventListener('click', function () {
+    var btn = this;
+    var title = document.getElementById('ct-new-title').value.trim() || 'Untitled Contract';
+    var party = document.getElementById('ct-new-party').value.trim() || 'Counterparty';
+    var tplKey = document.getElementById('ct-new-tpl').value;
+    var lhId = document.getElementById('ct-new-lh').value;
+    var initStage = document.getElementById('ct-new-stage').value;
+    var bodyHtml = (CONTRACT_BOILERPLATE[tplKey] || '<p></p>').replace(/\{\{PARTY\}\}/g, party.replace(/</g, '&lt;'));
+
+    btn.disabled = true; btn.textContent = 'Creating…';
+    var req = lhId
+      ? fetch('/api/letterheads/' + lhId + '/create-document', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+          body: JSON.stringify({ title: title, body_html: bodyHtml }),
+        })
+      : fetch('/api/tsd/', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+          body: JSON.stringify({ title: title, content_html: bodyHtml }),
+        });
+
+    req.then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (res) {
+        var docId = res.document_id || res.id;
+        var wfUrl = docId ? ('/contracts/' + docId + '/workflow') : '/contracts';
+        if (docId) {
+          return fetch('/contracts/' + docId + '/stage', {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+            body: JSON.stringify({ stage: initStage || 'draft', counterparty_name: party, letterhead_id: lhId ? parseInt(lhId, 10) : null }),
+          }).then(function () { window.location.href = wfUrl; });
+        }
+        window.location.href = wfUrl;
+      })
+      .catch(function (err) { btn.disabled = false; btn.textContent = 'Create & Open Workflow →'; alert('Create failed: ' + err.message); });
+  });
+})();
+</script>
+{% endblock %}

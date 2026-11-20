@@ -217,3 +217,46 @@ def test_stamp_dimensions_mm_clamps_invalid_physical_sizes():
     from app.blueprints.estamp.tsd_stamps_api import _stamp_dimensions_mm
 
     assert _stamp_dimensions_mm("seal", {"width_mm": 0, "height_mm": 999}) == (5.0, 300.0)
+
+
+def test_all_templates_have_valid_xml_svg_unique_slugs_and_layouts():
+    import xml.etree.ElementTree as ET
+    from app.services import tsd_stamp_templates
+
+    templates = tsd_stamp_templates.list_templates()
+    assert len(templates) >= 70
+    valid_kinds = {"seal", "company_dated", "company_rect", "date", "rubber", "signature"}
+    slugs = set()
+    for t in templates:
+        slug = t["slug"]
+        assert slug not in slugs, f"Duplicate template slug: {slug}"
+        slugs.add(slug)
+        assert t["kind"] in valid_kinds, f"Unexpected kind on {slug}: {t['kind']}"
+        assert isinstance(t.get("layout"), dict) and len(t["layout"]) > 0, f"Missing layout on {slug}"
+        root = ET.fromstring(t["svg"])
+        assert root.tag.endswith("svg"), f"Invalid SVG root on {slug}"
+
+
+def test_corporate_general_and_industry_templates_present_with_dimensions():
+    from app.services import tsd_stamp_templates
+    from app.blueprints.estamp.tsd_stamps_api import _stamp_dimensions_mm
+
+    by_slug = {t["slug"]: t for t in tsd_stamp_templates.list_templates()}
+    expected_slugs = [
+        "corp-rect-official-seal",
+        "corp-rect-director-sign",
+        "general-company-oval-seal",
+        "general-company-rubber-rect",
+        "general-company-rubber-circle",
+        "general-company-rubber-hexagon",
+        "std-accounting-posting-voucher",
+        "std-bank-deposit-only",
+        "std-notary-jurat-block",
+        "std-medical-practitioner",
+        "std-engineering-drawing-approval",
+    ]
+    for slug in expected_slugs:
+        assert slug in by_slug, f"Missing expected template: {slug}"
+        t = by_slug[slug]
+        w, h = _stamp_dimensions_mm(t["kind"], t["layout"])
+        assert 5.0 <= w <= 300.0 and 5.0 <= h <= 300.0

@@ -1,21 +1,31 @@
 {#
-  Authenticated verifier wrapper — operators clicking Verification
-  from the sidebar stay inside their workspace shell.
+  Authenticated verifier wrapper — unified borderless Verification Hub
+  connecting Document/PDF verification and Covert Stamp Forensics.
 #}
 {% extends "layouts/app.html" %}
 {% set active_nav_item = 'verify' %}
 
 {% block title %}Verification · TRUSTSEAL{% endblock %}
-{% block page_title %}Verify a sealed document{% endblock %}
-{% block page_description %}
-  <p class="ts-page-header__description">
-    Independently check a PDF against the platform's sealing certificate.
-    Verification compares bytes and evidence; it does not touch any
-    tenant lookup, and the uploaded file is discarded immediately after
-    hashing. Results list exactly which checks ran.
-  </p>
-{% endblock %}
+{% block page_title %}Verification{% endblock %}
+{% block page_description %}{% endblock %}
 
 {% block content %}
-{% include "trust/_verify_body.html" %}
+<div class="st-flat">
+  {% include "stamps/_flat_ui.html" %}
+
+  <nav class="st-subnav" aria-label="Verification modes">
+    <a href="{{ url_for('verify_views.verify_app') if 'verify_views.verify_app' in url_map_endpoints else request.path }}"
+       class="st-subnav__link is-active">
+      Document &amp; PDF Verification
+    </a>
+    {% if 'tsd_stamps_views.verify_page' in url_map_endpoints %}
+    <a href="{{ url_for('tsd_stamps_views.verify_page') }}"
+       class="st-subnav__link">
+      Stamp Forensics
+    </a>
+    {% endif %}
+  </nav>
+
+  {% include "trust/_verify_body.html" %}
+</div>
 {% endblock %}

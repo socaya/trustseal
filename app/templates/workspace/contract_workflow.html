@@ -1,0 +1,607 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'signed-contracts' %}
+
+{% block title %}Deal Workflow · {{ doc.title }} · TRUSTSEAL{% endblock %}
+{% block page_header %}{% endblock %}
+{% block page_title %}{% endblock %}
+{% block page_description %}{% endblock %}
+{% block page_actions %}{% endblock %}
+{% block breadcrumbs %}{% endblock %}
+
+{% block extra_head %}
+<style>.ts-page { padding: 0 !important; max-width: none !important; }</style>
+{% endblock %}
+
+{% block content %}
+<div class="ts-ed cw-studio st-flat" id="cw-shell" data-doc-id="{{ doc.id }}">
+  {% include "stamps/_flat_ui.html" %}
+
+  {# ======================= 1. STUDIO APPLICATION BAR ======================= #}
+  <header class="ts-ed__appbar">
+    <div class="ts-ed__brand">
+      <strong>DEAL WORKFLOW</strong><small>TRUSTSEAL</small>
+    </div>
+    <span class="ts-ed__divider" aria-hidden="true"></span>
+    <span class="cw-appbar-title">{{ doc.title }}</span>
+    <span id="cw-stage-pill" class="cw-appbar-stage">Draft</span>
+    <div class="ts-ed__spacer"></div>
+    <a class="ts-ed__btn ts-ed__btn--ghost" href="{{ url_for('workspace_assets_views.signed_contracts_page') }}">← Contracts</a>
+    <a class="ts-ed__btn ts-ed__btn--ghost" href="{{ url_for('tsd_views.edit', tsd_id=doc.id) }}">Open Editor</a>
+    <a class="ts-ed__btn ts-ed__btn--ghost" href="/api/tsd/{{ doc.id }}/export.pdf" target="_blank">PDF</a>
+    <a class="ts-ed__btn ts-ed__btn--primary" href="/api/tsd/{{ doc.id }}/download">Download .tsd</a>
+  </header>
+
+  {# ======================= 2. INTERACTIVE 5-STEP DEAL RIBBON ======================= #}
+  <ol class="cw-stepper" id="cw-stepper" aria-label="Contract deal workflow">
+    <li class="cw-step" data-step="draft"><span class="cw-step__num">1</span><span class="cw-step__lbl">Draft</span></li>
+    <li class="cw-step" data-step="review"><span class="cw-step__num">2</span><span class="cw-step__lbl">Legal Review</span></li>
+    <li class="cw-step" data-step="approval"><span class="cw-step__num">3</span><span class="cw-step__lbl">Approval</span></li>
+    <li class="cw-step" data-step="signature"><span class="cw-step__num">4</span><span class="cw-step__lbl">Agreement Signing (TS)</span></li>
+    <li class="cw-step" data-step="signed"><span class="cw-step__num">5</span><span class="cw-step__lbl">Deal Closed</span></li>
+  </ol>
+
+  {# ======================= 3. STUDIO STAGE + DYNAMIC RIGHT PANE ======================= #}
+  <main class="st-canvas cw-workspace" id="cw-workspace">
+    <section class="st-canvas__stage cw-stage">
+      <button type="button" class="cw-pane-rail" id="cw-pane-toggle" aria-expanded="true" title="Collapse / expand inspector">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <div class="cw-stage-scroll">
+        <div class="cw-stage-inner">
+          {# Stage 1: Draft #}
+          <section class="cw-card" data-stage-panel="draft" hidden>
+            <div class="cw-card__head">
+              <h2>1. Contract Drafting &amp; Authoring</h2>
+              <span class="cw-badge cw-badge--draft">Draft</span>
+            </div>
+            <div class="cw-card__body">
+              <div class="cw-kv">
+                <div><span>Document</span><strong>{{ doc.title }}</strong></div>
+                <div><span>Version</span><strong>v{{ doc.version }}</strong></div>
+                <div><span>Vault Security</span><strong>AES-128 + HMAC-SHA256</strong></div>
+              </div>
+              <div class="cw-actions">
+                <a class="ts-btn" href="{{ url_for('tsd_views.edit', tsd_id=doc.id) }}">Edit Clauses &amp; Letterhead</a>
+                <button type="button" class="ts-btn ts-btn--primary" data-advance="review">Submit for Legal Review →</button>
+              </div>
+            </div>
+          </section>
+
+          {# Stage 2: Legal Review #}
+          <section class="cw-card" data-stage-panel="review" hidden>
+            <div class="cw-card__head">
+              <h2>2. Internal &amp; Legal Review</h2>
+              <span class="cw-badge cw-badge--warn">Pending Review</span>
+            </div>
+            <div class="cw-card__body">
+              <div class="cw-checklist" id="cw-checklist">
+                <label class="cw-chk"><input type="checkbox" data-chk="commercial_terms"> Commercial terms, pricing &amp; deliverables verified</label>
+                <label class="cw-chk"><input type="checkbox" data-chk="liability_indemnity"> Liability cap, indemnity &amp; termination clauses reviewed</label>
+                <label class="cw-chk"><input type="checkbox" data-chk="confidentiality_data"> Confidentiality &amp; data protection obligations checked</label>
+                <label class="cw-chk"><input type="checkbox" data-chk="governing_law"> Governing law, dispute resolution &amp; signatory authority confirmed</label>
+              </div>
+              <div class="cw-field">
+                <label for="cw-review-note">Review Note</label>
+                <input type="text" id="cw-review-note" placeholder="Redlines resolved with counterparty counsel">
+              </div>
+              <div class="cw-actions">
+                <button type="button" class="ts-btn" data-advance="draft">← Return to Draft</button>
+                <button type="button" class="ts-btn ts-btn--primary" data-advance="approval" data-note-el="cw-review-note">Complete Review &amp; Request Approval →</button>
+              </div>
+            </div>
+          </section>
+
+          {# Stage 3: Executive Approval #}
+          <section class="cw-card" data-stage-panel="approval" hidden>
+            <div class="cw-card__head">
+              <h2>3. Commercial &amp; Executive Approval</h2>
+              <span class="cw-badge cw-badge--warn">Pending Approval</span>
+            </div>
+            <div class="cw-card__body">
+              <div class="cw-kv">
+                <div><span>Approving Officer</span><strong>{{ actor_name }}</strong></div>
+                <div><span>Counterparty</span><strong id="cw-sum-party">—</strong></div>
+                <div><span>Deal Value</span><strong id="cw-sum-val">—</strong></div>
+              </div>
+              <div class="cw-field">
+                <label for="cw-approval-note">Approval Sign-Off Note</label>
+                <input type="text" id="cw-approval-note" placeholder="Approved under Delegated Authority Schedule B">
+              </div>
+              <div class="cw-actions">
+                <button type="button" class="ts-btn" data-advance="review">← Back to Review</button>
+                <button type="button" class="ts-btn ts-btn--primary" data-advance="signature" data-note-el="cw-approval-note">Grant Approval &amp; Prepare TS Signing →</button>
+              </div>
+            </div>
+          </section>
+
+          {# Stage 4: Agreement Signing with TrustSeal #}
+          <section class="cw-card" data-stage-panel="signature" hidden>
+            <div class="cw-card__head">
+              <h2>4. Agreement Signing with TrustSeal</h2>
+              <span class="cw-badge cw-badge--blue">Ready for Execution</span>
+            </div>
+            <div class="cw-card__body">
+              <div class="cw-subhead">Signatories</div>
+              <div id="cw-signers-list" class="cw-signers"></div>
+
+              <div class="cw-add-signer">
+                <input type="text" id="cw-sig-name" placeholder="Signatory full name">
+                <input type="email" id="cw-sig-email" placeholder="Email address">
+                <select id="cw-sig-role">
+                  <option value="Counterparty Signatory">Counterparty Signatory</option>
+                  <option value="Authorized Signatory (Organization)">Authorized Signatory (Org)</option>
+                  <option value="Managing Director / CEO">Managing Director / CEO</option>
+                  <option value="Company Secretary">Company Secretary</option>
+                  <option value="Witness">Witness</option>
+                </select>
+                <button type="button" class="ts-btn" id="cw-add-signer-btn">+ Add</button>
+              </div>
+
+              <div class="cw-subhead" style="margin-top:12px;">Official TrustSeal Stamp / Corporate Seal</div>
+              <div class="cw-stamp-row">
+                <select id="cw-stamp-sel" style="flex:1;">
+                  <option value="">— No stamp attached —</option>
+                  {% for s in stamps %}
+                  <option value="{{ s.id }}">{{ s.name }} ({{ s.kind }})</option>
+                  {% endfor %}
+                </select>
+                <a class="ts-btn" href="{{ url_for('tsd_stamps_views.studio_new') }}">Stamp Studio ↗</a>
+              </div>
+
+              <div class="cw-field" style="margin-top:8px;">
+                <label for="cw-close-note">Execution Attestation Note</label>
+                <input type="text" id="cw-close-note" placeholder="Executed by both parties under TrustSeal cryptographic integrity">
+              </div>
+
+              <div class="cw-actions" style="margin-top:10px;">
+                <button type="button" class="ts-btn" data-advance="approval">← Back to Approval</button>
+                <button type="button" class="cw-btn-close" id="cw-close-deal-btn">✓ Sign &amp; Close Deal with TrustSeal</button>
+              </div>
+            </div>
+          </section>
+
+          {# Stage 5: Deal Closed #}
+          <section class="cw-card cw-card--closed" data-stage-panel="signed" hidden>
+            <div class="cw-card__head">
+              <h2>5. Deal Closed · Executed with TrustSeal</h2>
+              <span class="cw-badge cw-badge--green">Executed ✓</span>
+            </div>
+            <div class="cw-card__body">
+              <div class="cw-cert">
+                <div class="cw-cert__row"><span>Status</span><strong style="color:#02982e;">Finalized &amp; Cryptographically Sealed</strong></div>
+                <div class="cw-cert__row"><span>Closed At</span><strong id="cw-cert-at">—</strong></div>
+                <div class="cw-cert__row"><span>Counterparty</span><strong id="cw-cert-party">—</strong></div>
+                <div class="cw-cert__row"><span>Deal Value</span><strong id="cw-cert-val">—</strong></div>
+                <div class="cw-cert__row"><span>SHA-256 Fingerprint</span><code id="cw-cert-sha" style="font-size:11px;color:#002769;word-break:break-all;">{{ doc.ciphertext_sha256 }}</code></div>
+              </div>
+              <div class="cw-subhead" style="margin-top:10px;">Executed Signatories</div>
+              <div id="cw-closed-signers" class="cw-signers"></div>
+              <div class="cw-actions" style="margin-top:10px;">
+                <a class="ts-btn ts-btn--primary" href="/api/tsd/{{ doc.id }}/export.pdf" target="_blank">Download Executed PDF</a>
+                <a class="ts-btn" href="/api/tsd/{{ doc.id }}/download">Download .tsd Vault</a>
+                <a class="ts-btn" href="{{ url_for('tsd_stamps_views.verify_page') }}">Forensic Verify</a>
+                <button type="button" class="ts-btn" data-advance="closed" style="margin-left:auto;color:#9b2c2c;">Archive</button>
+              </div>
+            </div>
+          </section>
+
+          {# Stage 6: Archived #}
+          <section class="cw-card" data-stage-panel="closed" hidden>
+            <div class="cw-card__head">
+              <h2>Archived / Void Contract</h2>
+              <span class="cw-badge cw-badge--draft">Archived</span>
+            </div>
+            <div class="cw-card__body">
+              <div class="cw-actions">
+                <button type="button" class="ts-btn ts-btn--primary" data-advance="draft">Reopen as Draft</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    {# ---- STAMP STUDIO DYNAMIC RIGHT PANE ---- #}
+    <aside class="st-canvas__meta cw-right-pane" aria-label="Deal inspector">
+      <nav class="st-props__tabs" role="tablist">
+        <button type="button" role="tab" class="ts-ed__tab ts-is-active" data-wtab="details">Deal Details</button>
+        <button type="button" role="tab" class="ts-ed__tab" data-wtab="audit">Audit Trail</button>
+      </nav>
+
+      <header class="st-props__header">
+        <h3 class="st-props__title" id="cw-rp-title">Deal Details</h3>
+        <span id="cw-meta-msg" style="font-size:11px;color:#02982e;font-weight:600;"></span>
+      </header>
+
+      <div class="st-props__body" id="cw-props">
+        <div data-wpane="details">
+          <section class="ts-ed__grp">
+            <div class="ts-ed__grp-label">Commercial Terms</div>
+            <div class="ts-ed__grp--labeled st-field-full">
+              <label for="cw-party">Counterparty</label>
+              <input type="text" id="cw-party" placeholder="Counterparty legal name">
+            </div>
+            <div class="ts-ed__grp--labeled">
+              <label for="cw-currency">Currency</label>
+              <select id="cw-currency">
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="KES">KES</option>
+                <option value="ZAR">ZAR</option>
+                <option value="AED">AED</option>
+              </select>
+            </div>
+            <div class="ts-ed__grp--labeled">
+              <label for="cw-value">Deal Value</label>
+              <input type="text" id="cw-value" placeholder="250,000">
+            </div>
+            <div class="ts-ed__grp--labeled">
+              <label for="cw-effdate">Effective Date</label>
+              <input type="date" id="cw-effdate">
+            </div>
+            <div class="ts-ed__grp--labeled">
+              <label for="cw-law">Governing Law</label>
+              <input type="text" id="cw-law" placeholder="Kenya / UK">
+            </div>
+            <div class="ts-ed__grp--labeled st-field-full">
+              <button type="button" class="ts-ed__btn ts-ed__btn--primary" id="cw-save-meta" style="width:100%;justify-content:center;">Save Deal Details</button>
+            </div>
+          </section>
+        </div>
+
+        <div data-wpane="audit" hidden>
+          <section class="ts-ed__grp">
+            <div class="ts-ed__grp-label">Chronological Events</div>
+            <div class="ts-ed__grp--labeled st-field-full">
+              <div id="cw-events" class="cw-events"></div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="st-props__meta">
+        <div class="st-meta-row"><span>Document</span><b>v{{ doc.version }}</b></div>
+        <div class="st-meta-row"><span>SHA-256</span><b style="font-family:monospace;font-size:10px;">{{ doc.ciphertext_sha256[:14] }}…</b></div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="ts-ed__statusbar">
+    <div>
+      <span>{{ doc.title }}</span>
+      <span>·</span>
+      <span id="cw-sb-stage">Draft</span>
+    </div>
+    <div>
+      <span>TrustSeal Cryptographic Integrity</span>
+    </div>
+  </footer>
+</div>
+
+<style>
+#cw-shell {
+  height: calc(100vh - var(--ts-topbar-h, 54px));
+  max-height: calc(100vh - var(--ts-topbar-h, 54px));
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--ts-surface-sunken, #eef2f6);
+}
+#cw-shell > * { min-height: 0; }
+.cw-appbar-title { font-size: 13px; font-weight: 600; color: #1d3648; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 340px; }
+.cw-appbar-stage { font-size: 11px; font-weight: 700; color: #002769; background: #eef3fa; padding: 3px 8px; white-space: nowrap; }
+
+.cw-stepper {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  background: #ffffff; border-bottom: 1px solid rgba(0, 39, 105, 0.06);
+  flex: 0 0 auto;
+}
+.cw-step {
+  display: flex; align-items: center; gap: 8px; padding: 9px 14px;
+  cursor: pointer; border-bottom: 2.5px solid transparent; color: #718494;
+}
+.cw-step:hover { background: #f6f8fb; color: #1d3648; }
+.cw-step__num { width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; background: #eef3fa; color: #4c6273; flex: 0 0 auto; }
+.cw-step__lbl { font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cw-step.is-active { color: #002769; border-bottom-color: #002769; }
+.cw-step.is-active .cw-step__num { background: #002769; color: #ffffff; }
+.cw-step.is-done { color: #02982e; }
+.cw-step.is-done .cw-step__num { background: #02982e; color: #ffffff; }
+
+.cw-workspace { flex: 1 1 auto; min-height: 0; position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) 326px; }
+.cw-workspace.is-pane-hidden { grid-template-columns: minmax(0, 1fr); }
+.cw-workspace.is-pane-hidden .cw-right-pane { display: none; }
+.cw-stage { position: relative; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.cw-stage-scroll { flex: 1 1 auto; overflow: auto; padding: 24px 28px 44px; }
+.cw-stage-inner { max-width: 820px; margin: 0 auto; }
+
+.cw-pane-rail {
+  position: absolute; top: 50%; right: 0; transform: translateY(-50%); z-index: 40;
+  width: 18px; height: 48px; border: 0; padding: 0; background: #ffffff; color: #4c6273;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: -2px 0 10px rgba(0, 39, 105, 0.08);
+}
+.cw-pane-rail:hover { background: #002769; color: #ffffff; }
+.cw-workspace.is-pane-hidden .cw-pane-rail svg { transform: rotate(180deg); }
+
+.cw-card { background: #ffffff; }
+.cw-card--closed { border-top: 3px solid #02982e; }
+.cw-card__head { padding: 14px 20px; border-bottom: 1px solid rgba(0, 39, 105, 0.06); display: flex; align-items: center; justify-content: space-between; }
+.cw-card__head h2 { margin: 0; font-size: 14px; font-weight: 700; color: #1d3648; }
+.cw-card__body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+
+.cw-badge { font-size: 11px; font-weight: 700; padding: 3px 8px; }
+.cw-badge--draft { background: #f1f4f8; color: #4c6273; }
+.cw-badge--warn  { background: #fff6df; color: #8a5300; }
+.cw-badge--blue  { background: #eef3fa; color: #002769; }
+.cw-badge--green { background: #eaf9ee; color: #02982e; }
+
+.cw-kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; background: #f6f8fb; padding: 12px 14px; }
+.cw-kv span { display: block; font-size: 10px; font-weight: 700; color: #718494; text-transform: uppercase; letter-spacing: 0.06em; }
+.cw-kv strong { display: block; font-size: 12.5px; color: #1d3648; margin-top: 2px; }
+
+.cw-checklist { display: flex; flex-direction: column; gap: 8px; }
+.cw-chk { display: flex; align-items: center; gap: 9px; padding: 10px 12px; background: #f6f8fb; font-size: 12.5px; color: #1d3648; cursor: pointer; }
+.cw-chk input { accent-color: #02982e; }
+
+.cw-subhead { font-size: 10.5px; font-weight: 700; color: #4c6273; text-transform: uppercase; letter-spacing: 0.06em; }
+.cw-signers { display: flex; flex-direction: column; gap: 6px; }
+.cw-signer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: #f6f8fb; }
+.cw-signer__name { font-size: 12.5px; font-weight: 600; color: #1d3648; }
+.cw-signer__meta { font-size: 11px; color: #718494; margin-top: 1px; }
+.cw-signer__right { display: inline-flex; align-items: center; gap: 6px; }
+.cw-sig-tag { font-size: 11px; font-weight: 700; color: #02982e; }
+.cw-add-signer { display: grid; grid-template-columns: 1.2fr 1.2fr 1.1fr auto; gap: 6px; }
+.cw-stamp-row { display: flex; gap: 8px; align-items: center; }
+
+.cw-field { display: flex; flex-direction: column; gap: 4px; }
+.cw-field label { font-size: 10px; font-weight: 700; color: #718494; text-transform: uppercase; letter-spacing: 0.06em; }
+.cw-stage input[type="text"], .cw-stage input[type="email"], .cw-stage select {
+  width: 100%; box-sizing: border-box; border: 0; background: #f4f6f9;
+  padding: 8px 10px; font-size: 12px; color: #1d3648; outline: none; font-family: inherit;
+}
+.cw-stage input:focus, .cw-stage select:focus { background: #ffffff; box-shadow: inset 0 0 0 1.5px #002769; }
+.cw-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cw-btn-close { border: 0; background: #02982e; color: #ffffff; font-size: 12.5px; font-weight: 700; height: 36px; padding: 0 18px; cursor: pointer; }
+.cw-btn-close:hover { background: #027d25; }
+.cw-cert { background: #f6f8fb; padding: 14px 16px; display: flex; flex-direction: column; gap: 7px; border-left: 3px solid #02982e; }
+.cw-cert__row { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+.cw-cert__row span { color: #718494; }
+
+/* Stamp Studio Right Pane */
+.cw-right-pane { background: #ffffff; display: flex; flex-direction: column; overflow: hidden; }
+.st-props__tabs { flex: 0 0 auto; height: 36px; display: flex; background: #fafbfc; border-bottom: 1px solid rgba(0, 39, 105, 0.06); padding: 0 4px; }
+.st-props__tabs .ts-ed__tab { flex: 1; border: 0; background: transparent; font-size: 11.5px; color: #718494; cursor: pointer; border-bottom: 2px solid transparent; }
+.st-props__tabs .ts-ed__tab.ts-is-active { color: #002769; font-weight: 600; border-bottom-color: #002769; }
+.st-props__header { padding: 10px 14px; border-bottom: 1px solid rgba(0, 39, 105, 0.06); display: flex; justify-content: space-between; align-items: center; }
+.st-props__title { margin: 0; font-size: 13px; color: #002769; font-weight: 700; }
+.st-props__body { flex: 1 1 auto; overflow-y: auto; }
+#cw-props .ts-ed__grp { border-bottom: 1px solid rgba(0, 39, 105, 0.05); padding: 12px 14px 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 9px 10px; }
+#cw-props .ts-ed__grp-label { grid-column: 1 / -1; font-size: 10px; font-weight: 700; color: #718494; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+#cw-props .ts-ed__grp-label::before { content: '▾'; font-size: 9px; }
+#cw-props .ts-ed__grp.st-is-collapsed .ts-ed__grp-label::before { transform: rotate(-90deg); }
+#cw-props .ts-ed__grp.st-is-collapsed > *:not(.ts-ed__grp-label) { display: none !important; }
+#cw-props .ts-ed__grp--labeled { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+#cw-props .ts-ed__grp--labeled.st-field-full { grid-column: 1 / -1; }
+#cw-props label { font-size: 10px; color: #718494; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+#cw-props input, #cw-props select { width: 100%; box-sizing: border-box; border: 0; background: #f4f6f9; padding: 7px 9px; font-size: 12px; color: #1d3648; outline: none; font-family: inherit; }
+#cw-props input:focus, #cw-props select:focus { background: #ffffff; box-shadow: inset 0 0 0 1.5px #002769; }
+.st-props__meta { flex: 0 0 auto; padding: 9px 14px; border-top: 1px solid rgba(0, 39, 105, 0.06); background: #fafbfc; }
+.st-meta-row { display: flex; justify-content: space-between; font-size: 11px; color: #718494; padding: 2px 0; }
+.st-meta-row b { color: #1d3648; font-weight: 600; }
+
+.cw-events { display: flex; flex-direction: column; gap: 9px; }
+.cw-ev { padding-left: 10px; border-left: 2px solid #002769; }
+.cw-ev__act { font-size: 12px; font-weight: 600; color: #1d3648; }
+.cw-ev__meta { font-size: 10.5px; color: #718494; margin-top: 1px; }
+</style>
+
+<script>
+(function () {
+  var docId = document.getElementById('cw-shell').getAttribute('data-doc-id');
+  var workspace = document.getElementById('cw-workspace');
+  var wf = {{ wf|tojson }};
+  var STEP_ORDER = ['draft', 'review', 'approval', 'signature', 'signed'];
+
+  function escH(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function postJson(url, body) {
+    return fetch(url, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify(body || {}),
+    }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+  }
+
+  document.getElementById('cw-pane-toggle').addEventListener('click', function () {
+    workspace.classList.toggle('is-pane-hidden');
+  });
+  document.querySelectorAll('[data-wtab]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var t = b.getAttribute('data-wtab');
+      document.querySelectorAll('[data-wtab]').forEach(function (x) { x.classList.toggle('ts-is-active', x === b); });
+      document.querySelectorAll('[data-wpane]').forEach(function (p) { p.hidden = (p.getAttribute('data-wpane') !== t); });
+      document.getElementById('cw-rp-title').textContent = t === 'audit' ? 'Audit Trail' : 'Deal Details';
+    });
+  });
+  document.getElementById('cw-props').addEventListener('click', function (e) {
+    var lbl = e.target.closest('.ts-ed__grp-label');
+    if (lbl) lbl.closest('.ts-ed__grp').classList.toggle('st-is-collapsed');
+  });
+
+  function render() {
+    var curIdx = STEP_ORDER.indexOf(wf.stage);
+    document.querySelectorAll('#cw-stepper .cw-step').forEach(function (li) {
+      var st = li.getAttribute('data-step');
+      var idx = STEP_ORDER.indexOf(st);
+      li.classList.toggle('is-active', st === wf.stage);
+      li.classList.toggle('is-done', curIdx > idx || (wf.stage === 'signed' && st === 'signed'));
+    });
+    document.querySelectorAll('[data-stage-panel]').forEach(function (sec) {
+      sec.hidden = (sec.getAttribute('data-stage-panel') !== wf.stage);
+    });
+    document.getElementById('cw-stage-pill').textContent = wf.stage_label || wf.stage;
+    document.getElementById('cw-sb-stage').textContent = wf.stage_label || wf.stage;
+
+    document.getElementById('cw-party').value = wf.counterparty_name || '';
+    document.getElementById('cw-currency').value = wf.currency || 'USD';
+    document.getElementById('cw-value').value = wf.deal_value || '';
+    document.getElementById('cw-effdate').value = wf.effective_date || '';
+    document.getElementById('cw-law').value = wf.governing_law || '';
+    var stampSel = document.getElementById('cw-stamp-sel');
+    if (stampSel) stampSel.value = wf.stamp_id ? String(wf.stamp_id) : '';
+
+    var valTxt = wf.deal_value ? ((wf.currency || 'USD') + ' ' + wf.deal_value) : '—';
+    document.getElementById('cw-sum-party').textContent = wf.counterparty_name || '—';
+    document.getElementById('cw-sum-val').textContent = valTxt;
+    document.getElementById('cw-cert-at').textContent = wf.closed_at || 'Executed';
+    document.getElementById('cw-cert-party').textContent = wf.counterparty_name || '—';
+    document.getElementById('cw-cert-val').textContent = valTxt;
+    if (wf.execution_sha256) document.getElementById('cw-cert-sha').textContent = wf.execution_sha256;
+
+    var chk = wf.checklist || {};
+    document.querySelectorAll('[data-chk]').forEach(function (cb) { cb.checked = !!chk[cb.getAttribute('data-chk')]; });
+
+    var signers = wf.signers || [];
+    var sigListEl = document.getElementById('cw-signers-list');
+    if (sigListEl) {
+      sigListEl.innerHTML = signers.length ? signers.map(function (s) {
+        var signed = s.status === 'signed';
+        return '<div class="cw-signer">' +
+          '<div>' +
+            '<div class="cw-signer__name">' + escH(s.name) + ' <span style="font-weight:400;color:#4c6273;">· ' + escH(s.role) + '</span></div>' +
+            '<div class="cw-signer__meta">' + escH(s.email || 'No email') + (signed && s.signed_at ? (' · Signed ' + escH(s.signed_at)) : '') + '</div>' +
+          '</div>' +
+          '<div class="cw-signer__right">' +
+            (signed
+              ? '<span class="cw-sig-tag">✓ Signed (' + escH(s.signature_text || s.name) + ')</span>'
+              : '<button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-sign-id="' + escH(s.id) + '" data-sign-name="' + escH(s.name) + '">Sign with TS</button>') +
+            '<button type="button" class="ts-btn ts-btn--sm" data-rm-sig="' + escH(s.id) + '" title="Remove">✕</button>' +
+          '</div>' +
+        '</div>';
+      }).join('') : '<div style="font-size:12px;color:#718494;">Add signatories below to execute with TrustSeal.</div>';
+    }
+
+    var closedSigEl = document.getElementById('cw-closed-signers');
+    if (closedSigEl) {
+      closedSigEl.innerHTML = signers.map(function (s) {
+        return '<div class="cw-signer">' +
+          '<div><div class="cw-signer__name">' + escH(s.name) + ' · ' + escH(s.role) + '</div><div class="cw-signer__meta">' + escH(s.email || '') + '</div></div>' +
+          '<span class="cw-sig-tag">✓ ' + escH(s.signed_at || 'Executed') + '</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    var evEl = document.getElementById('cw-events');
+    if (evEl) {
+      evEl.innerHTML = (wf.events || []).map(function (ev) {
+        return '<div class="cw-ev">' +
+          '<div class="cw-ev__act">' + escH(ev.action) + '</div>' +
+          '<div class="cw-ev__meta">' + escH(ev.at) + ' · ' + escH(ev.actor) + (ev.detail ? (' · ' + escH(ev.detail)) : '') + '</div>' +
+        '</div>';
+      }).join('');
+    }
+  }
+
+  function advanceStage(stage, note) {
+    postJson('/contracts/' + docId + '/stage', { stage: stage, note: note || '' })
+      .then(function (res) { if (res.workflow) { wf = res.workflow; render(); } })
+      .catch(function (e) { alert('Stage transition failed: ' + e.message); });
+  }
+
+  document.getElementById('cw-stepper').addEventListener('click', function (e) {
+    var li = e.target.closest('[data-step]');
+    if (!li) return;
+    var st = li.getAttribute('data-step');
+    if (st === wf.stage) return;
+    if (st === 'signed') {
+      if (confirm('Sign and close this deal with TrustSeal now?')) document.getElementById('cw-close-deal-btn').click();
+      return;
+    }
+    advanceStage(st, '');
+  });
+
+  document.querySelectorAll('[data-advance]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var st = btn.getAttribute('data-advance');
+      var noteId = btn.getAttribute('data-note-el');
+      var note = noteId ? (document.getElementById(noteId).value || '').trim() : '';
+      advanceStage(st, note);
+    });
+  });
+
+  document.getElementById('cw-checklist').addEventListener('change', function () {
+    var payload = {};
+    document.querySelectorAll('[data-chk]').forEach(function (cb) { payload[cb.getAttribute('data-chk')] = !!cb.checked; });
+    postJson('/contracts/' + docId + '/workflow/meta', { checklist: payload }).then(function (r) { if (r.workflow) wf = r.workflow; });
+  });
+
+  document.getElementById('cw-save-meta').addEventListener('click', function () {
+    postJson('/contracts/' + docId + '/workflow/meta', {
+      counterparty_name: document.getElementById('cw-party').value,
+      currency: document.getElementById('cw-currency').value,
+      deal_value: document.getElementById('cw-value').value,
+      effective_date: document.getElementById('cw-effdate').value,
+      governing_law: document.getElementById('cw-law').value,
+      stamp_id: document.getElementById('cw-stamp-sel').value || null,
+    }).then(function (r) {
+      if (r.workflow) { wf = r.workflow; render(); }
+      var m = document.getElementById('cw-meta-msg');
+      m.textContent = 'Saved';
+      setTimeout(function () { m.textContent = ''; }, 1800);
+    });
+  });
+
+  document.getElementById('cw-add-signer-btn').addEventListener('click', function () {
+    var name = document.getElementById('cw-sig-name').value.trim();
+    var email = document.getElementById('cw-sig-email').value.trim();
+    var role = document.getElementById('cw-sig-role').value;
+    if (!name) { document.getElementById('cw-sig-name').focus(); return; }
+    postJson('/contracts/' + docId + '/workflow/signers', { action: 'add', name: name, email: email, role: role })
+      .then(function (r) {
+        if (r.workflow) { wf = r.workflow; render(); }
+        document.getElementById('cw-sig-name').value = '';
+        document.getElementById('cw-sig-email').value = '';
+      });
+  });
+
+  document.getElementById('cw-signers-list').addEventListener('click', function (e) {
+    var rm = e.target.closest('[data-rm-sig]');
+    if (rm) {
+      postJson('/contracts/' + docId + '/workflow/signers', { action: 'remove', id: rm.getAttribute('data-rm-sig') })
+        .then(function (r) { if (r.workflow) { wf = r.workflow; render(); } });
+      return;
+    }
+    var sg = e.target.closest('[data-sign-id]');
+    if (sg) {
+      var defName = sg.getAttribute('data-sign-name') || '';
+      var typed = prompt('Type legal signature to execute with TrustSeal:', defName);
+      if (!typed) return;
+      postJson('/contracts/' + docId + '/workflow/sign', { id: sg.getAttribute('data-sign-id'), signature_text: typed })
+        .then(function (r) { if (r.workflow) { wf = r.workflow; render(); } });
+    }
+  });
+
+  document.getElementById('cw-close-deal-btn').addEventListener('click', function () {
+    var btn = this;
+    btn.disabled = true; btn.textContent = 'Closing Deal with TrustSeal…';
+    postJson('/contracts/' + docId + '/workflow/close-deal', {
+      stamp_id: document.getElementById('cw-stamp-sel').value || null,
+      note: document.getElementById('cw-close-note').value.trim(),
+    }).then(function (r) {
+      btn.disabled = false; btn.textContent = '✓ Sign & Close Deal with TrustSeal';
+      if (r.workflow) { wf = r.workflow; render(); }
+    }).catch(function (err) {
+      btn.disabled = false; btn.textContent = '✓ Sign & Close Deal with TrustSeal';
+      alert('Close deal failed: ' + err.message);
+    });
+  });
+
+  render();
+})();
+</script>
+{% endblock %}

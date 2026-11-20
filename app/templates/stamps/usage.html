@@ -1,0 +1,315 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'stamps' %}
+{% set stamp_subnav = 'usage' %}
+
+{% block title %}{% if stamp %}{{ stamp.name }} · Usage{% else %}Usage &amp; Audit{% endif %} · TRUSTSEAL{% endblock %}
+{% block page_title %}{% if stamp %}{{ stamp.name }} · Usage{% else %}Usage &amp; Audit{% endif %}{% endblock %}
+{% block page_description %}{% endblock %}
+{% block page_actions %}
+  {% if stamp %}
+    <a class="ts-btn" href="{{ url_for('tsd_stamps_views.usage_page') }}">All stamps</a>
+    <a class="ts-btn ts-btn--primary" href="{{ url_for('tsd_stamps_views.studio_edit', stamp_id=stamp.id) }}">Edit in Studio</a>
+  {% else %}
+    <a class="ts-btn" href="{{ url_for('tsd_stamps_views.verify_page') }}">Forensic verify</a>
+    <a class="ts-btn" href="{{ url_for('tsd_stamps_views.library') }}">Back to library</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="st-flat">
+  {% include "stamps/_flat_ui.html" %}
+
+  <div id="usg-inline-summary" style="display:flex;flex-wrap:wrap;gap:18px;align-items:center;margin-bottom:14px;font-size:12.5px;color:#42526e;font-variant-numeric:tabular-nums;">
+    <span><strong id="usg-m-total" style="color:#091e42;">—</strong> usages (<span id="usg-m-window">30d</span>)</span>
+    <span>Active / Revoked: <strong id="usg-m-status">—</strong></span>
+    <span><strong id="usg-m-actors" style="color:#091e42;">—</strong> · <span id="usg-m-docs">—</span></span>
+    <span id="usg-m-channels" style="margin-left:auto;">—</span>
+  </div>
+
+  <section class="st-toolbar">
+    <div class="st-search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+        <path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <input type="search" id="usg-q" placeholder="Filter by stamp, user, document, fingerprint, receipt #…">
+    </div>
+    <div class="st-toolbar__right" style="flex-wrap:wrap;">
+      <select id="usg-stamp" class="st-select" aria-label="Filter by stamp">
+        <option value="">All stamps</option>
+        {% for s in stamps %}
+        <option value="{{ s.id }}" {% if stamp and stamp.id == s.id %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+      <select id="usg-status" class="st-select" aria-label="Filter by status">
+        <option value="">All statuses</option>
+        <option value="active">Active</option>
+        <option value="revoked">Revoked</option>
+      </select>
+      <select id="usg-days" class="st-select" aria-label="Time window">
+        <option value="30">Last 30 days</option>
+        <option value="90">Last 90 days</option>
+        <option value="365">Last 365 days</option>
+      </select>
+      <button type="button" class="ts-btn ts-btn--sm" id="usg-refresh">Refresh</button>
+    </div>
+  </section>
+
+  <div class="usg-tabs" role="tablist">
+    <button type="button" class="usg-tab is-active" data-tab="ledger">Usage Ledger</button>
+    <button type="button" class="usg-tab" data-tab="breakdown">Top Stamps &amp; Actors</button>
+    <button type="button" class="usg-tab" data-tab="audit" id="usg-tab-audit">Security Audit Log</button>
+  </div>
+
+  <section class="st-panel" id="usg-pane-ledger">
+    <div style="overflow-x:auto;" id="usg-ledger-wrap">
+      <div style="padding:32px;text-align:center;color:#64748b;">Loading…</div>
+    </div>
+  </section>
+
+  <section class="usg-split" id="usg-pane-breakdown" hidden>
+    <div class="st-panel">
+      <div class="st-panel__head"><h2 class="st-panel__title">Top Stamps</h2></div>
+      <div id="usg-top-stamps" style="padding:12px 16px;color:#64748b;">Loading…</div>
+    </div>
+    <div class="st-panel">
+      <div class="st-panel__head"><h2 class="st-panel__title">Top Actors</h2></div>
+      <div id="usg-top-users" style="padding:12px 16px;color:#64748b;">Loading…</div>
+    </div>
+  </section>
+
+  <section class="st-panel" id="usg-pane-audit" hidden>
+    <div class="st-panel__head">
+      <h2 class="st-panel__title" id="usg-audit-heading">Security Audit Events</h2>
+    </div>
+    <div style="overflow-x:auto;" id="usg-audit-wrap">
+      <div style="padding:32px;text-align:center;color:#64748b;">Select a stamp above to view its security audit log.</div>
+    </div>
+  </section>
+</div>
+
+<style>
+.usg-tabs {
+  display: flex;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 16px;
+}
+.usg-tab {
+  padding: 9px 16px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #64748b;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+}
+.usg-tab:hover { color: #0f172a; background: #f1f5f9; }
+.usg-tab.is-active {
+  color: #0f172a;
+  font-weight: 600;
+  border-bottom-color: #2563eb;
+  background: #ffffff;
+}
+.usg-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 820px) {
+  .usg-split { grid-template-columns: 1fr; }
+}
+.usg-revoke-bar {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.usg-link {
+  color: #2563eb;
+  text-decoration: none;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.usg-link:hover { text-decoration: underline; }
+</style>
+
+<script>
+(function () {
+  var qEl = document.getElementById('usg-q');
+  var stampEl = document.getElementById('usg-stamp');
+  var statusEl = document.getElementById('usg-status');
+  var daysEl = document.getElementById('usg-days');
+  var refreshBtn = document.getElementById('usg-refresh');
+  var ledgerWrap = document.getElementById('usg-ledger-wrap');
+  var topStampsEl = document.getElementById('usg-top-stamps');
+  var topUsersEl = document.getElementById('usg-top-users');
+  var auditWrap = document.getElementById('usg-audit-wrap');
+  var auditHeading = document.getElementById('usg-audit-heading');
+  var activeTab = 'ledger';
+
+  function escH(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function switchTab(tab) {
+    activeTab = tab;
+    document.querySelectorAll('.usg-tab').forEach(function (b) {
+      b.classList.toggle('is-active', b.getAttribute('data-tab') === tab);
+    });
+    document.getElementById('usg-pane-ledger').hidden = (tab !== 'ledger');
+    document.getElementById('usg-pane-breakdown').hidden = (tab !== 'breakdown');
+    document.getElementById('usg-pane-audit').hidden = (tab !== 'audit');
+    if (tab === 'audit') loadAudit();
+  }
+
+  document.querySelectorAll('.usg-tab').forEach(function (b) {
+    b.addEventListener('click', function () { switchTab(b.getAttribute('data-tab')); });
+  });
+
+  function loadAudit() {
+    var sid = stampEl ? stampEl.value : '';
+    if (!sid) {
+      auditHeading.textContent = 'Security Audit Events';
+      auditWrap.innerHTML = '<div style="padding:32px;text-align:center;color:#64748b;">Select a stamp from the dropdown to inspect its audit log.</div>';
+      return;
+    }
+    auditHeading.textContent = 'Security Audit Events · ' + stampEl.options[stampEl.selectedIndex].text;
+    auditWrap.innerHTML = '<div style="padding:28px;text-align:center;color:#64748b;">Loading audit events…</div>';
+    fetch('/api/tsd-stamps/' + sid + '/audit', { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var evs = data.events || [];
+        if (!evs.length) {
+          auditWrap.innerHTML = '<div style="padding:28px;text-align:center;color:#64748b;">No audit events recorded.</div>';
+          return;
+        }
+        auditWrap.innerHTML =
+          '<table class="st-table"><thead><tr><th>Timestamp</th><th>Action</th><th>Actor</th><th>Outcome</th><th>Correlation</th></tr></thead><tbody>' +
+          evs.map(function (e) {
+            return '<tr>' +
+              '<td style="white-space:nowrap;">' + escH((e.created_at || '').replace('T', ' ').slice(0, 19)) + '</td>' +
+              '<td><code>' + escH(e.action) + '</code></td>' +
+              '<td title="' + escH(e.actor_email || '') + '">' + escH(e.actor_name || ('#' + e.actor_id)) + '</td>' +
+              '<td style="font-size:11.5px;word-break:break-all;">' + escH(e.outcome || '—') + '</td>' +
+              '<td style="font-family:monospace;font-size:11px;color:#64748b;">' + escH((e.correlation_id || '').slice(0, 12)) + '</td>' +
+            '</tr>';
+          }).join('') + '</tbody></table>';
+      })
+      .catch(function (e) {
+        auditWrap.innerHTML = '<div style="padding:24px;color:#991b1b;">Failed to load audit log: ' + escH(e.message) + '</div>';
+      });
+  }
+
+  function loadAll() {
+    var params = new URLSearchParams();
+    if (stampEl && stampEl.value) params.set('stamp_id', stampEl.value);
+    if (statusEl && statusEl.value) params.set('status', statusEl.value);
+    if (daysEl && daysEl.value) params.set('days', daysEl.value);
+    if (qEl && qEl.value.trim()) params.set('q', qEl.value.trim());
+
+    ledgerWrap.innerHTML = '<div style="padding:28px;text-align:center;color:#64748b;">Loading…</div>';
+
+    Promise.all([
+      fetch('/api/tsd-stamps/insertions?' + params.toString(), { credentials: 'same-origin' }).then(function (r) { return r.json(); }),
+      fetch('/api/tsd-stamps/usage-analytics?days=' + (daysEl ? daysEl.value : '30'), { credentials: 'same-origin' }).then(function (r) { return r.json(); }),
+    ]).then(function (pair) {
+      var data = pair[0] || {};
+      var an = pair[1] || {};
+      var ch = an.channel_breakdown || {};
+
+      document.getElementById('usg-m-total').textContent = an.total_insertions || 0;
+      document.getElementById('usg-m-window').textContent = 'Last ' + (an.days || 30) + ' days';
+      document.getElementById('usg-m-status').innerHTML =
+        '<span style="color:#0f766e;">' + (an.active_insertions || 0) + '</span> <span style="color:#cbd5e1;">/</span> <span style="color:#991b1b;">' + (an.revoked_insertions || 0) + '</span>';
+      document.getElementById('usg-m-actors').textContent = (an.unique_users || 0) + ' users';
+      document.getElementById('usg-m-docs').textContent = (an.unique_documents || 0) + ' documents · ' + (an.unique_stamps_used || 0) + ' stamps';
+      document.getElementById('usg-m-channels').innerHTML =
+        'TSD: <strong>' + (ch.tsd_document || 0) + '</strong> · SVG: <strong>' + (ch.svg_export || 0) + '</strong> · ' +
+        'PNG: <strong>' + (ch.png_export || 0) + '</strong> · PDF: <strong>' + (ch.pdf_export || 0) + '</strong>';
+
+      // Top stamps
+      var ts = an.top_stamps || [];
+      topStampsEl.innerHTML = ts.length
+        ? '<table class="st-table"><thead><tr><th>Stamp</th><th style="text-align:right;">Usages</th></tr></thead><tbody>' +
+          ts.map(function (s) {
+            return '<tr><td><a class="usg-link" href="/stamps/' + s.stamp_id + '/usage">' + escH(s.name) + '</a></td><td style="text-align:right;font-weight:600;">' + s.count + '</td></tr>';
+          }).join('') + '</tbody></table>'
+        : '<div style="padding:16px 0;color:#64748b;">No usage data yet.</div>';
+
+      // Top users
+      var tu = an.top_users || [];
+      topUsersEl.innerHTML = tu.length
+        ? '<table class="st-table"><thead><tr><th>Actor</th><th style="text-align:right;">Usages</th></tr></thead><tbody>' +
+          tu.map(function (u) {
+            return '<tr><td title="' + escH(u.email || '') + '">' + escH(u.name || ('User #' + u.user_id)) + '</td><td style="text-align:right;font-weight:600;">' + u.count + '</td></tr>';
+          }).join('') + '</tbody></table>'
+        : '<div style="padding:16px 0;color:#64748b;">No actor data yet.</div>';
+
+      // Ledger table
+      var rows = data.insertions || [];
+      if (!rows.length) {
+        ledgerWrap.innerHTML = '<div style="padding:36px;text-align:center;color:#64748b;">No tracked stamp usages found.</div>';
+        return;
+      }
+      ledgerWrap.innerHTML =
+        '<table class="st-table"><thead><tr>' +
+          '<th>Receipt</th><th>Stamp</th><th>Channel</th><th>Actor</th><th>Document / Context</th><th>Timestamp</th><th>Forensic Fingerprint</th><th>Status</th><th></th>' +
+        '</tr></thead><tbody>' +
+        rows.map(function (i) {
+          var statusTag = i.revoked_at
+            ? '<span class="st-tag st-tag--bad" title="' + escH(i.revoked_reason || '') + '">Revoked</span>'
+            : '<span class="st-tag st-tag--ok">Valid</span>';
+          var docCtx = i.document_title
+            ? ('#' + i.document_id + ' · ' + escH(i.document_title))
+            : escH(i.context_label || '—');
+          var vLink = i.verify_url ? '<a class="usg-link" href="' + escH(i.verify_url) + '" target="_blank" rel="noopener">Verify ↗</a>' : '';
+          var revBtn = i.revoked_at
+            ? ''
+            : '<button type="button" class="ts-btn ts-btn--text ts-btn--sm" style="color:#991b1b;padding:2px 6px;" data-revoke-id="' + i.id + '" data-revoke-sid="' + i.stamp_id + '">Revoke</button>';
+          return '<tr>' +
+            '<td><strong>#' + i.id + '</strong>' + (vLink ? ' ' + vLink : '') + '</td>' +
+            '<td><a class="usg-link" style="color:#091e42;font-weight:600;" href="/stamps/' + i.stamp_id + '/usage">' + escH(i.stamp_name) + '</a></td>' +
+            '<td><span class="st-tag st-tag--info">' + escH(i.channel || 'tsd_document') + '</span></td>' +
+            '<td title="' + escH(i.placed_by_email || '') + '">' + escH(i.placed_by_name) + '</td>' +
+            '<td>' + docCtx + '</td>' +
+            '<td style="white-space:nowrap;">' + escH((i.placed_at || '').replace('T', ' ').slice(0, 19)) + '</td>' +
+            '<td style="font-family:monospace;font-size:11px;">' + escH(i.forensic_fingerprint || '—') + '</td>' +
+            '<td>' + statusTag + '</td>' +
+            '<td>' + revBtn + '</td>' +
+          '</tr>';
+        }).join('') + '</tbody></table>';
+
+      ledgerWrap.querySelectorAll('[data-revoke-id]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var rid = btn.getAttribute('data-revoke-id');
+          var sid = btn.getAttribute('data-revoke-sid');
+          var reason = prompt('Reason for revoking receipt #' + rid + ':', 'Superseded / unauthorized use');
+          if (reason === null) return;
+          fetch('/api/tsd-stamps/' + sid + '/insertions/' + rid + '/revoke', {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+            body: JSON.stringify({ reason: reason }),
+          }).then(function (r) {
+            if (r.ok) loadAll();
+            else alert('Revoke failed: HTTP ' + r.status);
+          });
+        });
+      });
+
+      if (activeTab === 'audit') loadAudit();
+    }).catch(function (e) {
+      ledgerWrap.innerHTML = '<div style="padding:24px;color:#991b1b;">Failed to load usage data: ' + escH(e.message) + '</div>';
+    });
+  }
+
+  if (refreshBtn) refreshBtn.addEventListener('click', loadAll);
+  if (stampEl) stampEl.addEventListener('change', loadAll);
+  if (statusEl) statusEl.addEventListener('change', loadAll);
+  if (daysEl) daysEl.addEventListener('change', loadAll);
+  if (qEl) qEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') loadAll(); });
+
+  loadAll();
+})();
+</script>
+{% endblock %}

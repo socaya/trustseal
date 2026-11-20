@@ -1,0 +1,607 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'signatures' %}
+
+{% block title %}Authorized Signatories · TRUSTSEAL{% endblock %}
+{% block page_title %}Authorized Signatories{% endblock %}
+{% block page_description %}{% endblock %}
+{% block page_actions %}
+  <button type="button" class="ts-btn ts-btn--primary" id="sig-reg-toggle">+ Register signatory</button>
+{% endblock %}
+
+{% block content %}
+{% set pending_otp_cnt = usage_logs|selectattr('status', 'equalto', 'otp_pending')|list|length %}
+<div class="st-flat ts-sig-vault" id="ts-sig-vault" data-viewer="{{ current_user_email }}">
+  {% include "stamps/_flat_ui.html" %}
+
+  <!-- Security Notice Banner -->
+  <div class="sig-sec-banner">
+    <strong>Zero-Copy Protected Vault:</strong> Only <strong>Approved</strong> signatures can be applied to documents. Every usage is logged and requires <strong>Owner OTP Approval</strong>. Copying, screenshots, and camera snapshots are actively blocked.
+  </div>
+
+  <!-- Tab bar: Authorized Signatories | Usage & OTP Audit Log -->
+  <section class="sig-tabs-bar">
+    <div class="sig-tabs" role="tablist">
+      <button type="button" class="sig-tab is-active" data-sig-view="registry">
+        Authorized Signatories <span class="sig-tab__n">{{ registered_signatures|length }}</span>
+      </button>
+      <button type="button" class="sig-tab" data-sig-view="audit">
+        Usage &amp; OTP Approvals <span class="sig-tab__n">{{ usage_logs|length }}{% if pending_otp_cnt %} · {{ pending_otp_cnt }} pending{% endif %}</span>
+      </button>
+    </div>
+    <div class="st-search" style="min-width:250px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+        <path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <input type="search" id="sig-search" placeholder="Search signatories or audit logs…">
+    </div>
+  </section>
+
+  <!-- Inline Register Signatory Panel (Connected Device / Stylus Pen / TS HQ Engine / Upload) -->
+  <section id="sig-reg-panel" class="st-panel" style="padding:18px 20px;margin-bottom:18px;" hidden>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div>
+        <strong style="font-size:14px;color:#091e42;">Register Authorized Signatory Signature</strong>
+        <div style="font-size:12px;color:#5a6676;margin-top:2px;">Capture via connected Signature Pad, Stylus Pen, or TS High-Quality Vector Signature Engine.</div>
+      </div>
+      <button type="button" class="sig-close" id="sig-reg-close" aria-label="Close">✕</button>
+    </div>
+
+    <form method="post" action="{{ url_for('workspace_assets_views.register_staff_signature') }}" id="sig-reg-form">
+      <input type="hidden" name="signature_type" id="sig-reg-type" value="drawn">
+      <input type="hidden" name="capture_engine" id="sig-reg-engine" value="stylus_pen">
+      <input type="hidden" name="device_name" id="sig-reg-device" value="">
+      <input type="hidden" name="signature_data" id="sig-reg-data" value="">
+
+      <div class="sig-form" style="margin-bottom:14px;">
+        <div class="sig-field">
+          <label for="sig-staff-user">Authorized Signatory (Staff Member)</label>
+          <select id="sig-staff-user" name="user_id" class="st-select" style="width:100%;background:#f6f8fb;">
+            {% for u in tenant_users %}
+            <option value="{{ u.id }}" {% if u.id == current_user_id %}selected{% endif %}>
+              {{ u.get_full_name() or u.username or u.email }} ({{ u.email }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="sig-field">
+          <label for="sig-label">Official Title / Role Label</label>
+          <input type="text" id="sig-label" name="name" required class="st-select" style="width:100%;background:#f6f8fb;" placeholder="e.g. Managing Director — Official Signature" value="Official Signature">
+        </div>
+        <div class="sig-field">
+          <label for="sig-initials">Initials (optional)</label>
+          <input type="text" id="sig-initials" name="initials_data" maxlength="12" class="st-select" style="width:100%;background:#f6f8fb;" placeholder="e.g. J.D.">
+        </div>
+        <div class="sig-field" style="justify-content:flex-end;gap:6px;">
+          <label style="display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#1d3648;cursor:pointer;text-transform:none;letter-spacing:0;">
+            <input type="checkbox" name="is_default" value="1" checked style="accent-color:#002769;">
+            Set as default signature
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#02982E;cursor:pointer;text-transform:none;letter-spacing:0;">
+            <input type="checkbox" name="approve_now" value="1" checked style="accent-color:#02982E;">
+            Owner-approve immediately (if registering own signature)
+          </label>
+        </div>
+      </div>
+
+      <!-- Capture Engine Tabs -->
+      <div class="sig-mode-tabs" role="tablist">
+        <button type="button" class="sig-mode-btn is-active" data-cap-mode="stylus_pen">Stylus Pen / Pressure Pad</button>
+        <button type="button" class="sig-mode-btn" data-cap-mode="device_pad">Connected Signature Device (USB/HID)</button>
+        <button type="button" class="sig-mode-btn" data-cap-mode="ts_hq_engine">TS High-Quality Vector Engine</button>
+        <button type="button" class="sig-mode-btn" data-cap-mode="uploaded">Upload Scanned Signature</button>
+      </div>
+
+      <!-- Connected Device Status Bar (shown for device_pad & stylus_pen) -->
+      <div id="sig-device-bar" class="sig-device-bar">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="sig-dev-dot" id="sig-dev-dot"></span>
+          <span id="sig-dev-status" style="font-size:12px;color:#1d3648;">Stylus / Pen Pressure Engine Ready (TS High-Quality Vector Smoothing ON)</span>
+        </div>
+        <div style="display:inline-flex;align-items:center;gap:8px;">
+          <button type="button" class="ts-btn ts-btn--sm" id="sig-connect-hid">Connect Signature Pad (USB/HID)</button>
+          <select id="sig-ink-color" class="st-select" style="height:26px;font-size:11.5px;padding:0 8px;">
+            <option value="#002769">TrustSeal Navy</option>
+            <option value="#091e42">Executive Black</option>
+            <option value="#1d3648">Slate Ink</option>
+          </select>
+          <button type="button" class="ts-btn ts-btn--sm" id="sig-pad-clear">Clear</button>
+        </div>
+      </div>
+
+      <!-- Mode 1 & 2: Pressure-Sensitive Stylus / Device Pad -->
+      <div id="sig-cap-pad" class="sig-cap-box">
+        <canvas id="sig-pad" width="760" height="190" style="width:100%;max-width:760px;height:190px;background:#fafbfd;border:1px dashed #94a3b8;cursor:crosshair;display:block;touch-action:none;"></canvas>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-top:6px;">
+          <span id="sig-pen-telemetry">Input: waiting for stylus pen, signature pad, or mouse…</span>
+          <span>Auto-vectorized by TS High-Quality Signature Engine (SVG Bezier)</span>
+        </div>
+      </div>
+
+      <!-- Mode 3: TS High-Quality Vector Signature Engine -->
+      <div id="sig-cap-hq" class="sig-cap-box" hidden>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+          <input type="text" id="sig-type-input" class="st-select" style="flex:1;min-width:240px;background:#f6f8fb;" placeholder="Type signatory full name for TS High-Quality Calligraphy Engine…">
+          <select id="sig-hq-style" class="st-select" style="background:#f6f8fb;">
+            <option value="executive">Executive Fountain Nib</option>
+            <option value="calligraphy">Formal Calligraphy Script</option>
+            <option value="monogram">Clean Legal Initialed</option>
+          </select>
+        </div>
+        <div id="sig-type-preview" style="min-height:110px;display:flex;align-items:center;justify-content:center;background:#fafbfd;border:1px dashed #cbd5e1;padding:12px;">
+          <span style="color:#7a869a;font-size:12px;">TS High-Quality Vector Signature preview will appear here</span>
+        </div>
+      </div>
+
+      <!-- Mode 4: Upload Image -->
+      <div id="sig-cap-uploaded" class="sig-cap-box" hidden>
+        <input type="file" id="sig-file-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="margin-bottom:10px;">
+        <div id="sig-upload-preview" style="min-height:100px;display:flex;align-items:center;justify-content:center;background:#fafbfd;border:1px dashed #cbd5e1;padding:12px;color:#7a869a;font-size:12px;">
+          Upload a high-resolution PNG/SVG signature scan.
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
+        <button type="button" class="ts-btn" id="sig-reg-cancel">Cancel</button>
+        <button type="submit" class="ts-btn ts-btn--primary">Register Authorized Signature</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- ==================== VIEW 1: AUTHORIZED SIGNATORIES VAULT ==================== -->
+  <section id="sig-view-registry">
+    {% if registered_signatures %}
+    <div class="sig-reg-grid" id="sig-reg-grid">
+      {% for s in registered_signatures %}
+      <article class="sig-card" data-hay="{{ (s.staff_name ~ ' ' ~ s.staff_email ~ ' ' ~ s.name ~ ' ' ~ s.approval_status ~ ' ' ~ s.capture_engine)|lower }}">
+        <!-- Anti-Copy / Anti-Screenshot / Anti-Camera Protected Preview -->
+        <div class="sig-card__preview ts-sig-protected" data-sig-shield="1">
+          <div class="ts-sig-graphic">
+            {% if s.signature_data.startswith('data:image/') or s.signature_data.startswith('/static/') %}
+              <img src="{{ s.signature_data }}" alt="Protected Signature" draggable="false">
+            {% elif '<svg' in s.signature_data %}
+              {{ s.signature_data|safe }}
+            {% else %}
+              <span style="font-family:Georgia,serif;font-style:italic;font-size:24px;color:#002769;">{{ s.signature_data }}</span>
+            {% endif %}
+          </div>
+          <div class="ts-sig-curtain" aria-hidden="true">
+            <span class="ts-sig-curtain__badge">PROTECTED · ANTI-CAPTURE SHIELD</span>
+            <span class="ts-sig-curtain__sub">Hold "Verify" to peek · No Copy / Screenshot / Photo</span>
+          </div>
+          <div class="ts-sig-wm" aria-hidden="true">CONFIDENTIAL · {{ current_user_email }} · DO NOT COPY</div>
+        </div>
+
+        <div class="sig-card__meta">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px;">
+            <strong style="font-size:13.5px;color:#091e42;">{{ s.staff_name }}</strong>
+            {% if s.approval_status == 'approved' %}
+              <span class="st-tag st-tag--ok">Approved</span>
+            {% elif s.approval_status == 'revoked' %}
+              <span class="st-tag st-tag--warn">Revoked</span>
+            {% else %}
+              <span class="st-tag">Pending Approval</span>
+            {% endif %}
+          </div>
+          <div style="font-size:12px;color:#42526e;margin-bottom:2px;">{{ s.name }}{% if s.is_default %} · <strong style="color:#002769;">Default</strong>{% endif %}</div>
+          <div style="font-size:11px;color:#7a869a;margin-bottom:10px;">
+            {{ s.staff_email }} · {{ s.capture_engine|replace('_', ' ')|upper }}{% if s.device_name %} ({{ s.device_name }}){% endif %}
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-top:auto;">
+            <button type="button" class="ts-btn ts-btn--sm ts-sig-peek-btn" title="Press and hold to momentarily inspect">Hold to Verify</button>
+            <div style="display:inline-flex;gap:5px;flex-wrap:wrap;">
+              {% if s.approval_status != 'approved' %}
+              <form method="post" action="{{ url_for('workspace_assets_views.approve_staff_signature', sig_id=s.id) }}" style="margin:0;">
+                <button type="submit" class="ts-btn ts-btn--sm" style="background:#02982E;color:#fff;border-color:#02982E;font-weight:600;">Approve</button>
+              </form>
+              {% else %}
+              <form method="post" action="{{ url_for('workspace_assets_views.revoke_staff_signature', sig_id=s.id) }}" style="margin:0;">
+                <button type="submit" class="ts-btn ts-btn--sm" style="color:#9b2c2c;">Revoke</button>
+              </form>
+              {% endif %}
+              {% if not s.is_default and s.approval_status == 'approved' %}
+              <form method="post" action="{{ url_for('workspace_assets_views.set_default_staff_signature', sig_id=s.id) }}" style="margin:0;">
+                <button type="submit" class="ts-btn ts-btn--sm" style="color:#002769;">Default</button>
+              </form>
+              {% endif %}
+              <form method="post" action="{{ url_for('workspace_assets_views.delete_staff_signature', sig_id=s.id) }}" style="margin:0;" onsubmit="return confirm('Permanently delete this registered signature?');">
+                <button type="submit" class="ts-btn ts-btn--sm" style="color:#7a869a;">✕</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <section class="st-empty">
+      <div class="st-empty__title">No authorized signatories registered yet</div>
+      <p style="font-size:13px;color:#5a6676;margin:6px 0 14px;">Register authorized staff signatures using a connected signature pad, stylus pen, or the TS High-Quality Vector Engine.</p>
+      <button type="button" class="ts-btn ts-btn--primary" onclick="document.getElementById('sig-reg-toggle').click()">+ Register first signatory</button>
+    </section>
+    {% endif %}
+  </section>
+
+  <!-- ==================== VIEW 2: USAGE & OWNER OTP APPROVAL LOG ==================== -->
+  <section id="sig-view-audit" hidden>
+    {% if usage_logs %}
+    <section class="st-panel" style="overflow-x:auto;">
+      <table class="st-table">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Signature / Owner</th>
+            <th>Requested By</th>
+            <th>Document</th>
+            <th>IP Address</th>
+            <th>Status</th>
+            <th style="text-align:right;width:180px;">Owner Action</th>
+          </tr>
+        </thead>
+        <tbody id="sig-audit-tbody">
+          {% for lg in usage_logs %}
+          <tr data-hay="{{ (lg.signature_name ~ ' ' ~ lg.owner_name ~ ' ' ~ lg.requester_name ~ ' ' ~ lg.document_title ~ ' ' ~ lg.status)|lower }}">
+            <td style="color:#7a869a;white-space:nowrap;">{{ lg.created_at }}</td>
+            <td><strong>{{ lg.signature_name }}</strong><div style="font-size:11px;color:#5a6676;">Owner: {{ lg.owner_name }}</div></td>
+            <td style="color:#1d3648;">{{ lg.requester_name }}</td>
+            <td style="color:#002769;font-weight:600;">{{ lg.document_title }}</td>
+            <td style="font-family:monospace;font-size:11.5px;color:#5a6676;">{{ lg.ip_address }}</td>
+            <td>
+              <span class="st-tag {% if lg.status in ('applied','approved') %}st-tag--ok{% elif lg.status in ('denied','expired') %}st-tag--warn{% endif %}">
+                {{ lg.status|replace('_', ' ')|upper }}
+              </span>
+            </td>
+            <td style="text-align:right;">
+              {% if lg.status == 'otp_pending' and lg.is_owner %}
+              <form method="post" action="{{ url_for('workspace_assets_views.owner_decide_signature_usage', log_id=lg.id) }}" style="display:inline;">
+                <input type="hidden" name="decision" value="approve">
+                <button type="submit" class="ts-btn ts-btn--sm" style="background:#02982E;color:#fff;border-color:#02982E;">Approve</button>
+              </form>
+              <form method="post" action="{{ url_for('workspace_assets_views.owner_decide_signature_usage', log_id=lg.id) }}" style="display:inline;">
+                <input type="hidden" name="decision" value="deny">
+                <button type="submit" class="ts-btn ts-btn--sm" style="color:#9b2c2c;">Deny</button>
+              </form>
+              {% else %}
+              <span style="font-size:11px;color:#7a869a;">Logged</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% else %}
+    <section class="st-empty">
+      <div class="st-empty__title">No signature usage events logged yet</div>
+      <p style="font-size:13px;color:#5a6676;margin-top:6px;">Every time an authorized signature is requested or applied to a document, it is logged here with owner OTP verification.</p>
+    </section>
+    {% endif %}
+  </section>
+</div>
+
+<style>
+.sig-sec-banner {
+  background: #edf2fa; border-left: 3px solid #002769; color: #1d3648;
+  padding: 9px 14px; font-size: 12px; margin-bottom: 14px;
+}
+.sig-tabs-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 18px; padding-bottom: 10px; border-bottom: 1px solid #dfe5ee;
+}
+.sig-tabs { display: flex; gap: 6px; }
+.sig-tab {
+  border: 1px solid #d5dce6; background: #fff; color: #1d3648;
+  padding: 7px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px; border-radius: 0;
+}
+.sig-tab.is-active { background: #002769; border-color: #002769; color: #fff; }
+.sig-tab__n { font-size: 11px; opacity: 0.85; }
+.sig-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sig-field { display: flex; flex-direction: column; gap: 5px; }
+.sig-field label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #5a6676; }
+.sig-close { border: 0; background: transparent; font-size: 16px; color: #64748b; cursor: pointer; }
+.sig-mode-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.sig-mode-btn {
+  border: 1px solid #d5dce6; background: #fff; color: #1d3648;
+  padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.sig-mode-btn.is-active { background: #002769; border-color: #002769; color: #fff; }
+.sig-device-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  background: #f6f8fb; border: 1px solid #dfe5ee; padding: 8px 12px; margin-bottom: 8px;
+}
+.sig-dev-dot { width: 8px; height: 8px; border-radius: 50%; background: #02982E; display: inline-block; }
+.sig-reg-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px;
+}
+.sig-card {
+  background: #fff; border: 1px solid #dfe5ee; padding: 14px; display: flex; flex-direction: column;
+}
+.sig-card:hover { border-color: #002769; }
+.sig-card__meta { display: flex; flex-direction: column; flex: 1; }
+
+/* Hardened Anti-Copy, Anti-Screenshot & Anti-Camera Blur Shield */
+.ts-sig-protected {
+  position: relative; height: 112px; display: flex; align-items: center; justify-content: center;
+  background: #fafbfd; border: 1px solid #dfe5ee; margin-bottom: 12px; padding: 8px; overflow: hidden;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.ts-sig-graphic {
+  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+  filter: blur(18px) saturate(0.15) contrast(0.5);
+  transition: filter 0.12s ease;
+}
+.ts-sig-graphic img, .ts-sig-graphic svg { max-width: 100%; max-height: 88px; width: auto; height: auto; pointer-events: none; }
+.ts-sig-curtain {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  background: repeating-linear-gradient(-35deg, rgba(0,39,105,0.08) 0 4px, rgba(255,255,255,0.72) 4px 8px);
+  pointer-events: none; text-align: center; padding: 6px;
+}
+.ts-sig-curtain__badge { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; color: #002769; background: rgba(255,255,255,0.92); padding: 2px 7px; border: 1px solid #cbd5e1; }
+.ts-sig-curtain__sub { font-size: 9.5px; color: #42526e; }
+.ts-sig-wm {
+  position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+  transform: rotate(-14deg); font-size: 9.5px; font-weight: 800; letter-spacing: 0.1em;
+  color: rgba(0, 39, 105, 0.24); pointer-events: none; white-space: nowrap;
+}
+.ts-sig-protected.is-peeking .ts-sig-graphic { filter: none; }
+.ts-sig-protected.is-peeking .ts-sig-curtain { display: none; }
+.ts-sig-protected.is-peeking .ts-sig-wm { display: flex; }
+
+/* Aggressive global capture lockdown when screenshot/blur/print detected */
+body.ts-capture-lock .ts-sig-graphic { filter: blur(28px) contrast(0.2) !important; opacity: 0.15 !important; }
+body.ts-capture-lock .ts-sig-curtain { display: flex !important; background: #091e42 !important; color: #fff !important; }
+@media print {
+  .ts-sig-graphic { filter: blur(28px) !important; opacity: 0 !important; }
+}
+</style>
+
+<script>
+(function () {
+  var regPanel = document.getElementById('sig-reg-panel');
+  document.getElementById('sig-reg-toggle').addEventListener('click', function () { regPanel.hidden = !regPanel.hidden; });
+  document.getElementById('sig-reg-close').addEventListener('click', function () { regPanel.hidden = true; });
+  document.getElementById('sig-reg-cancel').addEventListener('click', function () { regPanel.hidden = true; });
+
+  // View tabs
+  document.querySelectorAll('[data-sig-view]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var v = btn.getAttribute('data-sig-view');
+      document.querySelectorAll('[data-sig-view]').forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+      document.getElementById('sig-view-registry').hidden = (v !== 'registry');
+      document.getElementById('sig-view-audit').hidden = (v !== 'audit');
+    });
+  });
+
+  // Search filter
+  var searchEl = document.getElementById('sig-search');
+  if (searchEl) {
+    searchEl.addEventListener('input', function () {
+      var q = (searchEl.value || '').trim().toLowerCase();
+      document.querySelectorAll('#sig-reg-grid .sig-card, #sig-audit-tbody tr').forEach(function (el) {
+        var hay = el.getAttribute('data-hay') || '';
+        el.style.display = (!q || hay.indexOf(q) !== -1) ? '' : 'none';
+      });
+    });
+  }
+
+  // ---- Hardened Anti-Copy, Anti-Screenshot & Anti-Camera Shield ----
+  function lockShields() {
+    document.querySelectorAll('.ts-sig-protected.is-peeking').forEach(function (el) { el.classList.remove('is-peeking'); });
+    document.body.classList.add('ts-capture-lock');
+  }
+  function unlockShields() {
+    document.body.classList.remove('ts-capture-lock');
+  }
+  window.addEventListener('blur', lockShields);
+  document.addEventListener('visibilitychange', function () { if (document.hidden) lockShields(); else unlockShields(); });
+  window.addEventListener('focus', unlockShields);
+  document.addEventListener('keydown', function (e) {
+    var isShot = e.key === 'PrintScreen' ||
+      ((e.metaKey || e.ctrlKey) && e.shiftKey && ['3', '4', '5', 's', 'S'].indexOf(e.key) !== -1) ||
+      ((e.metaKey || e.ctrlKey) && (e.key === 'p' || e.key === 'P'));
+    if (isShot) {
+      lockShields();
+      if (e.key === 'PrintScreen' || ((e.metaKey || e.ctrlKey) && (e.key === 'p' || e.key === 'P'))) e.preventDefault();
+      setTimeout(unlockShields, 1800);
+    }
+  });
+  document.querySelectorAll('.ts-sig-protected').forEach(function (box) {
+    ['contextmenu', 'copy', 'cut', 'dragstart', 'selectstart'].forEach(function (ev) {
+      box.addEventListener(ev, function (e) { e.preventDefault(); });
+    });
+  });
+  document.querySelectorAll('.ts-sig-peek-btn').forEach(function (btn) {
+    var card = btn.closest('.sig-card');
+    var shield = card && card.querySelector('.ts-sig-protected');
+    if (!shield) return;
+    function startPeek() { unlockShields(); shield.classList.add('is-peeking'); }
+    function stopPeek() { shield.classList.remove('is-peeking'); }
+    btn.addEventListener('pointerdown', startPeek);
+    btn.addEventListener('pointerup', stopPeek);
+    btn.addEventListener('pointerleave', stopPeek);
+    btn.addEventListener('pointercancel', stopPeek);
+  });
+
+  // ---- Capture Mode & Connected Signature Device / Stylus Pen / TS HQ Engine ----
+  var activeMode = 'stylus_pen';
+  var typeHidden = document.getElementById('sig-reg-type');
+  var engHidden = document.getElementById('sig-reg-engine');
+  var devHidden = document.getElementById('sig-reg-device');
+  var dataHidden = document.getElementById('sig-reg-data');
+  var devBar = document.getElementById('sig-device-bar');
+  var devStatus = document.getElementById('sig-dev-status');
+
+  document.querySelectorAll('[data-cap-mode]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      activeMode = b.getAttribute('data-cap-mode');
+      engHidden.value = activeMode;
+      typeHidden.value = (activeMode === 'uploaded') ? 'uploaded' : (activeMode === 'ts_hq_engine' ? 'text' : 'drawn');
+      document.querySelectorAll('[data-cap-mode]').forEach(function (x) { x.classList.toggle('is-active', x === b); });
+      var isPad = (activeMode === 'stylus_pen' || activeMode === 'device_pad');
+      devBar.hidden = !isPad;
+      document.getElementById('sig-cap-pad').hidden = !isPad;
+      document.getElementById('sig-cap-hq').hidden = (activeMode !== 'ts_hq_engine');
+      document.getElementById('sig-cap-uploaded').hidden = (activeMode !== 'uploaded');
+    });
+  });
+
+  // WebHID Connected Signature Device (Wacom / Topaz / Evolis / HID Pads)
+  var hidBtn = document.getElementById('sig-connect-hid');
+  if (hidBtn) {
+    hidBtn.addEventListener('click', function () {
+      if (!navigator.hid) {
+        devStatus.textContent = 'WebHID unavailable in this browser — Stylus Pen & Pressure Pointer mode is active.';
+        return;
+      }
+      navigator.hid.requestDevice({ filters: [] }).then(function (devices) {
+        if (!devices || !devices.length) return;
+        var dev = devices[0];
+        devHidden.value = dev.productName || 'USB Signature Pad';
+        engHidden.value = 'device_pad';
+        devStatus.textContent = 'Connected: ' + (dev.productName || 'HID Signature Pad') + ' · Live pressure capture active';
+      }).catch(function () {});
+    });
+  }
+
+  // Pressure-Sensitive Stylus Pen + TS High-Quality Vector Bezier Signature Engine
+  var canvas = document.getElementById('sig-pad');
+  var ctx = canvas.getContext('2d');
+  var inkSel = document.getElementById('sig-ink-color');
+  var teleEl = document.getElementById('sig-pen-telemetry');
+  var strokes = [];
+  var curStroke = null;
+
+  function canvasPt(e) {
+    var r = canvas.getBoundingClientRect();
+    var p = (typeof e.pressure === 'number' && e.pressure > 0 && e.pressure <= 1) ? e.pressure : 0.5;
+    return {
+      x: (e.clientX - r.left) * (canvas.width / r.width),
+      y: (e.clientY - r.top) * (canvas.height / r.height),
+      p: p,
+      pt: e.pointerType || 'mouse',
+    };
+  }
+  canvas.addEventListener('pointerdown', function (e) {
+    var pt = canvasPt(e);
+    curStroke = [pt];
+    strokes.push(curStroke);
+    canvas.setPointerCapture(e.pointerId);
+    if (pt.pt === 'pen') {
+      engHidden.value = 'stylus_pen';
+      if (!devHidden.value) devHidden.value = 'Stylus Pen (Pressure)';
+    }
+    teleEl.textContent = 'Input: ' + pt.pt.toUpperCase() + ' · Pressure: ' + Math.round(pt.p * 100) + '% · TS HQ Vectorizer active';
+  });
+  canvas.addEventListener('pointermove', function (e) {
+    if (!curStroke) return;
+    var pt = canvasPt(e);
+    var prev = curStroke[curStroke.length - 1];
+    curStroke.push(pt);
+    ctx.strokeStyle = inkSel.value || '#002769';
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(1.2, Math.min(5.2, 1.4 + pt.p * 3.4));
+    ctx.beginPath();
+    ctx.moveTo(prev.x, prev.y);
+    ctx.lineTo(pt.x, pt.y);
+    ctx.stroke();
+    teleEl.textContent = 'Input: ' + pt.pt.toUpperCase() + ' · Pressure: ' + Math.round(pt.p * 100) + '% · ' + strokes.length + ' stroke(s)';
+  });
+  canvas.addEventListener('pointerup', function () { curStroke = null; });
+  document.getElementById('sig-pad-clear').addEventListener('click', function () {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    strokes = [];
+    curStroke = null;
+    teleEl.textContent = 'Input: waiting for stylus pen, signature pad, or mouse…';
+  });
+
+  function strokesToHighQualitySvg() {
+    if (!strokes.length) return '';
+    var ink = inkSel.value || '#002769';
+    var minX = 9999, minY = 9999, maxX = 0, maxY = 0;
+    strokes.forEach(function (st) {
+      st.forEach(function (pt) {
+        if (pt.x < minX) minX = pt.x; if (pt.y < minY) minY = pt.y;
+        if (pt.x > maxX) maxX = pt.x; if (pt.y > maxY) maxY = pt.y;
+      });
+    });
+    var pad = 14;
+    var vx = Math.max(0, Math.floor(minX - pad));
+    var vy = Math.max(0, Math.floor(minY - pad));
+    var vw = Math.max(80, Math.ceil(maxX - minX + pad * 2));
+    var vh = Math.max(40, Math.ceil(maxY - minY + pad * 2));
+    var paths = strokes.map(function (st) {
+      if (st.length < 2) {
+        var p0 = st[0];
+        return '<circle cx="' + p0.x.toFixed(1) + '" cy="' + p0.y.toFixed(1) + '" r="1.8" fill="' + ink + '"/>';
+      }
+      var d = 'M ' + st[0].x.toFixed(1) + ' ' + st[0].y.toFixed(1);
+      var avgP = 0;
+      for (var i = 1; i < st.length; i++) {
+        var prev = st[i - 1], cur = st[i];
+        var mx = ((prev.x + cur.x) / 2).toFixed(1);
+        var my = ((prev.y + cur.y) / 2).toFixed(1);
+        d += ' Q ' + prev.x.toFixed(1) + ' ' + prev.y.toFixed(1) + ' ' + mx + ' ' + my;
+        avgP += cur.p;
+      }
+      avgP = avgP / Math.max(1, st.length - 1);
+      var sw = Math.max(1.5, Math.min(4.2, 1.5 + avgP * 2.6)).toFixed(2);
+      return '<path d="' + d + '" fill="none" stroke="' + ink + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>';
+    }).join('');
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + vx + ' ' + vy + ' ' + vw + ' ' + vh + '" width="240" height="80" data-ts-hq-sig="1">' + paths + '</svg>';
+  }
+
+  // TS High-Quality Vector Calligraphy Generator
+  var hqSvg = '';
+  function buildHqSvg(txt, style) {
+    var safe = String(txt || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var ink = inkSel.value || '#002769';
+    var fam = style === 'calligraphy'
+      ? "'Snell Roundhand', 'Brush Script MT', 'Apple Chancery', cursive"
+      : (style === 'monogram' ? "Georgia, 'Times New Roman', serif" : "'Zapfino', 'Segoe Script', Georgia, italic, serif");
+    var flourish = style === 'monogram'
+      ? '<line x1="36" y1="74" x2="324" y2="74" stroke="' + ink + '" stroke-width="1.3" opacity="0.7"/>'
+      : '<path d="M36 74 Q 140 60 220 72 T 326 66" fill="none" stroke="' + ink + '" stroke-width="1.5" stroke-linecap="round" opacity="0.72"/>';
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 94" width="260" height="68" data-ts-hq-sig="1">' +
+      '<text x="180" y="58" text-anchor="middle" font-family="' + fam + '" font-style="italic" font-size="34" fill="' + ink + '">' + safe + '</text>' +
+      flourish + '</svg>';
+  }
+  function refreshHq() {
+    var v = (document.getElementById('sig-type-input').value || '').trim();
+    var st = document.getElementById('sig-hq-style').value;
+    hqSvg = v ? buildHqSvg(v, st) : '';
+    document.getElementById('sig-type-preview').innerHTML = hqSvg || '<span style="color:#7a869a;font-size:12px;">TS High-Quality Vector Signature preview will appear here</span>';
+  }
+  document.getElementById('sig-type-input').addEventListener('input', refreshHq);
+  document.getElementById('sig-hq-style').addEventListener('change', refreshHq);
+
+  // Upload
+  var uploadedUri = '';
+  document.getElementById('sig-file-input').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      uploadedUri = reader.result;
+      document.getElementById('sig-upload-preview').innerHTML = '<img src="' + uploadedUri + '" style="max-height:84px;max-width:100%;">';
+    };
+    reader.readAsDataURL(f);
+  });
+
+  document.getElementById('sig-reg-form').addEventListener('submit', function (e) {
+    if (activeMode === 'stylus_pen' || activeMode === 'device_pad') {
+      var svg = strokesToHighQualitySvg();
+      if (!svg) { e.preventDefault(); alert('Please sign using your stylus pen, signature pad, or mouse first.'); return; }
+      dataHidden.value = svg;
+    } else if (activeMode === 'ts_hq_engine') {
+      if (!hqSvg) { e.preventDefault(); alert('Please type the signatory name first.'); return; }
+      dataHidden.value = hqSvg;
+    } else {
+      if (!uploadedUri) { e.preventDefault(); alert('Please upload a signature image first.'); return; }
+      dataHidden.value = uploadedUri;
+    }
+  });
+})();
+</script>
+{% endblock %}

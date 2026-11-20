@@ -8,35 +8,40 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--ts-space-2);
+  gap: 6px;
   height: var(--ts-control-h);
-  padding: 0 var(--ts-space-4);
-  font-size: var(--ts-fs-body);
+  padding: 0 13px;
+  font-size: 13px;
   font-weight: var(--ts-fw-medium);
   line-height: 1;
-  border: 1px solid transparent;
-  border-radius: var(--ts-radius);
+  border: 0;
+  border-radius: 0;
   background: transparent;
-  color: var(--ts-text);
+  color: var(--ts-text-muted);
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
+  text-decoration: none;
   transition: background var(--ts-dur-fast) var(--ts-ease),
-              color var(--ts-dur-fast) var(--ts-ease),
-              border-color var(--ts-dur-fast) var(--ts-ease);
+              color var(--ts-dur-fast) var(--ts-ease);
 }
-.ts-btn:disabled, .ts-btn[aria-disabled="true"] { cursor: not-allowed; opacity: 0.5; }
-.ts-btn--sm { height: var(--ts-control-h-sm); padding: 0 var(--ts-space-3); font-size: var(--ts-fs-label); }
-.ts-btn--lg { height: var(--ts-control-h-lg); padding: 0 var(--ts-space-5); font-size: var(--ts-fs-subsection); }
+.ts-btn:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--ts-text);
+  text-decoration: none;
+}
+.ts-btn:disabled, .ts-btn[aria-disabled="true"] { cursor: not-allowed; opacity: 0.45; }
+.ts-btn--sm { height: var(--ts-control-h-sm); padding: 0 10px; font-size: 12px; }
+.ts-btn--lg { height: var(--ts-control-h-lg); padding: 0 18px; font-size: 14px; }
 
 .ts-btn--primary {
   background: var(--ts-brand-primary);
   color: var(--ts-text-inverse);
-  border-color: var(--ts-brand-primary);
+  font-weight: var(--ts-fw-semibold);
 }
 .ts-btn--primary:hover:not(:disabled) {
   background: var(--ts-brand-primary-hover);
-  border-color: var(--ts-brand-primary-hover);
+  color: var(--ts-text-inverse);
 }
 
 .ts-btn--secondary {
@@ -114,34 +119,33 @@
 .ts-status--warning  { color: var(--ts-warning); }
 .ts-status--info     { color: var(--ts-info); }
 
-/* ============================================================= Tag / chip */
+/* ============================================================= Editorial labels (no chips) */
 
 .ts-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  margin-right: 4px;
-  font-size: var(--ts-fs-meta);
-  color: var(--ts-text);
-  background: var(--ts-surface-alt);
-  border: 1px solid var(--ts-border);
-  border-radius: var(--ts-radius-sm);
-  line-height: 18px;
+  display: inline;
+  padding: 0;
+  margin-right: 6px;
+  font-size: var(--ts-fs-label);
+  font-weight: var(--ts-fw-medium);
+  color: var(--ts-text-muted);
+  background: transparent;
+  border: 0;
+  line-height: 1.4;
 }
 .ts-tag--brand {
   color: var(--ts-brand-primary);
-  border-color: var(--ts-brand-primary-soft);
-  background: var(--ts-brand-primary-soft);
+  font-weight: var(--ts-fw-semibold);
+  border: 0;
+  background: transparent;
 }
 
 /* ============================================================= Panel / section head */
 
 .ts-panel {
   background: var(--ts-surface);
-  border: 1px solid var(--ts-border);
-  border-radius: var(--ts-radius-none);
-  padding: var(--ts-space-6);
+  border: 0;
+  border-radius: 0;
+  padding: 18px 20px;
 }
 .ts-panel__title {
   margin: 0 0 var(--ts-space-4);

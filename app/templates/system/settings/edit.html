@@ -1,60 +1,164 @@
 {% extends "layouts/app.html" %}
 {% set active_nav_item = 'settings' %}
 
-{% block title %}Organization settings · TRUSTSEAL{% endblock %}
-{% block page_title %}Organization settings{% endblock %}
-{% block page_description %}
-  <p class="ts-page-header__description">
-    Tenant-wide switches: mail transport, SMS gateway, signing features,
-    password policy, backup cadence, branding, and legal URLs. Changes
-    take effect immediately for this workspace.
-  </p>
+{% block title %}Settings · TRUSTSEAL{% endblock %}
+{% block page_title %}Settings{% endblock %}
+{% block page_description %}{% endblock %}
+{% block page_actions %}
+  <a class="ts-btn" href="{{ url_for('audit_security_views.index') }}">Audit &amp; security</a>
 {% endblock %}
 
 {% block content %}
-<form method="post" class="ts-form" style="max-width: 920px;">
-  {{ form.hidden_tag() }}
+<div class="st-flat">
+  {% include "stamps/_flat_ui.html" %}
 
-  {% set groups = [
-    ('Mail transport', ['smtp_host','smtp_port','smtp_username','smtp_password','smtp_use_tls','smtp_use_ssl','default_from_email']),
-    ('SMS gateway',    ['sms_gateway_type','sms_api_url','sms_api_key','sms_sender_id','sms_smpp_host','sms_smpp_port','sms_smpp_bind_type','sms_smpp_system_type']),
-    ('Features & policy', ['enable_signing','enable_stamping','require_email_verification','enable_two_factor_auth','password_complexity','account_lock_threshold']),
-    ('Backups',        ['auto_backup_enabled','backup_frequency_cron','backup_retention_days','backup_storage_path','backup_storage_provider']),
-    ('Branding & legal', ['platform_name','platform_logo_url','platform_brand_color','terms_url']),
-  ] %}
+  <nav class="st-subnav" aria-label="Settings sections">
+    <button type="button" class="st-subnav__link is-active set-tab" data-tab="general">General &amp; Branding</button>
+    <button type="button" class="st-subnav__link set-tab" data-tab="security">Security &amp; Policies</button>
+    <button type="button" class="st-subnav__link set-tab" data-tab="mail">Mail</button>
+    <button type="button" class="st-subnav__link set-tab" data-tab="backups">Backups</button>
+  </nav>
 
-  {% for label, fields in groups %}
-  <section class="ts-panel" style="margin-bottom: var(--ts-space-5);">
-    <h2 class="ts-panel__title">{{ label }}</h2>
-    <div class="ts-form-grid">
-      {% for name in fields %}
-        {% if form[name] is defined %}
-        {% set field = form[name] %}
-        <div class="ts-form-field">
-          {{ field.label(class="ts-form-label") }}
-          {% if field.type == 'BooleanField' %}
-            <label class="ts-form-switch">
-              {{ field(class="ts-switch__input") }}
-              <span class="ts-switch__slider"></span>
-            </label>
-          {% else %}
-            {{ field(class="ts-input") }}
-          {% endif %}
-          {% if field.errors %}
-            {% for e in field.errors %}
-              <span class="ts-form-error">{{ e }}</span>
-            {% endfor %}
-          {% endif %}
+  <form method="post" action="{{ url_for('system.system_settings_view') }}" style="max-width:860px;">
+    <!-- TAB 1: General & Branding -->
+    <section class="st-panel set-pane" id="set-pane-general">
+      <div class="set-grid">
+        {% if org %}
+        <div>
+          <label class="set-lbl">Organization Name</label>
+          <input type="text" class="set-inp" value="{{ org.name }}" disabled>
+        </div>
+        <div>
+          <label class="set-lbl">Organization ID</label>
+          <input type="text" class="set-inp" value="#{{ org.id }}" disabled>
         </div>
         {% endif %}
-      {% endfor %}
-    </div>
-  </section>
-  {% endfor %}
+        <div>
+          <label class="set-lbl">Platform Name</label>
+          <input type="text" name="platform_name" class="set-inp" value="{{ setting.platform_name or 'TrustSeal' }}">
+        </div>
+        <div>
+          <label class="set-lbl">Primary Brand Color</label>
+          <input type="color" name="platform_brand_color" class="set-inp" style="height:36px;padding:2px;" value="{{ setting.platform_brand_color or '#18345e' }}">
+        </div>
+      </div>
+    </section>
 
-  <div class="ts-form-actions">
-    <button type="submit" class="ts-btn ts-btn--primary">Save settings</button>
-    <a href="{{ url_for('system.main_views.home') }}" class="ts-btn ts-btn--ghost">Cancel</a>
-  </div>
-</form>
+    <!-- TAB 2: Security & Policies -->
+    <section class="st-panel set-pane" id="set-pane-security" hidden>
+      <div class="set-grid">
+        <label class="set-chk"><input type="checkbox" name="enable_signing" value="1" {% if setting.enable_signing %}checked{% endif %}> Enable digital signing workflows</label>
+        <label class="set-chk"><input type="checkbox" name="enable_stamping" value="1" {% if setting.enable_stamping %}checked{% endif %}> Enable stamp studio &amp; covert forensics</label>
+        <label class="set-chk"><input type="checkbox" name="require_email_verification" value="1" {% if setting.require_email_verification %}checked{% endif %}> Require email verification</label>
+        <label class="set-chk"><input type="checkbox" name="enable_two_factor_auth" value="1" {% if setting.enable_two_factor_auth %}checked{% endif %}> Enforce two-factor authentication (2FA)</label>
+        <div>
+          <label class="set-lbl">Password Complexity</label>
+          <select name="password_complexity" class="set-inp">
+            {% for opt in ('low', 'medium', 'high', 'strict') %}
+            <option value="{{ opt }}" {% if (setting.password_complexity or 'medium') == opt %}selected{% endif %}>{{ opt|capitalize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="set-lbl">Account Lock Threshold</label>
+          <input type="number" name="account_lock_threshold" class="set-inp" min="3" max="20" value="{{ setting.account_lock_threshold or 5 }}">
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: Mail -->
+    <section class="st-panel set-pane" id="set-pane-mail" hidden>
+      <div class="set-grid">
+        <div>
+          <label class="set-lbl">Default From Email</label>
+          <input type="email" name="default_from_email" class="set-inp" value="{{ setting.default_from_email or '' }}" placeholder="no-reply@company.com">
+        </div>
+        <div>
+          <label class="set-lbl">SMTP Host</label>
+          <input type="text" name="smtp_host" class="set-inp" value="{{ setting.smtp_host or '' }}" placeholder="smtp.company.com">
+        </div>
+        <div>
+          <label class="set-lbl">SMTP Port</label>
+          <input type="number" name="smtp_port" class="set-inp" value="{{ setting.smtp_port or 587 }}">
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: Backups -->
+    <section class="st-panel set-pane" id="set-pane-backups" hidden>
+      <div class="set-grid">
+        <div>
+          <label class="set-lbl">Backup Retention (days)</label>
+          <input type="number" name="backup_retention_days" class="set-inp" min="1" max="3650" value="{{ setting.backup_retention_days or 30 }}">
+        </div>
+        <div style="display:flex;align-items:flex-end;padding-bottom:6px;">
+          <label class="set-chk"><input type="checkbox" name="auto_backup_enabled" value="1" {% if setting.auto_backup_enabled %}checked{% endif %}> Enable automated encrypted backups</label>
+        </div>
+      </div>
+    </section>
+
+    <div style="margin-top:16px;">
+      <button type="submit" class="ts-btn ts-btn--primary">Save settings</button>
+    </div>
+  </form>
+</div>
+
+<style>
+  .set-tab { border: 0; background: transparent; cursor: pointer; }
+  .set-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    padding: 20px;
+  }
+  @media (max-width: 720px) { .set-grid { grid-template-columns: 1fr; } }
+  .set-lbl {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #7a869a;
+    margin-bottom: 6px;
+  }
+  .set-inp {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 9px 12px;
+    border: 0;
+    background: #f6f8fb;
+    font-size: 13px;
+    color: #091e42;
+    outline: none;
+    transition: box-shadow 120ms ease, background 120ms ease;
+  }
+  .set-inp:focus {
+    background: #ffffff;
+    box-shadow: inset 0 0 0 1.5px #1e4b9e;
+  }
+  .set-inp:disabled { color: #7a869a; cursor: not-allowed; }
+  .set-chk {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #091e42;
+    cursor: pointer;
+  }
+</style>
+
+<script>
+(function () {
+  document.querySelectorAll('.set-tab').forEach(function (t) {
+    t.addEventListener('click', function () {
+      document.querySelectorAll('.set-tab').forEach(function (x) { x.classList.remove('is-active'); });
+      t.classList.add('is-active');
+      var k = t.dataset.tab;
+      document.querySelectorAll('.set-pane').forEach(function (p) {
+        p.hidden = (p.id !== 'set-pane-' + k);
+      });
+    });
+  });
+})();
+</script>
 {% endblock %}

@@ -387,6 +387,14 @@ def create_app(config_class=None):
     blueprints.append(tsd_stamps_views)
     from .blueprints.estamp.stamp_verify_public import stamp_verify_public
     blueprints.append(stamp_verify_public)
+    from .blueprints.estamp.media_letterheads_api import (
+        media_library_api,
+        letterheads_api,
+    )
+    blueprints.append(media_library_api)
+    blueprints.append(letterheads_api)
+    from .blueprints.estamp.media_letterheads_views import workspace_assets_views
+    blueprints.append(workspace_assets_views)
     from .blueprints.documents.api.document_label_api import (
         document_label_api,
     )

@@ -1,5 +1,243 @@
-<!-- Template: clients/list.html for organizations blueprint -->
-{% extends 'base.html' %}
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'clients' %}
+
+{% block title %}Clients · TRUSTSEAL{% endblock %}
+{% block page_title %}Clients{% endblock %}
+{% block page_description %}{% endblock %}
+{% block page_actions %}
+  <a class="ts-btn" href="{{ url_for('document_party_views.view_document_parties') }}">Contacts &amp; parties</a>
+  <button type="button" class="ts-btn ts-btn--primary" id="cl-new-toggle">+ Add client</button>
+{% endblock %}
+
 {% block content %}
-<h1>Clients/List</h1>
+<div class="st-flat">
+  {% include "stamps/_flat_ui.html" %}
+
+  <!-- Collapsible Add / Edit Client panel (no modal) -->
+  <section id="cl-editor" class="st-panel" style="padding:16px 20px;margin-bottom:18px;" hidden>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <strong id="cl-editor-title" style="font-size:13.5px;color:#091e42;">Add client</strong>
+      <button type="button" class="cl-close" id="cl-editor-close" aria-label="Close">✕</button>
+    </div>
+    <form method="post" action="{{ url_for('organizations_bp.view_clients') }}" id="cl-form" class="cl-form">
+      <input type="hidden" name="action" id="cl-form-action" value="create">
+      <input type="hidden" name="client_id" id="cl-form-id" value="">
+      <input type="text" name="name" id="cl-f-name" required class="st-select" style="width:100%;background:#f6f8fb;" placeholder="Client / Company name">
+      <input type="email" name="email" id="cl-f-email" class="st-select" style="width:100%;background:#f6f8fb;" placeholder="Email">
+      <input type="text" name="phone" id="cl-f-phone" class="st-select" style="width:100%;background:#f6f8fb;" placeholder="Phone">
+      <input type="text" name="tax_id" id="cl-f-tax" class="st-select" style="width:100%;background:#f6f8fb;" placeholder="Tax / Reg ID">
+      <button type="submit" class="ts-btn ts-btn--primary" id="cl-form-submit">Save client</button>
+    </form>
+  </section>
+
+  <section class="st-toolbar">
+    <div class="st-search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+        <path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <input type="search" id="cl-search" placeholder="Search client name, email, tax ID…">
+    </div>
+    <div class="st-toolbar__right">
+      <select id="cl-status" class="st-select" aria-label="Filter status">
+        <option value="all">All statuses</option>
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+      </select>
+    </div>
+  </section>
+
+  {% if items %}
+  <section class="st-panel" style="overflow-x:auto;">
+    <table class="st-table">
+      <thead>
+        <tr>
+          <th>Client Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Tax / Reg ID</th>
+          <th>Status</th>
+          <th>Added</th>
+          <th style="width:44px;text-align:right;"></th>
+        </tr>
+      </thead>
+      <tbody id="cl-tbody">
+        {% for c in items %}
+        <tr data-id="{{ c.id }}"
+            data-name="{{ c.name }}"
+            data-email="{{ c.email or '' }}"
+            data-phone="{{ c.phone or '' }}"
+            data-tax="{{ c.tax_id or '' }}"
+            data-status="{{ 'active' if c.is_active else 'inactive' }}"
+            data-hay="{{ (c.name ~ ' ' ~ (c.email or '') ~ ' ' ~ (c.tax_id or ''))|lower }}">
+          <td style="font-weight:600;">{{ c.name }}</td>
+          <td style="color:#475569;">{{ c.email or '—' }}</td>
+          <td style="color:#475569;">{{ c.phone or '—' }}</td>
+          <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#475569;">{{ c.tax_id or '—' }}</td>
+          <td><span class="st-tag {% if c.is_active %}st-tag--ok{% else %}st-tag--warn{% endif %}">{{ 'Active' if c.is_active else 'Inactive' }}</span></td>
+          <td style="color:#64748b;">{{ c.created_at.strftime('%Y-%m-%d') if c.created_at else '—' }}</td>
+          <td style="text-align:right;">
+            <button type="button" class="cl-more" aria-label="Client actions">⋮</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% else %}
+  <section class="st-empty">
+    <div class="st-empty__title">No clients added yet</div>
+    <div class="st-empty__actions">
+      <button type="button" class="ts-btn ts-btn--primary" id="cl-empty-add">Add your first client</button>
+    </div>
+  </section>
+  {% endif %}
+</div>
+
+<form id="cl-action-form" method="post" action="{{ url_for('organizations_bp.view_clients') }}" hidden>
+  <input type="hidden" name="action" id="cl-act-name">
+  <input type="hidden" name="client_id" id="cl-act-id">
+</form>
+
+<div id="cl-ctx" class="cl-ctx" hidden role="menu">
+  <button type="button" class="cl-ctx__item" data-act="edit">Edit client</button>
+  <button type="button" class="cl-ctx__item" data-act="toggle" id="cl-ctx-toggle">Deactivate</button>
+  <button type="button" class="cl-ctx__item" data-act="copy">Copy email</button>
+  <div class="cl-ctx__sep"></div>
+  <button type="button" class="cl-ctx__item cl-ctx__item--danger" data-act="delete">Delete</button>
+</div>
+
+<style>
+  .cl-form { display: grid; grid-template-columns: 1.3fr 1fr 0.85fr 0.85fr auto; gap: 10px; align-items: center; }
+  @media (max-width: 900px) { .cl-form { grid-template-columns: 1fr 1fr; } }
+  .cl-close { border: 0; background: transparent; color: #64748b; cursor: pointer; font-size: 14px; padding: 4px 8px; }
+  .cl-close:hover { background: #f1f5f9; color: #091e42; }
+  .cl-more { border: 0; background: transparent; color: #64748b; width: 28px; height: 28px; cursor: pointer; font-size: 15px; }
+  .cl-more:hover { background: #eef2f7; color: #091e42; }
+  .cl-ctx {
+    position: fixed; z-index: 1200; min-width: 170px;
+    background: #ffffff; box-shadow: 0 8px 24px rgba(9, 30, 66, 0.14);
+    padding: 4px 0;
+  }
+  .cl-ctx__item {
+    display: block; width: 100%; text-align: left; border: 0;
+    background: transparent; padding: 8px 14px; font-size: 12.5px;
+    color: #091e42; cursor: pointer;
+  }
+  .cl-ctx__item:hover { background: #f1f5f9; color: #1e4b9e; }
+  .cl-ctx__item--danger { color: #9b2c2c; }
+  .cl-ctx__item--danger:hover { background: #fff0f0; color: #9b2c2c; }
+  .cl-ctx__sep { height: 1px; background: rgba(15, 23, 42, 0.06); margin: 4px 0; }
+</style>
+
+<script>
+(function () {
+  var editor = document.getElementById('cl-editor');
+  var titleEl = document.getElementById('cl-editor-title');
+  var actEl = document.getElementById('cl-form-action');
+  var idEl = document.getElementById('cl-form-id');
+  var fName = document.getElementById('cl-f-name');
+  var fEmail = document.getElementById('cl-f-email');
+  var fPhone = document.getElementById('cl-f-phone');
+  var fTax = document.getElementById('cl-f-tax');
+  var submitBtn = document.getElementById('cl-form-submit');
+
+  function openCreate() {
+    titleEl.textContent = 'Add client';
+    actEl.value = 'create'; idEl.value = '';
+    fName.value = ''; fEmail.value = ''; fPhone.value = ''; fTax.value = '';
+    submitBtn.textContent = 'Add client';
+    editor.hidden = false;
+    fName.focus();
+  }
+  function openEdit(row) {
+    titleEl.textContent = 'Edit client';
+    actEl.value = 'edit'; idEl.value = row.dataset.id;
+    fName.value = row.dataset.name || '';
+    fEmail.value = row.dataset.email || '';
+    fPhone.value = row.dataset.phone || '';
+    fTax.value = row.dataset.tax || '';
+    submitBtn.textContent = 'Update client';
+    editor.hidden = false;
+    fName.focus();
+  }
+  var newBtn = document.getElementById('cl-new-toggle');
+  var emptyBtn = document.getElementById('cl-empty-add');
+  var closeBtn = document.getElementById('cl-editor-close');
+  if (newBtn) newBtn.addEventListener('click', function () {
+    if (!editor.hidden && actEl.value === 'create') { editor.hidden = true; } else { openCreate(); }
+  });
+  if (emptyBtn) emptyBtn.addEventListener('click', openCreate);
+  if (closeBtn) closeBtn.addEventListener('click', function () { editor.hidden = true; });
+
+  var tbody = document.getElementById('cl-tbody');
+  var searchEl = document.getElementById('cl-search');
+  var statusEl = document.getElementById('cl-status');
+  function apply() {
+    if (!tbody) return;
+    var q = (searchEl.value || '').trim().toLowerCase();
+    var s = statusEl.value;
+    tbody.querySelectorAll('tr').forEach(function (r) {
+      var ok = (s === 'all' || r.dataset.status === s)
+        && (!q || (r.dataset.hay || '').indexOf(q) !== -1);
+      r.style.display = ok ? '' : 'none';
+    });
+  }
+  if (searchEl) searchEl.addEventListener('input', apply);
+  if (statusEl) statusEl.addEventListener('change', apply);
+
+  var menu = document.getElementById('cl-ctx');
+  var toggleItem = document.getElementById('cl-ctx-toggle');
+  var actionForm = document.getElementById('cl-action-form');
+  var actName = document.getElementById('cl-act-name');
+  var actId = document.getElementById('cl-act-id');
+  var activeRow = null;
+
+  function hide() { if (menu) menu.hidden = true; activeRow = null; }
+  function openMenu(row, x, y) {
+    activeRow = row;
+    if (toggleItem) toggleItem.textContent = row.dataset.status === 'active' ? 'Mark Inactive' : 'Mark Active';
+    menu.hidden = false;
+    var mw = menu.offsetWidth || 170, mh = menu.offsetHeight || 150;
+    menu.style.left = Math.min(x, window.innerWidth - mw - 8) + 'px';
+    menu.style.top = Math.min(y, window.innerHeight - mh - 8) + 'px';
+  }
+  if (tbody && menu) {
+    tbody.addEventListener('click', function (e) {
+      var btn = e.target.closest('.cl-more');
+      if (!btn) return;
+      e.stopPropagation();
+      var r = btn.getBoundingClientRect();
+      openMenu(btn.closest('tr'), r.right - 170, r.bottom + 4);
+    });
+    tbody.addEventListener('contextmenu', function (e) {
+      var tr = e.target.closest('tr');
+      if (!tr) return;
+      e.preventDefault();
+      openMenu(tr, e.clientX, e.clientY);
+    });
+    menu.addEventListener('click', function (e) {
+      var item = e.target.closest('[data-act]');
+      if (!item || !activeRow) return;
+      var act = item.dataset.act;
+      var rowRef = activeRow;
+      hide();
+      if (act === 'edit') {
+        openEdit(rowRef);
+      } else if (act === 'copy' && navigator.clipboard) {
+        navigator.clipboard.writeText(rowRef.dataset.email || '');
+      } else if (act === 'toggle') {
+        actName.value = 'toggle_active'; actId.value = rowRef.dataset.id;
+        actionForm.submit();
+      } else if (act === 'delete') {
+        if (!confirm('Delete client "' + rowRef.dataset.name + '"?')) return;
+        actName.value = 'delete'; actId.value = rowRef.dataset.id;
+        actionForm.submit();
+      }
+    });
+    document.addEventListener('click', hide);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
+  }
+})();
+</script>
 {% endblock %}

@@ -3,198 +3,271 @@
 
 {% block title %}Integrations &amp; API · TRUSTSEAL{% endblock %}
 {% block page_title %}Integrations &amp; API{% endblock %}
-{% block page_description %}
-  <p class="ts-page-header__description">
-    Webhook endpoints registered for this tenant plus the latest 100
-    delivery attempts. Secrets are stored as hashes — the raw secret is
-    only returned once at creation time via the webhook API.
-  </p>
+{% block page_description %}{% endblock %}
+{% block page_actions %}
+  <button type="button" class="ts-btn ts-btn--primary" id="wh-new-toggle">+ Register webhook</button>
 {% endblock %}
 
 {% block content %}
+<div class="st-flat">
+  {% include "stamps/_flat_ui.html" %}
 
-<section class="ts-metric-strip" style="margin-bottom: var(--ts-space-5);">
-  <div class="ts-metric">
-    <span class="ts-metric__label">Endpoints</span>
-    <span class="ts-metric__value">{{ endpoints|length }}</span>
-    <span class="ts-metric__sub">registered</span>
-  </div>
-  {% for label, key in [
-    ('Succeeded', 'succeeded'),
-    ('Pending',   'pending'),
-    ('In flight', 'in_flight'),
-    ('Failed',    'failed'),
-    ('Dead',      'dead'),
-  ] %}
-  <div class="ts-metric">
-    <span class="ts-metric__label">{{ label }}</span>
-    <span class="ts-metric__value">{{ counts_by_status.get(key, 0) }}</span>
-    <span class="ts-metric__sub">deliveries</span>
-  </div>
-  {% endfor %}
-</section>
+  {% if revealed_secret %}
+  <section class="st-panel" style="padding:14px 18px;margin-bottom:18px;background:#e9f7ef;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#17633a;">One-time signing secret for {{ revealed_secret.url }}</div>
+        <code id="wh-secret-val" style="font-size:13px;color:#091e42;word-break:break-all;">{{ revealed_secret.secret }}</code>
+      </div>
+      <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" id="wh-copy-secret">Copy secret</button>
+    </div>
+  </section>
+  {% endif %}
 
-<section>
-  <header class="ts-section-head">
-    <h2>Webhook endpoints</h2>
-    <span class="ts-panel__meta">
-      Create / rotate / disable via <code>POST /api/webhooks</code>.
-    </span>
-  </header>
-  <div class="ts-table-shell">
-    <div class="ts-table-scroll">
-      <table class="ts-table">
+  <!-- Collapsible Register Webhook form -->
+  <section id="wh-create-panel" class="st-panel" style="padding:16px 20px;margin-bottom:18px;" hidden>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <strong style="font-size:13.5px;color:#091e42;">Register webhook endpoint</strong>
+      <button type="button" class="wh-close" id="wh-new-close" aria-label="Close">✕</button>
+    </div>
+    <form method="post" action="{{ url_for('integrations_views.create_endpoint') }}" style="display:grid;grid-template-columns:1.5fr 1.2fr 1fr auto;gap:10px;align-items:center;">
+      <input type="url" name="url" required class="st-select" style="width:100%;background:#f6f8fb;" placeholder="https://api.example.com/trustseal/webhook">
+      <input type="text" name="events" class="st-select" style="width:100%;background:#f6f8fb;" placeholder="tsd.create, document.sign (or *)">
+      <input type="text" name="description" class="st-select" style="width:100%;background:#f6f8fb;" placeholder="Description (optional)">
+      <button type="submit" class="ts-btn ts-btn--primary">Register</button>
+    </form>
+  </section>
+
+  <nav class="st-subnav" aria-label="Integrations sections">
+    <button type="button" class="st-subnav__link is-active wh-tab" data-tab="endpoints">
+      Webhook Endpoints ({{ endpoints|length }})
+    </button>
+    <button type="button" class="st-subnav__link wh-tab" data-tab="deliveries">
+      Recent Deliveries ({{ deliveries|length }})
+    </button>
+  </nav>
+
+  <!-- TAB 1: Webhook Endpoints -->
+  <div id="wh-pane-endpoints">
+    {% if endpoints %}
+    <section class="st-panel" style="overflow-x:auto;">
+      <table class="st-table">
         <thead>
           <tr>
-            <th scope="col" style="width:  6%;">#</th>
-            <th scope="col" style="width: 32%;">URL</th>
-            <th scope="col" style="width: 18%;">Events</th>
-            <th scope="col" style="width: 10%;">State</th>
-            <th scope="col" style="width: 16%;">Created by</th>
-            <th scope="col" style="width: 18%;">Created</th>
+            <th style="width:56px;">#</th>
+            <th>URL</th>
+            <th>Events</th>
+            <th>State</th>
+            <th>Created By</th>
+            <th>Created</th>
+            <th style="width:44px;text-align:right;"></th>
           </tr>
         </thead>
-        <tbody>
-        {% if endpoints %}
+        <tbody id="wh-tbody">
           {% for ep in endpoints %}
-          <tr>
-            <td data-label="#"><code>{{ ep.id }}</code></td>
-            <td data-label="URL">
-              {% with value=ep.url, label_hidden='Copy webhook URL' %}
-                {% include 'components_ds/copy_value.html' %}
-              {% endwith %}
-            </td>
-            <td data-label="Events">
+            {% set u = creators.get(ep.created_by_id) %}
+            {% set owner_name = ((u.first_name ~ ' ' ~ u.last_name)|trim or u.username) if u else ('User #' ~ ep.created_by_id) %}
+          <tr data-id="{{ ep.id }}" data-url="{{ ep.url }}" data-active="{{ '1' if ep.active else '0' }}">
+            <td style="font-family:var(--ts-font-mono);color:#64748b;">{{ ep.id }}</td>
+            <td style="font-family:var(--ts-font-mono);font-size:12px;font-weight:600;max-width:320px;" title="{{ ep.url }}">{{ ep.url }}</td>
+            <td>
               {% if ep.events %}
-                {% for evt in ep.events[:4] %}
-                  <span class="ts-tag ts-tag--brand">{{ evt }}</span>
-                {% endfor %}
-                {% if ep.events|length > 4 %}
-                  <span class="ts-panel__meta">+{{ ep.events|length - 4 }} more</span>
-                {% endif %}
-              {% else %}
-                <span class="ts-panel__meta">—</span>
-              {% endif %}
+                {% for evt in ep.events[:3] %}<span class="st-tag st-tag--info" style="margin-right:3px;">{{ evt }}</span>{% endfor %}
+                {% if ep.events|length > 3 %}<span style="font-size:11px;color:#7a869a;">+{{ ep.events|length - 3 }}</span>{% endif %}
+              {% else %}—{% endif %}
             </td>
-            <td data-label="State">
+            <td>
               {% if ep.active %}
-                <span class="ts-status ts-status--success">Active</span>
+                <span class="st-tag st-tag--ok">Active</span>
               {% else %}
-                <span class="ts-status ts-status--danger">Disabled</span>
+                <span class="st-tag st-tag--bad">Disabled</span>
               {% endif %}
             </td>
-            <td data-label="Created by">
-              {% set u = creators.get(ep.created_by_id) %}
-              {% if u %}
-                <span class="ts-cell-title">{{ (u.first_name ~ ' ' ~ u.last_name)|trim or u.username }}</span>
-                <span class="ts-cell-sub">id #{{ u.id }}</span>
-              {% else %}
-                <span class="ts-panel__meta">id #{{ ep.created_by_id }}</span>
-              {% endif %}
-            </td>
-            <td data-label="Created">
-              {{ ep.created_at.strftime('%Y-%m-%d %H:%M') if ep.created_at else '—' }}
+            <td style="color:#42526e;">{{ owner_name }}</td>
+            <td style="color:#64748b;">{{ ep.created_at.strftime('%Y-%m-%d %H:%M') if ep.created_at else '—' }}</td>
+            <td style="text-align:right;">
+              <button type="button" class="wh-more" aria-label="Webhook actions">⋮</button>
             </td>
           </tr>
           {% endfor %}
-        {% else %}
-          <tr>
-            <td colspan="6">
-              <div class="ts-empty">
-                <div class="ts-empty__title">No webhook endpoints configured</div>
-                <p class="ts-empty__hint">
-                  Register one via <code>POST /api/webhooks</code> with
-                  a URL and an <code>events</code> list. The response
-                  returns the raw signing secret exactly once — store it
-                  immediately.
-                </p>
-              </div>
-            </td>
-          </tr>
-        {% endif %}
         </tbody>
       </table>
-    </div>
+    </section>
+    {% else %}
+    <section class="st-empty">
+      <div class="st-empty__title">No webhook endpoints configured</div>
+      <div class="st-empty__actions">
+        <button type="button" class="ts-btn ts-btn--primary" id="wh-empty-add">Register your first webhook</button>
+      </div>
+    </section>
+    {% endif %}
   </div>
-</section>
 
-<section style="margin-top: var(--ts-space-6);">
-  <header class="ts-section-head">
-    <h2>Recent deliveries</h2>
-    <span class="ts-panel__meta">
-      At-least-once delivery; failed rows are retried with exponential backoff.
-    </span>
-  </header>
-  <div class="ts-table-shell">
-    <div class="ts-table-scroll">
-      <table class="ts-table">
+  <!-- TAB 2: Recent Deliveries -->
+  <div id="wh-pane-deliveries" hidden>
+    {% if deliveries %}
+    <section class="st-panel" style="overflow-x:auto;">
+      <table class="st-table">
         <thead>
           <tr>
-            <th scope="col" style="width:  6%;">#</th>
-            <th scope="col" style="width:  8%;">Endpoint</th>
-            <th scope="col" style="width: 18%;">Event type</th>
-            <th scope="col" style="width:  8%;">Status</th>
-            <th scope="col" style="width:  8%;">HTTP</th>
-            <th scope="col" style="width:  8%;">Attempts</th>
-            <th scope="col" style="width: 18%;">Next retry</th>
-            <th scope="col" style="width: 26%;">Last error</th>
+            <th style="width:56px;">#</th>
+            <th>Endpoint</th>
+            <th>Event Type</th>
+            <th>Status</th>
+            <th>HTTP</th>
+            <th>Attempts</th>
+            <th>Next Retry</th>
+            <th>Last Error</th>
           </tr>
         </thead>
         <tbody>
-        {% if deliveries %}
           {% for d in deliveries %}
           <tr>
-            <td data-label="#"><code>{{ d.id }}</code></td>
-            <td data-label="Endpoint"><code>#{{ d.endpoint_id }}</code></td>
-            <td data-label="Event type"><code>{{ d.event_type }}</code></td>
-            <td data-label="Status">
+            <td style="font-family:var(--ts-font-mono);color:#64748b;">{{ d.id }}</td>
+            <td style="font-family:var(--ts-font-mono);color:#42526e;">#{{ d.endpoint_id }}</td>
+            <td style="font-family:var(--ts-font-mono);font-size:12px;">{{ d.event_type }}</td>
+            <td>
               {% if d.status == 'succeeded' %}
-                <span class="ts-status ts-status--success">Succeeded</span>
+                <span class="st-tag st-tag--ok">Succeeded</span>
               {% elif d.status == 'pending' %}
-                <span class="ts-status ts-status--pending">Pending</span>
+                <span class="st-tag st-tag--warn">Pending</span>
               {% elif d.status == 'in_flight' %}
-                <span class="ts-status ts-status--info">In flight</span>
-              {% elif d.status == 'failed' %}
-                <span class="ts-status ts-status--warning">Failed</span>
+                <span class="st-tag st-tag--info">In flight</span>
               {% else %}
-                <span class="ts-status ts-status--danger">Dead</span>
+                <span class="st-tag st-tag--bad">{{ d.status|title }}</span>
               {% endif %}
             </td>
-            <td data-label="HTTP">
-              {% if d.response_status %}
-                <code>{{ d.response_status }}</code>
-              {% else %}
-                <span class="ts-panel__meta">—</span>
-              {% endif %}
-            </td>
-            <td data-label="Attempts">{{ d.retry_count }}</td>
-            <td data-label="Next retry">
-              {{ d.next_retry_at.strftime('%Y-%m-%d %H:%M') if d.next_retry_at else '—' }}
-            </td>
-            <td data-label="Last error">
-              {% if d.last_error %}
-                <span class="ts-cell-sub"><code>{{ d.last_error|truncate(70) }}</code></span>
-              {% else %}
-                <span class="ts-panel__meta">—</span>
-              {% endif %}
-            </td>
+            <td style="font-family:var(--ts-font-mono);">{{ d.response_status or '—' }}</td>
+            <td style="color:#42526e;">{{ d.retry_count }}</td>
+            <td style="color:#64748b;">{{ d.next_retry_at.strftime('%Y-%m-%d %H:%M') if d.next_retry_at else '—' }}</td>
+            <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#9b2c2c;" title="{{ d.last_error or '' }}">{{ d.last_error or '—' }}</td>
           </tr>
           {% endfor %}
-        {% else %}
-          <tr>
-            <td colspan="8">
-              <div class="ts-empty">
-                <div class="ts-empty__title">No webhook deliveries yet</div>
-                <p class="ts-empty__hint">
-                  Nothing has been dispatched against these endpoints.
-                </p>
-              </div>
-            </td>
-          </tr>
-        {% endif %}
         </tbody>
       </table>
-    </div>
+    </section>
+    {% else %}
+    <section class="st-empty">
+      <div class="st-empty__title">No webhook deliveries yet</div>
+    </section>
+    {% endif %}
   </div>
-</section>
+</div>
+
+<form id="wh-action-form" method="post" hidden></form>
+
+<div id="wh-ctx" class="wh-ctx" hidden role="menu">
+  <button type="button" class="wh-ctx__item" data-act="copy">Copy URL</button>
+  <button type="button" class="wh-ctx__item" data-act="rotate">Rotate Signing Secret</button>
+  <button type="button" class="wh-ctx__item" data-act="toggle" id="wh-ctx-toggle">Disable</button>
+  <div class="wh-ctx__sep"></div>
+  <button type="button" class="wh-ctx__item wh-ctx__item--danger" data-act="delete">Delete Endpoint</button>
+</div>
+
+<style>
+  .wh-tab { border: 0; background: transparent; cursor: pointer; }
+  .wh-close { border: 0; background: transparent; color: #64748b; cursor: pointer; font-size: 14px; padding: 4px 8px; }
+  .wh-close:hover { background: #f1f5f9; color: #091e42; }
+  .wh-more { border: 0; background: transparent; color: #64748b; width: 28px; height: 28px; cursor: pointer; font-size: 15px; }
+  .wh-more:hover { background: #eef2f7; color: #091e42; }
+  .wh-ctx {
+    position: fixed; z-index: 1200; min-width: 190px;
+    background: #ffffff; box-shadow: 0 8px 24px rgba(9, 30, 66, 0.14);
+    padding: 4px 0;
+  }
+  .wh-ctx__item {
+    display: block; width: 100%; text-align: left; border: 0;
+    background: transparent; padding: 8px 14px; font-size: 12.5px;
+    color: #091e42; cursor: pointer;
+  }
+  .wh-ctx__item:hover { background: #f1f5f9; color: #1e4b9e; }
+  .wh-ctx__item--danger { color: #9b2c2c; }
+  .wh-ctx__item--danger:hover { background: #fff0f0; color: #9b2c2c; }
+  .wh-ctx__sep { height: 1px; background: rgba(15, 23, 42, 0.06); margin: 4px 0; }
+</style>
+
+<script>
+(function () {
+  var panel = document.getElementById('wh-create-panel');
+  var toggleBtn = document.getElementById('wh-new-toggle');
+  var emptyBtn = document.getElementById('wh-empty-add');
+  var closeBtn = document.getElementById('wh-new-close');
+  if (toggleBtn) toggleBtn.addEventListener('click', function () { panel.hidden = !panel.hidden; });
+  if (emptyBtn) emptyBtn.addEventListener('click', function () { panel.hidden = false; });
+  if (closeBtn) closeBtn.addEventListener('click', function () { panel.hidden = true; });
+
+  var copySec = document.getElementById('wh-copy-secret');
+  var secVal = document.getElementById('wh-secret-val');
+  if (copySec && secVal) {
+    copySec.addEventListener('click', function () {
+      if (navigator.clipboard) navigator.clipboard.writeText(secVal.textContent.trim());
+      copySec.textContent = 'Copied';
+    });
+  }
+
+  document.querySelectorAll('.wh-tab').forEach(function (t) {
+    t.addEventListener('click', function () {
+      document.querySelectorAll('.wh-tab').forEach(function (x) { x.classList.remove('is-active'); });
+      t.classList.add('is-active');
+      var k = t.dataset.tab;
+      document.getElementById('wh-pane-endpoints').hidden = (k !== 'endpoints');
+      document.getElementById('wh-pane-deliveries').hidden = (k !== 'deliveries');
+    });
+  });
+
+  var tbody = document.getElementById('wh-tbody');
+  var menu = document.getElementById('wh-ctx');
+  var toggleItem = document.getElementById('wh-ctx-toggle');
+  var form = document.getElementById('wh-action-form');
+  var activeRow = null;
+  function hide() { if (menu) menu.hidden = true; activeRow = null; }
+  function openMenu(row, x, y) {
+    activeRow = row;
+    if (toggleItem) toggleItem.textContent = row.dataset.active === '1' ? 'Disable Endpoint' : 'Enable Endpoint';
+    menu.hidden = false;
+    var mw = menu.offsetWidth || 190, mh = menu.offsetHeight || 150;
+    menu.style.left = Math.min(x, window.innerWidth - mw - 8) + 'px';
+    menu.style.top = Math.min(y, window.innerHeight - mh - 8) + 'px';
+  }
+  if (tbody && menu) {
+    tbody.addEventListener('click', function (e) {
+      var btn = e.target.closest('.wh-more');
+      if (!btn) return;
+      e.stopPropagation();
+      var r = btn.getBoundingClientRect();
+      openMenu(btn.closest('tr'), r.right - 190, r.bottom + 4);
+    });
+    tbody.addEventListener('contextmenu', function (e) {
+      var tr = e.target.closest('tr');
+      if (!tr) return;
+      e.preventDefault();
+      openMenu(tr, e.clientX, e.clientY);
+    });
+    menu.addEventListener('click', function (e) {
+      var item = e.target.closest('[data-act]');
+      if (!item || !activeRow) return;
+      var act = item.dataset.act;
+      var id = activeRow.dataset.id;
+      var url = activeRow.dataset.url;
+      hide();
+      if (act === 'copy' && navigator.clipboard) {
+        navigator.clipboard.writeText(url);
+      } else if (act === 'rotate') {
+        if (!confirm('Rotate signing secret for endpoint #' + id + '?')) return;
+        form.action = '/admin/integrations/' + id + '/rotate';
+        form.submit();
+      } else if (act === 'toggle') {
+        form.action = '/admin/integrations/' + id + '/toggle';
+        form.submit();
+      } else if (act === 'delete') {
+        if (!confirm('Delete webhook endpoint #' + id + '?')) return;
+        form.action = '/admin/integrations/' + id + '/delete';
+        form.submit();
+      }
+    });
+    document.addEventListener('click', hide);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
+  }
+})();
+</script>
 {% endblock %}

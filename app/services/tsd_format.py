@@ -379,39 +379,115 @@ def rotate_tenant_key(organization_id: int) -> int:
 
 
 _ALLOWED_TAGS = {
-    "a", "abbr", "b", "blockquote", "br", "code", "em", "figure",
+    "a", "abbr", "b", "blockquote", "br", "code", "div", "em", "figure",
     "figcaption", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i",
     "img", "li", "ol", "p", "pre", "span", "strong", "sub", "sup",
     "table", "tbody", "td", "th", "thead", "tr", "u", "ul",
 }
 _ALLOWED_ATTRS = {
-    "*": ["style", "class"],
+    "*": [
+        "style", "class", "title", "contenteditable",
+        "data-tsd-marks", "data-tsd-stamp-receipt", "data-tsd-stamp-nonce",
+        "data-tsd-stamp-date", "data-tsd-sig-id", "data-tsd-sig-usage",
+        "data-tsd-group", "data-align",
+    ],
     "a": ["href", "title", "rel", "target"],
-    "img": ["src", "alt", "width", "height"],
+    "img": ["src", "alt", "width", "height", "draggable"],
     "td": ["colspan", "rowspan"],
     "th": ["colspan", "rowspan", "scope"],
 }
 _ALLOWED_STYLES = {
-    "color", "background-color", "font-family", "font-size", "font-weight",
-    "font-style", "text-align", "text-decoration", "line-height", "margin",
-    "margin-top", "margin-bottom", "padding", "padding-left", "border-left",
-    "border-collapse", "border-top", "letter-spacing", "max-width", "height",
+    "color", "background", "background-color", "font-family", "font-size",
+    "font-weight", "font-style", "text-align", "text-decoration", "line-height",
+    "margin", "margin-top", "margin-bottom", "margin-left", "margin-right",
+    "padding", "padding-top", "padding-bottom", "padding-left", "padding-right",
+    "border", "border-left", "border-right", "border-collapse", "border-top",
+    "border-bottom", "letter-spacing", "width", "min-width", "max-width",
+    "height", "max-height", "display", "flex-wrap", "align-items",
+    "justify-content", "gap", "vertical-align", "position", "z-index",
+    "overflow", "user-select", "pointer-events", "transform",
 }
 _ALLOWED_PROTOCOLS = {"http", "https", "mailto", "data"}
 
+_SAFE_SVG_TAGS = frozenset({
+    "svg", "g", "defs", "path", "circle", "ellipse", "rect", "polygon",
+    "polyline", "line", "text", "textPath", "tspan", "image", "clipPath",
+    "mask", "filter", "linearGradient", "radialGradient", "stop",
+    "feTurbulence", "feDisplacementMap", "feColorMatrix", "feComposite",
+    "feGaussianBlur", "feComponentTransfer", "feFuncA", "feFuncR",
+    "feFuncG", "feFuncB", "feMerge", "feMergeNode", "feMorphology",
+})
+
+
+def _sanitize_svg_fragment(svg_raw: str) -> str:
+    """Strictly sanitize an inline SVG (stamp or vector signature) while preserving SVG camelCase."""
+    import xml.etree.ElementTree as ET
+
+    try:
+        root = ET.fromstring(svg_raw)
+    except Exception:
+        return ""
+
+    def _local(tag: str) -> str:
+        return tag.split("}", 1)[1] if "}" in tag else tag
+
+    if _local(root.tag) != "svg":
+        return ""
+
+    def _clean_el(el: ET.Element) -> ET.Element | None:
+        lname = _local(el.tag)
+        if lname not in _SAFE_SVG_TAGS:
+            return None
+        new_el = ET.Element(lname)
+        new_el.text = el.text
+        new_el.tail = el.tail
+        for k, v in el.attrib.items():
+            ak = _local(k)
+            kl = ak.lower()
+            if kl.startswith("on") or kl in ("xmlns:xlink",):
+                continue
+            if kl == "href":
+                vs = (v or "").strip()
+                if not (vs.startswith("#") or vs.startswith("data:image/") or vs.startswith("/static/")):
+                    continue
+            if "javascript:" in (v or "").lower():
+                continue
+            new_el.set(ak, v)
+        for child in list(el):
+            cleaned_child = _clean_el(child)
+            if cleaned_child is not None:
+                new_el.append(cleaned_child)
+        return new_el
+
+    cleaned_root = _clean_el(root)
+    if cleaned_root is None:
+        return ""
+    cleaned_root.set("xmlns", "http://www.w3.org/2000/svg")
+    return ET.tostring(cleaned_root, encoding="unicode")
+
 
 def sanitize_html(raw: str, *, allow_data_images: bool = True) -> str:
-    """Strip XSS vectors from ingested or editor-authored HTML.
-
-    * Tag + attribute whitelist above
-    * Inline ``style`` values filtered through :mod:`bleach.css_sanitizer`
-    * ``data:`` URIs allowed only on ``<img>`` so image ingest keeps
-      working without opening the door to ``data:text/html`` XSS
+    """Strip XSS vectors from ingested or editor-authored HTML while preserving
+    forensically sealed SVG stamps and verified staff signatures.
     """
     if not raw:
         return ""
     import bleach
     from bleach.css_sanitizer import CSSSanitizer
+
+    # Extract <svg>...</svg> blocks before bleach.clean so bleach never lowercases
+    # or strips SVG camelCase tags/attributes (viewBox, textPath, feTurbulence, etc.).
+    svg_slots: list[str] = []
+
+    def _stash_svg(match: re.Match) -> str:
+        safe_svg = _sanitize_svg_fragment(match.group(0))
+        if not safe_svg:
+            return ""
+        idx = len(svg_slots)
+        svg_slots.append(safe_svg)
+        return f"__TSD_SAFE_SVG_{idx}__"
+
+    stashed = re.sub(r"<svg\b[^>]*>.*?</svg>", _stash_svg, raw, flags=re.IGNORECASE | re.DOTALL)
 
     css = CSSSanitizer(allowed_css_properties=sorted(_ALLOWED_STYLES))
 
@@ -420,7 +496,7 @@ def sanitize_html(raw: str, *, allow_data_images: bool = True) -> str:
         protocols.discard("data")
 
     cleaned = bleach.clean(
-        raw,
+        stashed,
         tags=_ALLOWED_TAGS,
         attributes=_ALLOWED_ATTRS,
         protocols=protocols,
@@ -429,11 +505,12 @@ def sanitize_html(raw: str, *, allow_data_images: bool = True) -> str:
     )
     # Second pass: non-image data: URIs slip through the protocol
     # filter above because bleach only inspects ``href``/``src`` text.
-    # Pattern below catches anything the first pass left on a non-img.
     cleaned = re.sub(
         r'<(?!img\b)([a-zA-Z][^\s>]*)([^>]*?)(href|src)\s*=\s*"data:[^"]*"',
         r'<\1\2',
         cleaned,
         flags=re.IGNORECASE,
     )
+    for idx, safe_svg in enumerate(svg_slots):
+        cleaned = cleaned.replace(f"__TSD_SAFE_SVG_{idx}__", safe_svg)
     return cleaned

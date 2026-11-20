@@ -3,14 +3,7 @@
 
 {% block title %}Retention #{{ retention.id }} · TRUSTSEAL{% endblock %}
 {% block page_title %}Retention #{{ retention.id }}{% endblock %}
-{% block page_description %}
-  <p class="ts-page-header__description">
-    {{ retention.artifact_type|capitalize }} #{{ retention.artifact_id }} —
-    retain until {% if retention.retain_until %}<strong>{{ retention.retain_until.strftime("%Y-%m-%d") }}</strong>{% else %}indefinitely{% endif %}.
-    This page shows every piece of evidence recorded against the retained
-    artifact. Nothing on this screen is editable.
-  </p>
-{% endblock %}
+{% block page_description %}{% endblock %}
 {% block page_actions %}
   <a class="ts-btn ts-btn--secondary" href="{{ url_for('evidence_views.list_retentions') }}">
     ← Back to retentions

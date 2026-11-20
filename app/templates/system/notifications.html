@@ -3,13 +3,7 @@
 
 {% block title %}Notifications · TRUSTSEAL{% endblock %}
 {% block page_title %}Notifications{% endblock %}
-{% block page_description %}
-  <p class="ts-page-header__description">
-    In-app events raised for you — envelope auto-expiry, webhook
-    dead-letter transitions, envelope sealing and operator-facing
-    audit notices. Unread badges clear only when you mark rows read.
-  </p>
-{% endblock %}
+{% block page_description %}{% endblock %}
 {% block page_actions %}
   {% if unread_count %}
   <form method="POST" action="{{ url_for('operator_notifications_views.mark_all_read') }}" style="display: inline;">

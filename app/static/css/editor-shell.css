@@ -143,15 +143,15 @@
 }
 .ts-ed__statusbar > div { display: inline-flex; gap: 10px; align-items: center; }
 
-/* ---------- Status chips ---------- */
+/* ---------- Status labels (clean text, no pill chips) ---------- */
 .ts-status-chip {
   display: inline-flex; align-items: center;
-  padding: 1px 8px;
-  font-size: 9px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.08em;
-  border-radius: var(--ts-radius-pill);
-  border: 1px solid transparent;
+  padding: 0;
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  background: transparent;
+  border: 0;
 }
-.ts-status-chip--draft     { color: var(--ts-warning);     background: var(--ts-warning-soft);   border-color: #e8d7a9; }
-.ts-status-chip--finalized { color: var(--ts-brand-green); background: var(--ts-green-soft);     border-color: #c6dfd1; }
-.ts-status-chip--archived  { color: var(--ed-muted);       background: var(--ed-subline);        border-color: var(--ed-line); }
+.ts-status-chip--draft     { color: var(--ts-warning); }
+.ts-status-chip--finalized { color: var(--ts-brand-green); }
+.ts-status-chip--archived  { color: var(--ed-muted); }

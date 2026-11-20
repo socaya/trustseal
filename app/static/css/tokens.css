@@ -1,71 +1,87 @@
 /*
- * TRUSTSEAL canonical design tokens.
+ * TRUSTSEAL canonical design tokens — Calm Architectural Flat UI
  *
- * Direction v3 (operator feedback):
- *   - Soft, flat, professional. No gradients. No colored shadow lifts.
- *   - Minimal radii — surfaces are near-square; only controls carry
- *     a small 3px radius so pointer affordances still read.
- *   - Generous, editorial type scale with tabular numerals.
- *   - Neutrals lean slate-warm, not blue-cold, so content can breathe.
+ * Harmonized with VitalReturns & DER design standards:
+ *   - Soft cool-slate canvas (#F6F8FB) lifting crisp white (#FFFFFF) surfaces
+ *   - Whisper-quiet hairlines (rgba(15, 23, 42, 0.07) / #EBEEF2) — no heavy box walls
+ *   - Deep calm ink hierarchy (#091E42 -> #253858 -> #42526E -> #7A869A)
+ *   - Trust navy primary (#1E4B9E) + restrained WCAG AA semantic status triplets
+ *   - Strict 0px border-radius flat architectural geometry
+ *   - Compact, balanced control heights (34px) & tabular numerals
  */
 
 :root {
-  /* Brand ------------------------------------------------------- */
-  --ts-brand-primary:         #0f3b82;
-  --ts-brand-primary-hover:   #0b2f69;
+  /* Brand & interactive (Official TRUSTSEAL Palette) ----------- */
+  --ts-brand-primary:         #002769;
+  --ts-brand-primary-hover:   #001d52;
+  --ts-brand-primary-active:  #00163f;
   --ts-brand-primary-soft:    #eef3fa;
-  --ts-brand-green:           #0e664d;
-  --ts-green-soft:            #eaf5f0;
+  --ts-brand-primary-border:  rgba(0, 39, 105, 0.22);
 
-  /* Surfaces --- subtle contrast between canvas and card ------- */
-  --ts-canvas:                #f5f6f8;
+  --ts-brand-green:           #02982e;
+  --ts-green-soft:            #eaf9ee;
+  --ts-green-border:          rgba(2, 152, 46, 0.22);
+
+  --ts-brand-tagline:         #1d3648;
+
+  /* Surfaces (VitalReturns cool-calm canvas + pure white cards) */
+  --ts-canvas:                #f6f8fb;
   --ts-surface:               #ffffff;
-  --ts-surface-alt:           #fafbfc;
-  --ts-surface-sunken:        #f1f2f5;
+  --ts-surface-alt:           #f9fafc;
+  --ts-surface-sunken:        #f1f4f8;
+  --ts-surface-hover:         #eef2f7;
+  --ts-surface-selected:      #e6eef9;
 
-  /* Text — higher contrast for body, softer for meta ----------- */
-  --ts-text:                  #121a26;
-  --ts-text-muted:            #5a6676;
-  --ts-text-subtle:           #7a8494;
+  /* Ink hierarchy (Anchored to Brand Tagline #1D3648) ---------- */
+  --ts-text:                  #1d3648;
+  --ts-text-secondary:        #2c475a;
+  --ts-text-muted:            #4c6273;
+  --ts-text-subtle:           #718494;
   --ts-text-inverse:          #ffffff;
 
-  /* Boundaries ------------------------------------------------- */
-  --ts-border:                #e4e7ec;
-  --ts-border-strong:         #c7ced6;
+  /* Hairlines & boundaries (whisper-quiet at rest) ------------- */
+  --ts-border-hairline:       rgba(0, 39, 105, 0.07);
+  --ts-border:                #ebeef2;
+  --ts-border-default:        #d5dce6;
+  --ts-border-strong:         #b8c2d1;
 
-  /* Semantic utility ------------------------------------------ */
-  --ts-danger:                #9e2f36;
-  --ts-danger-soft:           #fbeef0;
-  --ts-warning:               #835a0c;
-  --ts-warning-soft:          #fbf3e2;
-  --ts-info:                  #2b5aa0;
-  --ts-info-soft:             #eaf0f8;
-  --ts-focus:                 #3778d4;
+  /* Semantic utility (WCAG 2.2 AA triplets) -------------------- */
+  --ts-danger:                #9b2c2c;
+  --ts-danger-soft:           #fff0f0;
+  --ts-danger-border:         rgba(155, 44, 44, 0.22);
+  --ts-warning:               #7a4a00;
+  --ts-warning-soft:          #fff6df;
+  --ts-warning-border:        rgba(156, 116, 24, 0.24);
+  --ts-info:                  #002769;
+  --ts-info-soft:             #eef3fa;
+  --ts-info-border:           rgba(0, 39, 105, 0.22);
+  --ts-focus:                 #002769;
+  --ts-focus-ring:            rgba(0, 39, 105, 0.24);
 
   /* Typography ------------------------------------------------- */
-  --ts-font:                  "Inter", system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --ts-font:                  "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --ts-font-mono:             ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
-  /* Editorial type scale (minor-third-ish, trimmed) ----------- */
-  --ts-fs-display:            32px;
-  --ts-fs-page-title:         26px;
-  --ts-fs-section:            18px;
-  --ts-fs-subsection:         16px;
-  --ts-fs-body:               15px;
-  --ts-fs-label:              13px;
+  /* Restrained operational type scale -------------------------- */
+  --ts-fs-display:            26px;
+  --ts-fs-page-title:         21px;
+  --ts-fs-section:            16px;
+  --ts-fs-subsection:         14.5px;
+  --ts-fs-body:               13.5px;
+  --ts-fs-label:              12.5px;
   --ts-fs-meta:               12px;
   --ts-fs-micro:              11px;
 
-  --ts-lh-tight:              1.2;
-  --ts-lh-base:               1.55;
-  --ts-lh-prose:              1.65;
+  --ts-lh-tight:              1.25;
+  --ts-lh-base:               1.5;
+  --ts-lh-prose:              1.6;
 
   --ts-fw-regular:            400;
   --ts-fw-medium:             500;
   --ts-fw-semibold:           600;
   --ts-fw-bold:               700;
 
-  /* Spacing (4px base, 8px rhythm) ---------------------------- */
+  /* Spacing (4px base, 8px rhythm) ----------------------------- */
   --ts-space-1:               4px;
   --ts-space-2:               8px;
   --ts-space-3:               12px;
@@ -77,34 +93,35 @@
   --ts-space-9:               48px;
   --ts-space-10:              64px;
 
-  /* Shell geometry --- more breathing room -------------------- */
-  --ts-topbar-h:              60px;
-  --ts-sidebar-w:             248px;
-  --ts-sidebar-w-min:         224px;
-  --ts-sidebar-w-max:         320px;
-  --ts-sidebar-rail-w:        64px;
+  /* Shell geometry --------------------------------------------- */
+  --ts-topbar-h:              54px;
+  --ts-sidebar-w:             236px;
+  --ts-sidebar-w-min:         220px;
+  --ts-sidebar-w-max:         300px;
+  --ts-sidebar-rail-w:        60px;
   --ts-inspector-w:           360px;
-  --ts-page-gutter:           32px;
-  --ts-content-max:           1240px;
+  --ts-page-gutter:           28px;
+  --ts-content-max:           1320px;
 
-  /* Controls --- only buttons/inputs have radii; surfaces don't */
-  --ts-control-h:             40px;
-  --ts-control-h-sm:          30px;
-  --ts-control-h-lg:          46px;
+  /* Controls (crisp, calm heights; 0px flat radii) ------------- */
+  --ts-control-h:             34px;
+  --ts-control-h-sm:          29px;
+  --ts-control-h-lg:          40px;
 
   --ts-radius-none:           0;
-  --ts-radius-sm:             2px;
-  --ts-radius:                3px;
-  --ts-radius-pill:           999px;
+  --ts-radius-sm:             0;
+  --ts-radius:                0;
+  --ts-radius-pill:           0;
 
-  /* Elevation (flat — only overlays lift) --------------------- */
-  --ts-shadow-sm:             0 1px 0 rgba(18, 26, 38, 0.04);
-  --ts-shadow-overlay:        0 6px 20px rgba(18, 26, 38, 0.10);
+  /* Elevation (flat in-flow; whisper shadow only on menus) ----- */
+  --ts-shadow-sm:             none;
+  --ts-shadow-menu:           0 4px 12px rgba(16, 24, 40, 0.08);
+  --ts-shadow-overlay:        0 10px 28px rgba(16, 24, 40, 0.12);
   --ts-shadow-inspector:      -1px 0 0 var(--ts-border);
 
   /* Motion ----------------------------------------------------- */
-  --ts-dur-fast:              120ms;
-  --ts-dur-base:              180ms;
+  --ts-dur-fast:              110ms;
+  --ts-dur-base:              160ms;
   --ts-ease:                  cubic-bezier(0.2, 0, 0.1, 1);
 
   /* Layering --------------------------------------------------- */
@@ -116,14 +133,11 @@
   --ts-z-modal:               70;
 }
 
-/*
- * Density preference. Opt-in via <body class="ts-density-comfortable">.
- */
 .ts-density-comfortable {
-  --ts-control-h:             44px;
+  --ts-control-h:             38px;
   --ts-space-4:               18px;
   --ts-space-6:               28px;
-  --ts-page-gutter:           40px;
+  --ts-page-gutter:           34px;
 }
 
 @media (prefers-reduced-motion: reduce) {

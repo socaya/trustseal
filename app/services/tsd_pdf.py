@@ -1,20 +1,16 @@
 """Render a TrustSeal Document to PDF.
 
 The decrypted HTML is passed through ``xhtml2pdf`` which runs on
-ReportLab under the hood — pure-Python, no native dependencies. The
-output PDF can optionally be AES-256 encrypted with a user password
-(required to open) and an owner password (required for printing /
-copying / modifying). If only a user password is given, the owner
-password is generated randomly so permissions are enforced.
-
-A footer with the document id, version, and tenant is drawn by
-ReportLab via the ``@page`` CSS block. The footer makes every
-exported page attributable without relying on the viewer app.
+ReportLab under the hood — pure-Python, no native dependencies. Supports
+standard international & legal paper sizes (A4, US Letter, US Legal, A5,
+Executive, B5), Portrait/Landscape orientation, custom margins, and
+automatic detection of letterhead paper metadata embedded in the HTML.
 """
 from __future__ import annotations
 
 import html as html_std
 import io
+import re
 import secrets
 from datetime import datetime, timezone
 from typing import Optional
@@ -24,29 +20,71 @@ class PdfExportError(RuntimeError):
     """Domain-level PDF-export failure (render or encryption)."""
 
 
-_WRAPPER_CSS = """
-@page {
-  size: Letter;
-  margin: 1in;
-  @frame footer_frame {
-    -pdf-frame-content: footer_content;
-    left: 1in; width: 6.5in;
-    bottom: 0.4in; height: 0.3in;
-  }
+_PAGE_SIZE_CSS: dict[str, str] = {
+    "a4": "A4",
+    "letter": "Letter",
+    "legal": "Legal",
+    "a5": "A5",
+    "executive": "184.15mm 266.7mm",
+    "b5": "176mm 250mm",
 }
-body { font-family: Helvetica, Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #121a26; }
-h1 { font-size: 20pt; font-weight: bold; margin: 18pt 0 10pt; color: #121a26; }
-h2 { font-size: 15pt; font-weight: bold; margin: 16pt 0 8pt; color: #121a26; }
-h3 { font-size: 12pt; font-weight: bold; margin: 12pt 0 6pt; color: #121a26; }
-p  { margin: 0 0 10pt; }
-blockquote { margin: 0 0 10pt; padding-left: 12pt; border-left: 2pt solid #c7ced6; color: #5a6676; font-style: italic; }
-pre, code { font-family: Courier, monospace; font-size: 9pt; }
-ul, ol { padding-left: 18pt; margin: 0 0 10pt; }
-a { color: #0f3b82; text-decoration: underline; }
-img { max-width: 6.5in; }
-.tsd-footer { font-size: 8pt; color: #5a6676; text-align: center; }
-.tsd-footer strong { color: #0f3b82; }
+
+
+def _build_wrapper_css(
+    page_size: str = "a4",
+    orientation: str = "portrait",
+    margin_mm: int = 22,
+) -> str:
+    sz_key = (page_size or "a4").strip().lower()
+    css_size = _PAGE_SIZE_CSS.get(sz_key, "A4")
+    orient = "landscape" if (orientation or "").strip().lower() == "landscape" else "portrait"
+    # xhtml2pdf supports "A4 landscape" or explicit "297mm 210mm"
+    if orient == "landscape":
+        if " " in css_size:
+            w, h = css_size.split(" ", 1)
+            size_decl = f"{h} {w}"
+        else:
+            size_decl = f"{css_size} landscape"
+    else:
+        size_decl = css_size
+    m = max(10, min(40, int(margin_mm or 22)))
+    return f"""
+@page {{
+  size: {size_decl};
+  margin: {m}mm {m}mm {m + 4}mm {m}mm;
+  @frame footer_frame {{
+    -pdf-frame-content: footer_content;
+    left: {m}mm; right: {m}mm;
+    bottom: 8mm; height: 8mm;
+  }}
+}}
+body {{ font-family: Helvetica, Arial, sans-serif; font-size: 10.5pt; line-height: 1.5; color: #121a26; }}
+h1 {{ font-size: 19pt; font-weight: bold; margin: 16pt 0 9pt; color: #121a26; }}
+h2 {{ font-size: 14pt; font-weight: bold; margin: 14pt 0 7pt; color: #121a26; }}
+h3 {{ font-size: 11.5pt; font-weight: bold; margin: 11pt 0 5pt; color: #121a26; }}
+p  {{ margin: 0 0 9pt; }}
+blockquote {{ margin: 0 0 9pt; padding-left: 12pt; border-left: 2pt solid #c7ced6; color: #5a6676; font-style: italic; }}
+pre, code {{ font-family: Courier, monospace; font-size: 9pt; }}
+ul, ol {{ padding-left: 18pt; margin: 0 0 9pt; }}
+a {{ color: #0f3b82; text-decoration: underline; }}
+img {{ max-width: 100%; }}
+.tsd-footer {{ font-size: 7.5pt; color: #5a6676; text-align: center; }}
+.tsd-footer strong {{ color: #0f3b82; }}
 """
+
+
+def _detect_html_page_meta(html_src: str) -> tuple[Optional[str], Optional[str], Optional[int]]:
+    """Read optional data-paper-size / data-orientation / data-margin-mm from letterhead header."""
+    if not html_src:
+        return None, None, None
+    ps = re.search(r'data-paper-size="([a-z0-9]+)"', html_src, re.I)
+    ori = re.search(r'data-orientation="(portrait|landscape)"', html_src, re.I)
+    mg = re.search(r'data-margin-mm="(\d+)"', html_src, re.I)
+    return (
+        ps.group(1).lower() if ps else None,
+        ori.group(1).lower() if ori else None,
+        int(mg.group(1)) if mg else None,
+    )
 
 
 def _footer_block(*, document_id: int, version: int, tenant_id: int, exported_at: datetime) -> str:
@@ -68,22 +106,28 @@ def render_html_to_pdf(
     tenant_id: int,
     user_password: Optional[str] = None,
     owner_password: Optional[str] = None,
+    page_size: Optional[str] = None,
+    orientation: Optional[str] = None,
+    margin_mm: Optional[int] = None,
 ) -> bytes:
-    """Render decrypted HTML to PDF bytes, optionally encrypted.
-
-    When ``user_password`` is set, the PDF is encrypted with AES-256 so
-    the viewer must supply the password. ``owner_password`` defaults
-    to a fresh 24-byte random secret, so operator-level permissions
-    (printing, copying) stay revoked unless the caller explicitly
-    chooses a shared owner password.
-    """
+    """Render decrypted HTML to PDF bytes, optionally encrypted."""
     from xhtml2pdf import pisa
 
+    det_ps, det_ori, det_mg = _detect_html_page_meta(html or "")
+    eff_size = page_size or det_ps or "a4"
+    eff_orient = orientation or det_ori or "portrait"
+    eff_margin = margin_mm if margin_mm is not None else (det_mg if det_mg is not None else 22)
+
     exported_at = datetime.now(timezone.utc)
+    wrapper_css = _build_wrapper_css(
+        page_size=eff_size,
+        orientation=eff_orient,
+        margin_mm=eff_margin,
+    )
     doc_html = (
         f'<html><head>'
         f'<title>{html_std.escape(title)}</title>'
-        f'<style>{_WRAPPER_CSS}</style></head>'
+        f'<style>{wrapper_css}</style></head>'
         f'<body>{html or "<p></p>"}'
         f'{_footer_block(document_id=document_id, version=version, tenant_id=tenant_id, exported_at=exported_at)}'
         f'</body></html>'
@@ -98,7 +142,6 @@ def render_html_to_pdf(
     if user_password is None:
         return pdf_bytes
 
-    # Pass the rendered PDF through pypdf to apply AES-256 encryption.
     try:
         from pypdf import PdfReader, PdfWriter
     except Exception as exc:
@@ -111,11 +154,10 @@ def render_html_to_pdf(
         writer.encrypt(
             user_password=user_password,
             owner_password=owner,
-            use_128bit=True,       # pypdf will prefer AES-256 if available
-            permissions_flag=0b0100,  # print low-res, deny modify/copy
+            use_128bit=True,
+            permissions_flag=0b0100,
         )
     except TypeError:
-        # Older pypdf API
         writer.encrypt(user_password, owner, use_128bit=True)
 
     out = io.BytesIO()

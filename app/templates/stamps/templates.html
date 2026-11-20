@@ -1,0 +1,207 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'stamps' %}
+{% set stamp_subnav = 'templates' %}
+
+{% block title %}Stamp Templates · TRUSTSEAL{% endblock %}
+{% block page_title %}Stamp Templates{% endblock %}
+{% block page_description %}{% endblock %}
+{% block page_actions %}
+  <a class="ts-btn" href="{{ url_for('tsd_stamps_views.library') }}">Back to library</a>
+  <a class="ts-btn ts-btn--primary" href="{{ url_for('tsd_stamps_views.studio_new') }}">Blank stamp</a>
+{% endblock %}
+
+{% block content %}
+<div class="st-flat">
+  {% include "stamps/_flat_ui.html" %}
+
+  <section class="st-toolbar">
+    <div class="st-search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+        <path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <input type="search" id="tpl-search" placeholder="Search templates…">
+    </div>
+    <div class="st-filters" id="tpl-cats" role="tablist" aria-label="Filter by category">
+      <button type="button" class="st-chip is-active" data-cat="all">All</button>
+    </div>
+    <div class="st-toolbar__right">
+      <span id="tpl-count" style="font-size:12px;color:#64748b;"></span>
+    </div>
+  </section>
+
+  <div class="tpl-grid" id="tpl-grid">
+    <div class="st-empty" style="grid-column:1/-1;">Loading templates…</div>
+  </div>
+</div>
+
+<style>
+.tpl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
+  gap: 16px;
+}
+.tpl-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.tpl-card:hover {
+  border-color: #2563eb;
+  background: #f8fbff;
+}
+.tpl-card__preview {
+  background: #f8fafc;
+  padding: 24px 16px;
+  min-height: 176px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid #f1f5f9;
+}
+.tpl-card__preview svg {
+  max-width: 148px;
+  max-height: 148px;
+}
+.tpl-card__meta {
+  padding: 12px 14px;
+  flex: 1;
+}
+.tpl-card__cat {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #2563eb;
+}
+.tpl-card__name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0f172a;
+  margin-top: 3px;
+}
+.tpl-card__foot {
+  padding: 9px 14px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: #64748b;
+}
+.tpl-card__cta {
+  color: #2563eb;
+  font-weight: 600;
+}
+</style>
+
+<script>
+(function () {
+  var grid = document.getElementById('tpl-grid');
+  var catsEl = document.getElementById('tpl-cats');
+  var searchEl = document.getElementById('tpl-search');
+  var countEl = document.getElementById('tpl-count');
+  var allTemplates = [];
+  var activeCat = 'all';
+  var query = '';
+
+  function escH(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function render() {
+    var list = allTemplates.filter(function (t) {
+      if (activeCat !== 'all' && (t.category || '').toLowerCase() !== activeCat) return false;
+      if (query) {
+        var hay = ((t.name || '') + ' ' + (t.category || '') + ' ' + (t.kind || '')).toLowerCase();
+        if (hay.indexOf(query) === -1) return false;
+      }
+      return true;
+    });
+    if (countEl) countEl.textContent = list.length + ' template' + (list.length === 1 ? '' : 's');
+    if (!list.length) {
+      grid.innerHTML = '<div class="st-empty" style="grid-column:1/-1;">No matching templates</div>';
+      return;
+    }
+    grid.innerHTML = list.map(function (t) {
+      var dims = '';
+      if (t.layout && t.layout.diameter_mm) dims = t.layout.diameter_mm + ' mm';
+      else if (t.layout && t.layout.width_mm && t.layout.height_mm) dims = t.layout.width_mm + ' × ' + t.layout.height_mm + ' mm';
+      return '<div class="tpl-card" data-slug="' + escH(t.slug) + '">' +
+        '<div class="tpl-card__preview">' + t.svg + '</div>' +
+        '<div class="tpl-card__meta">' +
+          '<div class="tpl-card__cat">' + escH(t.category) + ' · ' + escH((t.kind || '').replace('_', ' ')) + '</div>' +
+          '<div class="tpl-card__name">' + escH(t.name) + '</div>' +
+        '</div>' +
+        '<div class="tpl-card__foot">' +
+          '<span>' + escH(dims || 'Standard') + '</span>' +
+          '<span class="tpl-card__cta">Use template →</span>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    grid.querySelectorAll('[data-slug]').forEach(function (card) {
+      card.addEventListener('click', function () {
+        var slug = card.getAttribute('data-slug');
+        card.style.opacity = '0.55';
+        fetch('/api/tsd-stamps/from-template/' + slug, {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+          body: '{}',
+        }).then(function (r) {
+          if (r.status === 409) {
+            alert('A stamp with this name already exists.');
+            card.style.opacity = '';
+            return null;
+          }
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        }).then(function (stamp) {
+          if (stamp && stamp.id) window.location = '/stamps/studio/' + stamp.id;
+        }).catch(function (e) {
+          card.style.opacity = '';
+          alert('Create failed: ' + e.message);
+        });
+      });
+    });
+  }
+
+  if (searchEl) searchEl.addEventListener('input', function () {
+    query = searchEl.value.trim().toLowerCase();
+    render();
+  });
+
+  fetch('/api/tsd-stamps/templates', { credentials: 'same-origin' })
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function (data) {
+      allTemplates = data.templates || [];
+      var seen = {};
+      var cats = [];
+      allTemplates.forEach(function (t) {
+        var c = (t.category || 'General').trim();
+        var k = c.toLowerCase();
+        if (!seen[k]) { seen[k] = true; cats.push({ key: k, label: c }); }
+      });
+      catsEl.innerHTML = '<button type="button" class="st-chip is-active" data-cat="all">All</button>' +
+        cats.map(function (c) {
+          return '<button type="button" class="st-chip" data-cat="' + escH(c.key) + '">' + escH(c.label) + '</button>';
+        }).join('');
+      catsEl.querySelectorAll('[data-cat]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          catsEl.querySelectorAll('[data-cat]').forEach(function (x) { x.classList.remove('is-active'); });
+          b.classList.add('is-active');
+          activeCat = b.getAttribute('data-cat');
+          render();
+        });
+      });
+      render();
+    })
+    .catch(function (e) {
+      grid.innerHTML = '<div class="st-empty" style="grid-column:1/-1;color:#991b1b;">Failed to load templates: ' + escH(e.message) + '</div>';
+    });
+})();
+</script>
+{% endblock %}

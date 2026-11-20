@@ -26,6 +26,8 @@ from .tsd_presence import TSDPresence
 from .tsd_stamp import TSDStamp
 from .tsd_stamp_insertion import TSDStampInsertion
 from .tsd_stamp_revision import TSDStampRevision
+from .media_asset import MediaAsset
+from .tsd_letterhead import TSDLetterhead
 from .device_profile import DeviceProfile
 from .tenant_key import TenantKey
 from .signing_envelope import SigningEnvelope, EnvelopeParticipant

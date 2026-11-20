@@ -17,6 +17,7 @@
 </style>
 <script src="{{ url_for('static', filename='js/vendor/socket.io.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/vendor/pm-bundle.js') }}"></script>
+<script src="{{ url_for('static', filename='js/letterhead_patterns.js') }}"></script>
 {% endblock %}
 
 {% block content %}
@@ -29,23 +30,24 @@
   {# ======================= 1. APPLICATION BAR (38px) ======================= #}
   <header class="ts-ed__appbar">
     <div class="ts-ed__brand">
-      <strong>TRUSTSEAL</strong><small>DOCUMENTS</small>
+      <strong>TRUSTSEAL</strong><small>DOCS</small>
     </div>
     <span class="ts-ed__divider" aria-hidden="true"></span>
     <input type="text" id="tsd-title" class="ts-ed__filename"
            value="{{ doc.title if doc else '' }}"
            placeholder="Untitled document"
            aria-label="Document title">
-    <span id="tsd-save-state" class="ts-ed__savestate">● New draft — not saved yet</span>
+    <span id="tsd-save-state" class="ts-ed__savestate" title="Save status">● New draft</span>
     <div class="ts-ed__spacer"></div>
     <span id="tsd-presence" class="ts-ed__presence" aria-label="Currently viewing"></span>
-    <span id="tsd-rt-badge" class="ts-ed__rt-badge ts-ed__rt-badge--off" title="Real-time awareness">● offline</span>
-    <span class="ts-ed__class-mark">Classification: <b id="tsd-class-top">Internal</b></span>
+    <button type="button" class="ts-ed__btn ts-ed__btn--ghost" id="tsd-lh-open" title="Apply or configure official letterhead">
+      Letterhead
+    </button>
     <button type="button" class="ts-ed__btn ts-ed__btn--ghost" id="tsd-security-open" aria-expanded="false" aria-controls="tsd-security-panel">
       ◈ Security
     </button>
     {% if doc %}
-    <button type="button" class="ts-ed__btn" id="tsd-history-btn">Version history</button>
+    <button type="button" class="ts-ed__btn" id="tsd-history-btn" title="Version history">History</button>
     <button type="button" class="ts-ed__btn" id="tsd-cmdk-btn" title="Command palette (⌘K)">⌘K</button>
     <a class="ts-ed__btn" href="/api/tsd/{{ doc.id }}/download" title="Download encrypted .tsd">Download</a>
     {% endif %}
@@ -94,7 +96,8 @@
       <div class="ts-ed__hruler" id="tsd-hruler" aria-hidden="true"></div>
       <div class="ts-ed__vruler" id="tsd-vruler" aria-hidden="true"></div>
       <div class="ts-ed__page" id="tsd-page" data-watermark="">
-        <div class="ts-ed__printable" id="tsd-printable">
+        <div id="tsd-lh-design-layer" class="tsd-lh-design-layer" aria-hidden="true"></div>
+        <div class="ts-ed__printable" id="tsd-printable" style="position:relative;z-index:1;">
           <div id="tsd-surface" class="ts-ed__editable"
                contenteditable="true"
                spellcheck="true"
@@ -103,11 +106,20 @@
                aria-multiline="true"
                data-placeholder="Start drafting your document. Type / for the command menu."></div>
         </div>
-        <div class="ts-ed__pagefooter">
-          <span>VITALWORKS LIMITED · TrustSeal Documents</span>
-          <span>Page 1 of 1</span>
+        <div class="ts-ed__pagefooter" id="tsd-pagefooter">
+          <span id="tsd-pf-left" contenteditable="true" spellcheck="false" title="Click to edit footer text">VITALWORKS LIMITED · TrustSeal Documents</span>
+          <span style="display:inline-flex;align-items:center;gap:8px;">
+            <span id="tsd-pf-right" contenteditable="true" spellcheck="false" title="Click to edit page label">Page 1 of 1</span>
+            <button type="button" id="tsd-pf-delete" class="tsd-pf-del" title="Delete page footer" aria-label="Delete page footer">✕</button>
+          </span>
         </div>
       </div>
+    </div>
+    <div id="tsd-obj-floatbar" class="tsd-obj-floatbar" hidden role="toolbar" aria-label="Selected object actions">
+      <button type="button" id="tsd-obj-sign" title="Sign this stamp (Direct one-time or Load registered)">✎ Sign</button>
+      <button type="button" id="tsd-obj-smaller" title="Shrink stamp">−</button>
+      <button type="button" id="tsd-obj-larger" title="Enlarge stamp">+</button>
+      <button type="button" id="tsd-obj-delete" class="is-danger" title="Delete selected stamp (Del)">✕ Delete</button>
     </div>
     <aside class="ts-ed__outline" id="tsd-outline" aria-label="Document outline">
       <header class="ts-ed__outline-head">
@@ -124,10 +136,15 @@
   <footer class="ts-ed__statusbar">
     <div>
       <span>Page 1 of 1</span>
-      <span>A4 (21 × 29.7 cm)</span>
+      <span id="tsd-sb-pagesize">A4 (210 × 297 mm)</span>
       <span id="tsd-wordcount">0 words</span>
+      <button type="button" id="tsd-pf-restore" hidden style="border:0;background:transparent;color:#002769;font-size:10.5px;font-weight:600;cursor:pointer;padding:0 4px;">+ Restore footer</button>
     </div>
     <div>
+      <span id="tsd-rt-badge" class="ts-ed__rt-badge ts-ed__rt-badge--off" title="Real-time awareness">● offline</span>
+      <span>·</span>
+      <span class="ts-ed__class-mark" style="border-left:0;padding-left:0;">Classification: <b id="tsd-class-top">Internal</b></span>
+      <span>·</span>
       <span id="tsd-viewmode">Print layout</span>
       <span>·</span>
       <span class="ts-status-chip ts-status-chip--{{ _status }}" id="tsd-status-chip">{{ _status|capitalize }}</span>
@@ -251,13 +268,35 @@
         <button type="button" class="ts-btn ts-btn--text" id="tsd-stamp-close" aria-label="Close">✕</button>
       </header>
       <div class="ts-stamp-picker-controls">
-        <div class="ts-stamp-picker-search">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <div class="ts-stamp-picker-search" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;max-width:100%;box-sizing:border-box;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="flex:0 0 auto;">
             <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
             <path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
-          <input type="search" id="tsd-stamp-search" placeholder="Search your stamps…" autofocus>
+          <input type="search" id="tsd-stamp-search" placeholder="Search your stamps…" autofocus style="flex:1 1 180px;min-width:140px;">
         </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:6px;">
+          <label style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:#1d3648;white-space:nowrap;" title="Stamp date (today or backdate only — future dates are not allowed)">
+            <span>Stamp Date</span>
+            <input type="date" id="tsd-stamp-date" style="border:1px solid #d0d7e2;padding:3px 6px;font-size:11.5px;color:#091e42;background:#fff;">
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:#1d3648;white-space:nowrap;cursor:pointer;">
+            <input type="checkbox" id="tsd-stamp-randomize" style="accent-color:#002769;"> Randomize impression
+          </label>
+        </div>
+        <div id="tsd-stamp-sig-bar" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:6px 10px;background:#f6f8fb;border:1px solid #dfe5ee;margin-top:6px;font-size:11.5px;color:#1d3648;">
+          <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="checkbox" id="tsd-stamp-use-my-sig" checked style="accent-color:#002769;">
+            <span><strong>Sign stamps with my signature</strong> (applies on stamps with a signature line)</span>
+          </label>
+          <div style="display:inline-flex;align-items:center;gap:8px;">
+            <select id="tsd-stamp-my-sig-sel" style="border:1px solid #d0d7e2;padding:3px 7px;font-size:11.5px;color:#091e42;background:#fff;max-width:230px;">
+              <option value="">Checking your approved signatures…</option>
+            </select>
+            <a href="/signatures" target="_blank" style="font-size:11px;color:#002769;font-weight:600;text-decoration:none;white-space:nowrap;">Manage ↗</a>
+          </div>
+        </div>
+        <div id="tsd-stamp-sig-otp-box" hidden style="padding:8px 10px;background:#edf2fa;border-left:3px solid #002769;margin-top:6px;font-size:11.5px;color:#091e42;"></div>
         <div class="ts-stamp-picker-filters" role="tablist" aria-label="Filter by kind">
           <button type="button" class="ts-chip-mini ts-is-active" data-stamp-kind="all">All</button>
           <button type="button" class="ts-chip-mini" data-stamp-kind="seal">Seal</button>
@@ -416,8 +455,11 @@
   --ed-rulerH: 19px;
   --ed-visualzoom: 1;
   display: flex; flex-direction: column;
+  width: 100%; max-width: 100%; min-width: 0;
+  overflow-x: hidden;
   background: var(--ed-bg);
-  min-height: calc(100vh - var(--ts-topbar-h));
+  height: calc(100vh - var(--ts-topbar-h));
+  max-height: calc(100vh - var(--ts-topbar-h));
   font-family: Arial, "Helvetica Neue", sans-serif;
   color: var(--ed-ink);
   font-size: 13px;
@@ -426,21 +468,24 @@
 /* ---------- 1. Application bar ---------- */
 .ts-ed__appbar {
   height: 38px; flex: 0 0 auto;
+  width: 100%; max-width: 100%; min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
   background: #fff;
   border-bottom: 1px solid var(--ed-line);
-  display: flex; align-items: center; gap: 10px;
-  padding: 0 14px;
+  display: flex; align-items: center; gap: 7px;
+  padding: 0 10px;
 }
 .ts-ed__brand {
-  display: inline-flex; align-items: baseline; gap: 6px;
+  display: inline-flex; align-items: baseline; gap: 5px;
   color: var(--ed-brand);
-  white-space: nowrap;
+  white-space: nowrap; flex: 0 0 auto;
 }
-.ts-ed__brand strong { font-size: 13px; font-weight: 800; letter-spacing: -0.2px; }
-.ts-ed__brand small  { font-size: 10px; color: var(--ed-muted); font-weight: 500; }
-.ts-ed__divider { width: 1px; height: 17px; background: var(--ed-line); }
+.ts-ed__brand strong { font-size: 12.5px; font-weight: 800; letter-spacing: -0.2px; }
+.ts-ed__brand small  { font-size: 9.5px; color: var(--ed-muted); font-weight: 600; }
+.ts-ed__divider { width: 1px; height: 17px; background: var(--ed-line); flex: 0 0 auto; }
 .ts-ed__filename {
-  flex: 0 1 300px;
+  flex: 1 1 140px; min-width: 80px; max-width: 240px;
   font-size: 12px; font-weight: 600;
   background: transparent; border: 1px solid transparent;
   padding: 3px 6px;
@@ -449,8 +494,11 @@
 }
 .ts-ed__filename:hover { border-color: var(--ed-line); }
 .ts-ed__filename:focus { border-color: var(--ed-brand); box-shadow: 0 0 0 2px rgba(55,120,212,.15); }
-.ts-ed__savestate { font-size: 10px; color: var(--ed-muted); white-space: nowrap; }
-.ts-ed__spacer { flex: 1 1 auto; }
+.ts-ed__savestate {
+  font-size: 10px; color: var(--ed-muted); white-space: nowrap;
+  max-width: 190px; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto;
+}
+.ts-ed__spacer { flex: 1 1 8px; min-width: 4px; }
 .ts-ed__class-mark {
   font-size: 10px; color: var(--ed-muted);
   border-left: 1px solid var(--ed-line);
@@ -576,18 +624,20 @@
 /* ---------- 5. Workspace ---------- */
 .ts-ed__workspace {
   flex: 1 1 auto;
+  min-height: 0; min-width: 0;
   overflow: auto;
   position: relative;
-  padding: 22px 28px 50px;
+  padding: 20px 22px 44px;
   display: grid;
-  grid-template-columns: 1fr 240px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 18px;
 }
-.ts-ed__workspace--no-outline { grid-template-columns: 1fr; }
+.ts-ed__workspace--no-outline { grid-template-columns: minmax(0, 1fr); }
 .ts-ed__workspace--no-outline .ts-ed__outline { display: none; }
 
 .ts-ed__editorwrap {
   width: calc(var(--ed-pagew) + 28px);
+  max-width: 100%;
   margin: 0 auto;
   position: relative;
   transform: scale(var(--ed-visualzoom));
@@ -625,9 +675,10 @@
   border: 1px solid #d2d9e1;
 }
 .ts-ed__printable {
-  position: absolute;
-  left: var(--ed-margx); right: var(--ed-margx);
-  top: var(--ed-margy); bottom: var(--ed-margy);
+  position: relative;
+  z-index: 1;
+  padding: var(--ed-margy) var(--ed-margx) calc(var(--ed-margy) + 28px);
+  box-sizing: border-box;
   outline: 1px dashed transparent;
   transition: outline .15s;
 }
@@ -716,22 +767,61 @@
 }
 .ts-ed__page[data-watermark=""]::after { content: none; }
 
+.tsd-lh-design-layer {
+  position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 0;
+}
 .ts-ed__pagefooter {
   position: absolute; bottom: 30px;
   left: var(--ed-margx); right: var(--ed-margx);
   font-size: 10px; color: #8a97a3;
   border-top: 1px solid #e5e9ed;
   padding-top: 8px;
-  display: flex; justify-content: space-between;
+  display: flex; justify-content: space-between; align-items: center;
 }
+.ts-ed__pagefooter[hidden] { display: none !important; }
+.ts-ed__pagefooter [contenteditable="true"] {
+  outline: none; padding: 1px 4px; border: 1px solid transparent;
+}
+.ts-ed__pagefooter [contenteditable="true"]:hover {
+  border-color: #d5dce6; background: #f8fafc; color: #1d3648;
+}
+.ts-ed__pagefooter [contenteditable="true"]:focus {
+  border-color: #002769; background: #fff; color: #091e42;
+}
+.tsd-pf-del {
+  border: 0; background: transparent; color: #9aa5b1; cursor: pointer;
+  font-size: 11px; padding: 1px 4px; line-height: 1; opacity: 0; transition: opacity 0.15s;
+}
+.ts-ed__pagefooter:hover .tsd-pf-del, .tsd-pf-del:focus { opacity: 1; }
+.tsd-pf-del:hover { color: #9b2c2c; background: #fff0f0; }
 
-/* Page size + orientation presets (overrides --ed-pagew / --ed-pageh). */
-.ts-ed__page--letter    { --ed-pagew: 816px;  --ed-pageh: 1056px; }
+.tsd-obj-floatbar {
+  position: fixed; z-index: 9400; display: inline-flex; align-items: center; gap: 2px;
+  background: #091e42; color: #fff; padding: 3px 5px;
+  box-shadow: 0 4px 14px rgba(9, 30, 66, 0.22);
+}
+.tsd-obj-floatbar[hidden] { display: none !important; }
+.tsd-obj-floatbar button {
+  border: 0; background: transparent; color: #e2e8f0; cursor: pointer;
+  font-size: 11.5px; font-weight: 600; padding: 3px 7px; line-height: 1.2;
+}
+.tsd-obj-floatbar button:hover { background: rgba(255,255,255,0.14); color: #fff; }
+.tsd-obj-floatbar button.is-danger { color: #ffb4b4; }
+.tsd-obj-floatbar button.is-danger:hover { background: #9b2c2c; color: #fff; }
+
+/* Page size + orientation presets (overrides --ed-pagew / --ed-pageh at 96dpi). */
 .ts-ed__page--a4        { --ed-pagew: 794px;  --ed-pageh: 1123px; }
+.ts-ed__page--letter    { --ed-pagew: 816px;  --ed-pageh: 1056px; }
 .ts-ed__page--legal     { --ed-pagew: 816px;  --ed-pageh: 1344px; }
-.ts-ed__page--letter.ts-ed__page--landscape { --ed-pagew: 1056px; --ed-pageh: 816px; }
-.ts-ed__page--a4.ts-ed__page--landscape     { --ed-pagew: 1123px; --ed-pageh: 794px; }
-.ts-ed__page--legal.ts-ed__page--landscape  { --ed-pagew: 1344px; --ed-pageh: 816px; }
+.ts-ed__page--a5        { --ed-pagew: 559px;  --ed-pageh: 794px;  }
+.ts-ed__page--executive { --ed-pagew: 696px;  --ed-pageh: 1008px; }
+.ts-ed__page--b5        { --ed-pagew: 665px;  --ed-pageh: 945px;  }
+.ts-ed__page--a4.ts-ed__page--landscape        { --ed-pagew: 1123px; --ed-pageh: 794px;  }
+.ts-ed__page--letter.ts-ed__page--landscape    { --ed-pagew: 1056px; --ed-pageh: 816px;  }
+.ts-ed__page--legal.ts-ed__page--landscape     { --ed-pagew: 1344px; --ed-pageh: 816px;  }
+.ts-ed__page--a5.ts-ed__page--landscape        { --ed-pagew: 794px;  --ed-pageh: 559px;  }
+.ts-ed__page--executive.ts-ed__page--landscape { --ed-pagew: 1008px; --ed-pageh: 696px;  }
+.ts-ed__page--b5.ts-ed__page--landscape        { --ed-pagew: 945px;  --ed-pageh: 665px;  }
 
 /* Rulers hidden. */
 .ts-ed__editorwrap.ts-is-rulers-hidden .ts-ed__hruler,
@@ -787,18 +877,18 @@
 }
 .ts-ed__statusbar > div { display: inline-flex; gap: 10px; align-items: center; }
 
-/* ---------- Status chip ---------- */
+/* ---------- Status label (clean text, no pill chip) ---------- */
 .ts-status-chip {
   display: inline-flex; align-items: center;
-  padding: 1px 8px;
-  font-size: 9px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.08em;
-  border-radius: var(--ts-radius-pill);
-  border: 1px solid transparent;
+  padding: 0;
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  background: transparent;
+  border: 0;
 }
-.ts-status-chip--draft     { color: var(--ts-warning);     background: var(--ts-warning-soft);   border-color: #e8d7a9; }
-.ts-status-chip--finalized { color: var(--ts-brand-green); background: var(--ts-green-soft);     border-color: #c6dfd1; }
-.ts-status-chip--archived  { color: var(--ed-muted);       background: var(--ed-subline);        border-color: var(--ed-line); }
+.ts-status-chip--draft     { color: var(--ts-warning); }
+.ts-status-chip--finalized { color: var(--ts-brand-green); }
+.ts-status-chip--archived  { color: var(--ed-muted); }
 
 /* ---------- Save state coloring ---------- */
 .ts-ed__savestate--saving { color: var(--ed-muted); }
@@ -984,14 +1074,14 @@
 }
 .ts-stamp-picker-filters { display: inline-flex; gap: 4px; }
 .ts-chip-mini {
-  background: #fff; border: 1px solid var(--ts-border);
-  padding: 4px 10px; font-size: 11px; color: var(--ts-text-muted);
-  cursor: pointer; border-radius: 99px;
+  background: transparent; border: 0; border-bottom: 2px solid transparent;
+  padding: 4px 8px; font-size: 11.5px; color: var(--ts-text-muted);
+  cursor: pointer; border-radius: 0;
 }
-.ts-chip-mini:hover { color: var(--ts-text); border-color: var(--ts-border-strong); }
+.ts-chip-mini:hover { color: var(--ts-text); }
 .ts-chip-mini.ts-is-active {
-  color: var(--ts-brand-primary); background: var(--ts-brand-primary-soft);
-  border-color: var(--ts-brand-primary); font-weight: 600;
+  color: var(--ts-brand-primary); background: transparent;
+  border-bottom-color: var(--ts-brand-primary); font-weight: 600;
 }
 .ts-stamp-picker-section { padding: var(--ts-space-3) var(--ts-space-5) 0; }
 .ts-stamp-picker-section:last-child { padding-bottom: var(--ts-space-4); }
@@ -1221,7 +1311,7 @@
   .ts-ed__hruler, .ts-ed__vruler, .ts-ed__statusbar,
   .ts-ed__outline, .ts-ed__secpanel, .ts-ed__toast,
   .ts-ed__bubble, .ts-ed__slash, .ts-ed__find, .ts-ed__cmdk,
-  .ts-ed__hist { display: none !important; }
+  .ts-ed__hist, .tsd-pf-del, .tsd-obj-floatbar { display: none !important; }
   .ts-ed__workspace { padding: 0; height: auto; overflow: visible; grid-template-columns: 1fr; }
   .ts-ed__page { margin: 0; box-shadow: none; border: 0; }
   body { background: #fff; }
@@ -1238,6 +1328,15 @@
 .tsd-stamp-mark.tsd-verify-flash {
   animation: tsd-verify-flash 0.9s ease-out;
 }
+.tsd-obj-selected { outline: 1.5px solid #002769 !important; outline-offset: 2px; }
+.tsd-obj-group {
+  display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  position: relative; padding: 4px; vertical-align: middle;
+}
+.tsd-obj-group.tsd-obj-selected { outline: 1.5px dashed #02982e !important; outline-offset: 3px; }
+.ts-sig-doc-protected { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+body.ts-sig-blur-lock .ts-sig-doc-protected img,
+body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.2) !important; opacity: 0.18 !important; }
 @keyframes tsd-verify-flash {
   0%   { box-shadow: 0 0 0 0 rgba(55,120,212,0.5); }
   100% { box-shadow: 0 0 0 10px rgba(55,120,212,0); }
@@ -1627,40 +1726,491 @@
       makeGroup('Trust', [
         { name: 'Signature',  icon: 'signature', fn: insertSignature },
         { name: 'Stamp',      icon: 'lock',      fn: openStampPicker },
+        { name: 'Letterhead', icon: 'page',      fn: openLetterheadPicker },
         { name: 'Field',      icon: 'page',      fn: insertFieldVar },
       ]),
     ];
   }
   function tabLayout() {
     var sizeCombo = makeCombo([
-      { value: 'a4',     label: 'A4 (210 × 297 mm)',   selected: true },
-      { value: 'letter', label: 'Letter (8.5 × 11 in)' },
-      { value: 'legal',  label: 'Legal (8.5 × 14 in)' },
+      { value: 'a4',        label: 'A4 (210 × 297 mm)',          selected: pageSize === 'a4' },
+      { value: 'letter',    label: 'US Letter (8.5 × 11 in)',    selected: pageSize === 'letter' },
+      { value: 'legal',     label: 'US Legal (8.5 × 14 in)',     selected: pageSize === 'legal' },
+      { value: 'a5',        label: 'A5 (148 × 210 mm)',          selected: pageSize === 'a5' },
+      { value: 'executive', label: 'Executive (7.25 × 10.5 in)', selected: pageSize === 'executive' },
+      { value: 'b5',        label: 'B5 (176 × 250 mm)',          selected: pageSize === 'b5' },
     ], function (v) { pageSize = v; applyPageSize(); });
 
     var orient = makeCombo([
-      { value: 'portrait',  label: 'Portrait', selected: true },
-      { value: 'landscape', label: 'Landscape' },
+      { value: 'portrait',  label: 'Portrait',  selected: pageOrient === 'portrait' },
+      { value: 'landscape', label: 'Landscape', selected: pageOrient === 'landscape' },
     ], function (v) { pageOrient = v; applyPageSize(); }, 'ts-ed__combo--sm');
 
     var margins = makeCombo([
-      { value: '1',   label: 'Narrow (1 cm)' },
-      { value: '2',   label: 'Normal (2 cm)', selected: true },
-      { value: '2.5', label: 'Moderate (2.5 cm)' },
-      { value: '3.5', label: 'Wide (3.5 cm)' },
-    ], function (v) { pageMargin = parseFloat(v); applyMargins(); });
+      { value: '1.2', label: 'Narrow (12 mm)',   selected: pageMargin <= 1.3 },
+      { value: '2',   label: 'Normal (20 mm)',   selected: pageMargin > 1.3 && pageMargin <= 2.2 },
+      { value: '2.5', label: 'Moderate (25 mm)', selected: pageMargin > 2.2 && pageMargin <= 3.0 },
+      { value: '3.2', label: 'Wide (32 mm)',     selected: pageMargin > 3.0 },
+    ], function (v) { pageMargin = parseFloat(v); pageMarginY = pageMargin; applyMargins(); });
 
     return [
       makeGroup('Page setup', [sizeCombo, orient, margins]),
+      makeGroup('Stationery', [
+        { name: 'Letterhead', icon: 'page', fn: openLetterheadPicker },
+      ]),
       makeGroup('Paragraph', [
         { name: 'Indent +', icon: 'align', fn: function () { exec('indent'); } },
         { name: 'Indent −', icon: 'align', fn: function () { exec('outdent'); } },
       ]),
       makeGroup('Arrange', [
-        { name: 'Columns',  icon: 'columns', fn: function () { showToast('Multi-column layout coming in next phase.'); } },
+        { name: 'Bring Front', icon: 'page', fn: function () { tsdArrangeOrder('front'); } },
+        { name: 'Forward',     icon: 'page', fn: function () { tsdArrangeOrder('forward'); } },
+        { name: 'Backward',    icon: 'page', fn: function () { tsdArrangeOrder('backward'); } },
+        { name: 'Send Back',   icon: 'page', fn: function () { tsdArrangeOrder('back'); } },
+        { name: 'Group',       icon: 'copy', fn: tsdGroupObjects },
+        { name: 'Ungroup',     icon: 'copy', fn: tsdUngroupObjects },
       ]),
     ];
   }
+
+  /* ---- TSD Document Editor: Object Selection, Ordering & Grouping ---- */
+  var _tsdSelObjs = [];
+  var _objFloatbar = document.getElementById('tsd-obj-floatbar');
+
+  function _positionObjFloatbar() {
+    if (!_objFloatbar) return;
+    if (!_tsdSelObjs.length || !_tsdSelObjs[0] || !_tsdSelObjs[0].isConnected) {
+      _objFloatbar.hidden = true;
+      return;
+    }
+    var r = _tsdSelObjs[0].getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) { _objFloatbar.hidden = true; return; }
+    var isStamp = _tsdSelObjs[0].classList && _tsdSelObjs[0].classList.contains('tsd-stamp-mark');
+    var bSign = document.getElementById('tsd-obj-sign');
+    var bSm = document.getElementById('tsd-obj-smaller');
+    var bLg = document.getElementById('tsd-obj-larger');
+    if (bSign) bSign.style.display = isStamp ? '' : 'none';
+    if (bSm) bSm.style.display = isStamp ? '' : 'none';
+    if (bLg) bLg.style.display = isStamp ? '' : 'none';
+    _objFloatbar.hidden = false;
+    var top = Math.max(8, r.top - 32);
+    var left = Math.max(8, Math.min(window.innerWidth - 150, r.right - _objFloatbar.offsetWidth));
+    _objFloatbar.style.top = top + 'px';
+    _objFloatbar.style.left = left + 'px';
+  }
+
+  function _tsdClearObjSel() {
+    _tsdSelObjs.forEach(function (el) { if (el && el.classList) el.classList.remove('tsd-obj-selected'); });
+    _tsdSelObjs = [];
+    if (_objFloatbar) _objFloatbar.hidden = true;
+  }
+
+  function _tsdDeleteSelectedObjects() {
+    if (!_tsdSelObjs.length) return false;
+    var count = 0;
+    _tsdSelObjs.forEach(function (el) {
+      if (!el || !el.parentNode) return;
+      var parentP = el.parentNode;
+      el.remove();
+      // Clean up empty wrapper paragraph if stamp was its only child
+      if (parentP && parentP.tagName === 'P' && parentP !== editor && !parentP.textContent.trim() && !parentP.querySelector('svg, img, table')) {
+        parentP.remove();
+      }
+      count++;
+    });
+    _tsdClearObjSel();
+    if (count > 0) {
+      scheduleSave();
+      if (typeof showToast === 'function') showToast(count === 1 ? 'Object deleted' : (count + ' objects deleted'));
+    }
+    return count > 0;
+  }
+
+  function _tsdResizeSelectedStamp(deltaPx) {
+    if (!_tsdSelObjs.length) return;
+    _tsdSelObjs.forEach(function (el) {
+      if (!el || !el.classList || !el.classList.contains('tsd-stamp-mark')) return;
+      var curW = parseFloat(el.style.width) || el.getBoundingClientRect().width || 168;
+      var nextW = Math.max(64, Math.min(420, Math.round(curW + deltaPx)));
+      el.style.width = nextW + 'px';
+      el.style.maxWidth = nextW + 'px';
+      var svg = el.querySelector('svg');
+      if (svg) svg.style.width = nextW + 'px';
+    });
+    _positionObjFloatbar();
+    scheduleSave();
+  }
+
+  function _openSignInsertedStampDrawer(stampEl) {
+    if (!stampEl) return;
+    var existing = document.getElementById('tsd-stamp-sign-drawer');
+    if (existing) existing.remove();
+
+    var drawer = document.createElement('aside');
+    drawer.id = 'tsd-stamp-sign-drawer';
+    drawer.setAttribute('role', 'region');
+    drawer.setAttribute('aria-label', 'Sign Inserted Stamp');
+    drawer.style.cssText = 'position:fixed;top:38px;right:0;bottom:24px;width:410px;max-width:95vw;z-index:8500;background:#ffffff;box-shadow:-6px 0 24px rgba(9,30,66,0.16);display:flex;flex-direction:column;';
+    drawer.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #e2e8f0;">' +
+        '<div><strong style="font-size:13px;color:#091e42;">Sign Inserted Stamp</strong>' +
+        '<div style="font-size:11px;color:#5a6676;">Sign directly (one-time, not stored) or load an approved signature.</div></div>' +
+        '<button type="button" id="tsd-ssd-close" style="border:0;background:transparent;font-size:16px;cursor:pointer;color:#64748b;padding:2px 6px;">✕</button>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;padding:10px 14px;background:#f6f8fb;border-bottom:1px solid #e2e8f0;">' +
+        '<button type="button" class="tsd-ssd-tab is-active" data-ssd-tab="direct" style="flex:1;padding:6px 8px;border:1px solid #002769;background:#002769;color:#fff;font-size:11.5px;font-weight:600;cursor:pointer;">Sign Directly (One-Time)</button>' +
+        '<button type="button" class="tsd-ssd-tab" data-ssd-tab="registered" style="flex:1;padding:6px 8px;border:1px solid #cbd5e1;background:#fff;color:#1d3648;font-size:11.5px;font-weight:600;cursor:pointer;">Load Registered (OTP)</button>' +
+      '</div>' +
+      '<div id="tsd-ssd-direct" style="padding:14px;display:flex;flex-direction:column;gap:10px;flex:1;overflow-y:auto;">' +
+        '<div style="font-size:11px;color:#1d3648;background:#edf2fa;border-left:3px solid #002769;padding:6px 9px;">' +
+          '<strong>Zero-Storage Direct Sign:</strong> Captured via TS High-Quality Pressure Signature Engine and applied to this stamp only — never saved for future reuse.' +
+        '</div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
+          '<select id="tsd-ssd-ink" style="border:1px solid #cbd5e1;padding:4px 7px;font-size:11.5px;background:#fff;color:#091e42;">' +
+            '<option value="#002769">TrustSeal Navy</option>' +
+            '<option value="#091e42">Executive Black</option>' +
+            '<option value="#1d3648">Slate Ink</option>' +
+          '</select>' +
+          '<button type="button" id="tsd-ssd-clear" style="border:1px solid #cbd5e1;background:#fff;padding:4px 9px;font-size:11.5px;cursor:pointer;color:#1d3648;">Clear</button>' +
+        '</div>' +
+        '<canvas id="tsd-ssd-canvas" width="380" height="150" style="width:100%;height:150px;background:#fafbfd;border:1px dashed #94a3b8;cursor:crosshair;touch-action:none;display:block;"></canvas>' +
+        '<div id="tsd-ssd-tele" style="font-size:10.5px;color:#64748b;">Sign with stylus pen, connected pad, or mouse…</div>' +
+        '<button type="button" id="tsd-ssd-apply" style="padding:8px 12px;background:#02982E;color:#fff;border:0;font-size:12px;font-weight:700;cursor:pointer;">Apply Direct Signature to Stamp</button>' +
+      '</div>' +
+      '<div id="tsd-ssd-registered" hidden style="padding:14px;display:flex;flex-direction:column;gap:10px;flex:1;overflow-y:auto;font-size:12px;color:#5a6676;">Loading approved signatures…</div>';
+    document.body.appendChild(drawer);
+
+    function applyGraphicToStamp(sigData, labelNote) {
+      var curSvg = stampEl.querySelector('svg');
+      if (!curSvg) return;
+      var updatedMarkup = _embedSignatureIntoStampSvg(curSvg.outerHTML, sigData);
+      var tmp = document.createElement('div');
+      tmp.innerHTML = updatedMarkup;
+      var newSvg = tmp.querySelector('svg');
+      if (newSvg) {
+        newSvg.style.cssText = curSvg.style.cssText || 'display:block;width:168px;max-width:100%;height:auto;overflow:visible;';
+        curSvg.replaceWith(newSvg);
+        stampEl.classList.add('ts-sig-doc-protected');
+        scheduleSave();
+        if (typeof showToast === 'function') showToast(labelNote || 'Signature applied to stamp.');
+      }
+      drawer.remove();
+    }
+
+    document.getElementById('tsd-ssd-close').addEventListener('click', function () { drawer.remove(); });
+    drawer.querySelectorAll('[data-ssd-tab]').forEach(function (tabBtn) {
+      tabBtn.addEventListener('click', function () {
+        var t = tabBtn.getAttribute('data-ssd-tab');
+        drawer.querySelectorAll('[data-ssd-tab]').forEach(function (b) {
+          var on = b === tabBtn;
+          b.style.background = on ? '#002769' : '#fff';
+          b.style.color = on ? '#fff' : '#1d3648';
+          b.style.borderColor = on ? '#002769' : '#cbd5e1';
+        });
+        document.getElementById('tsd-ssd-direct').hidden = (t !== 'direct');
+        document.getElementById('tsd-ssd-registered').hidden = (t !== 'registered');
+      });
+    });
+
+    // Direct TS HQ Pressure Signature Canvas (one-time, never stored)
+    var cvs = document.getElementById('tsd-ssd-canvas');
+    var c2d = cvs.getContext('2d');
+    var inkSel = document.getElementById('tsd-ssd-ink');
+    var tele = document.getElementById('tsd-ssd-tele');
+    var strokes = [];
+    var cur = null;
+    function cpt(e) {
+      var r = cvs.getBoundingClientRect();
+      var p = (typeof e.pressure === 'number' && e.pressure > 0 && e.pressure <= 1) ? e.pressure : 0.5;
+      return { x: (e.clientX - r.left) * (cvs.width / r.width), y: (e.clientY - r.top) * (cvs.height / r.height), p: p, pt: e.pointerType || 'mouse' };
+    }
+    cvs.addEventListener('pointerdown', function (e) {
+      var p = cpt(e);
+      cur = [p]; strokes.push(cur);
+      cvs.setPointerCapture(e.pointerId);
+      tele.textContent = 'Input: ' + p.pt.toUpperCase() + ' · Pressure: ' + Math.round(p.p * 100) + '%';
+    });
+    cvs.addEventListener('pointermove', function (e) {
+      if (!cur) return;
+      var p = cpt(e), prev = cur[cur.length - 1];
+      cur.push(p);
+      c2d.strokeStyle = inkSel.value || '#002769';
+      c2d.lineCap = 'round'; c2d.lineJoin = 'round';
+      c2d.lineWidth = Math.max(1.2, Math.min(4.8, 1.3 + p.p * 3.1));
+      c2d.beginPath(); c2d.moveTo(prev.x, prev.y); c2d.lineTo(p.x, p.y); c2d.stroke();
+    });
+    cvs.addEventListener('pointerup', function () { cur = null; });
+    document.getElementById('tsd-ssd-clear').addEventListener('click', function () {
+      c2d.clearRect(0, 0, cvs.width, cvs.height); strokes = []; cur = null;
+    });
+    document.getElementById('tsd-ssd-apply').addEventListener('click', function () {
+      if (!strokes.length) { alert('Please draw your signature first.'); return; }
+      var ink = inkSel.value || '#002769';
+      var minX = 9999, minY = 9999, maxX = 0, maxY = 0;
+      strokes.forEach(function (st) { st.forEach(function (pt) { if (pt.x < minX) minX = pt.x; if (pt.y < minY) minY = pt.y; if (pt.x > maxX) maxX = pt.x; if (pt.y > maxY) maxY = pt.y; }); });
+      var pad = 10, vx = Math.max(0, Math.floor(minX - pad)), vy = Math.max(0, Math.floor(minY - pad));
+      var vw = Math.max(60, Math.ceil(maxX - minX + pad * 2)), vh = Math.max(30, Math.ceil(maxY - minY + pad * 2));
+      var paths = strokes.map(function (st) {
+        if (st.length < 2) return '<circle cx="' + st[0].x.toFixed(1) + '" cy="' + st[0].y.toFixed(1) + '" r="1.8" fill="' + ink + '"/>';
+        var d = 'M ' + st[0].x.toFixed(1) + ' ' + st[0].y.toFixed(1), ap = 0;
+        for (var i = 1; i < st.length; i++) {
+          var mx = ((st[i - 1].x + st[i].x) / 2).toFixed(1), my = ((st[i - 1].y + st[i].y) / 2).toFixed(1);
+          d += ' Q ' + st[i - 1].x.toFixed(1) + ' ' + st[i - 1].y.toFixed(1) + ' ' + mx + ' ' + my;
+          ap += st[i].p;
+        }
+        var sw = Math.max(1.5, Math.min(4.0, 1.5 + (ap / (st.length - 1)) * 2.4)).toFixed(2);
+        return '<path d="' + d + '" fill="none" stroke="' + ink + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>';
+      }).join('');
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + vx + ' ' + vy + ' ' + vw + ' ' + vh + '" width="220" height="72" data-ts-direct-sig="1">' + paths + '</svg>';
+      applyGraphicToStamp(svg, 'Direct one-time signature applied to stamp (not stored).');
+    });
+
+    // Load Registered Signatures (OTP-verified)
+    fetch('/api/signatures/registered', { credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (d) {
+        var box = document.getElementById('tsd-ssd-registered');
+        var sigs = (d && d.signatures) || [];
+        if (!sigs.length) {
+          box.innerHTML = '<div style="padding:14px;border:1px dashed #cbd5e1;text-align:center;">No approved signatures registered yet. Use <strong>Sign Directly</strong> or register under <a href="/signatures" target="_blank">Brand &amp; Assets → Signatures</a>.</div>';
+          return;
+        }
+        box.innerHTML = '';
+        sigs.forEach(function (sg) {
+          var row = document.createElement('div');
+          row.style.cssText = 'border:1px solid #dfe5ee;padding:10px;display:flex;flex-direction:column;gap:6px;';
+          row.innerHTML =
+            '<div style="display:flex;justify-content:space-between;align-items:center;"><strong style="color:#091e42;">' + String(sg.staff_name || '').replace(/</g, '&lt;') + '</strong><span style="font-size:10px;color:#02982E;font-weight:700;">APPROVED</span></div>' +
+            '<div style="font-size:11px;color:#5a6676;">' + String(sg.name || 'Official Signature').replace(/</g, '&lt;') + '</div>' +
+            '<div class="tsd-ssd-otp"><button type="button" class="tsd-ssd-req" style="width:100%;padding:5px 8px;background:#002769;color:#fff;border:0;font-size:11.5px;font-weight:600;cursor:pointer;">Request Owner OTP &amp; Load</button></div>';
+          row.querySelector('.tsd-ssd-req').addEventListener('click', function () {
+            var z = row.querySelector('.tsd-ssd-otp');
+            z.textContent = 'Requesting OTP…';
+            fetch('/api/signatures/' + sg.id + '/request-otp', {
+              method: 'POST', credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+              body: JSON.stringify({ document_id: tsdId || null, document_title: ((document.getElementById('tsd-title') && document.getElementById('tsd-title').value) || 'TSD Document') + ' (Stamp Sign)' }),
+            }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); })
+              .then(function (res) {
+                z.innerHTML =
+                  (res.dev_otp_code ? '<div style="font-size:10.5px;color:#02982E;margin-bottom:4px;">OTP Code: <strong>' + res.dev_otp_code + '</strong></div>' : '') +
+                  '<div style="display:flex;gap:6px;"><input type="text" class="tsd-ssd-code" maxlength="6" placeholder="6-digit OTP" value="' + (res.dev_otp_code || '') + '" style="flex:1;padding:4px 7px;border:1px solid #cbd5e1;font-size:12px;">' +
+                  '<button type="button" class="tsd-ssd-go" style="padding:4px 9px;background:#02982E;color:#fff;border:0;font-size:11.5px;font-weight:600;cursor:pointer;">Apply</button></div>';
+                z.querySelector('.tsd-ssd-go').addEventListener('click', function () {
+                  var code = (z.querySelector('.tsd-ssd-code').value || '').trim();
+                  fetch('/api/signatures/usage/' + res.usage_log_id + '/verify-otp', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+                    body: JSON.stringify({ otp: code }),
+                  }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); })
+                    .then(function (ver) { applyGraphicToStamp(ver.signature_data, 'OTP-verified signature applied to stamp (#' + ver.usage_log_id + ').'); })
+                    .catch(function (err) { alert(err.message); });
+                });
+              }).catch(function (err) { z.textContent = err.message; });
+          });
+          box.appendChild(row);
+        });
+      }).catch(function (e) {
+        var box = document.getElementById('tsd-ssd-registered');
+        if (box) box.textContent = 'Could not load signatures: ' + e.message;
+      });
+  }
+
+  if (document.getElementById('tsd-obj-sign')) {
+    document.getElementById('tsd-obj-sign').addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (_tsdSelObjs.length && _tsdSelObjs[0].classList.contains('tsd-stamp-mark')) {
+        _openSignInsertedStampDrawer(_tsdSelObjs[0]);
+      }
+    });
+  }
+  if (document.getElementById('tsd-obj-delete')) {
+    document.getElementById('tsd-obj-delete').addEventListener('click', function (e) {
+      e.stopPropagation();
+      _tsdDeleteSelectedObjects();
+    });
+  }
+  if (document.getElementById('tsd-obj-smaller')) {
+    document.getElementById('tsd-obj-smaller').addEventListener('click', function (e) {
+      e.stopPropagation();
+      _tsdResizeSelectedStamp(-24);
+    });
+  }
+  if (document.getElementById('tsd-obj-larger')) {
+    document.getElementById('tsd-obj-larger').addEventListener('click', function (e) {
+      e.stopPropagation();
+      _tsdResizeSelectedStamp(24);
+    });
+  }
+  document.addEventListener('keydown', function (e) {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && _tsdSelObjs.length) {
+      var active = document.activeElement;
+      // Don't hijack typing inside inputs/textareas/footer
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.closest('#tsd-pagefooter'))) return;
+      // Only intercept if a non-text object (stamp, image, group, sig-block) is explicitly selected
+      if (_tsdSelObjs.some(function (el) { return el.classList && (el.classList.contains('tsd-stamp-mark') || el.classList.contains('tsd-obj-group') || el.tagName === 'IMG'); })) {
+        e.preventDefault();
+        _tsdDeleteSelectedObjects();
+      }
+    }
+  });
+  var _edWrap = document.getElementById('tsd-editorwrap');
+  if (_edWrap) _edWrap.addEventListener('scroll', _positionObjFloatbar, { passive: true });
+  window.addEventListener('resize', _positionObjFloatbar, { passive: true });
+
+  // Active Anti-Copy & Anti-Screenshot Blur Shield for Applied Document Signatures
+  (function initDocSignatureShield() {
+    function blurSigs() { document.body.classList.add('ts-sig-blur-lock'); }
+    function unblurSigs() { document.body.classList.remove('ts-sig-blur-lock'); }
+    window.addEventListener('blur', blurSigs);
+    window.addEventListener('focus', unblurSigs);
+    document.addEventListener('visibilitychange', function () { if (document.hidden) blurSigs(); else unblurSigs(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'PrintScreen' || ((e.metaKey || e.ctrlKey) && e.shiftKey && ['3', '4', '5', 's', 'S'].indexOf(e.key) !== -1)) {
+        blurSigs();
+        if (e.key === 'PrintScreen') e.preventDefault();
+        setTimeout(unblurSigs, 1800);
+      }
+    });
+    if (editor) {
+      ['copy', 'cut', 'contextmenu', 'dragstart'].forEach(function (ev) {
+        editor.addEventListener(ev, function (e) {
+          if (e.target && e.target.closest && e.target.closest('.ts-sig-doc-protected')) e.preventDefault();
+        });
+      });
+    }
+  })();
+
+  // Editable & deletable page footer (persisted per document in localStorage)
+  (function initPageFooter() {
+    var pf = document.getElementById('tsd-pagefooter');
+    var pfL = document.getElementById('tsd-pf-left');
+    var pfR = document.getElementById('tsd-pf-right');
+    var pfDel = document.getElementById('tsd-pf-delete');
+    var pfRes = document.getElementById('tsd-pf-restore');
+    if (!pf) return;
+    var key = 'tsd.pagefooter.' + (tsdId || 'new');
+    try {
+      var saved = JSON.parse(localStorage.getItem(key) || 'null');
+      if (saved) {
+        if (saved.hidden) { pf.hidden = true; if (pfRes) pfRes.hidden = false; }
+        if (typeof saved.left === 'string' && pfL) pfL.textContent = saved.left;
+        if (typeof saved.right === 'string' && pfR) pfR.textContent = saved.right;
+      }
+    } catch (_e) {}
+    function persist() {
+      try {
+        localStorage.setItem(key, JSON.stringify({
+          hidden: !!pf.hidden,
+          left: pfL ? pfL.textContent : '',
+          right: pfR ? pfR.textContent : '',
+        }));
+      } catch (_e) {}
+    }
+    if (pfL) pfL.addEventListener('input', persist);
+    if (pfR) pfR.addEventListener('input', persist);
+    if (pfDel) pfDel.addEventListener('click', function () {
+      pf.hidden = true;
+      if (pfRes) pfRes.hidden = false;
+      persist();
+      if (typeof showToast === 'function') showToast('Page footer removed');
+    });
+    if (pfRes) pfRes.addEventListener('click', function () {
+      pf.hidden = false;
+      pfRes.hidden = true;
+      persist();
+    });
+  })();
+
+  function _tsdFindSelectableObj(target) {
+    if (!target || !target.closest) return null;
+    var grp = target.closest('.tsd-obj-group');
+    if (grp && page.contains(grp)) return grp;
+    var obj = target.closest('.tsd-stamp-mark, img, table, figure, .tsd-sig-block, blockquote');
+    if (obj && page.contains(obj) && !obj.closest('.tsd-letterhead-header') && !obj.closest('.tsd-letterhead-footer')) return obj;
+    return null;
+  }
+  page.addEventListener('click', function (e) {
+    var obj = _tsdFindSelectableObj(e.target);
+    if (!obj) { _tsdClearObjSel(); return; }
+    if (e.shiftKey) {
+      var idx = _tsdSelObjs.indexOf(obj);
+      if (idx === -1) { _tsdSelObjs.push(obj); obj.classList.add('tsd-obj-selected'); }
+      else { _tsdSelObjs.splice(idx, 1); obj.classList.remove('tsd-obj-selected'); }
+    } else {
+      _tsdClearObjSel();
+      _tsdSelObjs = [obj];
+      obj.classList.add('tsd-obj-selected');
+    }
+    _positionObjFloatbar();
+  });
+  function tsdArrangeOrder(dir) {
+    if (!_tsdSelObjs.length) { showToast('Click an object (stamp, image, table, group) first.'); return; }
+    _tsdSelObjs.forEach(function (el) {
+      if (!el || !el.parentNode) return;
+      var curZ = parseInt(el.style.zIndex || '10', 10) || 10;
+      if (!el.style.position || el.style.position === 'static') el.style.position = 'relative';
+      if (dir === 'front') {
+        el.style.zIndex = String(Math.max(50, curZ + 10));
+        if (el.parentNode === page) page.appendChild(el);
+      } else if (dir === 'back') {
+        el.style.zIndex = '1';
+        if (el.parentNode === page && page.firstChild) page.insertBefore(el, page.firstChild);
+      } else if (dir === 'forward') {
+        el.style.zIndex = String(curZ + 1);
+        if (el.nextElementSibling) el.parentNode.insertBefore(el.nextElementSibling, el);
+      } else if (dir === 'backward') {
+        el.style.zIndex = String(Math.max(1, curZ - 1));
+        if (el.previousElementSibling) el.parentNode.insertBefore(el, el.previousElementSibling);
+      }
+    });
+    if (typeof markDirty === 'function') markDirty();
+    showToast('Object order updated (' + dir + ')');
+  }
+  function tsdGroupObjects() {
+    if (_tsdSelObjs.length < 2) { showToast('Shift+Click 2 or more objects to group.'); return; }
+    var first = _tsdSelObjs[0];
+    if (!first || !first.parentNode) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'tsd-obj-group';
+    wrap.setAttribute('data-tsd-group', '1');
+    wrap.setAttribute('contenteditable', 'false');
+    first.parentNode.insertBefore(wrap, first);
+    _tsdSelObjs.forEach(function (el) {
+      el.classList.remove('tsd-obj-selected');
+      wrap.appendChild(el);
+    });
+    _tsdSelObjs = [wrap];
+    wrap.classList.add('tsd-obj-selected');
+    if (typeof markDirty === 'function') markDirty();
+    showToast('Objects grouped');
+  }
+  function tsdUngroupObjects() {
+    var groups = _tsdSelObjs.filter(function (el) { return el && el.classList && el.classList.contains('tsd-obj-group'); });
+    if (!groups.length) { showToast('Select a grouped object to ungroup.'); return; }
+    var nextSel = [];
+    groups.forEach(function (grp) {
+      var parent = grp.parentNode;
+      if (!parent) return;
+      while (grp.firstChild) {
+        var child = grp.firstChild;
+        parent.insertBefore(child, grp);
+        if (child.nodeType === 1) { child.classList.add('tsd-obj-selected'); nextSel.push(child); }
+      }
+      parent.removeChild(grp);
+    });
+    _tsdSelObjs = nextSel;
+    if (typeof markDirty === 'function') markDirty();
+    showToast('Objects ungrouped');
+  }
+  document.addEventListener('keydown', function (e) {
+    if (!(e.metaKey || e.ctrlKey) || !_tsdSelObjs.length) return;
+    var k = (e.key || '').toLowerCase();
+    if (k === 'g' && !e.shiftKey) { e.preventDefault(); tsdGroupObjects(); }
+    else if (k === 'g' && e.shiftKey) { e.preventDefault(); tsdUngroupObjects(); }
+    else if (k === ']') { e.preventDefault(); tsdArrangeOrder(e.shiftKey ? 'forward' : 'front'); }
+    else if (k === '[') { e.preventDefault(); tsdArrangeOrder(e.shiftKey ? 'backward' : 'back'); }
+  });
   function tabReferences() {
     return [
       makeGroup('Contents', [
@@ -1796,14 +2346,182 @@
     inp.click();
   }
   function insertSignature() {
-    var name = prompt('Signer name or label', 'Signer');
-    if (name === null) return;
-    insertHTML(
-      '<div style="margin:24pt 0 6pt;display:inline-block;">' +
-      '<div style="border-bottom:1px solid #121a26;width:240pt;height:36pt;"></div>' +
-      '<div style="font-size:9pt;color:#5a6676;">' + (name || 'Signer') + ' · signature</div>' +
-      '</div>'
-    );
+    var existing = document.getElementById('tsd-sig-panel');
+    if (existing) { existing.remove(); return; }
+    // Save current editor caret before opening drawer
+    var savedRange = null;
+    try {
+      var sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && editor && editor.contains(sel.getRangeAt(0).startContainer)) {
+        savedRange = sel.getRangeAt(0).cloneRange();
+      }
+    } catch (_e) {}
+
+    var drawer = document.createElement('aside');
+    drawer.id = 'tsd-sig-panel';
+    drawer.setAttribute('role', 'region');
+    drawer.setAttribute('aria-label', 'Apply Authorized Staff Signature');
+    drawer.style.cssText = 'position:fixed;top:38px;right:0;bottom:24px;width:380px;max-width:94vw;z-index:8450;background:#ffffff;box-shadow:-6px 0 24px rgba(9,30,66,0.14);display:flex;flex-direction:column;';
+    drawer.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #e2e8f0;">' +
+        '<strong style="font-size:13px;color:#091e42;">Authorized Staff Signatures</strong>' +
+        '<div style="display:flex;gap:10px;align-items:center;">' +
+          '<a href="/signatures" target="_blank" style="font-size:11.5px;color:#002769;text-decoration:none;font-weight:600;">Register ↗</a>' +
+          '<button type="button" id="tsd-sig-close" style="border:0;background:transparent;font-size:16px;cursor:pointer;color:#64748b;padding:2px 6px;">✕</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:10px 14px;background:#f6f8fb;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
+        '<span style="font-size:11.5px;color:#42526e;">Click a registered signature to apply it to this document.</span>' +
+        '<button type="button" id="tsd-sig-blank" style="border:1px solid #cbd5e1;background:#fff;padding:4px 8px;font-size:11px;font-weight:600;color:#1d3648;cursor:pointer;white-space:nowrap;">+ Blank line</button>' +
+      '</div>' +
+      '<div id="tsd-sig-list" style="padding:14px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:10px;font-size:12.5px;color:#5a6676;">Loading registered signatures…</div>';
+    document.body.appendChild(drawer);
+
+    function placeSigNode(htmlStr) {
+      drawer.remove();
+      var tmp = document.createElement('div');
+      tmp.innerHTML = htmlStr;
+      var node = tmp.firstElementChild;
+      if (!node || !editor) return;
+      editor.focus();
+      var placed = false;
+      var marksLayer = document.getElementById('tsd-marks-layer');
+      if (window._pmView && marksLayer) {
+        marksLayer.appendChild(node);
+        placed = true;
+      }
+      if (!placed && savedRange && editor.contains(savedRange.startContainer)) {
+        try {
+          var s = window.getSelection();
+          s.removeAllRanges();
+          s.addRange(savedRange);
+          var r = savedRange.cloneRange();
+          r.collapse(false);
+          r.insertNode(node);
+          placed = true;
+        } catch (_e) { placed = false; }
+      }
+      if (!placed) {
+        var p = document.createElement('p');
+        p.style.margin = '12pt 0';
+        p.appendChild(node);
+        editor.appendChild(p);
+      }
+      try { node.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) {}
+      scheduleSave();
+    }
+
+    document.getElementById('tsd-sig-close').addEventListener('click', function () { drawer.remove(); });
+    document.getElementById('tsd-sig-blank').addEventListener('click', function () {
+      var nm = prompt('Signer name or label', 'Authorized Signatory');
+      if (nm === null) return;
+      placeSigNode(
+        '<div class="tsd-sig-block" contenteditable="false" style="margin:18pt 0 6pt;display:inline-block;">' +
+        '<div style="border-bottom:1px solid #121a26;width:220pt;height:36pt;"></div>' +
+        '<div style="font-size:9pt;color:#5a6676;margin-top:3pt;">' + String(nm || 'Authorized Signatory').replace(/</g, '&lt;') + ' · Signature</div>' +
+        '</div>'
+      );
+    });
+
+    fetch('/api/signatures/registered', { credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (data) {
+        var listEl = document.getElementById('tsd-sig-list');
+        var sigs = (data && data.signatures) || [];
+        if (!sigs.length) {
+          listEl.innerHTML = '<div style="padding:18px;text-align:center;border:1px dashed #cbd5e1;">' +
+            '<div style="font-weight:600;color:#091e42;margin-bottom:6px;">No approved signatory signatures available</div>' +
+            '<div style="font-size:12px;color:#5a6676;margin-bottom:12px;">Only owner-approved signatures registered under Brand &amp; Assets → Signatures can be applied.</div>' +
+            '<a href="/signatures" target="_blank" style="display:inline-block;padding:6px 12px;background:#002769;color:#fff;text-decoration:none;font-size:12px;font-weight:600;">Open Signatory Vault ↗</a>' +
+          '</div>';
+          return;
+        }
+        var today = (typeof _todayIsoLocal === 'function') ? _todayIsoLocal() : new Date().toISOString().slice(0, 10);
+        listEl.innerHTML = '';
+        sigs.forEach(function (sg) {
+          var card = document.createElement('div');
+          card.style.cssText = 'border:1px solid #dfe5ee;background:#fff;padding:11px 12px;display:flex;flex-direction:column;gap:7px;';
+          card.innerHTML =
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">' +
+              '<strong style="font-size:12.5px;color:#091e42;">' + String(sg.staff_name || '').replace(/</g, '&lt;') + '</strong>' +
+              '<span style="font-size:10px;background:#e6f6ec;color:#02982E;padding:1px 6px;font-weight:700;">APPROVED · OTP</span>' +
+            '</div>' +
+            '<div style="font-size:11.5px;color:#42526e;">' + String(sg.name || 'Official Signature').replace(/</g, '&lt;') + '</div>' +
+            '<div style="font-size:10.5px;color:#7a869a;">' + String(sg.capture_engine || 'ts_hq_engine').replace(/_/g, ' ').toUpperCase() + ' · Preview locked until Owner OTP verified</div>' +
+            '<div class="tsd-sig-otp-zone" style="display:flex;flex-direction:column;gap:6px;margin-top:2px;">' +
+              '<button type="button" class="tsd-sig-req-btn" style="padding:6px 10px;background:#002769;color:#fff;border:0;font-size:11.5px;font-weight:600;cursor:pointer;">Request Owner OTP to Sign</button>' +
+            '</div>';
+          var reqBtn = card.querySelector('.tsd-sig-req-btn');
+          var zone = card.querySelector('.tsd-sig-otp-zone');
+          reqBtn.addEventListener('click', function () {
+            reqBtn.disabled = true;
+            reqBtn.textContent = 'Notifying owner & generating OTP…';
+            fetch('/api/signatures/' + sg.id + '/request-otp', {
+              method: 'POST', credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+              body: JSON.stringify({
+                document_id: (typeof tsdId !== 'undefined' ? tsdId : null),
+                document_title: (document.getElementById('tsd-title') && document.getElementById('tsd-title').value) || 'TSD Document',
+              }),
+            }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); })
+              .then(function (res) {
+                var hintHtml = res.dev_otp_code
+                  ? ('<div style="font-size:10.5px;color:#02982E;background:#e6f6ec;padding:4px 7px;">Owner OTP Code: <strong style="letter-spacing:0.12em;">' + res.dev_otp_code + '</strong></div>')
+                  : '';
+                zone.innerHTML =
+                  '<div style="font-size:11px;color:#1d3648;background:#f6f8fb;padding:6px 8px;border-left:2px solid #002769;">' +
+                    'Usage logged (#' + res.usage_log_id + '). Owner notified via ' + String(res.notified_via || 'security log').replace(/</g, '&lt;') + '.' +
+                  '</div>' + hintHtml +
+                  '<div style="display:flex;gap:6px;">' +
+                    '<input type="text" class="tsd-sig-otp-in" maxlength="6" inputmode="numeric" placeholder="6-digit OTP" style="flex:1;padding:5px 8px;border:1px solid #cbd5e1;font-size:12px;letter-spacing:0.15em;">' +
+                    '<button type="button" class="tsd-sig-ver-btn" style="padding:5px 10px;background:#02982E;color:#fff;border:0;font-size:11.5px;font-weight:600;cursor:pointer;">Verify &amp; Apply</button>' +
+                  '</div>' +
+                  '<div class="tsd-sig-err" style="font-size:11px;color:#9b2c2c;" hidden></div>';
+                var otpIn = zone.querySelector('.tsd-sig-otp-in');
+                var verBtn = zone.querySelector('.tsd-sig-ver-btn');
+                var errEl = zone.querySelector('.tsd-sig-err');
+                if (otpIn) otpIn.focus();
+                verBtn.addEventListener('click', function () {
+                  verBtn.disabled = true;
+                  errEl.hidden = true;
+                  fetch('/api/signatures/usage/' + res.usage_log_id + '/verify-otp', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+                    body: JSON.stringify({ otp: (otpIn && otpIn.value || '').trim() }),
+                  }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); })
+                    .then(function (ver) {
+                      var sigGraphic = (ver.signature_data && (ver.signature_data.indexOf('data:image/') === 0 || ver.signature_data.indexOf('/static/') === 0))
+                        ? '<img src="' + ver.signature_data + '" alt="Verified Signature" draggable="false" style="max-height:58px;max-width:220px;display:block;margin-bottom:2pt;pointer-events:none;user-select:none;">'
+                        : (ver.signature_data && ver.signature_data.indexOf('<svg') !== -1
+                          ? '<div style="max-width:220px;line-height:0;margin-bottom:2pt;pointer-events:none;user-select:none;">' + ver.signature_data + '</div>'
+                          : '<div style="font-family:Georgia,serif;font-style:italic;font-size:22pt;color:#002769;user-select:none;">' + String(ver.staff_name || '').replace(/</g, '&lt;') + '</div>');
+                      placeSigNode(
+                        '<div class="tsd-sig-block ts-sig-doc-protected" data-tsd-sig-id="' + ver.signature_id + '" data-tsd-sig-usage="' + ver.usage_log_id + '" contenteditable="false" oncontextmenu="return false;" style="margin:14pt 0 8pt;display:inline-block;vertical-align:bottom;min-width:200pt;user-select:none;-webkit-user-select:none;">' +
+                          sigGraphic +
+                          '<div style="border-top:1px solid #1d3648;padding-top:3pt;font-size:9pt;font-weight:700;color:#091e42;">' + String(ver.staff_name || '').replace(/</g, '&lt;') + '</div>' +
+                          '<div style="font-size:8pt;color:#5a6676;">' + String(ver.name || 'Authorized Signatory').replace(/</g, '&lt;') + ' · OTP Verified #' + ver.usage_log_id + ' · ' + today + '</div>' +
+                        '</div>'
+                      );
+                      if (typeof showToast === 'function') showToast('OTP verified & signature applied (audit #' + ver.usage_log_id + ')');
+                    }).catch(function (err) {
+                      verBtn.disabled = false;
+                      errEl.textContent = err.message;
+                      errEl.hidden = false;
+                    });
+                });
+              }).catch(function (err) {
+                reqBtn.disabled = false;
+                reqBtn.textContent = 'Request Owner OTP to Sign';
+                alert(err.message);
+              });
+          });
+          listEl.appendChild(card);
+        });
+      })
+      .catch(function (e) {
+        var listEl = document.getElementById('tsd-sig-list');
+        if (listEl) listEl.textContent = 'Could not load signatures: ' + e.message;
+      });
   }
   function insertFieldVar() {
     var n = prompt('Variable name', 'client_name'); if (!n) return;
@@ -1883,56 +2601,539 @@
     });
   }
 
-  function _insertStampFromCard(el) {
-    var svg = el.querySelector('svg');
-    if (!svg) return;
-    var sid = parseInt(el.getAttribute('data-sid'), 10);
-    var svgMarkup = svg.outerHTML;
+  function _applyRandomStampImpression(svgMarkup) {
+    var uid = 'r' + Math.floor(Math.random() * 1e7);
+    var seed = Math.floor(Math.random() * 99999) + 1;
+    var rot = (Math.random() * 11 - 5.5).toFixed(2);
+    var pressure = (0.74 + Math.random() * 0.22).toFixed(3);
+    var dispScale = (0.5 + Math.random() * 1.9).toFixed(2);
+    var ragFreq = (0.018 + Math.random() * 0.055).toFixed(4);
+    var patchThresh = (-0.22 + Math.random() * 0.62).toFixed(3);
+    var grainOp = (0.24 + Math.random() * 0.42).toFixed(3);
+
+    var modes = [
+      'impression', 'overink', 'rim', 'bleed',
+      'tilt_left', 'tilt_right', 'tilt_nw',
+      'thumb_hotspot', 'half_miss', 'heavy_slam', 'feather_tap',
+      'fold_h', 'step_edge', 'staple_bump', 'wavy_curl'
+    ];
+    var mode = modes[Math.floor(Math.random() * modes.length)];
+    var extraDefs = '';
+    var maskAttr = '';
+    var outerFilter = '';
+
+    if (mode === 'overink') {
+      var dilR = (0.9 + Math.random() * 0.85).toFixed(2);
+      var sprP = (1.0 + Math.random() * 1.0).toFixed(2);
+      extraDefs = '<filter id="' + uid + '-oi" x="-25%" y="-25%" width="150%" height="150%">' +
+        '<feMorphology in="SourceGraphic" operator="dilate" radius="' + dilR + '" result="sw"/>' +
+        '<feTurbulence type="fractalNoise" baseFrequency="0.032" numOctaves="3" seed="' + (seed + 53) + '" result="bn"/>' +
+        '<feColorMatrix in="bn" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 6.5 -2.1" result="bm"/>' +
+        '<feComposite in="sw" in2="bm" operator="in" result="ba"/>' +
+        '<feGaussianBlur in="ba" stdDeviation="' + sprP + '" result="fe"/>' +
+        '<feComponentTransfer in="fe" result="fs"><feFuncA type="linear" slope="0.85"/></feComponentTransfer>' +
+        '<feMerge><feMergeNode in="fs"/><feMergeNode in="ba"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+      outerFilter = ' filter="url(#' + uid + '-oi)"';
+    } else if (mode === 'heavy_slam') {
+      pressure = (0.92 + Math.random() * 0.08).toFixed(3);
+      extraDefs = '<filter id="' + uid + '-hs" x="-15%" y="-15%" width="130%" height="130%">' +
+        '<feMorphology in="SourceGraphic" operator="dilate" radius="0.65" result="cp"/>' +
+        '<feComponentTransfer in="cp" result="cpa"><feFuncA type="linear" slope="0.72"/></feComponentTransfer>' +
+        '<feMerge><feMergeNode in="cpa"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+      outerFilter = ' filter="url(#' + uid + '-hs)"';
+    } else if (mode === 'feather_tap') {
+      pressure = (0.48 + Math.random() * 0.16).toFixed(3);
+      extraDefs = '<filter id="' + uid + '-ft" x="-10%" y="-10%" width="120%" height="120%">' +
+        '<feMorphology in="SourceGraphic" operator="erode" radius="0.30"/></filter>';
+      outerFilter = ' filter="url(#' + uid + '-ft)"';
+    } else if (mode === 'rim') {
+      extraDefs = '<filter id="' + uid + '-rim" x="-15%" y="-15%" width="130%" height="130%">' +
+        '<feMorphology in="SourceAlpha" operator="erode" radius="0.85" result="er"/>' +
+        '<feComposite in="SourceGraphic" in2="er" operator="out" result="rim"/>' +
+        '<feComponentTransfer in="SourceGraphic" result="core"><feFuncA type="linear" slope="0.82"/></feComponentTransfer>' +
+        '<feColorMatrix in="rim" type="matrix" values="0.72 0 0 0 0  0 0.72 0 0 0  0 0 0.72 0 0  0 0 0 1.22 0" result="dr"/>' +
+        '<feMerge><feMergeNode in="core"/><feMergeNode in="dr"/></feMerge></filter>';
+      outerFilter = ' filter="url(#' + uid + '-rim)"';
+    } else if (mode === 'bleed') {
+      extraDefs = '<filter id="' + uid + '-bl" x="-20%" y="-20%" width="140%" height="140%">' +
+        '<feGaussianBlur in="SourceGraphic" stdDeviation="0.85" result="b"/>' +
+        '<feComponentTransfer in="b" result="bc"><feFuncA type="linear" slope="0.28"/></feComponentTransfer>' +
+        '<feMerge><feMergeNode in="bc"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+      outerFilter = ' filter="url(#' + uid + '-bl)"';
+    } else if (mode.indexOf('tilt_') === 0) {
+      var c = mode === 'tilt_left' ? 'x1="0%" y1="50%" x2="100%" y2="50%"'
+        : (mode === 'tilt_right' ? 'x1="100%" y1="50%" x2="0%" y2="50%"' : 'x1="0%" y1="0%" x2="100%" y2="100%"');
+      extraDefs = '<linearGradient id="' + uid + '-tg" ' + c + '>' +
+        '<stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>' +
+        '<stop offset="60%" stop-color="#ffffff" stop-opacity="0.86"/>' +
+        '<stop offset="100%" stop-color="#ffffff" stop-opacity="0.32"/></linearGradient>' +
+        '<mask id="' + uid + '-tm" maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">' +
+        '<rect x="0" y="0" width="1" height="1" fill="url(#' + uid + '-tg)"/></mask>';
+      maskAttr = ' mask="url(#' + uid + '-tm)"';
+    } else if (mode === 'thumb_hotspot') {
+      var hx = Math.random() < 0.5 ? '28%' : '72%';
+      var hy = Math.random() < 0.5 ? '30%' : '70%';
+      extraDefs = '<radialGradient id="' + uid + '-tg" cx="' + hx + '" cy="' + hy + '" r="72%">' +
+        '<stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>' +
+        '<stop offset="55%" stop-color="#ffffff" stop-opacity="0.88"/>' +
+        '<stop offset="100%" stop-color="#ffffff" stop-opacity="0.28"/></radialGradient>' +
+        '<mask id="' + uid + '-tm" maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">' +
+        '<rect x="0" y="0" width="1" height="1" fill="url(#' + uid + '-tg)"/></mask>';
+      maskAttr = ' mask="url(#' + uid + '-tm)"';
+    } else if (mode === 'half_miss') {
+      extraDefs = '<linearGradient id="' + uid + '-tg" x1="15%" y1="0%" x2="88%" y2="100%">' +
+        '<stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>' +
+        '<stop offset="50%" stop-color="#ffffff" stop-opacity="0.90"/>' +
+        '<stop offset="75%" stop-color="#ffffff" stop-opacity="0.26"/>' +
+        '<stop offset="100%" stop-color="#ffffff" stop-opacity="0.08"/></linearGradient>' +
+        '<mask id="' + uid + '-tm" maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">' +
+        '<rect x="0" y="0" width="1" height="1" fill="url(#' + uid + '-tg)"/></mask>';
+      maskAttr = ' mask="url(#' + uid + '-tm)"';
+    } else if (mode === 'fold_h') {
+      var fp = 38 + Math.floor(Math.random() * 24);
+      extraDefs = '<linearGradient id="' + uid + '-tg" x1="0%" y1="0%" x2="4%" y2="100%">' +
+        '<stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>' +
+        '<stop offset="' + (fp - 4) + '%" stop-color="#ffffff" stop-opacity="0.95"/>' +
+        '<stop offset="' + fp + '%" stop-color="#ffffff" stop-opacity="0.12"/>' +
+        '<stop offset="' + (fp + 4) + '%" stop-color="#ffffff" stop-opacity="0.95"/>' +
+        '<stop offset="100%" stop-color="#ffffff" stop-opacity="1"/></linearGradient>' +
+        '<mask id="' + uid + '-tm" maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">' +
+        '<rect x="0" y="0" width="1" height="1" fill="url(#' + uid + '-tg)"/></mask>';
+      maskAttr = ' mask="url(#' + uid + '-tm)"';
+    } else if (mode === 'step_edge') {
+      var sp = 40 + Math.floor(Math.random() * 22);
+      extraDefs = '<linearGradient id="' + uid + '-tg" x1="0%" y1="0%" x2="6%" y2="100%">' +
+        '<stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>' +
+        '<stop offset="' + sp + '%" stop-color="#ffffff" stop-opacity="1"/>' +
+        '<stop offset="' + (sp + 3) + '%" stop-color="#ffffff" stop-opacity="0.30"/>' +
+        '<stop offset="100%" stop-color="#ffffff" stop-opacity="0.36"/></linearGradient>' +
+        '<mask id="' + uid + '-tm" maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">' +
+        '<rect x="0" y="0" width="1" height="1" fill="url(#' + uid + '-tg)"/></mask>';
+      maskAttr = ' mask="url(#' + uid + '-tm)"';
+    } else if (mode === 'staple_bump') {
+      var sx = 28 + Math.floor(Math.random() * 44);
+      var sy = 28 + Math.floor(Math.random() * 44);
+      extraDefs = '<radialGradient id="' + uid + '-tg" cx="' + sx + '%" cy="' + sy + '%" r="22%">' +
+        '<stop offset="0%" stop-color="#ffffff" stop-opacity="0.08"/>' +
+        '<stop offset="52%" stop-color="#ffffff" stop-opacity="0.18"/>' +
+        '<stop offset="78%" stop-color="#ffffff" stop-opacity="0.95"/>' +
+        '<stop offset="100%" stop-color="#ffffff" stop-opacity="1"/></radialGradient>' +
+        '<mask id="' + uid + '-tm" maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">' +
+        '<rect x="0" y="0" width="1" height="1" fill="url(#' + uid + '-tg)"/></mask>';
+      maskAttr = ' mask="url(#' + uid + '-tm)"';
+    } else if (mode === 'wavy_curl') {
+      extraDefs = '<linearGradient id="' + uid + '-tg" x1="0%" y1="0%" x2="100%" y2="25%">' +
+        '<stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>' +
+        '<stop offset="28%" stop-color="#ffffff" stop-opacity="0.40"/>' +
+        '<stop offset="55%" stop-color="#ffffff" stop-opacity="0.96"/>' +
+        '<stop offset="80%" stop-color="#ffffff" stop-opacity="0.38"/>' +
+        '<stop offset="100%" stop-color="#ffffff" stop-opacity="0.88"/></linearGradient>' +
+        '<mask id="' + uid + '-tm" maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">' +
+        '<rect x="0" y="0" width="1" height="1" fill="url(#' + uid + '-tg)"/></mask>';
+      maskAttr = ' mask="url(#' + uid + '-tm)"';
+    }
+
+    var defsBlock =
+      '<defs>' +
+        '<filter id="' + uid + '-imp" x="-20%" y="-20%" width="140%" height="140%">' +
+          '<feTurbulence type="fractalNoise" baseFrequency="' + ragFreq + '" numOctaves="2" seed="' + seed + '" result="t1"/>' +
+          '<feDisplacementMap in="SourceGraphic" in2="t1" scale="' + dispScale + '" xChannelSelector="R" yChannelSelector="G" result="d"/>' +
+          '<feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="' + (seed + 37) + '" result="t2"/>' +
+          '<feColorMatrix in="t2" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 8 ' + patchThresh + '" result="m"/>' +
+          '<feComposite in="d" in2="m" operator="in" result="ink"/>' +
+          '<feTurbulence type="fractalNoise" baseFrequency="1.35" numOctaves="2" seed="' + (seed + 91) + '" result="t3"/>' +
+          '<feColorMatrix in="t3" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 ' + grainOp + ' -0.15" result="gm"/>' +
+          '<feComposite in="ink" in2="gm" operator="out"/>' +
+        '</filter>' +
+        extraDefs +
+      '</defs>';
+
+    var openMatch = svgMarkup.match(/^<svg\b[^>]*>/i);
+    if (!openMatch || !/<\/svg>\s*$/i.test(svgMarkup)) return svgMarkup;
+    var openTag = openMatch[0];
+    var inner = svgMarkup.slice(openTag.length, svgMarkup.lastIndexOf('</svg>'));
+    return openTag + defsBlock +
+      '<g opacity="' + pressure + '" transform="rotate(' + rot + ')"' + maskAttr + '>' +
+        '<g' + outerFilter + '><g filter="url(#' + uid + '-imp)">' + inner + '</g></g>' +
+      '</g></svg>';
+  }
+
+  var _savedStampRange = null;
+
+  function _todayIsoLocal() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function _formatStampDate(isoStr, fmt) {
+    var parts = String(isoStr || '').split('-');
+    if (parts.length !== 3) return isoStr;
+    var y = parseInt(parts[0], 10), mIdx = parseInt(parts[1], 10) - 1, dd = parseInt(parts[2], 10);
+    if (isNaN(y) || isNaN(mIdx) || isNaN(dd)) return isoStr;
+    var MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    var DD = String(dd).padStart(2, '0');
+    var MM = String(mIdx + 1).padStart(2, '0');
+    var MMM = MONTHS[Math.max(0, Math.min(11, mIdx))];
+    var f = (fmt || 'DD MMM YYYY').toUpperCase();
+    if (f === 'YYYY-MM-DD') return y + '-' + MM + '-' + DD;
+    if (f === 'DD/MM/YYYY') return DD + '/' + MM + '/' + y;
+    if (f === 'MM/DD/YYYY') return MM + '/' + DD + '/' + y;
+    if (f === 'DD.MM.YYYY') return DD + '.' + MM + '.' + y;
+    if (f === 'MMM DD, YYYY') return MMM + ' ' + DD + ', ' + y;
+    return DD + ' ' + MMM + ' ' + y;
+  }
+
+  function _applyDateToStampSvg(svgMarkup, isoDate) {
+    if (!isoDate) return svgMarkup;
+    try {
+      var tmp = document.createElement('div');
+      tmp.innerHTML = svgMarkup;
+      var svgEl = tmp.querySelector('svg');
+      if (!svgEl) return svgMarkup;
+      var updated = false;
+      svgEl.querySelectorAll('text[data-stamp-date]').forEach(function (t) {
+        var fmt = t.getAttribute('data-stamp-date') || 'DD MMM YYYY';
+        t.textContent = _formatStampDate(isoDate, fmt);
+        updated = true;
+      });
+      if (!updated) {
+        var dateRx = /^(\[?(?:DD[\s\/\.-]MMM[\s\/\.-]YYYY|YYYY-MM-DD|DD\/MM\/YYYY|MM\/DD\/YYYY|DD\.MM\.YYYY)\]?|\d{1,2}\s+(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}[\/\.]\d{1,2}[\/\.]\d{4})$/i;
+        svgEl.querySelectorAll('text').forEach(function (t) {
+          var txt = (t.textContent || '').trim();
+          if (dateRx.test(txt)) {
+            var fmt = /\d{4}-\d{2}-\d{2}|YYYY-MM-DD/i.test(txt) ? 'YYYY-MM-DD'
+              : (/\//.test(txt) ? 'DD/MM/YYYY' : (/\./.test(txt) ? 'DD.MM.YYYY' : 'DD MMM YYYY'));
+            t.textContent = _formatStampDate(isoDate, fmt);
+            t.setAttribute('data-stamp-date', fmt);
+            updated = true;
+          }
+        });
+      }
+      svgEl.setAttribute('data-stamp-date-value', isoDate);
+      return svgEl.outerHTML;
+    } catch (_e) {
+      return svgMarkup;
+    }
+  }
+
+  function _insertStampNodeIntoEditor(wrapperHtml) {
+    closeStampPicker();
+    var tmp = document.createElement('div');
+    tmp.innerHTML = wrapperHtml;
+    var node = tmp.firstElementChild;
+    if (!node || !editor) return;
+
+    // Guarantee the SVG inside the stamp wrapper has explicit visible dimensions.
+    var svgEl = node.querySelector('svg');
+    if (svgEl) {
+      if (!svgEl.getAttribute('viewBox')) {
+        var wAttr = parseFloat(svgEl.getAttribute('width')) || 160;
+        var hAttr = parseFloat(svgEl.getAttribute('height')) || 160;
+        svgEl.setAttribute('viewBox', '0 0 ' + wAttr + ' ' + hAttr);
+      }
+      svgEl.style.display = 'block';
+      svgEl.style.width = '168px';
+      svgEl.style.maxWidth = '100%';
+      svgEl.style.height = 'auto';
+      svgEl.style.overflow = 'visible';
+    }
+
+    editor.focus();
+    var inserted = false;
+    var marksLayer = document.getElementById('tsd-marks-layer');
+    if (window._pmView && marksLayer) {
+      marksLayer.appendChild(node);
+      inserted = true;
+    }
+    if (!inserted && _savedStampRange && editor.contains(_savedStampRange.startContainer)) {
+      try {
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(_savedStampRange);
+        var r = _savedStampRange.cloneRange();
+        r.collapse(false);
+        r.insertNode(node);
+        // Move caret right after the inserted stamp
+        var after = document.createRange();
+        after.setStartAfter(node);
+        after.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(after);
+        inserted = true;
+      } catch (_err) {
+        inserted = false;
+      }
+    }
+    if (!inserted) {
+      var p = document.createElement('p');
+      p.style.margin = '12pt 0';
+      p.appendChild(node);
+      var footer = editor.querySelector('.tsd-letterhead-footer');
+      if (footer && footer.parentNode === editor) {
+        editor.insertBefore(p, footer);
+      } else {
+        editor.appendChild(p);
+      }
+    }
+    _savedStampRange = null;
+    try {
+      node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      node.classList.add('tsd-verify-flash');
+      setTimeout(function () { node.classList.remove('tsd-verify-flash'); }, 1400);
+    } catch (_e) {}
+    scheduleSave();
+  }
+
+  function _stampHasSignArea(stampObj, svgMarkup) {
+    if (stampObj) {
+      if (stampObj.kind === 'signature' || stampObj.kind === 'date') return true;
+      if (stampObj.layout && stampObj.layout.show_signatory) return true;
+    }
+    return /(?:SIGNATORY|SIGNATURE|SIGNED|BY\s*_{3,}|AUTHORIZED\s+SIGN)/i.test(svgMarkup || '');
+  }
+
+  function _embedSignatureIntoStampSvg(svgMarkup, sigData) {
+    if (!sigData) return svgMarkup;
+    try {
+      var tmp = document.createElement('div');
+      tmp.innerHTML = svgMarkup;
+      var svgEl = tmp.querySelector('svg');
+      if (!svgEl) return svgMarkup;
+      var vb = (svgEl.getAttribute('viewBox') || '0 0 320 170').trim().split(/[\s,]+/).map(Number);
+      if (vb.length !== 4 || vb.some(isNaN)) vb = [0, 0, 320, 170];
+      var vx = vb[0], vy = vb[1], vw = vb[2], vh = vb[3];
+
+      // Find the signatory line in the lower half of the stamp if present
+      var sigLineY = vy + vh * 0.74;
+      var sigCenterX = vx + vw / 2;
+      var lines = svgEl.querySelectorAll('line');
+      lines.forEach(function (ln) {
+        var y1 = parseFloat(ln.getAttribute('y1'));
+        var y2 = parseFloat(ln.getAttribute('y2'));
+        var x1 = parseFloat(ln.getAttribute('x1'));
+        var x2 = parseFloat(ln.getAttribute('x2'));
+        if (!isNaN(y1) && !isNaN(y2) && Math.abs(y1 - y2) < 2 && y1 > vy + vh * 0.50 && Math.abs(x2 - x1) > vw * 0.25) {
+          sigLineY = y1;
+          sigCenterX = (x1 + x2) / 2;
+        }
+      });
+
+      var imgHref = sigData;
+      if (sigData.indexOf('<svg') !== -1 && sigData.indexOf('data:image/') !== 0) {
+        imgHref = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(sigData)));
+      }
+      if (imgHref.indexOf('data:image/') !== 0 && imgHref.indexOf('/static/') !== 0) return svgMarkup;
+
+      var sigW = vw * 0.50;
+      var sigH = vh * 0.24;
+      var sigX = sigCenterX - sigW / 2;
+      var sigY = Math.max(vy + vh * 0.32, sigLineY - sigH * 0.88);
+      var ns = 'http://www.w3.org/2000/svg';
+      var img = document.createElementNS(ns, 'image');
+      img.setAttribute('href', imgHref);
+      img.setAttribute('x', sigX.toFixed(1));
+      img.setAttribute('y', sigY.toFixed(1));
+      img.setAttribute('width', sigW.toFixed(1));
+      img.setAttribute('height', sigH.toFixed(1));
+      img.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      img.setAttribute('data-stamp-embedded-sig', '1');
+      svgEl.appendChild(img);
+      return svgEl.outerHTML;
+    } catch (_e) {
+      return svgMarkup;
+    }
+  }
+
+  function _finalizeAndInsertStamp(sid, stampObj, chosenDate, svgMarkup, sigUsageId) {
+    var rndToggle = document.getElementById('tsd-stamp-randomize');
+    var stampAutoRnd = !!(stampObj && stampObj.layout && stampObj.layout.effects && stampObj.layout.effects.randomize_on_insert);
+    if ((rndToggle && rndToggle.checked) || stampAutoRnd) {
+      svgMarkup = _applyRandomStampImpression(svgMarkup);
+    }
     fetch('/api/tsd-stamps/' + sid + '/receipt', {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
       body: JSON.stringify({
         document_id: tsdId || null,
         svg: svgMarkup,
-        context_label: (shell.dataset.tsdTitle || 'TSD document').slice(0, 120),
+        stamp_date: chosenDate,
+        context_label: ((shell.dataset.tsdTitle || 'TSD document') + ' · ' + chosenDate + (sigUsageId ? (' · sig#' + sigUsageId) : '')).slice(0, 120),
       }),
     }).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     }).then(function (receipt) {
-      var stamped = svgMarkup.replace(
+      var baseSvg = receipt.sealed_svg || svgMarkup;
+      var stamped = baseSvg.replace(
         /^<svg\b/,
         '<svg data-stamp-receipt-id="' + receipt.receipt_id + '"' +
         ' data-stamp-receipt-nonce="' + receipt.nonce + '"' +
         ' data-stamp-placed-at="' + receipt.placed_at + '"' +
-        ' data-stamp-placed-by="' + receipt.placed_by_id + '"'
+        ' data-stamp-placed-by="' + receipt.placed_by_id + '"' +
+        ' data-stamp-date-value="' + chosenDate + '"' +
+        (sigUsageId ? (' data-stamp-sig-usage="' + sigUsageId + '"') : '')
       );
+      var fpBadge = receipt.forensic_fingerprint ? (' · ' + receipt.forensic_fingerprint) : '';
+      var sigCls = sigUsageId ? ' ts-sig-doc-protected' : '';
       var wrapper =
-        '<span class="tsd-stamp-mark" data-tsd-stamp-receipt="' + receipt.receipt_id + '"' +
+        '<span class="tsd-stamp-mark' + sigCls + '" data-tsd-stamp-receipt="' + receipt.receipt_id + '"' +
         ' data-tsd-stamp-nonce="' + receipt.nonce + '"' +
-        ' style="display:inline-block;vertical-align:middle;margin:0 6pt;max-width:220px;"' +
-        ' contenteditable="false" title="Signed stamp · receipt #' + receipt.receipt_id + '">' +
+        ' data-tsd-stamp-date="' + chosenDate + '"' +
+        ' style="display:inline-block;vertical-align:middle;margin:6pt;width:168px;max-width:220px;"' +
+        ' contenteditable="false" title="TSD Forensically Sealed Stamp (' + chosenDate + ') · receipt #' + receipt.receipt_id + fpBadge + '">' +
         stamped + '</span>';
-      insertHTML(wrapper);
+      _insertStampNodeIntoEditor(wrapper);
       _saveRecent(sid);
-      closeStampPicker();
-      if (typeof showToast === 'function') showToast('Stamp inserted · receipt #' + receipt.receipt_id);
+      if (typeof showToast === 'function') showToast('Stamp sealed & inserted (' + chosenDate + ')' + (sigUsageId ? ' with verified signature' : '') + ' · receipt #' + receipt.receipt_id + fpBadge);
     }).catch(function (e) {
       var wrapper =
         '<span class="tsd-stamp-mark tsd-stamp-mark--unsigned"' +
-        ' style="display:inline-block;vertical-align:middle;margin:0 6pt;max-width:220px;"' +
-        ' contenteditable="false" title="Unsigned stamp — signing service unavailable">' +
+        ' data-tsd-stamp-date="' + chosenDate + '"' +
+        ' style="display:inline-block;vertical-align:middle;margin:6pt;width:168px;max-width:220px;"' +
+        ' contenteditable="false" title="Stamp (' + chosenDate + ') — signing service unavailable">' +
         svgMarkup + '</span>';
-      insertHTML(wrapper);
+      _insertStampNodeIntoEditor(wrapper);
       _saveRecent(sid);
-      closeStampPicker();
-      if (typeof showToast === 'function') showToast('Stamp inserted unsigned: ' + e.message);
+      if (typeof showToast === 'function') showToast('Stamp inserted (' + chosenDate + '): ' + e.message);
     });
+  }
+
+  function _insertStampFromCard(el) {
+    var svg = el.querySelector('svg');
+    if (!svg) return;
+    var sid = parseInt(el.getAttribute('data-sid'), 10);
+
+    // Enforce Stamp Date: today or backdate allowed; future dates blocked.
+    var todayIso = _todayIsoLocal();
+    var dateInp = document.getElementById('tsd-stamp-date');
+    var chosenDate = (dateInp && dateInp.value) ? dateInp.value.trim() : todayIso;
+    if (chosenDate > todayIso) {
+      if (dateInp) dateInp.value = todayIso;
+      if (typeof showToast === 'function') showToast('Future stamp dates are not allowed. Only today or backdates are permitted.');
+      else alert('Future stamp dates are not allowed. Only today or backdates are permitted.');
+      return;
+    }
+
+    var svgMarkup = _applyDateToStampSvg(svg.outerHTML, chosenDate);
+    var stampObj = (_stampCache || []).find(function (s) { return s.id === sid; });
+    var useMySigCb = document.getElementById('tsd-stamp-use-my-sig');
+    var mySigSel = document.getElementById('tsd-stamp-my-sig-sel');
+    var chosenSigId = (useMySigCb && useMySigCb.checked && mySigSel && mySigSel.value) ? parseInt(mySigSel.value, 10) : 0;
+
+    if (chosenSigId && _stampHasSignArea(stampObj, svgMarkup)) {
+      var otpBox = document.getElementById('tsd-stamp-sig-otp-box');
+      if (otpBox) {
+        otpBox.hidden = false;
+        otpBox.innerHTML = 'Requesting OTP to sign stamp with your registered signature…';
+      }
+      fetch('/api/signatures/' + chosenSigId + '/request-otp', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({
+          document_id: tsdId || null,
+          document_title: ((document.getElementById('tsd-title') && document.getElementById('tsd-title').value) || 'TSD Document') + ' (Stamp Sign)',
+        }),
+      }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); })
+        .then(function (res) {
+          if (!otpBox) { _finalizeAndInsertStamp(sid, stampObj, chosenDate, svgMarkup, null); return; }
+          var hint = res.dev_otp_code ? (' · Code: <strong style="letter-spacing:0.12em;color:#02982E;">' + res.dev_otp_code + '</strong>') : '';
+          otpBox.innerHTML =
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">' +
+              '<span><strong>Confirm your signature on this stamp</strong> (Usage #' + res.usage_log_id + hint + ')</span>' +
+              '<div style="display:inline-flex;align-items:center;gap:6px;">' +
+                '<input type="text" id="tsd-st-otp-val" maxlength="6" inputmode="numeric" placeholder="6-digit OTP" value="' + (res.dev_otp_code || '') + '" style="width:100px;padding:3px 7px;border:1px solid #cbd5e1;font-size:12px;letter-spacing:0.12em;">' +
+                '<button type="button" id="tsd-st-otp-ok" style="padding:4px 10px;background:#02982E;color:#fff;border:0;font-size:11.5px;font-weight:600;cursor:pointer;">Sign &amp; Stamp</button>' +
+                '<button type="button" id="tsd-st-otp-skip" style="padding:4px 8px;background:#fff;color:#42526e;border:1px solid #cbd5e1;font-size:11px;cursor:pointer;">Stamp without sign</button>' +
+              '</div>' +
+            '</div>';
+          document.getElementById('tsd-st-otp-skip').addEventListener('click', function () {
+            otpBox.hidden = true;
+            _finalizeAndInsertStamp(sid, stampObj, chosenDate, svgMarkup, null);
+          });
+          document.getElementById('tsd-st-otp-ok').addEventListener('click', function () {
+            var okBtn = document.getElementById('tsd-st-otp-ok');
+            var code = (document.getElementById('tsd-st-otp-val').value || '').trim();
+            okBtn.disabled = true;
+            fetch('/api/signatures/usage/' + res.usage_log_id + '/verify-otp', {
+              method: 'POST', credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+              body: JSON.stringify({ otp: code }),
+            }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); })
+              .then(function (ver) {
+                otpBox.hidden = true;
+                var signedSvg = _embedSignatureIntoStampSvg(svgMarkup, ver.signature_data);
+                _finalizeAndInsertStamp(sid, stampObj, chosenDate, signedSvg, ver.usage_log_id);
+              }).catch(function (err) {
+                okBtn.disabled = false;
+                alert(err.message);
+              });
+          });
+        }).catch(function (err) {
+          if (otpBox) otpBox.hidden = true;
+          if (typeof showToast === 'function') showToast('Signature skipped: ' + err.message);
+          _finalizeAndInsertStamp(sid, stampObj, chosenDate, svgMarkup, null);
+        });
+      return;
+    }
+
+    _finalizeAndInsertStamp(sid, stampObj, chosenDate, svgMarkup, null);
   }
 
   function openStampPicker() {
     var overlay = document.getElementById('tsd-stamp-overlay');
     if (!overlay) return;
+    // Save current editor caret/selection BEFORE focusing the picker search input.
+    try {
+      var sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && editor && editor.contains(sel.getRangeAt(0).startContainer)) {
+        _savedStampRange = sel.getRangeAt(0).cloneRange();
+      } else {
+        _savedStampRange = null;
+      }
+    } catch (_e) { _savedStampRange = null; }
+
+    var todayIso = _todayIsoLocal();
+    var dateInp = document.getElementById('tsd-stamp-date');
+    if (dateInp) {
+      dateInp.max = todayIso;
+      if (!dateInp.value || dateInp.value > todayIso) dateInp.value = todayIso;
+      if (!dateInp._tsBound) {
+        dateInp._tsBound = true;
+        dateInp.addEventListener('change', function () {
+          var t = _todayIsoLocal();
+          if (dateInp.value && dateInp.value > t) {
+            dateInp.value = t;
+            if (typeof showToast === 'function') showToast('Future stamp dates are not allowed. Backdates and today are permitted.');
+          }
+        });
+      }
+    }
+
+    var otpBoxReset = document.getElementById('tsd-stamp-sig-otp-box');
+    if (otpBoxReset) { otpBoxReset.hidden = true; otpBoxReset.innerHTML = ''; }
+    var mySigSel = document.getElementById('tsd-stamp-my-sig-sel');
+    var mySigCb = document.getElementById('tsd-stamp-use-my-sig');
+    if (mySigSel) {
+      fetch('/api/signatures/registered', { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : { signatures: [] }; })
+        .then(function (d) {
+          var mine = ((d && d.signatures) || []).filter(function (s) { return s.is_mine; });
+          if (!mine.length) {
+            mySigSel.innerHTML = '<option value="">No own approved signature yet</option>';
+            mySigSel.disabled = true;
+            if (mySigCb) { mySigCb.checked = false; mySigCb.disabled = true; }
+          } else {
+            mySigSel.disabled = false;
+            if (mySigCb) { mySigCb.disabled = false; mySigCb.checked = true; }
+            mySigSel.innerHTML = mine.map(function (s) {
+              return '<option value="' + s.id + '">' + String(s.name || 'My Signature').replace(/</g, '&lt;') + (s.is_default ? ' (Default)' : '') + '</option>';
+            }).join('');
+          }
+        }).catch(function () {});
+    }
+
     overlay.removeAttribute('hidden'); overlay.style.display = 'flex';
     // Reset filter state each open so the user sees the full picker.
     _stampFilter = { query: '', kind: 'all' };
@@ -1957,6 +3158,568 @@
     if (!o) return;
     o.setAttribute('hidden', ''); o.style.display = 'none';
   }
+
+  // ===================================================================== LETTERHEADS (Design-Only Inheritance · No Content Duplication)
+  var _TSD_LH_FONTS = {
+    sans: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    serif: "Georgia, 'Times New Roman', serif",
+    legal: "'Times New Roman', Times, serif",
+    modern: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+    garamond: "'Garamond', 'Baskerville', Georgia, serif",
+    mono: "'JetBrains Mono', 'Courier New', monospace",
+  };
+
+  function _buildTsdLhPatternSvg(pattern, accent, brand2, opPct) {
+    if (!pattern || pattern === 'none') return '';
+    if (typeof window.buildTsLhPatternSvg === 'function') {
+      var shared = window.buildTsLhPatternSvg(pattern, accent, brand2, opPct);
+      if (shared) return shared;
+    }
+    var op = (Math.max(5, Math.min(100, parseInt(opPct || 85, 10) || 85)) / 100).toFixed(2);
+    var p = accent || '#002769';
+    var b = brand2 || '#02982E';
+    var body = '';
+    if (pattern === 'curved_band') {
+      body = '<path d="M0,0 L560,0 C420,95 210,125 0,105 Z" fill="' + p + '" fill-opacity="0.13"/>' +
+        '<path d="M0,108 C220,128 430,96 580,0" fill="none" stroke="' + b + '" stroke-width="5" stroke-opacity="0.22"/>' +
+        '<path d="M800,1120 L260,1120 C400,1030 610,1005 800,1022 Z" fill="' + p + '" fill-opacity="0.11"/>';
+    } else if (pattern === 'diagonal_band') {
+      body = '<polygon points="0,0 800,0 800,125 0,48" fill="' + p + '" fill-opacity="0.11"/>' +
+        '<polygon points="0,48 800,125 800,136 0,59" fill="' + b + '" fill-opacity="0.22"/>' +
+        '<polygon points="0,1072 800,1010 800,1120 0,1120" fill="' + p + '" fill-opacity="0.09"/>';
+    } else if (pattern === 'top_wave') {
+      body = '<path d="M0,0 L800,0 L800,96 Q600,148 400,94 T0,118 Z" fill="' + p + '" fill-opacity="0.13"/>' +
+        '<path d="M0,124 Q200,82 400,102 T800,102" fill="none" stroke="' + b + '" stroke-width="4" stroke-opacity="0.25"/>' +
+        '<path d="M0,1120 L0,1045 Q260,998 520,1065 T800,1030 L800,1120 Z" fill="' + p + '" fill-opacity="0.10"/>';
+    } else if (pattern === 'corner_brackets') {
+      body = '<path d="M22,82 L22,22 L82,22 M718,22 L778,22 L778,82 M22,1038 L22,1098 L82,1098 M718,1098 L778,1098 L778,1038" fill="none" stroke="' + p + '" stroke-width="4" stroke-opacity="0.35"/>' +
+        '<path d="M32,74 L32,32 L74,32 M726,32 L768,32 L768,74 M32,1046 L32,1088 L74,1088 M726,1088 L768,1088 L768,1046" fill="none" stroke="' + b + '" stroke-width="2" stroke-opacity="0.45"/>';
+    } else if (pattern === 'certificate_frame') {
+      body = '<rect x="18" y="18" width="764" height="1084" fill="none" stroke="' + p + '" stroke-width="3" stroke-opacity="0.30"/>' +
+        '<rect x="26" y="26" width="748" height="1068" fill="none" stroke="' + b + '" stroke-width="1.5" stroke-opacity="0.45"/>';
+    } else if (pattern === 'guilloche_wave') {
+      body = '<path d="M0,175 Q200,120 400,175 T800,175 M0,190 Q200,135 400,190 T800,190" fill="none" stroke="' + p + '" stroke-width="1.5" stroke-opacity="0.22"/>' +
+        '<path d="M0,182 Q200,128 400,182 T800,182" fill="none" stroke="' + b + '" stroke-width="1.5" stroke-opacity="0.28"/>' +
+        '<path d="M0,975 Q200,920 400,975 T800,975" fill="none" stroke="' + p + '" stroke-width="1.5" stroke-opacity="0.18"/>';
+    } else if (pattern === 'side_pillar') {
+      body = '<rect x="0" y="0" width="22" height="1120" fill="' + p + '" fill-opacity="0.22"/>' +
+        '<rect x="22" y="0" width="5" height="1120" fill="' + b + '" fill-opacity="0.38"/>';
+    } else if (pattern === 'chevron_ribbon') {
+      body = '<polygon points="0,0 800,0 800,66 400,118 0,66" fill="' + p + '" fill-opacity="0.12"/>' +
+        '<polyline points="0,70 400,122 800,70" fill="none" stroke="' + b + '" stroke-width="4" stroke-opacity="0.28"/>';
+    } else if (pattern === 'double_arc') {
+      body = '<circle cx="0" cy="0" r="240" fill="none" stroke="' + p + '" stroke-width="22" stroke-opacity="0.10"/>' +
+        '<circle cx="0" cy="0" r="262" fill="none" stroke="' + b + '" stroke-width="5" stroke-opacity="0.24"/>' +
+        '<circle cx="800" cy="1120" r="220" fill="none" stroke="' + p + '" stroke-width="18" stroke-opacity="0.09"/>';
+    } else if (pattern === 'prism_corner') {
+      body = '<polygon points="0,0 240,0 0,190" fill="' + p + '" fill-opacity="0.14"/>' +
+        '<polygon points="0,0 130,0 0,110" fill="' + b + '" fill-opacity="0.20"/>' +
+        '<polygon points="800,1120 560,1120 800,930" fill="' + p + '" fill-opacity="0.12"/>';
+    } else if (pattern === 'minimal_corners') {
+      body = '<polygon points="0,0 110,0 0,110" fill="' + p + '" fill-opacity="0.16"/>' +
+        '<polygon points="800,1120 690,1120 800,1010" fill="' + b + '" fill-opacity="0.22"/>';
+    } else if (pattern === 'architect_frame') {
+      body = '<rect x="16" y="16" width="768" height="1088" fill="none" stroke="' + p + '" stroke-width="1.5" stroke-opacity="0.24"/>' +
+        '<line x1="16" y1="120" x2="784" y2="120" stroke="' + b + '" stroke-width="1.5" stroke-opacity="0.28"/>' +
+        '<line x1="16" y1="1040" x2="784" y2="1040" stroke="' + b + '" stroke-width="1.5" stroke-opacity="0.28"/>';
+    } else {
+      body = '<defs><pattern id="tsd-lh-pat" width="24" height="24" patternUnits="userSpaceOnUse">' +
+        '<path d="M0,24 L24,0" stroke="' + p + '" stroke-width="0.9" stroke-opacity="0.12"/>' +
+        '<circle cx="12" cy="12" r="1.1" fill="' + b + '" fill-opacity="0.16"/>' +
+      '</pattern></defs><rect width="800" height="1120" fill="url(#tsd-lh-pat)"/>';
+    }
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1120" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;opacity:' + op + ';">' + body + '</svg>';
+  }
+
+  var _lhAutogapObserver = null;
+
+  function _syncLetterheadAutogap() {
+    var printable = document.getElementById('tsd-printable');
+    var hdrChrome = document.getElementById('tsd-lh-chrome-hdr');
+    var ftrChrome = document.getElementById('tsd-lh-chrome-ftr');
+    if (!printable || !page || !page.hasAttribute('data-tsd-lh-applied')) return;
+
+    var pRect = page.getBoundingClientRect();
+    if (!pRect || pRect.width < 10) return;
+    // Account for any CSS transform scale/zoom on the page container
+    var scaleY = page.offsetHeight > 0 ? (pRect.height / page.offsetHeight) : 1;
+    if (!scaleY || scaleY <= 0.1) scaleY = 1;
+
+    // Measure the lowest visible pixel of the Letterhead Header (including logo, dragged offsets & divider)
+    var maxHdrBottom = 0;
+    if (hdrChrome) {
+      var hr = hdrChrome.getBoundingClientRect();
+      maxHdrBottom = Math.max(maxHdrBottom, (hr.bottom - pRect.top) / scaleY);
+      hdrChrome.querySelectorAll('img, div, span').forEach(function (el) {
+        var r = el.getBoundingClientRect();
+        if (r.height > 0 && r.width > 0) {
+          var b = (r.bottom - pRect.top) / scaleY;
+          if (b > maxHdrBottom && b < page.offsetHeight * 0.65) maxHdrBottom = b;
+        }
+      });
+    }
+
+    // Measure the highest visible pixel of the Letterhead Footer (including rule, text & bottom stripe)
+    var maxFtrHeight = 0;
+    if (ftrChrome) {
+      var fr = ftrChrome.getBoundingClientRect();
+      maxFtrHeight = Math.max(maxFtrHeight, (pRect.bottom - fr.top) / scaleY);
+      ftrChrome.querySelectorAll('img, div, span').forEach(function (el) {
+        var r = el.getBoundingClientRect();
+        if (r.height > 0 && r.width > 0) {
+          var h = (pRect.bottom - r.top) / scaleY;
+          if (h > maxFtrHeight && h < page.offsetHeight * 0.4) maxFtrHeight = h;
+        }
+      });
+    }
+
+    var TOP_GAP = 14; // crisp executive breathing room below letterhead header/divider
+    var BOT_GAP = 16; // crisp breathing room above letterhead footer rule
+    var finalTop = Math.max(24, Math.ceil(maxHdrBottom) + TOP_GAP);
+    var finalBot = Math.max(24, Math.ceil(maxFtrHeight) + BOT_GAP);
+    printable.style.paddingTop = finalTop + 'px';
+    printable.style.paddingBottom = finalBot + 'px';
+  }
+
+  function clearLetterheadDesignFromPage() {
+    if (_lhAutogapObserver) { try { _lhAutogapObserver.disconnect(); } catch (_e) {} _lhAutogapObserver = null; }
+    var layer = document.getElementById('tsd-lh-design-layer');
+    if (layer) layer.innerHTML = '';
+    var printable = document.getElementById('tsd-printable');
+    if (printable) {
+      printable.style.paddingTop = '';
+      printable.style.paddingBottom = '';
+    }
+    var defFooter = document.getElementById('tsd-pagefooter');
+    if (defFooter && defFooter.getAttribute('data-lh-hidden') === '1') {
+      defFooter.hidden = false;
+      defFooter.removeAttribute('data-lh-hidden');
+    }
+    if (page) {
+      page.style.background = '#ffffff';
+      page.style.borderLeft = '0';
+      page.style.outline = '0';
+      page.style.outlineOffset = '0';
+      page.style.fontFamily = '';
+      page.removeAttribute('data-tsd-lh-applied');
+    }
+    if (editor) {
+      editor.querySelectorAll('.tsd-letterhead-header, .tsd-letterhead-footer').forEach(function (el) { el.remove(); });
+      editor.removeAttribute('data-tsd-letterhead-id');
+    }
+    try { localStorage.removeItem('tsd.lh_design.' + (tsdId || 'new')); } catch (_e) {}
+  }
+
+  function _escLh(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function applyLetterheadToDocument(lh, finalizeAfter, syncPaper, silent) {
+    if (!lh || !editor || !page) return;
+    var lay = lh.layout || {};
+
+    // 1. Remove any legacy duplicated letterhead blocks from the editable document body
+    editor.querySelectorAll('.tsd-letterhead-header, .tsd-letterhead-footer').forEach(function (el) { el.remove(); });
+    editor.setAttribute('data-tsd-letterhead-id', String(lh.id));
+
+    // 2. Apply full Letterhead visual design & stationery chrome onto #tsd-lh-design-layer (non-editable)
+    var accent = lay.accent_color || '#002769';
+    var brand2 = lay.brand_secondary || '#02982E';
+    var sec = lay.secondary_color || '#334155';
+    page.style.background = lay.paper_bg || '#ffffff';
+    page.style.fontFamily = _TSD_LH_FONTS[lay.font_style] || _TSD_LH_FONTS.sans;
+    var leftBar = parseInt(lay.left_bar_px || '0', 10) || 0;
+    page.style.borderLeft = leftBar > 0 ? (leftBar + 'px solid ' + accent) : '0';
+    page.style.outline = lay.page_border === 'double'
+      ? ('4px double ' + accent)
+      : (lay.page_border === 'thin' ? '1px solid rgba(15,23,42,0.18)' : '0');
+    page.style.outlineOffset = (lay.page_border && lay.page_border !== 'none') ? '-14px' : '0';
+    page.setAttribute('data-tsd-lh-applied', String(lh.id));
+
+    // Sync page size, orientation & base margins first so measurements match the target paper
+    if (syncPaper !== false && lh.layout) {
+      if (lay.paper_size) { pageSize = String(lay.paper_size).toLowerCase(); }
+      if (lay.orientation) { pageOrient = String(lay.orientation).toLowerCase(); }
+      if (lay.margin_mm) {
+        var cmVal = Math.max(1.0, Math.min(3.5, parseFloat(lay.margin_mm) / 10));
+        pageMargin = cmVal;
+        pageMarginY = cmVal;
+      }
+      applyPageSize();
+      applyMargins();
+    }
+
+    var layer = document.getElementById('tsd-lh-design-layer');
+    var padX = Math.round((parseFloat(lay.margin_mm || 22) || 22) * 3.78);
+    var padY = Math.round((parseFloat(lay.margin_y_mm || 20) || 20) * 3.78);
+    var topBarPx = parseInt(lay.top_bar_px || '0', 10) || 0;
+    var elPos = (lay.el_pos && typeof lay.el_pos === 'object') ? lay.el_pos : {};
+    var elAlign = (lay.el_align && typeof lay.el_align === 'object') ? lay.el_align : {};
+    function elStyle(k) {
+      var s = '';
+      var p = elPos[k];
+      if (p && (p.x || p.y)) s += 'position:relative;transform:translate(' + (p.x || 0) + 'px,' + (p.y || 0) + 'px);';
+      if (elAlign[k]) s += 'text-align:' + elAlign[k] + ';';
+      return s;
+    }
+
+    if (layer) {
+      var html = _buildTsdLhPatternSvg(lay.bg_pattern, accent, brand2, lay.bg_pattern_opacity);
+      if (lay.bg_image_data_uri) {
+        var bgScale = parseInt(lay.bg_image_scale || '42', 10) || 42;
+        var bgOp = ((parseInt(lay.bg_image_opacity || '8', 10) || 8) / 100).toFixed(2);
+        html += '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">' +
+          '<img src="' + lay.bg_image_data_uri + '" alt="" style="width:' + bgScale + '%;max-height:60%;object-fit:contain;opacity:' + bgOp + ';"></div>';
+      }
+      if (lay.watermark_text) {
+        var wmAng = parseInt(lay.watermark_angle != null ? lay.watermark_angle : '-28', 10);
+        var wmOp = ((parseInt(lay.watermark_opacity || '6', 10) || 6) / 100).toFixed(2);
+        html += '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">' +
+          '<div style="transform:rotate(' + wmAng + 'deg);font-size:44pt;font-weight:700;letter-spacing:0.12em;color:' + accent + ';opacity:' + wmOp + ';white-space:nowrap;">' +
+          _escLh(lay.watermark_text) + '</div></div>';
+      }
+
+      // ---- Full Letterhead Header Chrome (Logo + Org + Tagline + Contact + Full-Width Divider) ----
+      var align = String(lay.header_align || 'left').toLowerCase();
+      var hdrBg = String(lay.header_bg || 'none').toLowerCase();
+      var isDarkHdr = (align === 'banner' || hdrBg === 'solid' || hdrBg === 'gradient' || hdrBg === 'angled');
+      var isBleedHdr = (lay.header_bleed === 'bleed' || align === 'banner');
+      var inkPrim = isDarkHdr ? '#ffffff' : accent;
+      var inkSec = isDarkHdr ? 'rgba(255,255,255,0.86)' : sec;
+      var inkMut = isDarkHdr ? 'rgba(255,255,255,0.72)' : '#64748b';
+
+      var hPadY = Math.max(0, lay.header_pad_y != null ? parseInt(lay.header_pad_y, 10) : 14);
+      var hPadX = isBleedHdr ? Math.max(12, parseInt(lay.header_pad_x || padX, 10)) : (hdrBg !== 'none' ? Math.max(12, Math.min(36, parseInt(lay.header_pad_x || 16, 10))) : 0);
+      var hMinCss = (parseInt(lay.header_min_height || '0', 10) > 0) ? ('min-height:' + parseInt(lay.header_min_height, 10) + 'px;box-sizing:border-box;') : '';
+      var hStyleCss = '';
+      if (hdrBg === 'solid' || (align === 'banner' && hdrBg === 'none')) hStyleCss = 'background:' + accent + ';border-bottom:3px solid ' + brand2 + ';';
+      else if (hdrBg === 'gradient') hStyleCss = 'background:linear-gradient(125deg,' + accent + ' 0%,' + accent + ' 62%,' + brand2 + ' 135%);border-bottom:3px solid ' + brand2 + ';';
+      else if (hdrBg === 'angled') hStyleCss = 'background:linear-gradient(112deg,' + accent + ' 0%,' + accent + ' 68%,' + brand2 + ' 68.2%,' + brand2 + ' 100%);';
+      else if (hdrBg === 'neutral') hStyleCss = 'background:#f6f8fb;';
+      else if (hdrBg === 'tint') hStyleCss = 'background:linear-gradient(90deg,' + accent + '14,' + brand2 + '14);';
+      else if (hdrBg === 'framed') hStyleCss = 'background:#f8fafc;border-left:4px solid ' + accent + ';';
+      else if (hdrBg === 'underline_band') hStyleCss = 'background:#f8fafc;border-top:4px solid ' + accent + ';border-bottom:2px solid ' + brand2 + ';';
+
+      var logoHtml = '';
+      if (lay.logo_data_uri) {
+        var lhH = Math.max(20, Math.min(160, parseInt(lay.logo_height_px || '50', 10) || 50));
+        var lhW = Math.max(24, Math.min(360, parseInt(lay.logo_width_px || '220', 10) || 220));
+        var lOx = parseInt(lay.logo_offset_x || '0', 10) || 0;
+        var lOy = parseInt(lay.logo_offset_y || '0', 10) || 0;
+        var lOp = (Math.max(20, Math.min(100, parseInt(lay.logo_opacity != null ? lay.logo_opacity : '100', 10))) / 100).toFixed(2);
+        var fitCss = lay.logo_fit === 'fill'
+          ? ('width:' + lhW + 'px;height:' + lhH + 'px;object-fit:fill;')
+          : ('height:' + lhH + 'px;max-width:' + lhW + 'px;width:auto;object-fit:contain;');
+        logoHtml = '<div style="transform:translate(' + lOx + 'px,' + lOy + 'px);opacity:' + lOp + ';flex:0 0 auto;line-height:0;">' +
+          '<img src="' + lay.logo_data_uri + '" alt="Brand Logo" style="' + fitCss + 'display:block;"></div>';
+      }
+
+      var orgText = lay.hide_org_name ? '' : _escLh(lay.org_name || '');
+      var orgUpper = lay.org_uppercase ? 'text-transform:uppercase;' : '';
+      var orgHtml = orgText
+        ? ('<div contenteditable="true" spellcheck="false" title="Document Header · Click to adjust" style="outline:none;font-size:' + (lay.org_font_pt || 15) + 'pt;font-weight:700;color:' + inkPrim + ';line-height:1.15;' + orgUpper + elStyle('org_title') + '">' + orgText + '</div>')
+        : '';
+      var tagHtml = '';
+      if (lay.show_tagline !== false && (lay.tagline || lay.department)) {
+        tagHtml = '<div style="' + elStyle('tagline') + '">' +
+          (lay.tagline ? '<div contenteditable="true" spellcheck="false" title="Document Header · Click to adjust" style="outline:none;font-size:' + (lay.tagline_font_pt || 8.5) + 'pt;font-weight:600;color:' + (isDarkHdr ? brand2 : inkSec) + ';text-transform:uppercase;letter-spacing:0.05em;margin-top:2px;">' + _escLh(lay.tagline) + '</div>' : '') +
+          (lay.department ? '<div contenteditable="true" spellcheck="false" title="Document Header · Click to adjust" style="outline:none;font-size:' + (lay.tagline_font_pt || 8.5) + 'pt;color:' + inkSec + ';margin-top:1px;">' + _escLh(lay.department) + '</div>' : '') +
+        '</div>';
+      }
+      var titleBlock = '<div style="min-width:0;">' + orgHtml + tagHtml + '</div>';
+
+      var addrLine = [lay.address, lay.postal_address].filter(Boolean).map(_escLh).join(' · ');
+      var contactLine = [lay.phone, lay.secondary_phone, lay.email, lay.website].filter(Boolean).map(_escLh).join(' · ');
+      var regLine = [lay.reg_no, lay.tax_id, lay.license_no].filter(Boolean).map(_escLh).join(' · ');
+      var contactBlock = '';
+      if (lay.show_contact !== false && (addrLine || contactLine || regLine)) {
+        var ctPt = parseFloat(lay.contact_font_pt || 8.2) || 8.2;
+        if (lay.contact_layout === 'stacked') {
+          var stLines = [lay.address, lay.postal_address, lay.phone, lay.secondary_phone, lay.email, lay.website].filter(Boolean).map(function (x) { return '<div contenteditable="true" spellcheck="false" style="outline:none;">' + _escLh(x) + '</div>'; }).join('');
+          contactBlock = '<div style="font-size:' + ctPt + 'pt;color:' + inkSec + ';line-height:1.45;margin-top:3px;' + elStyle('contact') + '">' + stLines +
+            (regLine ? '<div contenteditable="true" spellcheck="false" style="outline:none;color:' + inkMut + ';font-size:' + Math.max(6.5, ctPt - 0.6).toFixed(1) + 'pt;">' + regLine + '</div>' : '') + '</div>';
+        } else {
+          contactBlock = '<div style="font-size:' + ctPt + 'pt;color:' + inkSec + ';line-height:1.45;margin-top:3px;' + elStyle('contact') + '">' +
+            (addrLine ? '<div contenteditable="true" spellcheck="false" style="outline:none;">' + addrLine + '</div>' : '') +
+            (contactLine ? '<div contenteditable="true" spellcheck="false" style="outline:none;">' + contactLine + '</div>' : '') +
+            (regLine ? '<div contenteditable="true" spellcheck="false" style="outline:none;color:' + inkMut + ';font-size:' + Math.max(6.5, ctPt - 0.6).toFixed(1) + 'pt;">' + regLine + '</div>' : '') + '</div>';
+        }
+      }
+
+      var hdrPadCss = isBleedHdr
+        ? ('padding:' + Math.max(16, hPadY) + 'px ' + hPadX + 'px;')
+        : ('padding:' + (hdrBg !== 'none' ? hPadY : 0) + 'px ' + (padX + hPadX) + 'px ' + Math.max(8, hPadY) + 'px;');
+      var hdrInner = '';
+      if (align === 'center') {
+        hdrInner = '<div style="display:flex;flex-direction:column;justify-content:center;text-align:center;' + hStyleCss + hdrPadCss + hMinCss + '">' +
+          (logoHtml ? '<div style="display:flex;justify-content:center;margin-bottom:8px;">' + logoHtml + '</div>' : '') +
+          titleBlock + contactBlock + '</div>';
+      } else if (align === 'split' || align === 'banner') {
+        hdrInner = '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;' + hStyleCss + hdrPadCss + hMinCss + '">' +
+          '<div style="display:flex;align-items:center;gap:12px;min-width:0;">' + logoHtml + titleBlock + '</div>' +
+          '<div style="text-align:right;">' + contactBlock + '</div></div>';
+      } else if (align === 'right') {
+        hdrInner = '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;' + hStyleCss + hdrPadCss + hMinCss + '">' +
+          '<div style="flex:1;min-width:0;">' + titleBlock + contactBlock + '</div>' + logoHtml + '</div>';
+      } else {
+        hdrInner = '<div style="display:flex;align-items:center;gap:14px;' + hStyleCss + hdrPadCss + hMinCss + '">' +
+          logoHtml + '<div style="flex:1;min-width:0;">' + titleBlock + contactBlock + '</div></div>';
+      }
+
+      // Full-width edge-to-edge Header Divider Line (no side margin)
+      var divStyle = String(lay.divider_style || 'solid').toLowerCase();
+      var divHtml = '';
+      if (lay.show_divider !== false && divStyle !== 'none' && !isDarkHdr) {
+        var dpx = Math.max(1, Math.min(8, parseInt(lay.divider_px || '2', 10) || 2));
+        if (divStyle === 'dual') divHtml = '<div style="height:' + dpx + 'px;width:100%;background:linear-gradient(90deg,' + accent + ' 72%,' + brand2 + ' 72%);margin-top:4px;"></div>';
+        else if (divStyle === 'double') divHtml = '<div style="width:100%;border-bottom:' + Math.max(3, dpx + 1) + 'px double ' + accent + ';margin-top:4px;"></div>';
+        else if (divStyle === 'thin') divHtml = '<div style="width:100%;border-bottom:' + dpx + 'px solid rgba(15,23,42,0.16);margin-top:4px;"></div>';
+        else if (divStyle === 'dotted') divHtml = '<div style="width:100%;border-bottom:' + dpx + 'px dotted ' + accent + ';margin-top:4px;"></div>';
+        else divHtml = '<div style="height:' + dpx + 'px;width:100%;background:' + accent + ';margin-top:4px;"></div>';
+      }
+
+      var topStripeHtml = (topBarPx > 0 && !isBleedHdr)
+        ? '<div style="height:' + topBarPx + 'px;width:100%;background:linear-gradient(90deg,' + accent + ' 72%,' + brand2 + ' 72%);margin-bottom:18px;"></div>'
+        : '';
+      var hdrTopOffset = (!isBleedHdr && topBarPx === 0) ? ('padding-top:' + padY + 'px;') : '';
+      html += '<header id="tsd-lh-chrome-hdr" role="banner" style="position:absolute;top:0;left:0;right:0;pointer-events:auto;z-index:2;' + hdrTopOffset + '">' + topStripeHtml + hdrInner + divHtml + '</header>';
+
+      // ---- Full Letterhead Footer Chrome (Full-Width Rule + Footer Disclosure + Bottom Stripe) ----
+      var showFtr = lay.show_footer !== false;
+      var ftrBg = String(lay.footer_bg || 'none').toLowerCase();
+      var isDarkFtr = (ftrBg === 'solid' || ftrBg === 'gradient');
+      var fInk = isDarkFtr ? 'rgba(255,255,255,0.9)' : sec;
+      var fMut = isDarkFtr ? 'rgba(255,255,255,0.72)' : '#7a869a';
+      var fPadY = Math.max(6, parseInt(lay.footer_pad_y != null ? lay.footer_pad_y : '10', 10));
+      var fBgCss = '';
+      if (ftrBg === 'solid') fBgCss = 'background:' + accent + ';';
+      else if (ftrBg === 'gradient') fBgCss = 'background:linear-gradient(125deg,' + accent + ' 0%,' + accent + ' 68%,' + brand2 + ' 135%);';
+      else if (ftrBg === 'neutral') fBgCss = 'background:#f6f8fb;';
+      else if (ftrBg === 'tint') fBgCss = 'background:linear-gradient(90deg,' + accent + '12,' + brand2 + '12);';
+
+      var ftrRuleHtml = (lay.show_footer_rule !== false && !isDarkFtr)
+        ? '<div style="width:100%;border-top:1px solid rgba(15,23,42,0.16);"></div>'
+        : '';
+      var ftrBodyHtml = '';
+      if (showFtr) {
+        var fText = _escLh(lay.footer_text || '') || regLine || _escLh(lay.org_name || '');
+        var rBits = [];
+        if (lay.show_page_numbers) rBits.push('Page 1 of 1');
+        if (lay.show_trust_badge !== false) rBits.push('Verified · TrustSeal Document');
+        var fRight = rBits.length ? ('<span style="color:' + fMut + ';white-space:nowrap;">' + rBits.join(' · ') + '</span>') : '';
+        var fRow = (lay.footer_layout === 'centered' || elAlign.footer_content === 'center')
+          ? ('<div style="text-align:center;"><div contenteditable="true" spellcheck="false" title="Document Footer · Click to adjust" style="outline:none;">' + fText + '</div>' + (fRight ? '<div contenteditable="true" spellcheck="false" style="outline:none;margin-top:2px;">' + fRight + '</div>' : '') + '</div>')
+          : ('<div style="display:flex;justify-content:space-between;gap:10px;"><span contenteditable="true" spellcheck="false" title="Document Footer · Click to adjust" style="outline:none;">' + fText + '</span>' + (fRight ? '<span contenteditable="true" spellcheck="false" style="outline:none;">' + fRight + '</span>' : '') + '</div>');
+        ftrBodyHtml = '<div style="font-size:' + (lay.footer_font_pt || 8) + 'pt;color:' + fInk + ';padding:' + fPadY + 'px ' + padX + 'px;' + fBgCss + elStyle('footer_content') + '">' +
+          (lay.directors ? '<div contenteditable="true" spellcheck="false" style="outline:none;color:' + fMut + ';margin-bottom:2px;"><strong>Directors / Officers:</strong> ' + _escLh(lay.directors) + '</div>' : '') +
+          (lay.bank_details ? '<div contenteditable="true" spellcheck="false" style="outline:none;color:' + fMut + ';margin-bottom:2px;"><strong>Banking:</strong> ' + _escLh(lay.bank_details) + '</div>' : '') +
+          fRow + '</div>';
+      }
+      var botBarHtml = lay.show_bottom_bar
+        ? '<div style="height:' + (parseInt(lay.bottom_bar_px || '5', 10) || 5) + 'px;width:100%;background:linear-gradient(90deg,' + accent + ' 72%,' + brand2 + ' 72%);"></div>'
+        : '';
+      if (ftrRuleHtml || ftrBodyHtml || botBarHtml) {
+        html += '<footer id="tsd-lh-chrome-ftr" role="contentinfo" style="position:absolute;bottom:0;left:0;right:0;pointer-events:auto;z-index:2;">' + ftrRuleHtml + ftrBodyHtml + botBarHtml + '</footer>';
+      }
+
+      layer.innerHTML = html;
+
+      // Hide default permanent footer while Letterhead chrome is active so there is no double footer
+      var defFooter = document.getElementById('tsd-pagefooter');
+      if (defFooter && !defFooter.hidden) {
+        defFooter.hidden = true;
+        defFooter.setAttribute('data-lh-hidden', '1');
+      }
+
+      // 3. Autogap: dynamically measure visual bounds (including async logo & dragged offsets) so body never overlaps
+      _syncLetterheadAutogap();
+      requestAnimationFrame(_syncLetterheadAutogap);
+      setTimeout(_syncLetterheadAutogap, 120);
+      layer.querySelectorAll('img').forEach(function (im) {
+        if (!im.complete) {
+          im.addEventListener('load', _syncLetterheadAutogap, { once: true });
+          im.addEventListener('error', _syncLetterheadAutogap, { once: true });
+        }
+      });
+      if (typeof ResizeObserver === 'function') {
+        if (_lhAutogapObserver) { try { _lhAutogapObserver.disconnect(); } catch (_e) {} }
+        _lhAutogapObserver = new ResizeObserver(function () { _syncLetterheadAutogap(); });
+        var hc = document.getElementById('tsd-lh-chrome-hdr');
+        var fc = document.getElementById('tsd-lh-chrome-ftr');
+        if (hc) _lhAutogapObserver.observe(hc);
+        if (fc) _lhAutogapObserver.observe(fc);
+        _lhAutogapObserver.observe(page);
+      }
+    }
+
+    // Persist design-only reference for reload continuity
+    try { localStorage.setItem('tsd.lh_design.' + (tsdId || 'new'), JSON.stringify({ id: lh.id, name: lh.name, layout: lay })); } catch (_e) {}
+
+    if (!silent) {
+      editor.dispatchEvent(new Event('input', { bubbles: true }));
+      if (typeof showToast === 'function') {
+        showToast('Letterhead "' + lh.name + '" applied' + (finalizeAfter ? ' — finalizing…' : '.'));
+      }
+    }
+    if (finalizeAfter && typeof tsdId !== 'undefined' && tsdId) {
+      fetch('/api/tsd/' + tsdId + '/status', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({
+          status: 'finalized',
+          letterhead_id: lh.id,
+          content_html: editor.innerHTML,
+        }),
+      }).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      }).then(function (res) {
+        if (typeof docVersion !== 'undefined' && res.version) docVersion = res.version;
+        if (typeof showToast === 'function') showToast('Document finalized with "' + lh.name + '" design.');
+      }).catch(function (e) {
+        if (typeof showToast === 'function') showToast('Finalize failed: ' + e.message);
+      });
+    }
+  }
+
+  // Restore saved letterhead design layer on load (without duplicating content)
+  (function restoreSavedLetterheadDesign() {
+    try {
+      var savedLh = JSON.parse(localStorage.getItem('tsd.lh_design.' + (tsdId || 'new')) || 'null');
+      if (savedLh && savedLh.layout) {
+        applyLetterheadToDocument(savedLh, false, true, true);
+      }
+    } catch (_e) {}
+  })();
+
+  function openLetterheadPicker() {
+    var existing = document.getElementById('tsd-lh-panel');
+    if (existing) { existing.remove(); return; }
+    var drawer = document.createElement('aside');
+    drawer.id = 'tsd-lh-panel';
+    drawer.setAttribute('role', 'region');
+    drawer.setAttribute('aria-label', 'Letterhead & Page Setup');
+    drawer.style.cssText = 'position:fixed;top:38px;right:0;bottom:24px;width:400px;max-width:94vw;z-index:8400;background:#ffffff;box-shadow:-6px 0 24px rgba(9,30,66,0.12);display:flex;flex-direction:column;';
+    drawer.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid rgba(15,23,42,0.06);">' +
+        '<strong style="font-size:13px;color:#091e42;">Letterhead &amp; Page Setup</strong>' +
+        '<div style="display:flex;gap:10px;align-items:center;">' +
+          '<a href="/letterheads" target="_blank" style="font-size:11.5px;color:#1e4b9e;text-decoration:none;font-weight:600;">Studio ↗</a>' +
+          '<button type="button" id="tsd-lh-close" style="border:0;background:transparent;font-size:16px;cursor:pointer;color:#64748b;padding:2px 6px;">✕</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:12px 16px;background:#f6f8fb;border-bottom:1px solid rgba(15,23,42,0.05);display:flex;flex-direction:column;gap:8px;">' +
+        '<div style="display:grid;grid-template-columns:1.25fr 0.75fr;gap:8px;">' +
+          '<div>' +
+            '<label style="display:block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#7a869a;margin-bottom:3px;">Paper Size</label>' +
+            '<select id="tsd-lh-size" style="width:100%;height:30px;padding:0 8px;border:0;background:#fff;font-size:12px;color:#091e42;">' +
+              '<option value="a4"' + (pageSize === 'a4' ? ' selected' : '') + '>A4 (210 × 297 mm)</option>' +
+              '<option value="letter"' + (pageSize === 'letter' ? ' selected' : '') + '>US Letter (8.5 × 11 in)</option>' +
+              '<option value="legal"' + (pageSize === 'legal' ? ' selected' : '') + '>US Legal (8.5 × 14 in)</option>' +
+              '<option value="a5"' + (pageSize === 'a5' ? ' selected' : '') + '>A5 (148 × 210 mm)</option>' +
+              '<option value="executive"' + (pageSize === 'executive' ? ' selected' : '') + '>Executive (7.25 × 10.5 in)</option>' +
+              '<option value="b5"' + (pageSize === 'b5' ? ' selected' : '') + '>B5 (176 × 250 mm)</option>' +
+            '</select>' +
+          '</div>' +
+          '<div>' +
+            '<label style="display:block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#7a869a;margin-bottom:3px;">Orientation</label>' +
+            '<select id="tsd-lh-orient" style="width:100%;height:30px;padding:0 8px;border:0;background:#fff;font-size:12px;color:#091e42;">' +
+              '<option value="portrait"' + (pageOrient === 'portrait' ? ' selected' : '') + '>Portrait</option>' +
+              '<option value="landscape"' + (pageOrient === 'landscape' ? ' selected' : '') + '>Landscape</option>' +
+            '</select>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
+          '<label style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#42526e;cursor:pointer;">' +
+            '<input type="checkbox" id="tsd-lh-sync" checked> Sync page size &amp; margins to letterhead' +
+          '</label>' +
+          '<button type="button" id="tsd-lh-remove" style="border:0;background:transparent;color:#9b2c2c;font-size:11.5px;font-weight:600;cursor:pointer;padding:2px 4px;">Remove</button>' +
+        '</div>' +
+        '<input type="search" id="tsd-lh-search" placeholder="Filter letterheads…" style="width:100%;height:30px;padding:0 10px;border:0;background:#fff;font-size:12px;color:#091e42;outline:none;">' +
+      '</div>' +
+      '<div id="tsd-lh-body" style="padding:14px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:12px;">Loading letterheads…</div>';
+    document.body.appendChild(drawer);
+
+    document.getElementById('tsd-lh-close').addEventListener('click', function () { drawer.remove(); });
+    document.getElementById('tsd-lh-size').addEventListener('change', function (e) {
+      pageSize = e.target.value; applyPageSize();
+    });
+    document.getElementById('tsd-lh-orient').addEventListener('change', function (e) {
+      pageOrient = e.target.value; applyPageSize();
+    });
+    document.getElementById('tsd-lh-remove').addEventListener('click', function () {
+      clearLetterheadDesignFromPage();
+      if (editor) editor.dispatchEvent(new Event('input', { bubbles: true }));
+      if (typeof showToast === 'function') showToast('Letterhead design removed from document.');
+    });
+
+    fetch('/api/letterheads/', { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var body = document.getElementById('tsd-lh-body');
+        var list = data.letterheads || [];
+        function renderDrawerList(q) {
+          var items = list.filter(function (lh) {
+            if (!q) return true;
+            return ((lh.name || '') + ' ' + (lh.description || '')).toLowerCase().indexOf(q) !== -1;
+          });
+          if (!items.length) {
+            body.innerHTML = '<div style="padding:28px 12px;text-align:center;color:#7a869a;font-size:12.5px;">No letterheads found. <a href="/letterheads" target="_blank" style="color:#1e4b9e;font-weight:600;">Create one in Letterhead Studio →</a></div>';
+            return;
+          }
+          body.innerHTML = items.map(function (lh) {
+            var lay = lh.layout || {};
+            var meta = String(lay.paper_size || 'a4').toUpperCase() + ' · ' + (lay.orientation === 'landscape' ? 'Landscape' : 'Portrait') + ' · ' + (lay.margin_mm || 22) + ' mm';
+            return '<div style="background:#f6f8fb;padding:12px;">' +
+              '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">' +
+                '<div style="min-width:0;">' +
+                  '<div style="font-size:12.5px;font-weight:600;color:#091e42;">' + lh.name.replace(/</g, '&lt;') +
+                    (lh.is_default ? ' <span style="font-size:10.5px;color:#17633a;font-weight:600;">· Default</span>' : '') +
+                  '</div>' +
+                  '<div style="font-size:11px;color:#7a869a;margin-top:2px;">' + meta + '</div>' +
+                '</div>' +
+                '<div style="display:flex;gap:6px;flex-shrink:0;">' +
+                  '<button type="button" data-apply-lh="' + lh.id + '" class="ts-btn ts-btn--sm">Apply</button>' +
+                  '<button type="button" data-finalize-lh="' + lh.id + '" class="ts-btn ts-btn--primary ts-btn--sm">Finalize</button>' +
+                '</div>' +
+              '</div>' +
+              '<div style="background:#ffffff;padding:8px 10px;overflow:hidden;">' + lh.header_html + '</div>' +
+            '</div>';
+          }).join('');
+          body.querySelectorAll('[data-apply-lh]').forEach(function (b) {
+            b.addEventListener('click', function () {
+              var id = parseInt(b.getAttribute('data-apply-lh'), 10);
+              var found = list.find(function (x) { return x.id === id; });
+              var syncEl = document.getElementById('tsd-lh-sync');
+              applyLetterheadToDocument(found, false, !syncEl || syncEl.checked);
+            });
+          });
+          body.querySelectorAll('[data-finalize-lh]').forEach(function (b) {
+            b.addEventListener('click', function () {
+              var id = parseInt(b.getAttribute('data-finalize-lh'), 10);
+              var found = list.find(function (x) { return x.id === id; });
+              var syncEl = document.getElementById('tsd-lh-sync');
+              applyLetterheadToDocument(found, true, !syncEl || syncEl.checked);
+              drawer.remove();
+            });
+          });
+        }
+        renderDrawerList('');
+        var searchInp = document.getElementById('tsd-lh-search');
+        if (searchInp) {
+          searchInp.addEventListener('input', function () {
+            renderDrawerList((searchInp.value || '').trim().toLowerCase());
+          });
+        }
+      })
+      .catch(function (e) {
+        var body = document.getElementById('tsd-lh-body');
+        if (body) body.innerHTML = '<div style="color:#9b2c2c;font-size:12.5px;">Failed to load letterheads: ' + e.message + '</div>';
+      });
+  }
+
+  var lhOpenBtn = document.getElementById('tsd-lh-open');
+  if (lhOpenBtn) lhOpenBtn.addEventListener('click', openLetterheadPicker);
 
   // Wire the picker's search + filter controls once (DOM exists at load).
   (function _wireStampPickerControls() {
@@ -2015,8 +3778,41 @@
     }).join('');
 
     items.forEach(function (it) {
-      if (!it.receiptId) return;
       var row = panel.querySelector('[data-i="' + it.idx + '"]');
+      if (!it.receiptId) {
+        // Overt receipt attributes missing/stripped — probe hidden TSD-only covert forensic layers!
+        if (!it.svgMarkup) return;
+        row.className = 'tsd-verify-row tsd-verify-row--pending';
+        row.querySelector('.tsd-verify-badge').textContent = '…';
+        row.querySelector('.tsd-verify-detail').textContent = 'Scanning covert TSD forensic layers…';
+        fetch('/api/tsd-stamps/forensic-verify', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+          body: JSON.stringify({ svg: it.svgMarkup }),
+        }).then(function (r) { return r.json(); })
+          .then(function (res) {
+            if (res.authentic) {
+              row.className = 'tsd-verify-row tsd-verify-row--ok';
+              row.querySelector('.tsd-verify-badge').textContent = '✓';
+              row.querySelector('.tsd-verify-detail').textContent =
+                'Covert TSD Seal Verified · ' + (res.stamp && res.stamp.name || '') +
+                ' · Receipt #' + (res.receipt && res.receipt.id) +
+                ' · ' + (res.forensic_fingerprint || '') +
+                ' (' + (res.layers_detected || []).length + ' layers)';
+            } else if (res.verdict === 'REVOKED' || res.verdict === 'TAMPERED') {
+              row.className = 'tsd-verify-row tsd-verify-row--warn';
+              row.querySelector('.tsd-verify-badge').textContent = '⚠';
+              row.querySelector('.tsd-verify-detail').textContent =
+                res.verdict + ' · ' + (res.reason || 'covert forensic check flagged');
+            } else {
+              row.className = 'tsd-verify-row tsd-verify-row--unsigned';
+              row.querySelector('.tsd-verify-badge').textContent = '✗';
+              row.querySelector('.tsd-verify-detail').textContent = 'Unsigned impression — no TSD forensic mark detected.';
+            }
+          })
+          .catch(function () {});
+        return;
+      }
       fetch('/api/tsd-stamps/verify-receipt', {
         method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
@@ -2027,7 +3823,13 @@
           if (!res.valid) { status = '✗'; cls = 'bad'; detail = 'Invalid — ' + (res.reason || 'unknown'); }
           else if (res.revoked) { status = '⚠'; cls = 'warn'; detail = 'Revoked · ' + (res.revoked_reason || '—'); }
           else if (res.context_intact === false) { status = '⚠'; cls = 'warn'; detail = 'Receipt valid but stamp mark edited after insertion.'; }
-          else { status = '✓'; cls = 'ok'; detail = (res.stamp_name || '') + ' · placed ' + (res.placed_at || '') + ' by user #' + (res.placed_by_id || '?'); }
+          else {
+            status = '✓'; cls = 'ok';
+            var covertTag = (res.covert_layers && res.covert_layers.length)
+              ? (' · TSD Covert Seal (' + res.covert_layers.length + ' layers)')
+              : '';
+            detail = (res.stamp_name || '') + ' · placed ' + (res.placed_at || '') + ' by user #' + (res.placed_by_id || '?') + covertTag;
+          }
           row.className = 'tsd-verify-row tsd-verify-row--' + cls;
           row.querySelector('.tsd-verify-badge').textContent = status;
           row.querySelector('.tsd-verify-detail').textContent = detail;
@@ -2103,11 +3905,21 @@
     drawRulers();
   }
   function updateBadge() {
-    var sz = pageSize.toUpperCase().replace('A4', 'A4').replace('LETTER', 'Letter').replace('LEGAL', 'Legal');
+    var labels = {
+      a4: ['A4', 'A4 (210 × 297 mm)'],
+      letter: ['US Letter', 'US Letter (8.5 × 11 in)'],
+      legal: ['US Legal', 'US Legal (8.5 × 14 in)'],
+      a5: ['A5', 'A5 (148 × 210 mm)'],
+      executive: ['Executive', 'Executive (7.25 × 10.5 in)'],
+      b5: ['B5', 'B5 (176 × 250 mm)']
+    };
+    var pair = labels[pageSize] || [pageSize.toUpperCase(), pageSize.toUpperCase()];
     var or = pageOrient.charAt(0).toUpperCase() + pageOrient.slice(1);
     var u = unit === 'cm' ? ' cm' : ' in';
     var m = unit === 'cm' ? pageMargin.toFixed(1).replace(/\.0$/, '') : (pageMargin / 2.54).toFixed(2);
-    badge.textContent = sz + ' · ' + or + ' · Margins: ' + m + u;
+    badge.textContent = pair[0] + ' · ' + or + ' · Margins: ' + m + u;
+    var sbSize = document.getElementById('tsd-sb-pagesize');
+    if (sbSize) sbSize.textContent = pair[1] + (pageOrient === 'landscape' ? ' · Landscape' : '');
   }
 
   // ===================================================================== RULERS
@@ -2246,9 +4058,33 @@
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(save, 900);
   }
+  var _saveInFlight = false;
+  var _saveQueued = false;
+  function _doTsdPut(url, method, payload, retried) {
+    return fetch(url, { method: method, credentials: 'same-origin', headers: headers(), body: JSON.stringify(payload) })
+      .then(function (r) {
+        if (r.status === 412 && !retried) {
+          return r.json().catch(function () { return {}; }).then(function (body) {
+            if (body && body.current_version) {
+              version = body.current_version;
+              shell.dataset.tsdVersion = String(version);
+            } else {
+              version = '';
+            }
+            return _doTsdPut(url, method, payload, true);
+          });
+        }
+        if (r.status === 412) throw new Error('Version conflict — please reload.');
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      });
+  }
   function save() {
     var title = (titleInput.value || '').trim();
     if (!title) { setSave('Title required', 'error'); return; }
+    if (_saveInFlight) { _saveQueued = true; return; }
+    _saveInFlight = true;
+    _saveQueued = false;
     setSave('● Encrypting & saving…', 'saving');
     var payload = {
       title: title,
@@ -2258,18 +4094,18 @@
     };
     var url = tsdId ? '/api/tsd/' + tsdId : '/api/tsd/';
     var method = tsdId ? 'PUT' : 'POST';
-    fetch(url, { method: method, credentials: 'same-origin', headers: headers(), body: JSON.stringify(payload) })
-      .then(function (r) {
-        if (r.status === 412) throw new Error('Someone else saved a newer version. Reload to merge.');
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      })
+    _doTsdPut(url, method, payload, false)
       .then(function (data) {
         tsdId = data.id; version = data.version;
+        shell.dataset.tsdVersion = String(data.version);
         if (!shell.dataset.tsdId) { shell.dataset.tsdId = tsdId; history.replaceState({}, '', '/documents/library/' + tsdId); }
         setSave('● Saved · v' + data.version + ' · ' + data.ciphertext_sha256.substring(0, 12) + '…', 'saved');
       })
-      .catch(function (e) { setSave('Save failed: ' + e.message, 'error'); });
+      .catch(function (e) { setSave('Save failed: ' + e.message, 'error'); })
+      .finally(function () {
+        _saveInFlight = false;
+        if (_saveQueued) { _saveQueued = false; save(); }
+      });
   }
   editor.addEventListener('input', scheduleSave);
   titleInput.addEventListener('input', scheduleSave);
@@ -2583,7 +4419,12 @@
     fetch('/api/tsd/' + tsdId + '/export/pdf', {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-      body: JSON.stringify({ user_password: pwd || undefined })
+      body: JSON.stringify({
+        user_password: pwd || undefined,
+        page_size: pageSize,
+        orientation: pageOrient,
+        margin_mm: Math.round(pageMargin * 10)
+      })
     }).then(function (r) {
       if (!r.ok) return r.json().then(function (j) { throw new Error(j.message || j.error || ('HTTP ' + r.status)); });
       var enc = r.headers.get('X-TrustSeal-Pdf-Encrypted') === 'true';
@@ -3300,6 +5141,24 @@
     var awareness = new Awareness(yDoc);
     awareness.setLocalStateField('user', { name: 'You', color: '#0f3b82' });
 
+    // Preserve any existing persisted stamps & signatures before mounting PM
+    var _preservedMarks = [];
+    function _collectMarksFromRoot(root) {
+      if (!root) return;
+      root.querySelectorAll('.tsd-stamp-mark, .tsd-sig-block').forEach(function (el) {
+        if (el.closest('.tsd-stamp-mark, .tsd-sig-block') !== el) return;
+        var clone = el.cloneNode(true);
+        clone.classList.remove('tsd-obj-selected', 'tsd-verify-flash');
+        _preservedMarks.push(clone.outerHTML);
+      });
+    }
+    _collectMarksFromRoot(editor);
+    if (!_preservedMarks.length && editor._initialHtml) {
+      var initTmp = document.createElement('div');
+      initTmp.innerHTML = editor._initialHtml;
+      _collectMarksFromRoot(initTmp);
+    }
+
     // Replace the contentEditable surface with a ProseMirror view.
     // We rebuild the DOM: the pm view mounts on a fresh child inside
     // the existing .ts-ed__editable so our ribbon + outline wiring
@@ -3309,6 +5168,17 @@
     var pmMount = document.createElement('div');
     pmMount.className = 'ts-ed__pm-mount';
     editor.appendChild(pmMount);
+
+    var marksLayer = document.createElement('div');
+    marksLayer.id = 'tsd-marks-layer';
+    marksLayer.className = 'tsd-persisted-marks';
+    marksLayer.setAttribute('data-tsd-marks', '1');
+    marksLayer.setAttribute('contenteditable', 'false');
+    marksLayer.style.cssText = 'margin-top:16pt;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14pt;';
+    if (_preservedMarks.length) {
+      marksLayer.innerHTML = _preservedMarks.join('');
+    }
+    editor.appendChild(marksLayer);
 
     var state_ = EditorState.create({
       schema: schema,
@@ -3420,11 +5290,21 @@
       var title = (titleInput.value || '').trim();
       if (!title) { setSave('Title required', 'error'); return; }
       setSave('● Encrypting & saving…', 'saving');
-      // Serialize ProseMirror doc back to HTML.
+      // Serialize ProseMirror doc back to HTML + preserve all inserted stamps & signatures.
       var tmp = document.createElement('div');
       var serializer = DOMSerializer.fromSchema(schema);
       tmp.appendChild(serializer.serializeFragment(pmView.state.doc.content));
       var htmlNow = tmp.innerHTML;
+      var savedMarks = [];
+      editor.querySelectorAll('.tsd-stamp-mark, .tsd-sig-block').forEach(function (el) {
+        if (el.closest('.tsd-stamp-mark, .tsd-sig-block') !== el) return;
+        var cl = el.cloneNode(true);
+        cl.classList.remove('tsd-obj-selected', 'tsd-verify-flash');
+        savedMarks.push(cl.outerHTML);
+      });
+      if (savedMarks.length) {
+        htmlNow += '<div class="tsd-persisted-marks" data-tsd-marks="1" style="margin-top:16pt;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14pt;">' + savedMarks.join('') + '</div>';
+      }
       var payload = {
         title: title,
         tags: (tagsInput && tagsInput.value) || '',
@@ -3433,18 +5313,21 @@
       };
       var url = tsdId ? '/api/tsd/' + tsdId : '/api/tsd/';
       var method = tsdId ? 'PUT' : 'POST';
-      fetch(url, { method: method, credentials: 'same-origin', headers: headers(), body: JSON.stringify(payload) })
-        .then(function (r) {
-          if (r.status === 412) throw new Error('Someone else saved a newer version. Reload to merge.');
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.json();
-        })
+      if (_saveInFlight) { _saveQueued = true; return; }
+      _saveInFlight = true;
+      _saveQueued = false;
+      _doTsdPut(url, method, payload, false)
         .then(function (data) {
           tsdId = data.id; version = data.version;
+          shell.dataset.tsdVersion = String(data.version);
           if (!shell.dataset.tsdId) { shell.dataset.tsdId = tsdId; history.replaceState({}, '', '/documents/library/' + tsdId); }
           setSave('● Saved · v' + data.version + ' · ' + data.ciphertext_sha256.substring(0, 12) + '…', 'saved');
         })
-        .catch(function (e) { setSave('Save failed: ' + e.message, 'error'); });
+        .catch(function (e) { setSave('Save failed: ' + e.message, 'error'); })
+        .finally(function () {
+          _saveInFlight = false;
+          if (_saveQueued) { _saveQueued = false; save(); }
+        });
     };
 
     // --- CRDT transport ---
@@ -3482,6 +5365,7 @@
         if (yFragment.length === 0 && editor._initialHtml) {
           var tmp = document.createElement('div');
           tmp.innerHTML = editor._initialHtml;
+          tmp.querySelectorAll('.tsd-persisted-marks, .tsd-stamp-mark, .tsd-sig-block').forEach(function (el) { el.remove(); });
           var slice = DOMParser.fromSchema(schema).parseSlice(tmp);
           pmView.dispatch(pmView.state.tr.replaceSelection(slice));
         }

@@ -15,7 +15,9 @@ officer.
 """
 from __future__ import annotations
 
-from flask import Blueprint, abort, render_template
+from datetime import datetime, timedelta
+
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.extensions import db
@@ -65,7 +67,84 @@ def list_retentions():
         .limit(200)
         .all()
     )
-    return render_template("trust/evidence_list.html", retentions=rows)
+    ret_ids = [r.id for r in rows]
+    active_holds: dict[int, EvidenceLegalHold] = {}
+    if ret_ids:
+        for h in (
+            EvidenceLegalHold.query.filter(
+                EvidenceLegalHold.retention_id.in_(ret_ids),
+                EvidenceLegalHold.organization_id == tenant_id,
+                EvidenceLegalHold.released_at.is_(None),
+            )
+            .order_by(EvidenceLegalHold.id.desc())
+            .all()
+        ):
+            active_holds.setdefault(h.retention_id, h)
+    return render_template(
+        "trust/evidence_list.html",
+        retentions=rows,
+        active_holds=active_holds,
+        now=datetime.utcnow(),
+    )
+
+
+@evidence_views.route("/retentions/<int:retention_id>/legal-hold", methods=["POST"])
+@login_required
+def toggle_legal_hold(retention_id: int):
+    tenant_id = _actor_tenant()
+    retention = EvidenceRetention.query.filter_by(
+        id=retention_id, organization_id=tenant_id
+    ).first()
+    if retention is None:
+        abort(404)
+
+    active = (
+        EvidenceLegalHold.query.filter_by(
+            retention_id=retention.id, organization_id=tenant_id
+        )
+        .filter(EvidenceLegalHold.released_at.is_(None))
+        .order_by(EvidenceLegalHold.id.desc())
+        .first()
+    )
+    reason = (request.form.get("reason") or "").strip()[:500]
+    if active is not None:
+        active.released_at = datetime.utcnow()
+        active.released_by_id = current_user.id
+        active.release_reason = reason or "Released by compliance operator"
+        db.session.commit()
+        flash(f"Legal hold released on retention #{retention.id}.", "success")
+    else:
+        hold = EvidenceLegalHold(
+            retention_id=retention.id,
+            organization_id=tenant_id,
+            reason=reason or "Compliance legal hold",
+            requested_by_id=current_user.id,
+        )
+        db.session.add(hold)
+        db.session.commit()
+        flash(f"Legal hold placed on retention #{retention.id}.", "success")
+    return redirect(url_for("evidence_views.list_retentions"))
+
+
+@evidence_views.route("/retentions/<int:retention_id>/extend", methods=["POST"])
+@login_required
+def extend_retention(retention_id: int):
+    tenant_id = _actor_tenant()
+    retention = EvidenceRetention.query.filter_by(
+        id=retention_id, organization_id=tenant_id
+    ).first()
+    if retention is None:
+        abort(404)
+    years = request.form.get("years", type=int) or 1
+    years = max(1, min(years, 25))
+    base = max(retention.retain_until or datetime.utcnow(), datetime.utcnow())
+    retention.retain_until = base + timedelta(days=365 * years)
+    db.session.commit()
+    flash(
+        f"Retention #{retention.id} extended to {retention.retain_until.strftime('%Y-%m-%d')}.",
+        "success",
+    )
+    return redirect(url_for("evidence_views.list_retentions"))
 
 
 @evidence_views.route("/retentions/<int:retention_id>", methods=["GET"])

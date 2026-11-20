@@ -3,38 +3,13 @@
 
 {% block title %}Documents · TRUSTSEAL{% endblock %}
 {% block page_title %}Documents{% endblock %}
-{% block page_description %}
-  <p class="ts-page-header__description">
-    Your workspace documents, stored in the proprietary
-    <code>.tsd</code> format. Everything — whether drafted in the
-    built-in editor or imported from PDF / DOCX / XLSX / TXT — is
-    encrypted at rest with a per-tenant key. Download for backup, open
-    to edit, export to PDF for signing — all through the authenticated
-    session. The raw bytes are useless outside TrustSeal.
-  </p>
-{% endblock %}
+{% block page_description %}{% endblock %}
 {% block page_actions %}
   <div class="ts-btn-group">
-    <a class="ts-btn ts-btn--primary" href="{{ url_for('tsd_views.new') }}">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
-      </svg>
-      New document
-    </a>
-    <button type="button" class="ts-btn ts-btn--secondary" id="tsd-template-btn">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <rect x="4" y="3" width="16" height="4" stroke="currentColor" stroke-width="1.75"/>
-        <rect x="4" y="10" width="7" height="11" stroke="currentColor" stroke-width="1.75"/>
-        <rect x="13" y="10" width="7" height="5" stroke="currentColor" stroke-width="1.75"/>
-        <rect x="13" y="17" width="7" height="4" stroke="currentColor" stroke-width="1.75"/>
-      </svg>
-      From template
-    </button>
-    <label class="ts-btn ts-btn--secondary" for="tsd-import-input" style="cursor: pointer;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M12 4v12M6 11l6 6 6-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M4 20h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-      </svg>
+    <a class="ts-btn ts-btn--primary" href="{{ url_for('tsd_views.new') }}">+ New document</a>
+    <a class="ts-btn ts-btn--secondary" href="{{ url_for('workspace_assets_views.templates_hub_page') }}">From template</a>
+    <a class="ts-btn ts-btn--secondary" href="{{ url_for('workspace_assets_views.letterheads_page') }}">From letterhead</a>
+    <label class="ts-btn ts-btn--secondary" for="tsd-import-input" style="cursor:pointer;">
       Import file
       <input id="tsd-import-input" type="file"
              accept=".pdf,.docx,.xlsx,.txt,.md,.html,.htm,.png,.jpg,.jpeg,.gif,.webp,.bmp,.tiff,.tif"
@@ -43,386 +18,266 @@
   </div>
 {% endblock %}
 
-{% block breadcrumbs %}
-  {% set trail = [
-    {'label': 'Workspace', 'url': url_for('system.main_views.home')},
-    {'label': 'Documents'}
-  ] %}
-  {% include 'components_ds/breadcrumbs.html' %}
-{% endblock %}
-
 {% block content %}
+<div class="st-flat">
+  {% include "stamps/_flat_ui.html" %}
 
-<section class="ts-metric-strip" style="margin-bottom: var(--ts-space-5);">
-  <div class="ts-metric">
-    <span class="ts-metric__label">In library</span>
-    <span class="ts-metric__value">{{ docs|length }}</span>
-    <span class="ts-metric__sub">documents</span>
-  </div>
-  <div class="ts-metric">
-    <span class="ts-metric__label">Signing-ready</span>
-    <span class="ts-metric__value">
-      {{ docs|selectattr('export_policy','equalto','pdf_allowed')|list|length }}
-    </span>
-    <span class="ts-metric__sub">PDF export allowed</span>
-  </div>
-  <div class="ts-metric">
-    <span class="ts-metric__label">Encrypted-only</span>
-    <span class="ts-metric__value">
-      {{ docs|selectattr('export_policy','equalto','encrypted_only')|list|length }}
-    </span>
-    <span class="ts-metric__sub">no plaintext exit</span>
-  </div>
-  <div class="ts-metric">
-    <span class="ts-metric__label">Format</span>
-    <span class="ts-metric__value" style="font-size: var(--ts-fs-section); letter-spacing: 0;">
-      .tsd
-    </span>
-    <span class="ts-metric__sub">AES+HMAC · per-tenant key</span>
-  </div>
-</section>
+  <div id="tsd-import-status" class="tsd-banner" hidden></div>
 
-{% if docs %}
-<section>
-  <header class="ts-section-head">
-    <h2>Library</h2>
-    <span class="ts-panel__meta">Encrypted at rest · click a row to open in the editor</span>
-  </header>
-  <div class="ts-table-shell">
-    <div class="ts-table-scroll">
-      <table class="ts-table">
-        <thead>
-          <tr>
-            <th scope="col" style="width: 38%;">Document</th>
-            <th scope="col" style="width: 12%;">Status</th>
-            <th scope="col" style="width: 14%;">Export</th>
-            <th scope="col" style="width: 10%;">Version</th>
-            <th scope="col" style="width: 16%;">Updated</th>
-            <th scope="col" style="width: 10%;"></th>
-          </tr>
-        </thead>
-        <tbody>
-        {% for d in docs %}
+  <section class="st-toolbar">
+    <div class="st-search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+        <path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <input type="search" id="tsd-search" placeholder="Search documents by title or description…">
+    </div>
+    <div class="st-toolbar__right">
+      <select id="tsd-status" class="st-select" aria-label="Filter status">
+        <option value="all">All statuses</option>
+        <option value="draft">Draft</option>
+        <option value="finalized">Finalized</option>
+        <option value="archived">Archived</option>
+      </select>
+      <select id="tsd-policy" class="st-select" aria-label="Filter export policy">
+        <option value="all">All export policies</option>
+        <option value="pdf_allowed">PDF allowed</option>
+        <option value="encrypted_only">Encrypted only</option>
+      </select>
+    </div>
+  </section>
+
+  {% if docs %}
+  <section class="st-panel" style="overflow-x:auto;">
+    <table class="st-table">
+      <thead>
         <tr>
-          <td data-label="Document">
-            <a class="ts-cell-title" href="{{ url_for('tsd_views.edit', tsd_id=d.id) }}">
-              {{ d.title }}
-            </a>
-            <span class="ts-cell-sub">
-              <span class="ts-tsd-chip" title="TrustSeal Document — encrypted">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <rect x="4" y="11" width="16" height="10" stroke="currentColor" stroke-width="1.75" rx="1"/>
-                  <path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" stroke-width="1.75"/>
-                </svg>
-                .tsd
-              </span>
-              {% if d.description %} · {{ d.description|truncate(90) }}{% endif %}
-            </span>
+          <th>Document</th>
+          <th>Status</th>
+          <th>Export Policy</th>
+          <th>Version</th>
+          <th>Updated</th>
+          <th style="width:44px;text-align:right;"></th>
+        </tr>
+      </thead>
+      <tbody id="tsd-tbody">
+        {% for d in docs %}
+        <tr data-id="{{ d.id }}"
+            data-title="{{ (d.title or '')|lower }}"
+            data-desc="{{ (d.description or '')|lower }}"
+            data-status="{{ (d.status or 'draft')|lower }}"
+            data-policy="{{ (d.export_policy or 'pdf_allowed')|lower }}"
+            data-edit-url="{{ url_for('tsd_views.edit', tsd_id=d.id) }}">
+          <td style="font-weight:600;max-width:340px;">
+            <a href="{{ url_for('tsd_views.edit', tsd_id=d.id) }}" style="color:#091e42;text-decoration:none;">{{ d.title }}</a>
           </td>
-          <td data-label="Status">
+          <td>
             {% if d.status == 'draft' %}
-              <span class="ts-status ts-status--pending">Draft</span>
+              <span class="st-tag st-tag--warn">Draft</span>
             {% elif d.status == 'finalized' %}
-              <span class="ts-status ts-status--success">Finalized</span>
+              <span class="st-tag st-tag--ok">Finalized</span>
             {% else %}
-              <span class="ts-status ts-status--warning">{{ d.status|capitalize }}</span>
+              <span class="st-tag">{{ (d.status or 'draft')|capitalize }}</span>
             {% endif %}
           </td>
-          <td data-label="Export">
+          <td>
             {% if d.export_policy == 'pdf_allowed' %}
-              <span class="ts-status ts-status--info">PDF allowed</span>
+              <span class="st-tag st-tag--info">PDF allowed</span>
             {% else %}
-              <span class="ts-status ts-status--danger">Encrypted only</span>
+              <span class="st-tag st-tag--bad">Encrypted only</span>
             {% endif %}
           </td>
-          <td data-label="Version"><code>v{{ d.version }}</code></td>
-          <td data-label="Updated">
-            {{ d.updated_at.strftime('%Y-%m-%d %H:%M') if d.updated_at else '—' }}
-          </td>
-          <td data-label="" class="ts-cell-actions">
-            <div class="ts-btn-group" style="gap: 2px;">
-              <a class="ts-btn ts-btn--text ts-btn--sm" href="{{ url_for('tsd_views.edit', tsd_id=d.id) }}">Open</a>
-              <span style="color: var(--ts-border-strong);" aria-hidden="true">·</span>
-              <a class="ts-btn ts-btn--text ts-btn--sm" href="/api/tsd/{{ d.id }}/download">Download</a>
-            </div>
+          <td style="font-family:var(--ts-font-mono);color:#42526e;">v{{ d.version }}</td>
+          <td style="color:#64748b;">{{ d.updated_at.strftime('%Y-%m-%d %H:%M') if d.updated_at else '—' }}</td>
+          <td style="text-align:right;">
+            <button type="button" class="tsd-more" aria-label="Document actions">⋮</button>
           </td>
         </tr>
         {% endfor %}
-        </tbody>
-      </table>
+      </tbody>
+    </table>
+  </section>
+  {% else %}
+  <section class="st-empty">
+    <div class="st-empty__title">No documents yet</div>
+    <div class="st-empty__actions">
+      <a class="ts-btn ts-btn--primary" href="{{ url_for('tsd_views.new') }}">Draft a new document</a>
+      <label class="ts-btn ts-btn--secondary" for="tsd-import-input" style="cursor:pointer;">Import file</label>
     </div>
-  </div>
-</section>
-{% else %}
-<section class="ts-panel" style="padding: 0;">
-  <div class="ts-empty">
-    <div class="ts-empty__title">No TrustSeal Documents yet</div>
-    <p class="ts-empty__hint">
-      The TrustSeal Document (<code>.tsd</code>) is our proprietary,
-      encrypted document format. Content is wrapped in a Fernet
-      envelope with a key derived per-tenant, so even an exfiltrated
-      file is unreadable without TrustSeal. Compose a new document
-      below to see it in action.
-    </p>
-    <div class="ts-empty__actions">
-      <div class="ts-btn-group" style="justify-content: center;">
-        <a class="ts-btn ts-btn--primary ts-btn--lg" href="{{ url_for('tsd_views.new') }}">
-          Draft a new document
-        </a>
-        <label class="ts-btn ts-btn--secondary ts-btn--lg" for="tsd-import-input" style="cursor: pointer;">
-          Import PDF / DOCX / XLSX
-        </label>
-      </div>
-    </div>
-  </div>
-</section>
-{% endif %}
-
-<div id="tsd-import-status" class="ts-inline ts-inline--info" style="display:none; margin-top: var(--ts-space-4);">
-  <div class="ts-inline__body" id="tsd-import-status-body">Importing…</div>
+  </section>
+  {% endif %}
 </div>
 
-{# ---------- Template picker overlay ---------- #}
-<div id="tsd-tpl-overlay" class="ts-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="tsd-tpl-title">
-  <div class="ts-tpl-modal">
-    <header class="ts-tpl-modal__head">
-      <div>
-        <h2 id="tsd-tpl-title" class="ts-modal__title" style="margin:0;">Start from a template</h2>
-        <p class="ts-panel__meta" style="margin: 4px 0 0;">
-          Each template is a starting point. Content stays editable and
-          encrypts into your tenant's <code>.tsd</code> library on save.
-        </p>
-      </div>
-      <button type="button" class="ts-btn ts-btn--text" id="tsd-tpl-close" aria-label="Close">✕</button>
-    </header>
-    <div class="ts-tpl-modal__filters">
-      <button type="button" class="ts-tpl-filter ts-tpl-filter--active" data-cat="all">All</button>
-      <button type="button" class="ts-tpl-filter" data-cat="Agreement">Agreements</button>
-      <button type="button" class="ts-tpl-filter" data-cat="Correspondence">Correspondence</button>
-      <button type="button" class="ts-tpl-filter" data-cat="Governance">Governance</button>
-      <button type="button" class="ts-tpl-filter" data-cat="Policy">Policies</button>
-      <button type="button" class="ts-tpl-filter" data-cat="Other">Other</button>
-    </div>
-    <ul id="tsd-tpl-grid" class="ts-tpl-grid">
-      <li class="ts-tpl-card ts-tpl-card--loading">Loading templates…</li>
-    </ul>
-  </div>
+<div id="tsd-ctx" class="tsd-ctx" hidden role="menu">
+  <button type="button" class="tsd-ctx__item" data-act="open">Open in Editor</button>
+  <button type="button" class="tsd-ctx__item" data-act="download">Download .tsd</button>
+  <button type="button" class="tsd-ctx__item" data-act="pdf" id="tsd-ctx-pdf">Export PDF</button>
+  <div class="tsd-ctx__sep"></div>
+  <button type="button" class="tsd-ctx__item tsd-ctx__item--danger" data-act="delete">Delete</button>
 </div>
 
 <style>
-.ts-tpl-modal {
-  background: var(--ts-surface);
-  border: 1px solid var(--ts-border);
-  width: 860px; max-width: 95vw;
-  max-height: 85vh;
-  display: flex; flex-direction: column;
-  box-shadow: var(--ts-shadow-overlay);
-}
-.ts-tpl-modal__head {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  gap: var(--ts-space-4);
-  padding: var(--ts-space-5) var(--ts-space-6);
-  border-bottom: 1px solid var(--ts-border);
-}
-.ts-tpl-modal__filters {
-  display: flex; flex-wrap: wrap; gap: 4px;
-  padding: var(--ts-space-3) var(--ts-space-6);
-  border-bottom: 1px solid var(--ts-border);
-  background: var(--ts-surface-alt);
-}
-.ts-tpl-filter {
-  background: transparent; border: 1px solid transparent;
-  padding: 4px 10px;
-  font-size: var(--ts-fs-label);
-  color: var(--ts-text-muted);
-  border-radius: var(--ts-radius-pill);
-  cursor: pointer;
-}
-.ts-tpl-filter:hover { color: var(--ts-text); background: var(--ts-surface); }
-.ts-tpl-filter--active {
-  background: var(--ts-brand-primary);
-  color: var(--ts-text-inverse);
-  border-color: var(--ts-brand-primary);
-}
-.ts-tpl-grid {
-  overflow-y: auto; flex: 1 1 auto;
-  padding: var(--ts-space-5) var(--ts-space-6);
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: var(--ts-space-4);
-  list-style: none; margin: 0;
-}
-.ts-tpl-card {
-  display: flex; flex-direction: column;
-  padding: var(--ts-space-5);
-  background: var(--ts-surface);
-  border: 1px solid var(--ts-border);
-  cursor: pointer;
-  transition: border-color var(--ts-dur-fast) var(--ts-ease),
-              background var(--ts-dur-fast) var(--ts-ease);
-}
-.ts-tpl-card:hover {
-  border-color: var(--ts-brand-primary);
-  background: var(--ts-brand-primary-soft);
-}
-.ts-tpl-card--loading { text-align: center; color: var(--ts-text-muted); border: 0; }
-.ts-tpl-card__cat {
-  font-size: var(--ts-fs-micro); font-weight: var(--ts-fw-semibold);
-  text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--ts-brand-primary);
-  margin-bottom: 4px;
-}
-.ts-tpl-card__name {
-  font-size: var(--ts-fs-section);
-  font-weight: var(--ts-fw-semibold);
-  margin-bottom: var(--ts-space-2);
-  color: var(--ts-text);
-}
-.ts-tpl-card__desc {
-  font-size: var(--ts-fs-label);
-  color: var(--ts-text-muted);
-  line-height: var(--ts-lh-base);
-  flex: 1 1 auto;
-}
-.ts-tpl-card__cta {
-  margin-top: var(--ts-space-3);
-  font-size: var(--ts-fs-label);
-  color: var(--ts-brand-primary);
-  font-weight: var(--ts-fw-medium);
-}
+  .tsd-chip {
+    display: inline-block; margin-left: 6px; padding: 1px 5px;
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em; color: #1e4b9e; background: #edf5ff;
+  }
+  .tsd-banner {
+    padding: 10px 14px; margin-bottom: 14px; font-size: 12.5px;
+    background: #edf5ff; color: #1e4b9e;
+  }
+  .tsd-banner--ok { background: #e9f7ef; color: #17633a; }
+  .tsd-banner--err { background: #fff0f0; color: #9b2c2c; }
+  .tsd-more {
+    border: 0; background: transparent; color: #64748b;
+    width: 28px; height: 28px; cursor: pointer; font-size: 15px;
+  }
+  .tsd-more:hover { background: #eef2f7; color: #091e42; }
+  .tsd-ctx {
+    position: fixed; z-index: 1200; min-width: 175px;
+    background: #ffffff; box-shadow: 0 8px 24px rgba(9, 30, 66, 0.14);
+    padding: 4px 0;
+  }
+  .tsd-ctx__item {
+    display: block; width: 100%; text-align: left; border: 0;
+    background: transparent; padding: 8px 14px; font-size: 12.5px;
+    color: #091e42; cursor: pointer;
+  }
+  .tsd-ctx__item:hover { background: #f1f5f9; color: #1e4b9e; }
+  .tsd-ctx__item--danger { color: #9b2c2c; }
+  .tsd-ctx__item--danger:hover { background: #fff0f0; color: #9b2c2c; }
+  .tsd-ctx__sep { height: 1px; background: rgba(15, 23, 42, 0.06); margin: 4px 0; }
 </style>
 
 <script>
 (function () {
-  var btn      = document.getElementById('tsd-template-btn');
-  var overlay  = document.getElementById('tsd-tpl-overlay');
-  var closeBtn = document.getElementById('tsd-tpl-close');
-  var grid     = document.getElementById('tsd-tpl-grid');
-  var filters  = document.querySelectorAll('.ts-tpl-filter');
-  var all = [];
-  var currentCat = 'all';
+  var tbody = document.getElementById('tsd-tbody');
+  var searchEl = document.getElementById('tsd-search');
+  var statusEl = document.getElementById('tsd-status');
+  var policyEl = document.getElementById('tsd-policy');
+  var menu = document.getElementById('tsd-ctx');
+  var pdfItem = document.getElementById('tsd-ctx-pdf');
+  var banner = document.getElementById('tsd-import-status');
+  var activeRow = null;
 
-  function show() {
-    overlay.removeAttribute('hidden'); overlay.style.display = 'flex';
-    if (!all.length) load();
+  function showBanner(type, text) {
+    banner.hidden = false;
+    banner.className = 'tsd-banner' + (type === 'ok' ? ' tsd-banner--ok' : type === 'err' ? ' tsd-banner--err' : '');
+    banner.textContent = text;
   }
-  function hide() { overlay.setAttribute('hidden', ''); overlay.style.display = 'none'; }
 
-  function render() {
-    var items = all.filter(function (t) { return currentCat === 'all' || t.category === currentCat; });
-    if (!items.length) {
-      grid.innerHTML = '<li class="ts-tpl-card--loading">No templates in this category.</li>';
-      return;
-    }
-    grid.innerHTML = items.map(function (t) {
-      return '<li class="ts-tpl-card" data-slug="' + t.slug + '">' +
-        '<div class="ts-tpl-card__cat">' + t.category + '</div>' +
-        '<div class="ts-tpl-card__name">' + t.name + '</div>' +
-        '<div class="ts-tpl-card__desc">' + t.description + '</div>' +
-        '<div class="ts-tpl-card__cta">Use template →</div>' +
-      '</li>';
-    }).join('');
-    grid.querySelectorAll('[data-slug]').forEach(function (c) {
-      c.addEventListener('click', function () { use(c.getAttribute('data-slug')); });
+  function applyFilter() {
+    if (!tbody) return;
+    var q = (searchEl.value || '').trim().toLowerCase();
+    var s = statusEl.value;
+    var p = policyEl.value;
+    tbody.querySelectorAll('tr').forEach(function (r) {
+      var hay = (r.dataset.title || '') + ' ' + (r.dataset.desc || '');
+      var ok = (!q || hay.indexOf(q) !== -1)
+        && (s === 'all' || r.dataset.status === s)
+        && (p === 'all' || r.dataset.policy === p);
+      r.style.display = ok ? '' : 'none';
     });
   }
+  if (searchEl) searchEl.addEventListener('input', applyFilter);
+  if (statusEl) statusEl.addEventListener('change', applyFilter);
+  if (policyEl) policyEl.addEventListener('change', applyFilter);
 
-  function load() {
-    grid.innerHTML = '<li class="ts-tpl-card--loading">Loading templates…</li>';
-    fetch('/api/tsd/templates', { credentials: 'same-origin' })
-      .then(function (r) { return r.json(); })
-      .then(function (data) { all = data || []; render(); })
-      .catch(function (e) { grid.innerHTML = '<li class="ts-tpl-card--loading">Failed to load: ' + e.message + '</li>'; });
+  function hideMenu() { if (menu) menu.hidden = true; activeRow = null; }
+  function openMenu(row, x, y) {
+    activeRow = row;
+    if (pdfItem) pdfItem.style.display = row.dataset.policy === 'pdf_allowed' ? '' : 'none';
+    menu.hidden = false;
+    var mw = menu.offsetWidth || 175, mh = menu.offsetHeight || 150;
+    menu.style.left = Math.min(x, window.innerWidth - mw - 8) + 'px';
+    menu.style.top = Math.min(y, window.innerHeight - mh - 8) + 'px';
   }
 
-  function use(slug) {
-    fetch('/api/tsd/from-template/' + slug, {
-      method: 'POST', credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-      body: '{}',
-    }).then(function (r) {
-      if (!r.ok) return r.json().then(function (j) { throw new Error(j.message || j.error || ('HTTP ' + r.status)); });
-      return r.json();
-    }).then(function (doc) {
-      window.location = '/documents/library/' + doc.id;
-    }).catch(function (e) {
-      alert('Could not create from template: ' + e.message);
+  if (tbody && menu) {
+    tbody.addEventListener('click', function (e) {
+      var btn = e.target.closest('.tsd-more');
+      if (!btn) return;
+      e.stopPropagation();
+      var r = btn.getBoundingClientRect();
+      openMenu(btn.closest('tr'), r.right - 175, r.bottom + 4);
     });
-  }
-
-  filters.forEach(function (f) {
-    f.addEventListener('click', function () {
-      filters.forEach(function (x) { x.classList.remove('ts-tpl-filter--active'); });
-      f.classList.add('ts-tpl-filter--active');
-      currentCat = f.getAttribute('data-cat');
-      render();
+    tbody.addEventListener('contextmenu', function (e) {
+      var tr = e.target.closest('tr');
+      if (!tr) return;
+      e.preventDefault();
+      openMenu(tr, e.clientX, e.clientY);
     });
-  });
-  if (btn) btn.addEventListener('click', show);
-  if (closeBtn) closeBtn.addEventListener('click', hide);
-  overlay.addEventListener('click', function (e) { if (e.target === overlay) hide(); });
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !overlay.hasAttribute('hidden')) hide();
-  });
-})();
-</script>
-
-<script>
-(function () {
-  var input = document.getElementById('tsd-import-input');
-  var statusEl = document.getElementById('tsd-import-status');
-  var statusBody = document.getElementById('tsd-import-status-body');
-  if (!input) return;
-
-  function show(cls, html) {
-    statusEl.className = 'ts-inline ts-inline--' + cls;
-    statusEl.style.display = '';
-    statusBody.innerHTML = html;
-  }
-
-  input.addEventListener('change', function () {
-    var file = input.files && input.files[0];
-    if (!file) return;
-    show('info', 'Importing <strong>' + file.name + '</strong> (' + file.size + ' bytes)…');
-
-    var fd = new FormData();
-    fd.append('file', file);
-
-    fetch('/api/tsd/ingest', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'X-Requested-With': 'fetch' },
-      body: fd,
-    }).then(function (r) {
-      if (!r.ok) {
-        return r.json().then(function (j) { throw new Error(j.message || j.error || ('HTTP ' + r.status)); });
+    menu.addEventListener('click', function (e) {
+      var item = e.target.closest('[data-act]');
+      if (!item || !activeRow) return;
+      var id = activeRow.dataset.id;
+      var act = item.dataset.act;
+      var editUrl = activeRow.dataset.editUrl;
+      var rowRef = activeRow;
+      hideMenu();
+      if (act === 'open') {
+        window.location = editUrl;
+      } else if (act === 'download') {
+        window.location = '/api/tsd/' + id + '/download';
+      } else if (act === 'pdf') {
+        showBanner('info', 'Exporting PDF…');
+        fetch('/api/tsd/' + id + '/export/pdf', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'X-Requested-With': 'fetch' }
+        }).then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.blob();
+        }).then(function (blob) {
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url; a.download = 'document-' + id + '.pdf';
+          document.body.appendChild(a); a.click(); a.remove();
+          URL.revokeObjectURL(url);
+          showBanner('ok', 'PDF exported.');
+        }).catch(function (err) {
+          showBanner('err', 'PDF export failed: ' + err.message);
+        });
+      } else if (act === 'delete') {
+        if (!confirm('Delete this document?')) return;
+        fetch('/api/tsd/' + id, {
+          method: 'DELETE', credentials: 'same-origin',
+          headers: { 'X-Requested-With': 'fetch' }
+        }).then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          rowRef.remove();
+          showBanner('ok', 'Document deleted.');
+        }).catch(function (err) {
+          showBanner('err', 'Delete failed: ' + err.message);
+        });
       }
-      return r.json();
-    }).then(function (data) {
-      show('success', 'Imported as <strong>' + data.title + '</strong> (encrypted, ' + data.plaintext_bytes + ' B plaintext). Opening editor…');
-      setTimeout(function () { window.location = '/documents/library/' + data.id; }, 700);
-    }).catch(function (e) {
-      show('danger', 'Import failed: ' + e.message);
     });
-  });
+    document.addEventListener('click', hideMenu);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hideMenu(); });
+  }
+
+  var input = document.getElementById('tsd-import-input');
+  if (input) {
+    input.addEventListener('change', function () {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      showBanner('info', 'Importing ' + file.name + '…');
+      var fd = new FormData();
+      fd.append('file', file);
+      fetch('/api/tsd/ingest', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'fetch' },
+        body: fd
+      }).then(function (r) {
+        if (!r.ok) return r.json().then(function (j) { throw new Error(j.message || j.error || ('HTTP ' + r.status)); });
+        return r.json();
+      }).then(function (data) {
+        showBanner('ok', 'Imported "' + data.title + '". Opening editor…');
+        setTimeout(function () { window.location = '/documents/library/' + data.id; }, 600);
+      }).catch(function (err) {
+        showBanner('err', 'Import failed: ' + err.message);
+      });
+    });
+  }
 })();
 </script>
-
-<style>
-  .ts-tsd-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 1px 6px;
-    font-size: 10px;
-    font-weight: var(--ts-fw-semibold);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--ts-brand-primary);
-    background: var(--ts-brand-primary-soft);
-    border: 1px solid var(--ts-brand-primary-soft);
-    border-radius: var(--ts-radius-sm);
-  }
-</style>
-
 {% endblock %}

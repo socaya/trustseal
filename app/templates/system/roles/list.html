@@ -1,5 +1,264 @@
-<!-- Template: roles/list.html for system blueprint -->
-{% extends 'base.html' %}
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'roles' %}
+
+{% block title %}Roles &amp; Permissions · TRUSTSEAL{% endblock %}
+{% block page_title %}Roles &amp; Permissions{% endblock %}
+{% block page_description %}{% endblock %}
+{% block page_actions %}
+  <a class="ts-btn" href="{{ url_for('admin_users_views.index') }}">Users &amp; access</a>
+  <button type="button" class="ts-btn ts-btn--primary" id="rb-new-toggle">+ Add role</button>
+{% endblock %}
+
 {% block content %}
-<h1>Roles/List</h1>
+<div class="st-flat">
+  {% include "stamps/_flat_ui.html" %}
+
+  <!-- Collapsible Create Role panel -->
+  <section id="rb-create-panel" class="st-panel" style="padding:16px 20px;margin-bottom:18px;" hidden>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <strong style="font-size:13.5px;color:#091e42;">Create role</strong>
+      <button type="button" class="rb-close" id="rb-new-close" aria-label="Close">✕</button>
+    </div>
+    <form method="post" action="{{ url_for('system.view_roles') }}" style="display:grid;grid-template-columns:1fr 1.6fr auto;gap:10px;align-items:center;">
+      <input type="hidden" name="action" value="create_role">
+      <input type="text" name="name" required class="st-select" style="width:100%;background:#f6f8fb;" placeholder="Role name (e.g. compliance_auditor)">
+      <input type="text" name="description" class="st-select" style="width:100%;background:#f6f8fb;" placeholder="Description…">
+      <button type="submit" class="ts-btn ts-btn--primary">Create role</button>
+    </form>
+  </section>
+
+  <nav class="st-subnav" aria-label="RBAC sections">
+    <button type="button" class="st-subnav__link is-active rb-tab" data-rtab="roles">Roles ({{ items|length }})</button>
+    <button type="button" class="st-subnav__link rb-tab" data-rtab="matrix">Permission Matrix ({{ permissions|length }})</button>
+    <button type="button" class="st-subnav__link rb-tab" data-rtab="assignments">User Assignments ({{ tenant_users|length }})</button>
+  </nav>
+
+  <!-- TAB 1: Roles -->
+  <section class="st-panel" id="rb-pane-roles" style="overflow-x:auto;">
+    {% if items %}
+    <table class="st-table">
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>Description</th>
+          <th>Permissions</th>
+          <th>Assigned Users</th>
+          <th style="width:44px;text-align:right;"></th>
+        </tr>
+      </thead>
+      <tbody id="rb-roles-tbody">
+        {% for r in items %}
+        <tr data-id="{{ r.id }}" data-name="{{ r.name }}">
+          <td style="font-weight:600;font-family:var(--ts-font-mono);color:#1e4b9e;">{{ r.name }}</td>
+          <td style="color:#42526e;">{{ r.description or '—' }}</td>
+          <td><span class="st-tag st-tag--info">{{ perm_counts.get(r.id, 0) }}</span></td>
+          <td><span class="st-tag">{{ user_counts.get(r.id, 0) }}</span></td>
+          <td style="text-align:right;">
+            <button type="button" class="rb-more" aria-label="Role actions">⋮</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="st-empty"><div class="st-empty__title">No roles defined yet</div></div>
+    {% endif %}
+  </section>
+
+  <!-- TAB 2: Interactive Permission Matrix -->
+  <section class="st-panel" id="rb-pane-matrix" hidden style="overflow-x:auto;">
+    {% if permissions and items %}
+    <table class="st-table">
+      <thead>
+        <tr>
+          <th>Permission</th>
+          {% for r in items %}
+          <th style="text-align:center;">{{ r.name }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in permissions %}
+        <tr>
+          <td style="font-family:var(--ts-font-mono);font-size:12px;" title="{{ p.description or p.name }}">{{ p.name }}</td>
+          {% for r in items %}
+            {% set granted = (r.id, p.id) in role_perm_pairs %}
+          <td style="text-align:center;">
+            <form method="post" action="{{ url_for('system.view_roles') }}" style="display:inline;">
+              <input type="hidden" name="action" value="toggle_perm">
+              <input type="hidden" name="role_id" value="{{ r.id }}">
+              <input type="hidden" name="permission_id" value="{{ p.id }}">
+              <button type="submit" class="rb-perm-btn {% if granted %}is-on{% endif %}" title="Toggle {{ p.name }} for {{ r.name }}">
+                {{ '✓' if granted else '—' }}
+              </button>
+            </form>
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="st-empty"><div class="st-empty__title">No permissions or roles defined yet</div></div>
+    {% endif %}
+  </section>
+
+  <!-- TAB 3: User-Role Assignments -->
+  <section class="st-panel" id="rb-pane-assignments" hidden style="overflow-x:auto;">
+    {% if tenant_users %}
+    <table class="st-table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Email</th>
+          <th>Assigned Roles</th>
+          <th style="width:260px;">Toggle Role</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in tenant_users %}
+          {% set assigned = user_role_map.get(u.id, []) %}
+          {% set display_name = (u.first_name ~ ' ' ~ u.last_name)|trim or u.username %}
+        <tr>
+          <td style="font-weight:600;">{{ display_name }}</td>
+          <td style="color:#42526e;">{{ u.email }}</td>
+          <td>
+            {% if assigned %}
+              {% for r in assigned %}<span class="st-tag st-tag--info" style="margin-right:3px;">{{ r.name }}</span>{% endfor %}
+            {% else %}
+              <span style="color:#7a869a;">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <form method="post" action="{{ url_for('system.view_roles') }}" style="display:inline-flex;gap:6px;align-items:center;">
+              <input type="hidden" name="action" value="toggle_user_role">
+              <input type="hidden" name="user_id" value="{{ u.id }}">
+              <select name="role_id" class="st-select" style="height:28px;font-size:12px;background:#f6f8fb;">
+                {% for r in items %}
+                <option value="{{ r.id }}">{{ r.name }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="ts-btn ts-btn--sm">Toggle</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="st-empty"><div class="st-empty__title">No workspace users found</div></div>
+    {% endif %}
+  </section>
+</div>
+
+<form id="rb-action-form" method="post" action="{{ url_for('system.view_roles') }}" hidden>
+  <input type="hidden" name="action" value="delete_role">
+  <input type="hidden" name="role_id" id="rb-del-id">
+</form>
+
+<div id="rb-ctx" class="rb-ctx" hidden role="menu">
+  <button type="button" class="rb-ctx__item" data-act="matrix">Manage Permissions</button>
+  <button type="button" class="rb-ctx__item" data-act="assign">Assign to Users</button>
+  <div class="rb-ctx__sep"></div>
+  <button type="button" class="rb-ctx__item rb-ctx__item--danger" data-act="delete">Delete Role</button>
+</div>
+
+<style>
+  .rb-tab { border: 0; background: transparent; cursor: pointer; }
+  .rb-close { border: 0; background: transparent; color: #64748b; cursor: pointer; font-size: 14px; padding: 4px 8px; }
+  .rb-close:hover { background: #f1f5f9; color: #091e42; }
+  .rb-more { border: 0; background: transparent; color: #64748b; width: 28px; height: 28px; cursor: pointer; font-size: 15px; }
+  .rb-more:hover { background: #eef2f7; color: #091e42; }
+  .rb-perm-btn {
+    border: 0; width: 28px; height: 24px; cursor: pointer;
+    font-size: 12px; font-weight: 600; background: #f1f4f8; color: #7a869a;
+  }
+  .rb-perm-btn:hover { background: #e2e8f0; color: #091e42; }
+  .rb-perm-btn.is-on { background: #e9f7ef; color: #17633a; }
+  .rb-ctx {
+    position: fixed; z-index: 1200; min-width: 175px;
+    background: #ffffff; box-shadow: 0 8px 24px rgba(9, 30, 66, 0.14);
+    padding: 4px 0;
+  }
+  .rb-ctx__item {
+    display: block; width: 100%; text-align: left; border: 0;
+    background: transparent; padding: 8px 14px; font-size: 12.5px;
+    color: #091e42; cursor: pointer;
+  }
+  .rb-ctx__item:hover { background: #f1f5f9; color: #1e4b9e; }
+  .rb-ctx__item--danger { color: #9b2c2c; }
+  .rb-ctx__item--danger:hover { background: #fff0f0; color: #9b2c2c; }
+  .rb-ctx__sep { height: 1px; background: rgba(15, 23, 42, 0.06); margin: 4px 0; }
+</style>
+
+<script>
+(function () {
+  var createPanel = document.getElementById('rb-create-panel');
+  var newToggle = document.getElementById('rb-new-toggle');
+  var newClose = document.getElementById('rb-new-close');
+  if (newToggle) newToggle.addEventListener('click', function () { createPanel.hidden = !createPanel.hidden; });
+  if (newClose) newClose.addEventListener('click', function () { createPanel.hidden = true; });
+
+  function selectTab(t) {
+    document.querySelectorAll('[data-rtab]').forEach(function (x) {
+      x.classList.toggle('is-active', x.getAttribute('data-rtab') === t);
+    });
+    document.getElementById('rb-pane-roles').hidden = (t !== 'roles');
+    document.getElementById('rb-pane-matrix').hidden = (t !== 'matrix');
+    document.getElementById('rb-pane-assignments').hidden = (t !== 'assignments');
+  }
+  document.querySelectorAll('[data-rtab]').forEach(function (btn) {
+    btn.addEventListener('click', function () { selectTab(btn.getAttribute('data-rtab')); });
+  });
+  if (window.location.hash === '#matrix') selectTab('matrix');
+  if (window.location.hash === '#assignments') selectTab('assignments');
+
+  var tbody = document.getElementById('rb-roles-tbody');
+  var menu = document.getElementById('rb-ctx');
+  var form = document.getElementById('rb-action-form');
+  var delId = document.getElementById('rb-del-id');
+  var activeRow = null;
+  function hide() { if (menu) menu.hidden = true; activeRow = null; }
+  function openMenu(row, x, y) {
+    activeRow = row;
+    menu.hidden = false;
+    var mw = menu.offsetWidth || 175, mh = menu.offsetHeight || 120;
+    menu.style.left = Math.min(x, window.innerWidth - mw - 8) + 'px';
+    menu.style.top = Math.min(y, window.innerHeight - mh - 8) + 'px';
+  }
+  if (tbody && menu) {
+    tbody.addEventListener('click', function (e) {
+      var btn = e.target.closest('.rb-more');
+      if (!btn) return;
+      e.stopPropagation();
+      var r = btn.getBoundingClientRect();
+      openMenu(btn.closest('tr'), r.right - 175, r.bottom + 4);
+    });
+    tbody.addEventListener('contextmenu', function (e) {
+      var tr = e.target.closest('tr');
+      if (!tr) return;
+      e.preventDefault();
+      openMenu(tr, e.clientX, e.clientY);
+    });
+    menu.addEventListener('click', function (e) {
+      var item = e.target.closest('[data-act]');
+      if (!item || !activeRow) return;
+      var act = item.dataset.act;
+      var rowRef = activeRow;
+      hide();
+      if (act === 'matrix') {
+        selectTab('matrix');
+      } else if (act === 'assign') {
+        selectTab('assignments');
+      } else if (act === 'delete') {
+        if (!confirm('Delete role "' + rowRef.dataset.name + '"?')) return;
+        delId.value = rowRef.dataset.id;
+        form.submit();
+      }
+    });
+    document.addEventListener('click', hide);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
+  }
+})();
+</script>
 {% endblock %}

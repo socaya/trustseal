@@ -5,11 +5,7 @@
   {{ document.get('title', 'Document') }} · TRUSTSEAL
 {% endblock %}
 {% block page_title %}{{ document.get('title', 'Document details') }}{% endblock %}
-{% block page_description %}
-  <p class="ts-page-header__description">
-    {{ document.get('description') or 'No description provided.' }}
-  </p>
-{% endblock %}
+{% block page_description %}{% endblock %}
 {% block page_actions %}
   {% set doc_id = document.get('id') %}
   {% if doc_id and 'document_views.edit_document_view' in url_map_endpoints %}

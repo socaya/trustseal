@@ -19,6 +19,9 @@ from app.models.system import Role, UserRole
 SESSION_AUTH_ALLOWED_PREFIXES = (
     "/api/tsd",
     "/api/tsd-stamps",
+    "/api/media-library",
+    "/api/letterheads",
+    "/api/signatures",
 )
 
 PUBLIC_ENDPOINTS = frozenset((

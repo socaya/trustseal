@@ -147,17 +147,20 @@ def verify_receipt(
 
 
 def canonicalize_inserted_svg(svg: str) -> str:
-    """Strip ``data-stamp-receipt-*`` attributes before hashing.
+    """Strip ``data-stamp-receipt-*`` attributes and covert forensic layer before hashing.
 
-    When the editor wraps the server SVG with a receipt id + nonce the
-    hashed form must exclude those attributes, or the SVG self-
-    references and verify would never match. Light string-level
-    scrubber (no XML parse needed).
+    When the editor wraps the server SVG with a receipt id + nonce and/or
+    embeds the TSD covert forensic `<g data-tsd-f="1">` layer, the hashed
+    form must exclude those layers so the visible artwork hash stays
+    deterministic and any post-issuance edit to the stamp artwork is
+    immediately detected.
     """
     import re as _re
+    from app.services.tsd_stamp_forensics import strip_forensic_svg_layer
 
+    cleaned = strip_forensic_svg_layer(svg or "")
     return _re.sub(
         r'\sdata-stamp-(?:receipt-id|receipt-nonce|placed-at|placed-by)="[^"]*"',
         '',
-        svg or '',
+        cleaned,
     ).strip()

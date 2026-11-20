@@ -481,6 +481,15 @@ def export_tsd_pdf(tsd_id: int):
         record_tsd_operation("export_pdf", "decrypt_failed")
         return jsonify({"error": "decrypt_failed", "message": str(exc)}), 500
 
+    page_size = payload.get("page_size") or None
+    orientation = payload.get("orientation") or None
+    margin_mm = payload.get("margin_mm")
+    if margin_mm is not None:
+        try:
+            margin_mm = int(margin_mm)
+        except (TypeError, ValueError):
+            margin_mm = None
+
     try:
         pdf_bytes = render_html_to_pdf(
             html=content.get("html") or "",
@@ -490,6 +499,9 @@ def export_tsd_pdf(tsd_id: int):
             tenant_id=row.organization_id,
             user_password=user_password,
             owner_password=owner_password,
+            page_size=page_size,
+            orientation=orientation,
+            margin_mm=margin_mm,
         )
     except PdfExportError as exc:
         record_tsd_operation("export_pdf", "render_failed")
@@ -1335,6 +1347,66 @@ def list_presence(tsd_id: int):
         }
         for (p, u) in rows
     ])
+
+
+# ============================================================ status & finalization
+
+
+@tsd_api.route("/<int:tsd_id>/status", methods=["POST"])
+@login_required
+def set_tsd_status(tsd_id: int):
+    """Transition a TSD status (e.g. draft -> finalized with official letterhead)."""
+    row = _owned(tsd_id)
+    if _share_permission(row) not in ("owner", "edit"):
+        abort(403, description="edit_permission_required")
+
+    payload = request.get_json(silent=True) or {}
+    target = (payload.get("status") or "").strip().lower()
+    allowed = {"draft", "in_review", "finalized", "signed", "archived"}
+    if target not in allowed:
+        return jsonify({"error": "invalid_status", "allowed": sorted(allowed)}), 400
+
+    # If caller sends updated letterhead-wrapped HTML alongside finalization, persist atomically.
+    raw_html = payload.get("content_html")
+    if isinstance(raw_html, str) and raw_html.strip():
+        safe_html = sanitize_html(raw_html)
+        tags_list = [t.strip() for t in (row.tags or "").split(",") if t.strip()]
+        extras = {}
+        if payload.get("letterhead_id"):
+            extras["letterhead_id"] = payload.get("letterhead_id")
+        try:
+            plaintext = pack_content(
+                html=safe_html,
+                description=row.description or "",
+                tags=tags_list,
+                extras=extras or None,
+            )
+            ciphertext = encrypt_content_envelope(
+                plaintext, organization_id=row.organization_id
+            )
+            row.ciphertext = ciphertext
+            row.ciphertext_sha256 = sha256_hex(ciphertext)
+            row.plaintext_bytes = len(plaintext)
+            row.version = (row.version or 1) + 1
+        except TSDError as exc:
+            return jsonify({"error": "encrypt_failed", "message": str(exc)}), 400
+
+    row.status = target
+    row.updated_at = datetime.utcnow()
+    _emit(
+        actor_id=current_user.id,
+        organization_id=row.organization_id,
+        action=f"tsd.status_{target}",
+        resource_id=row.id,
+        outcome="success",
+    )
+    db.session.commit()
+    return jsonify({
+        "id": row.id,
+        "status": row.status,
+        "version": row.version,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+    })
 
 
 # ============================================================ delete

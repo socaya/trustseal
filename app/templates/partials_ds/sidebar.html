@@ -100,6 +100,22 @@
       <path d="M4 7h12M4 12h12M4 17h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
       <path d="M18 6l2 2 3-3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
+  {% elif name == 'letterhead' %}
+    <svg class="ts-sidebar__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="4" y="3" width="16" height="18" stroke="currentColor" stroke-width="1.5"/>
+      <path d="M4 8h16M8 12h8M8 15.5h6M4 18.5h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+  {% elif name == 'media' %}
+    <svg class="ts-sidebar__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" stroke="currentColor" stroke-width="1.5"/>
+      <circle cx="8.5" cy="9.5" r="1.5" stroke="currentColor" stroke-width="1.5"/>
+      <path d="M4 17l5-5 4 4 3-3 4 4" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+    </svg>
+  {% elif name == 'contract' %}
+    <svg class="ts-sidebar__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M6 3h9l4 4v14H6V3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M9 10h6M9 14l2 2 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
   {% else %}
     <svg class="ts-sidebar__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.5"/>
@@ -111,34 +127,45 @@
   {
     "label": "Workspace",
     "items": [
-      {"endpoint": "system.main_views.home",        "label": "Overview",            "icon": "overview",     "key": "overview"},
-      {"endpoint": "tsd_views.library",             "label": "Documents",           "icon": "documents",    "key": "documents"},
-      {"endpoint": "tsd_stamps_views.library",      "label": "Stamps",              "icon": "stamp",        "key": "stamps"},
-      {"endpoint": "verify_views.verify_form",      "label": "Verification",        "icon": "verify",       "key": "verify"},
-      {"endpoint": "evidence_views.list_retentions","label": "Evidence & audit",    "icon": "evidence",     "key": "evidence"},
-      {"endpoint": "operator_notifications_views.list_notifications", "label": "Notifications", "icon": "notifications", "key": "notifications"}
+      {"endpoint": "system.main_views.home",                 "label": "Overview",              "icon": "overview",   "key": "overview"},
+      {"endpoint": "tsd_views.library",                      "label": "Documents",             "icon": "documents",  "key": "documents"},
+      {"endpoint": "workspace_assets_views.signed_contracts_page", "label": "Contracts",       "icon": "contract",   "key": "signed-contracts"},
+      {"endpoint": "workspace_assets_views.templates_hub_page",  "label": "Templates",             "icon": "templates",  "key": "templates"}
     ]
   },
   {
-    "label": "Management",
+    "label": "Brand & Assets",
     "items": [
-      {"endpoint": "document_party_views.view_document_parties", "label": "Contacts & parties", "icon": "contacts", "key": "contacts"},
-      {"endpoint": "organizations_bp.view_organizations", "label": "Organizations", "icon": "teams",     "key": "organizations"},
-      {"endpoint": "organizations_bp.view_clients",       "label": "Clients",       "icon": "contacts",  "key": "clients"}
+      {"endpoint": "tsd_stamps_views.library",               "label": "Stamps",                "icon": "stamp",      "key": "stamps"},
+      {"endpoint": "workspace_assets_views.letterheads_page","label": "Letterheads",           "icon": "letterhead", "key": "letterheads"},
+      {"endpoint": "workspace_assets_views.signatures_hub_page", "label": "Signatures",        "icon": "signature",  "key": "signatures"},
+      {"endpoint": "workspace_assets_views.media_page",      "label": "Media library",         "icon": "media",      "key": "media"}
+    ]
+  },
+  {
+    "label": "Trust & Compliance",
+    "items": [
+      {"endpoint": "verify_views.verify_form",               "label": "Verification",          "icon": "verify",     "key": "verify"},
+      {"endpoint": "tsd_stamps_views.verify_page",           "label": "Stamp forensics",       "icon": "stamp",      "key": "stamp-verify"},
+      {"endpoint": "evidence_views.list_retentions",         "label": "Evidence & retention",  "icon": "evidence",   "key": "evidence"},
+      {"endpoint": "audit_security_views.index",             "label": "Audit & security",      "icon": "audit",      "key": "audit"}
+    ]
+  },
+  {
+    "label": "Directory",
+    "items": [
+      {"endpoint": "document_party_views.view_document_parties", "label": "Contacts & parties","icon": "contacts",   "key": "contacts"},
+      {"endpoint": "organizations_bp.view_clients",          "label": "Clients",               "icon": "teams",      "key": "clients"}
     ]
   },
   {
     "label": "Administration",
     "items": [
-      {"endpoint": "admin_users_views.index",       "label": "Users & invitations", "icon": "users",         "key": "users"},
-      {"endpoint": "audit_security_views.index",    "label": "Audit & security",    "icon": "audit",         "key": "audit"},
-      {"endpoint": "integrations_views.index",      "label": "Integrations & API",  "icon": "integrations",  "key": "integrations"},
-      {"endpoint": "billing_views.index",           "label": "Subscriptions & billing","icon": "billing",    "key": "billing"},
-      {"endpoint": "system.view_roles",             "label": "Roles",               "icon": "settings",    "key": "roles"},
-      {"endpoint": "system.view_permissions",       "label": "Permissions",         "icon": "settings",    "key": "permissions"},
-      {"endpoint": "system.assign_user_role_view",  "label": "User-role assignments","icon": "users",      "key": "user-roles"},
-      {"endpoint": "system.system_settings_view",   "label": "Organization settings","icon": "settings",   "key": "settings"},
-      {"endpoint": "design_gallery_bp.gallery",     "label": "Design system",       "icon": "overview",    "key": "design"}
+      {"endpoint": "admin_users_views.index",                "label": "Users & access",        "icon": "users",      "key": "users"},
+      {"endpoint": "system.view_roles",                      "label": "Roles & permissions",   "icon": "settings",   "key": "roles"},
+      {"endpoint": "integrations_views.index",               "label": "Integrations & API",    "icon": "integrations","key": "integrations"},
+      {"endpoint": "billing_views.index",                    "label": "Subscriptions & billing","icon": "billing",   "key": "billing"},
+      {"endpoint": "system.system_settings_view",            "label": "Settings",              "icon": "settings",   "key": "settings"}
     ]
   }
 ] %}
@@ -157,6 +184,7 @@
         {% set rendered.count = rendered.count + 1 %}
         <a class="ts-sidebar__item"
            href="{{ href }}"
+           title="{{ item.label }}"
            {% if active_nav_item == item.key %}aria-current="page"{% endif %}>
           {{ icon(item.icon) }}
           <span class="ts-sidebar__text">{{ item.label }}</span>
@@ -165,9 +193,18 @@
       {% endif %}
     {% endfor %}
     {% if rendered.count == 0 %}
-      <span class="ts-sidebar__item" aria-disabled="true" style="color:var(--ts-text-muted);">
+      <span class="ts-sidebar__item" aria-disabled="true" style="color:rgba(203,217,236,0.45);">
         <span class="ts-sidebar__text">No authorized items</span>
       </span>
     {% endif %}
   </nav>
 {% endfor %}
+
+<div class="ts-sidebar__footer">
+  <button type="button" class="ts-sidebar__collapse" data-ts-rail-toggle title="Collapse sidebar">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>Collapse</span>
+  </button>
+</div>

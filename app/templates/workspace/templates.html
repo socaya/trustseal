@@ -1,0 +1,353 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'templates' %}
+
+{% block title %}Templates · TRUSTSEAL{% endblock %}
+{% block page_title %}Templates{% endblock %}
+{% block page_description %}{% endblock %}
+{% block page_actions %}
+  <a class="ts-btn" href="/letterheads">Letterheads Designer</a>
+  <a class="ts-btn" href="{{ url_for('tsd_stamps_views.templates_page') }}">Stamp Studio Templates</a>
+  <button type="button" class="ts-btn ts-btn--primary" id="dt-toggle-new">New custom template</button>
+{% endblock %}
+
+{% block content %}
+{% set total_all = (tsd_templates|length) + (templates|length) + (saved_letterheads|length) + (letterhead_presets|length) + (stamp_templates|length) %}
+{% set total_docs = (tsd_templates|length) + (templates|length) %}
+{% set total_lh = (saved_letterheads|length) + (letterhead_presets|length) %}
+{% set total_stamps = stamp_templates|length %}
+
+<div class="st-flat">
+  {% include "stamps/_flat_ui.html" %}
+
+  <section class="st-panel" id="dt-new-panel" hidden style="margin-bottom:18px;padding:16px 18px;">
+    <form method="post" action="{{ url_for('workspace_assets_views.templates_hub_page') }}" style="display:flex;flex-direction:column;gap:10px;">
+      <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:10px;">
+        <input type="text" name="name" required class="st-select" style="width:100%;background:#f6f8fb;" placeholder="Template name (e.g. NDA / Employment Contract)">
+        <input type="text" name="description" class="st-select" style="width:100%;background:#f6f8fb;" placeholder="Short description…">
+      </div>
+      <textarea name="content" rows="4" style="width:100%;box-sizing:border-box;padding:10px;border:0;background:#f6f8fb;font-size:13px;color:#091e42;outline:none;" placeholder="Starter document body HTML or text…"></textarea>
+      <div style="display:flex;gap:8px;">
+        <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Save template</button>
+        <button type="button" class="ts-btn ts-btn--sm" id="dt-cancel-new">Cancel</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="tpl-hub-bar">
+    <div class="tpl-tabs" role="tablist" aria-label="Template category">
+      <button type="button" class="tpl-tab is-active" data-tpl-tab="all">All Templates <span class="tpl-tab__n">{{ total_all }}</span></button>
+      <button type="button" class="tpl-tab" data-tpl-tab="tsd">TSD Documents <span class="tpl-tab__n">{{ total_docs }}</span></button>
+      <button type="button" class="tpl-tab" data-tpl-tab="letterhead">Letterheads <span class="tpl-tab__n">{{ total_lh }}</span></button>
+      <button type="button" class="tpl-tab" data-tpl-tab="stamp">Stamps <span class="tpl-tab__n">{{ total_stamps }}</span></button>
+    </div>
+    <div class="st-search" style="min-width:260px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+        <path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <input type="search" id="dt-search" placeholder="Search all document, letterhead & stamp templates…">
+    </div>
+  </section>
+
+  {# ==================== 1. TSD DOCUMENT TEMPLATES ==================== #}
+  <section class="tpl-section" data-tpl-section="tsd">
+    <header class="tpl-section__head">
+      <div>
+        <h2 class="tpl-section__title">TSD Document Templates</h2>
+        <p class="tpl-section__sub">Ready-to-edit agreements, corporate resolutions, letters, memos, and your organization's custom templates.</p>
+      </div>
+      <span class="tpl-section__badge">{{ total_docs }} available</span>
+    </header>
+
+    <div class="tpl-card-grid">
+      {% for bt in tsd_templates %}
+      <article class="tpl-card" data-tpl-item="tsd" data-hay="{{ (bt.name ~ ' ' ~ bt.category ~ ' ' ~ bt.description)|lower }}">
+        <div class="tpl-card__top">
+          <span class="tpl-card__kicker">{{ bt.category }}</span>
+          <span class="st-tag st-tag--ok">Built-in TSD</span>
+        </div>
+        <h3 class="tpl-card__title">{{ bt.name }}</h3>
+        <p class="tpl-card__desc">{{ bt.description }}</p>
+        <div class="tpl-card__foot">
+          <form method="post" action="{{ url_for('workspace_assets_views.use_builtin_tsd_template', slug=bt.slug) }}" style="margin:0;">
+            <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Use in TSD Editor →</button>
+          </form>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+
+    {% if templates %}
+    <div style="margin-top:16px;">
+      <h3 class="tpl-subhead">Organization Custom Templates ({{ templates|length }})</h3>
+      <div class="st-panel" style="overflow-x:auto;">
+        <table class="st-table">
+          <thead>
+            <tr>
+              <th>Template Name</th>
+              <th>Description</th>
+              <th>Creator</th>
+              <th>State</th>
+              <th>Created</th>
+              <th style="text-align:right;width:160px;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="dt-tbody">
+            {% for t in templates %}
+            {% set st = (t.state or 'draft')|lower %}
+            <tr data-id="{{ t.id }}" data-tpl-item="tsd" data-hay="{{ (t.name ~ ' ' ~ (t.description or '') ~ ' ' ~ st)|lower }}">
+              <td style="font-weight:600;">{{ t.name }}</td>
+              <td style="color:#42526e;">{{ t.description or '—' }}</td>
+              <td style="color:#42526e;">{{ creators.get(t.created_by, 'System') }}</td>
+              <td>
+                <span class="st-tag {% if st == 'published' %}st-tag--ok{% elif st == 'archived' %}st-tag--warn{% endif %}">{{ st|capitalize }}</span>
+              </td>
+              <td style="color:#7a869a;">{{ t.created_at.strftime('%Y-%m-%d') if t.created_at else '—' }}</td>
+              <td style="text-align:right;">
+                <form method="post" action="{{ url_for('workspace_assets_views.use_template_create_tsd', tpl_id=t.id) }}" style="display:inline;">
+                  <button type="submit" class="ts-btn ts-btn--sm" style="color:#002769;font-weight:600;">Use →</button>
+                </form>
+                <button type="button" class="dt-dots" data-dt-dots="{{ t.id }}" data-dt-name="{{ t.name }}" title="Actions">⋮</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  </section>
+
+  {# ==================== 2. LETTERHEAD TEMPLATES ==================== #}
+  <section class="tpl-section" data-tpl-section="letterhead">
+    <header class="tpl-section__head">
+      <div>
+        <h2 class="tpl-section__title">Letterhead Templates</h2>
+        <p class="tpl-section__sub">Saved organization letterheads and built-in executive stationery designs ready for TSD documents and PDF export.</p>
+      </div>
+      <span class="tpl-section__badge">{{ total_lh }} available</span>
+    </header>
+
+    <div class="tpl-card-grid">
+      {% for lh in saved_letterheads %}
+      {% set lay = lh.layout or {} %}
+      {% set pcol = lay.get('primary_color', '#002769') %}
+      {% set acol = lay.get('accent_color', '#02982E') %}
+      <article class="tpl-card" data-tpl-item="letterhead" data-hay="{{ (lh.name ~ ' ' ~ (lh.description or '') ~ ' saved letterhead')|lower }}">
+        <div class="tpl-lh-swatch" style="background:linear-gradient(135deg, {{ pcol }} 0%, {{ pcol }} 68%, {{ acol }} 100%);"></div>
+        <div class="tpl-card__top">
+          <span class="tpl-card__kicker">Saved Letterhead</span>
+          {% if lh.is_default %}<span class="st-tag st-tag--ok">Default</span>{% endif %}
+        </div>
+        <h3 class="tpl-card__title">{{ lh.name }}</h3>
+        <p class="tpl-card__desc">{{ lh.description or 'Organization letterhead configured in Letterheads Studio.' }}</p>
+        <div class="tpl-card__foot">
+          <a class="ts-btn ts-btn--primary ts-btn--sm" href="/letterheads?id={{ lh.id }}">Open in Designer →</a>
+          <a class="ts-btn ts-btn--sm" href="/api/letterheads/{{ lh.id }}/preview.pdf" target="_blank" rel="noopener">PDF</a>
+        </div>
+      </article>
+      {% endfor %}
+
+      {% for lp in letterhead_presets %}
+      {% set lay = lp.get('layout') or {} %}
+      {% set pcol = lay.get('primary_color', '#002769') %}
+      {% set acol = lay.get('accent_color', '#02982E') %}
+      <article class="tpl-card" data-tpl-item="letterhead" data-hay="{{ (lp.get('label', '') ~ ' ' ~ lp.get('category', '') ~ ' ' ~ lp.get('description', '') ~ ' letterhead')|lower }}">
+        <div class="tpl-lh-swatch" style="background:linear-gradient(135deg, {{ pcol }} 0%, {{ pcol }} 68%, {{ acol }} 100%);"></div>
+        <div class="tpl-card__top">
+          <span class="tpl-card__kicker">{{ lp.get('category', 'Letterhead') }}</span>
+          <span class="st-tag">Preset</span>
+        </div>
+        <h3 class="tpl-card__title">{{ lp.get('label') }}</h3>
+        <p class="tpl-card__desc">{{ lp.get('description', '') }}</p>
+        <div class="tpl-card__foot">
+          <a class="ts-btn ts-btn--sm" style="color:#002769;font-weight:600;" href="/letterheads?preset={{ lp.get('slug') }}">Customize in Designer →</a>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  {# ==================== 3. STAMP TEMPLATES ==================== #}
+  <section class="tpl-section" data-tpl-section="stamp">
+    <header class="tpl-section__head">
+      <div>
+        <h2 class="tpl-section__title">Official Stamp Templates</h2>
+        <p class="tpl-section__sub">Corporate seals, dated registry stamps, branded logo stamps, rubber approvals, and legal stamps.</p>
+      </div>
+      <span class="tpl-section__badge">{{ total_stamps }} available</span>
+    </header>
+
+    <div class="tpl-stamp-grid">
+      {% for st in stamp_templates %}
+      <article class="tpl-stamp-card" data-tpl-item="stamp" data-hay="{{ (st.name ~ ' ' ~ st.category ~ ' ' ~ st.kind ~ ' ' ~ st.description)|lower }}">
+        <div class="tpl-stamp-card__preview">{{ st.svg|safe }}</div>
+        <div class="tpl-stamp-card__meta">
+          <div class="tpl-card__top" style="margin-bottom:4px;">
+            <span class="tpl-card__kicker">{{ st.category }}</span>
+            <span class="st-tag">{{ st.kind|replace('_', ' ') }}</span>
+          </div>
+          <h3 class="tpl-card__title" style="font-size:13.5px;">{{ st.name }}</h3>
+          <p class="tpl-card__desc" style="font-size:11.5px;margin-bottom:10px;">{{ st.description }}</p>
+          <a class="ts-btn ts-btn--sm" style="color:#002769;font-weight:600;" href="/stamps/studio?template={{ st.slug }}">Open in Stamp Studio →</a>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+
+<div id="dt-ctx" class="dt-ctx" hidden role="menu">
+  <form id="dt-f-pub" method="post" style="margin:0;"><input type="hidden" name="state" value="published"><button type="submit" class="dt-ctx__item">Mark Published</button></form>
+  <form id="dt-f-drf" method="post" style="margin:0;"><input type="hidden" name="state" value="draft"><button type="submit" class="dt-ctx__item">Revert to Draft</button></form>
+  <form id="dt-f-arc" method="post" style="margin:0;"><input type="hidden" name="state" value="archived"><button type="submit" class="dt-ctx__item">Archive</button></form>
+  <div class="dt-ctx__sep"></div>
+  <form id="dt-f-del" method="post" style="margin:0;" onsubmit="return confirm('Delete this template?');"><button type="submit" class="dt-ctx__item dt-ctx__item--danger">Delete</button></form>
+</div>
+
+<style>
+.tpl-hub-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #dfe5ee;
+}
+.tpl-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tpl-tab {
+  border: 1px solid #d5dce6; background: #fff; color: #1d3648;
+  padding: 7px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px; border-radius: 0;
+}
+.tpl-tab:hover { background: #f3f6fb; border-color: #002769; }
+.tpl-tab.is-active { background: #002769; border-color: #002769; color: #fff; }
+.tpl-tab__n { font-size: 11px; opacity: 0.85; font-weight: 500; }
+
+.tpl-section { margin-bottom: 28px; }
+.tpl-section__head {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
+  margin-bottom: 14px;
+}
+.tpl-section__title { margin: 0; font-size: 16px; font-weight: 700; color: #091e42; }
+.tpl-section__sub { margin: 3px 0 0; font-size: 12.5px; color: #5a6676; }
+.tpl-section__badge { font-size: 11.5px; font-weight: 600; color: #002769; background: #edf2fa; padding: 3px 9px; }
+.tpl-subhead { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: #1d3648; text-transform: uppercase; letter-spacing: 0.04em; }
+
+.tpl-card-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px;
+}
+.tpl-card {
+  background: #fff; border: 1px solid #dfe5ee; padding: 14px 16px;
+  display: flex; flex-direction: column; position: relative;
+}
+.tpl-card:hover { border-color: #002769; }
+.tpl-lh-swatch { height: 6px; margin: -14px -16px 12px; }
+.tpl-card__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.tpl-card__kicker { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #5a6676; }
+.tpl-card__title { margin: 0 0 6px; font-size: 14.5px; font-weight: 700; color: #091e42; }
+.tpl-card__desc { margin: 0 0 14px; font-size: 12.5px; color: #42526e; line-height: 1.45; flex: 1; }
+.tpl-card__foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.tpl-stamp-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(235px, 1fr)); gap: 14px;
+}
+.tpl-stamp-card {
+  background: #fff; border: 1px solid #dfe5ee; padding: 14px;
+  display: flex; flex-direction: column;
+}
+.tpl-stamp-card:hover { border-color: #002769; }
+.tpl-stamp-card__preview {
+  height: 130px; display: flex; align-items: center; justify-content: center;
+  background: #fafbfd; border: 1px solid #eef2f7; margin-bottom: 12px; padding: 8px; overflow: hidden;
+}
+.tpl-stamp-card__preview svg { max-width: 100%; max-height: 112px; width: auto; height: auto; }
+.tpl-stamp-card__meta { display: flex; flex-direction: column; flex: 1; }
+
+.dt-dots {
+  border: 0; background: transparent; width: 26px; height: 26px;
+  color: #7a869a; cursor: pointer; font-size: 15px; vertical-align: middle;
+}
+.dt-dots:hover { background: rgba(15, 23, 42, 0.06); color: #091e42; }
+.dt-ctx {
+  position: fixed; z-index: 9500; min-width: 164px;
+  background: #ffffff; border: 1px solid #d5dce6;
+  box-shadow: 0 6px 18px rgba(16, 24, 40, 0.10);
+  padding: 4px 0; display: flex; flex-direction: column;
+}
+.dt-ctx[hidden] { display: none; }
+.dt-ctx__item {
+  width: 100%; border: 0; background: transparent; padding: 8px 14px; text-align: left;
+  font-size: 12.5px; color: #091e42; cursor: pointer;
+}
+.dt-ctx__item:hover { background: #f1f4f8; }
+.dt-ctx__item--danger { color: #9b2c2c; }
+.dt-ctx__item--danger:hover { background: #fff0f0; }
+.dt-ctx__sep { height: 1px; background: #ebeef2; margin: 4px 0; }
+</style>
+
+<script>
+(function () {
+  var panel = document.getElementById('dt-new-panel');
+  var togBtn = document.getElementById('dt-toggle-new');
+  var canBtn = document.getElementById('dt-cancel-new');
+  if (togBtn && panel) togBtn.addEventListener('click', function () { panel.hidden = !panel.hidden; });
+  if (canBtn && panel) canBtn.addEventListener('click', function () { panel.hidden = true; });
+
+  var activeTab = 'all';
+  var searchEl = document.getElementById('dt-search');
+  var sections = document.querySelectorAll('[data-tpl-section]');
+  var tabs = document.querySelectorAll('[data-tpl-tab]');
+
+  function applyFilter() {
+    var q = (searchEl && searchEl.value || '').trim().toLowerCase();
+    sections.forEach(function (sec) {
+      var kind = sec.getAttribute('data-tpl-section');
+      var tabMatch = (activeTab === 'all' || activeTab === kind);
+      var anyVisible = false;
+      sec.querySelectorAll('[data-tpl-item]').forEach(function (item) {
+        var hay = item.getAttribute('data-hay') || '';
+        var show = tabMatch && (!q || hay.indexOf(q) !== -1);
+        item.style.display = show ? '' : 'none';
+        if (show) anyVisible = true;
+      });
+      sec.style.display = (tabMatch && (anyVisible || !q)) ? '' : 'none';
+    });
+  }
+
+  tabs.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activeTab = btn.getAttribute('data-tpl-tab') || 'all';
+      tabs.forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+      applyFilter();
+    });
+  });
+  if (searchEl) searchEl.addEventListener('input', applyFilter);
+
+  var ctx = document.getElementById('dt-ctx');
+  var tbody = document.getElementById('dt-tbody');
+  if (ctx && tbody) {
+    function openCtx(id, x, y) {
+      document.getElementById('dt-f-pub').action = '/templates/' + id + '/status';
+      document.getElementById('dt-f-drf').action = '/templates/' + id + '/status';
+      document.getElementById('dt-f-arc').action = '/templates/' + id + '/status';
+      document.getElementById('dt-f-del').action = '/templates/' + id + '/delete';
+      ctx.hidden = false;
+      ctx.style.left = Math.max(8, Math.min(x, window.innerWidth - 172)) + 'px';
+      ctx.style.top = Math.max(8, Math.min(y, window.innerHeight - 160)) + 'px';
+    }
+    document.querySelectorAll('[data-dt-dots]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var r = btn.getBoundingClientRect();
+        openCtx(btn.getAttribute('data-dt-dots'), r.right - 164, r.bottom + 4);
+      });
+    });
+    tbody.querySelectorAll('tr').forEach(function (tr) {
+      tr.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+        openCtx(tr.dataset.id, e.clientX, e.clientY);
+      });
+    });
+    document.addEventListener('click', function (e) { if (!ctx.hidden && !ctx.contains(e.target)) ctx.hidden = true; });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') ctx.hidden = true; });
+  }
+})();
+</script>
+{% endblock %}
