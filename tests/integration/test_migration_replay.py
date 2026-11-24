@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 import uuid
 
 import pytest
@@ -60,7 +61,7 @@ def disposable_db():
 def _flask(cmd: list[str], env: dict[str, str]) -> subprocess.CompletedProcess:
     full_env = {**os.environ, **env}
     return subprocess.run(
-        ["flask", *cmd],
+        [sys.executable, "-m", "flask", *cmd],
         capture_output=True,
         text=True,
         env=full_env,

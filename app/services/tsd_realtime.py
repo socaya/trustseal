@@ -254,17 +254,102 @@ def _release_session(tsd_id: int) -> None:
             _DOC_CACHE.pop(tsd_id, None)
 
 
+def _extract_persisted_marks_html(html: str) -> str:
+    """Extract persisted stamp/signature mark blocks verbatim from stored TSD HTML.
+
+    ProseMirror's CRDT fragment only manages editable text blocks; stamps and
+    platform-attested signatures live in ``.tsd-persisted-marks`` (or
+    standalone ``.tsd-stamp-mark`` / ``.tsd-sig-block`` elements) outside the
+    ProseMirror schema. Slicing the original substrings preserves camelCase SVG
+    attributes (such as ``viewBox``) verbatim so signature digests still match.
+    """
+    from html.parser import HTMLParser
+
+    if not html or not any(
+        tok in html
+        for tok in ("tsd-persisted-marks", "data-tsd-marks", "tsd-stamp-mark", "tsd-sig-block")
+    ):
+        return ""
+
+    _VOID_TAGS = frozenset({"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"})
+
+    line_starts = [0]
+    for idx, ch in enumerate(html):
+        if ch == "\n":
+            line_starts.append(idx + 1)
+
+    def _abs_offset(lineno: int, col: int) -> int:
+        return line_starts[lineno - 1] + col
+
+    class _MarksExtractor(HTMLParser):
+        def __init__(self) -> None:
+            super().__init__(convert_charrefs=False)
+            self.fragments: list[str] = []
+            self._start_offset: int | None = None
+            self._depth: int = 0
+
+        def _is_mark_root(self, attrs: list[tuple[str, str | None]]) -> bool:
+            attr_map = dict(attrs)
+            if attr_map.get("data-tsd-marks"):
+                return True
+            classes = set((attr_map.get("class") or "").split())
+            return bool(classes & {"tsd-persisted-marks", "tsd-stamp-mark", "tsd-sig-block"})
+
+        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+            if self._depth == 0:
+                if self._is_mark_root(attrs):
+                    start = _abs_offset(*self.getpos())
+                    raw = self.get_starttag_text() or ""
+                    if tag.lower() in _VOID_TAGS:
+                        self.fragments.append(html[start:start + len(raw)])
+                    else:
+                        self._start_offset = start
+                        self._depth = 1
+                return
+            if tag.lower() not in _VOID_TAGS:
+                self._depth += 1
+
+        def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+            if self._depth == 0 and self._is_mark_root(attrs):
+                start = _abs_offset(*self.getpos())
+                raw = self.get_starttag_text() or ""
+                self.fragments.append(html[start:start + len(raw)])
+
+        def handle_endtag(self, tag: str) -> None:
+            if self._depth == 0:
+                return
+            self._depth -= 1
+            if self._depth == 0 and self._start_offset is not None:
+                pos = _abs_offset(*self.getpos())
+                end = html.find(">", pos)
+                if end != -1:
+                    self.fragments.append(html[self._start_offset:end + 1])
+                self._start_offset = None
+
+    parser = _MarksExtractor()
+    parser.feed(html)
+    parser.close()
+    return "".join(parser.fragments)
+
+
 def _snapshot_session(sess: CrdtSession, *, force: bool = False) -> bool:
     """Write the merged CRDT plaintext back to the encrypted TSD.
 
     Respects :data:`SNAPSHOT_DEBOUNCE_SECONDS` unless ``force`` is set.
     Uses the existing format sanitize + encrypt + version-snapshot path
     so Y.js co-editing lands in the same audit trail as HTTP autosave.
+    Preserves persisted stamp/signature marks from the stored document and
+    enforces platform signature attestation before writing.
     """
     from app.models.tsd_document import TSDocument
     from app.models.tsd_document_version import TSDocumentVersion
+    from app.services.signature_attestations import (
+        SignatureAttestationError,
+        extract_signature_markers,
+        validate_document_signatures,
+    )
     from app.services.tsd_format import (
-        encrypt_content_envelope, pack_content, sanitize_html, sha256_hex,
+        decrypt_content_envelope, encrypt_content_envelope, pack_content, sanitize_html, sha256_hex,
     )
 
     if not sess.dirty:
@@ -273,11 +358,42 @@ def _snapshot_session(sess: CrdtSession, *, force: bool = False) -> bool:
     if not force and (now - sess.last_snapshot_at).total_seconds() < SNAPSHOT_DEBOUNCE_SECONDS:
         return False
 
-    doc = TSDocument.query.get(sess.tsd_id)
+    doc = db.session.get(TSDocument, sess.tsd_id)
     if doc is None or doc.deleted_at is not None:
         return False
 
+    previous_html = ""
+    allowed_legacy: set[tuple[int, int]] = set()
+    try:
+        previous = decrypt_content_envelope(
+            doc.ciphertext, organization_id=doc.organization_id
+        )
+        previous_html = previous.get("html") or ""
+        for marker in extract_signature_markers(previous_html):
+            if not marker.digest or not marker.attestation:
+                allowed_legacy.add(marker.legacy_key)
+    except Exception as exc:
+        log.warning("Could not read prior TSD content before CRDT snapshot for %s: %s", doc.id, exc)
+
     html = sanitize_html(sess.current_html() or "")
+    if previous_html and not any(
+        tok in html for tok in ("tsd-persisted-marks", "data-tsd-marks", "tsd-stamp-mark", "tsd-sig-block")
+    ):
+        preserved_marks = _extract_persisted_marks_html(previous_html)
+        if preserved_marks:
+            html = html + preserved_marks
+
+    try:
+        validate_document_signatures(
+            html=html,
+            organization_id=doc.organization_id,
+            document_id=doc.id,
+            allowed_legacy=allowed_legacy,
+        )
+    except SignatureAttestationError as exc:
+        log.warning("Rejected CRDT snapshot for TSD %s due to invalid signature: %s", doc.id, exc)
+        return False
+
     plaintext = pack_content(html=html, description=doc.description,
                              tags=[t for t in (doc.tags or "").split(",") if t.strip()])
     ciphertext = encrypt_content_envelope(plaintext, organization_id=doc.organization_id)

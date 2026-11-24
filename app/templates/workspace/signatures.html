@@ -15,7 +15,7 @@
 
   <!-- Security Notice Banner -->
   <div class="sig-sec-banner">
-    <strong>Zero-Copy Protected Vault:</strong> Only <strong>Approved</strong> signatures can be applied to documents. Every usage is logged and requires <strong>Owner OTP Approval</strong>. Copying, screenshots, and camera snapshots are actively blocked.
+    <strong>Platform-verified signature vault:</strong> Signature graphics are never exposed on this page. Only <strong>Approved</strong> signatures can be applied after <strong>Owner OTP Approval</strong>; TrustSeal then validates a tenant-keyed attestation automatically whenever the document is saved.
   </div>
 
   <!-- Tab bar: Authorized Signatories | Usage & OTP Audit Log -->
@@ -154,22 +154,14 @@
     <div class="sig-reg-grid" id="sig-reg-grid">
       {% for s in registered_signatures %}
       <article class="sig-card" data-hay="{{ (s.staff_name ~ ' ' ~ s.staff_email ~ ' ' ~ s.name ~ ' ' ~ s.approval_status ~ ' ' ~ s.capture_engine)|lower }}">
-        <!-- Anti-Copy / Anti-Screenshot / Anti-Camera Protected Preview -->
-        <div class="sig-card__preview ts-sig-protected" data-sig-shield="1">
-          <div class="ts-sig-graphic">
-            {% if s.signature_data.startswith('data:image/') or s.signature_data.startswith('/static/') %}
-              <img src="{{ s.signature_data }}" alt="Protected Signature" draggable="false">
-            {% elif '<svg' in s.signature_data %}
-              {{ s.signature_data|safe }}
-            {% else %}
-              <span style="font-family:Georgia,serif;font-style:italic;font-size:24px;color:#002769;">{{ s.signature_data }}</span>
-            {% endif %}
-          </div>
-          <div class="ts-sig-curtain" aria-hidden="true">
-            <span class="ts-sig-curtain__badge">PROTECTED · ANTI-CAPTURE SHIELD</span>
-            <span class="ts-sig-curtain__sub">Hold "Verify" to peek · No Copy / Screenshot / Photo</span>
-          </div>
-          <div class="ts-sig-wm" aria-hidden="true">CONFIDENTIAL · {{ current_user_email }} · DO NOT COPY</div>
+        <!-- No signature pixels are sent to the registry page. -->
+        <div class="sig-card__preview ts-sig-sealed" aria-label="Signature graphic sealed; verification is performed by TrustSeal">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="5" y="10" width="14" height="10" rx="1" stroke="currentColor" stroke-width="1.7"/>
+            <path d="M8 10V7a4 4 0 0 1 8 0v3M9 15l2 2 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <strong>SEALED BY TRUSTSEAL</strong>
+          <span>Platform verification only · Graphic preview disabled</span>
         </div>
 
         <div class="sig-card__meta">
@@ -188,7 +180,7 @@
             {{ s.staff_email }} · {{ s.capture_engine|replace('_', ' ')|upper }}{% if s.device_name %} ({{ s.device_name }}){% endif %}
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-top:auto;">
-            <button type="button" class="ts-btn ts-btn--sm ts-sig-peek-btn" title="Press and hold to momentarily inspect">Hold to Verify</button>
+            <span class="ts-sig-platform-badge">TS VERIFIED</span>
             <div style="display:inline-flex;gap:5px;flex-wrap:wrap;">
               {% if s.approval_status != 'approved' %}
               <form method="post" action="{{ url_for('workspace_assets_views.approve_staff_signature', sig_id=s.id) }}" style="margin:0;">
@@ -320,41 +312,17 @@
 .sig-card:hover { border-color: #002769; }
 .sig-card__meta { display: flex; flex-direction: column; flex: 1; }
 
-/* Hardened Anti-Copy, Anti-Screenshot & Anti-Camera Blur Shield */
-.ts-sig-protected {
+/* The registry never receives signature pixels; it renders a sealed state. */
+.ts-sig-sealed {
   position: relative; height: 112px; display: flex; align-items: center; justify-content: center;
-  background: #fafbfd; border: 1px solid #dfe5ee; margin-bottom: 12px; padding: 8px; overflow: hidden;
-  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  flex-direction: column; gap: 5px; color: #002769;
+  background: repeating-linear-gradient(-35deg, rgba(0,39,105,0.06) 0 4px, #fafbfd 4px 9px);
+  border: 1px solid #dfe5ee; margin-bottom: 12px; padding: 8px; overflow: hidden;
+  user-select: none; -webkit-user-select: none;
 }
-.ts-sig-graphic {
-  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
-  pointer-events: none;
-  filter: blur(18px) saturate(0.15) contrast(0.5);
-  transition: filter 0.12s ease;
-}
-.ts-sig-graphic img, .ts-sig-graphic svg { max-width: 100%; max-height: 88px; width: auto; height: auto; pointer-events: none; }
-.ts-sig-curtain {
-  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  background: repeating-linear-gradient(-35deg, rgba(0,39,105,0.08) 0 4px, rgba(255,255,255,0.72) 4px 8px);
-  pointer-events: none; text-align: center; padding: 6px;
-}
-.ts-sig-curtain__badge { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; color: #002769; background: rgba(255,255,255,0.92); padding: 2px 7px; border: 1px solid #cbd5e1; }
-.ts-sig-curtain__sub { font-size: 9.5px; color: #42526e; }
-.ts-sig-wm {
-  position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
-  transform: rotate(-14deg); font-size: 9.5px; font-weight: 800; letter-spacing: 0.1em;
-  color: rgba(0, 39, 105, 0.24); pointer-events: none; white-space: nowrap;
-}
-.ts-sig-protected.is-peeking .ts-sig-graphic { filter: none; }
-.ts-sig-protected.is-peeking .ts-sig-curtain { display: none; }
-.ts-sig-protected.is-peeking .ts-sig-wm { display: flex; }
-
-/* Aggressive global capture lockdown when screenshot/blur/print detected */
-body.ts-capture-lock .ts-sig-graphic { filter: blur(28px) contrast(0.2) !important; opacity: 0.15 !important; }
-body.ts-capture-lock .ts-sig-curtain { display: flex !important; background: #091e42 !important; color: #fff !important; }
-@media print {
-  .ts-sig-graphic { filter: blur(28px) !important; opacity: 0 !important; }
-}
+.ts-sig-sealed strong { font-size: 10.5px; letter-spacing: 0.08em; }
+.ts-sig-sealed span { font-size: 10px; color: #5a6676; }
+.ts-sig-platform-badge { font-size: 10px; color: #17633a; background: #e6f6ec; padding: 3px 7px; font-weight: 800; letter-spacing: 0.05em; }
 </style>
 
 <script>
@@ -385,44 +353,6 @@ body.ts-capture-lock .ts-sig-curtain { display: flex !important; background: #09
       });
     });
   }
-
-  // ---- Hardened Anti-Copy, Anti-Screenshot & Anti-Camera Shield ----
-  function lockShields() {
-    document.querySelectorAll('.ts-sig-protected.is-peeking').forEach(function (el) { el.classList.remove('is-peeking'); });
-    document.body.classList.add('ts-capture-lock');
-  }
-  function unlockShields() {
-    document.body.classList.remove('ts-capture-lock');
-  }
-  window.addEventListener('blur', lockShields);
-  document.addEventListener('visibilitychange', function () { if (document.hidden) lockShields(); else unlockShields(); });
-  window.addEventListener('focus', unlockShields);
-  document.addEventListener('keydown', function (e) {
-    var isShot = e.key === 'PrintScreen' ||
-      ((e.metaKey || e.ctrlKey) && e.shiftKey && ['3', '4', '5', 's', 'S'].indexOf(e.key) !== -1) ||
-      ((e.metaKey || e.ctrlKey) && (e.key === 'p' || e.key === 'P'));
-    if (isShot) {
-      lockShields();
-      if (e.key === 'PrintScreen' || ((e.metaKey || e.ctrlKey) && (e.key === 'p' || e.key === 'P'))) e.preventDefault();
-      setTimeout(unlockShields, 1800);
-    }
-  });
-  document.querySelectorAll('.ts-sig-protected').forEach(function (box) {
-    ['contextmenu', 'copy', 'cut', 'dragstart', 'selectstart'].forEach(function (ev) {
-      box.addEventListener(ev, function (e) { e.preventDefault(); });
-    });
-  });
-  document.querySelectorAll('.ts-sig-peek-btn').forEach(function (btn) {
-    var card = btn.closest('.sig-card');
-    var shield = card && card.querySelector('.ts-sig-protected');
-    if (!shield) return;
-    function startPeek() { unlockShields(); shield.classList.add('is-peeking'); }
-    function stopPeek() { shield.classList.remove('is-peeking'); }
-    btn.addEventListener('pointerdown', startPeek);
-    btn.addEventListener('pointerup', stopPeek);
-    btn.addEventListener('pointerleave', stopPeek);
-    btn.addEventListener('pointercancel', stopPeek);
-  });
 
   // ---- Capture Mode & Connected Signature Device / Stylus Pen / TS HQ Engine ----
   var activeMode = 'stylus_pen';

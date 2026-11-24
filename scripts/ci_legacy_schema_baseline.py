@@ -30,12 +30,23 @@ from app.extensions import db
 LEGACY_HEAD_REVISION = "1856829bd7b1"
 MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations" / "versions"
 _TABLE_RE = re.compile(r"""op\.create_table\(\s*["']([^"']+)["']""")
-_REV_RE = re.compile(r"""^revision\s*=\s*["']([^"']+)["']""", re.MULTILINE)
-_DOWN_RE = re.compile(r"""^down_revision\s*=\s*["']([^"']+)["']""", re.MULTILINE)
+_REV_RE = re.compile(r"""^revision\s*(?::[^=]+)?=\s*["']([^"']+)["']""", re.MULTILINE)
+_DOWN_LINE_RE = re.compile(r"""^down_revision\s*(?::[^=]+)?=\s*(.+)$""", re.MULTILINE)
+_QUOTED_STR_RE = re.compile(r"""["']([^"']+)["']""")
+
+
+def _parse_down_revisions(text: str) -> list[str]:
+    match = _DOWN_LINE_RE.search(text)
+    if match is None:
+        return []
+    rhs = match.group(1).strip()
+    if rhs.startswith("None"):
+        return []
+    return _QUOTED_STR_RE.findall(rhs)
 
 
 def _load_migration_graph() -> dict[str, dict]:
-    """Return ``{revision: {"down": str | None, "tables": [str, ...]}}``."""
+    """Return ``{revision: {"downs": [str, ...], "tables": [str, ...]}}``."""
     graph: dict[str, dict] = {}
     for path in MIGRATIONS_DIR.glob("*.py"):
         if path.name == "__init__.py":
@@ -44,32 +55,37 @@ def _load_migration_graph() -> dict[str, dict]:
         rev = _REV_RE.search(text)
         if rev is None:
             continue
-        down = _DOWN_RE.search(text)
         graph[rev.group(1)] = {
-            "down": down.group(1) if down else None,
+            "downs": _parse_down_revisions(text),
             "tables": _TABLE_RE.findall(text),
         }
     return graph
 
 
 def _descendants_of(root: str, graph: dict[str, dict]) -> set[str]:
-    """Return the set of revisions reachable from ``root`` via ``down``.
+    """Return the set of revisions reachable from ``root`` via ``downs``.
 
-    Every revision whose chain passes through ``root`` (exclusive) is
-    considered a descendant. The script treats ``1856829bd7b1`` as the
-    legacy ceiling — anything in its downstream set created trust-
-    service tables that CI must NOT pre-create.
+    Every revision whose ancestry passes through ``root`` (exclusive),
+    including merge revisions with tuple ``down_revision``, is considered a
+    descendant. The script treats ``1856829bd7b1`` as the legacy ceiling —
+    anything in its downstream set created trust-service tables that CI must
+    NOT pre-create.
     """
     out: set[str] = set()
     for rev, meta in graph.items():
         if rev == root:
             continue
-        cursor = meta["down"]
-        while cursor is not None:
+        stack = list(meta["downs"])
+        visited: set[str] = set()
+        while stack:
+            cursor = stack.pop()
             if cursor == root:
                 out.add(rev)
                 break
-            cursor = graph.get(cursor, {}).get("down")
+            if cursor in visited:
+                continue
+            visited.add(cursor)
+            stack.extend(graph.get(cursor, {}).get("downs", []))
     return out
 
 

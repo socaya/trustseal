@@ -97,6 +97,7 @@
       <div class="ts-ed__vruler" id="tsd-vruler" aria-hidden="true"></div>
       <div class="ts-ed__page" id="tsd-page" data-watermark="">
         <div id="tsd-lh-design-layer" class="tsd-lh-design-layer" aria-hidden="true"></div>
+        <div id="tsd-page-breaks-layer" class="tsd-page-breaks-layer" aria-hidden="true"></div>
         <div class="ts-ed__printable" id="tsd-printable" style="position:relative;z-index:1;">
           <div id="tsd-surface" class="ts-ed__editable"
                contenteditable="true"
@@ -135,7 +136,7 @@
   {# ======================= 6. STATUS BAR (24px) ======================= #}
   <footer class="ts-ed__statusbar">
     <div>
-      <span>Page 1 of 1</span>
+      <span id="tsd-sb-pages">Page 1 of 1</span>
       <span id="tsd-sb-pagesize">A4 (210 × 297 mm)</span>
       <span id="tsd-wordcount">0 words</span>
       <button type="button" id="tsd-pf-restore" hidden style="border:0;background:transparent;color:#002769;font-size:10.5px;font-weight:600;cursor:pointer;padding:0 4px;">+ Restore footer</button>
@@ -770,6 +771,21 @@
 .tsd-lh-design-layer {
   position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 0;
 }
+.tsd-page-breaks-layer {
+  position: absolute; inset: 0; pointer-events: none; z-index: 3;
+}
+.tsd-page-break-band {
+  position: absolute; left: -1px; right: -1px; height: 28px;
+  background: var(--ed-bg, #eef2f6);
+  border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1;
+  box-shadow: inset 0 4px 7px -5px rgba(15,23,42,0.18), inset 0 -4px 7px -5px rgba(15,23,42,0.12);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 18px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em;
+  color: #64748b; text-transform: uppercase; box-sizing: border-box;
+}
+@media print {
+  .tsd-page-breaks-layer { display: none !important; }
+}
 .ts-ed__pagefooter {
   position: absolute; bottom: 30px;
   left: var(--ed-margx); right: var(--ed-margx);
@@ -1394,6 +1410,7 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
 
   var tsdId   = shell.dataset.tsdId ? parseInt(shell.dataset.tsdId, 10) : null;
   var version = shell.dataset.tsdVersion ? parseInt(shell.dataset.tsdVersion, 10) : null;
+  var _contentReady = !tsdId;
 
   var pageSize    = 'a4';
   var pageOrient  = 'portrait';
@@ -1422,6 +1439,17 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
     var text = editor.innerText || '';
     var words = text.trim().split(/\s+/).filter(Boolean).length;
     wordCountEl.textContent = words + ' word' + (words === 1 ? '' : 's');
+  }
+  function serializeNativeEditorHtml() {
+    var clone = editor.cloneNode(true);
+    clone.querySelectorAll('[data-tsd-auto-page-offset]').forEach(function (el) {
+      var original = el.getAttribute('data-tsd-auto-page-original-style');
+      if (original === null || original === '') el.removeAttribute('style');
+      else el.setAttribute('style', original);
+      el.removeAttribute('data-tsd-auto-page-offset');
+      el.removeAttribute('data-tsd-auto-page-original-style');
+    });
+    return clone.innerHTML || '';
   }
 
   // ===================================================================== RIBBON
@@ -1854,33 +1882,20 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
     drawer.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #e2e8f0;">' +
         '<div><strong style="font-size:13px;color:#091e42;">Sign Inserted Stamp</strong>' +
-        '<div style="font-size:11px;color:#5a6676;">Sign directly (one-time, not stored) or load an approved signature.</div></div>' +
+        '<div style="font-size:11px;color:#5a6676;">Only owner-authorized, platform-attested signatures can be applied.</div></div>' +
         '<button type="button" id="tsd-ssd-close" style="border:0;background:transparent;font-size:16px;cursor:pointer;color:#64748b;padding:2px 6px;">✕</button>' +
       '</div>' +
       '<div style="display:flex;gap:6px;padding:10px 14px;background:#f6f8fb;border-bottom:1px solid #e2e8f0;">' +
-        '<button type="button" class="tsd-ssd-tab is-active" data-ssd-tab="direct" style="flex:1;padding:6px 8px;border:1px solid #002769;background:#002769;color:#fff;font-size:11.5px;font-weight:600;cursor:pointer;">Sign Directly (One-Time)</button>' +
-        '<button type="button" class="tsd-ssd-tab" data-ssd-tab="registered" style="flex:1;padding:6px 8px;border:1px solid #cbd5e1;background:#fff;color:#1d3648;font-size:11.5px;font-weight:600;cursor:pointer;">Load Registered (OTP)</button>' +
+        '<strong style="font-size:11.5px;color:#002769;">Registered signature · Owner OTP · TS platform attestation</strong>' +
       '</div>' +
-      '<div id="tsd-ssd-direct" style="padding:14px;display:flex;flex-direction:column;gap:10px;flex:1;overflow-y:auto;">' +
-        '<div style="font-size:11px;color:#1d3648;background:#edf2fa;border-left:3px solid #002769;padding:6px 9px;">' +
-          '<strong>Zero-Storage Direct Sign:</strong> Captured via TS High-Quality Pressure Signature Engine and applied to this stamp only — never saved for future reuse.' +
-        '</div>' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
-          '<select id="tsd-ssd-ink" style="border:1px solid #cbd5e1;padding:4px 7px;font-size:11.5px;background:#fff;color:#091e42;">' +
-            '<option value="#002769">TrustSeal Navy</option>' +
-            '<option value="#091e42">Executive Black</option>' +
-            '<option value="#1d3648">Slate Ink</option>' +
-          '</select>' +
-          '<button type="button" id="tsd-ssd-clear" style="border:1px solid #cbd5e1;background:#fff;padding:4px 9px;font-size:11.5px;cursor:pointer;color:#1d3648;">Clear</button>' +
-        '</div>' +
-        '<canvas id="tsd-ssd-canvas" width="380" height="150" style="width:100%;height:150px;background:#fafbfd;border:1px dashed #94a3b8;cursor:crosshair;touch-action:none;display:block;"></canvas>' +
-        '<div id="tsd-ssd-tele" style="font-size:10.5px;color:#64748b;">Sign with stylus pen, connected pad, or mouse…</div>' +
-        '<button type="button" id="tsd-ssd-apply" style="padding:8px 12px;background:#02982E;color:#fff;border:0;font-size:12px;font-weight:700;cursor:pointer;">Apply Direct Signature to Stamp</button>' +
-      '</div>' +
-      '<div id="tsd-ssd-registered" hidden style="padding:14px;display:flex;flex-direction:column;gap:10px;flex:1;overflow-y:auto;font-size:12px;color:#5a6676;">Loading approved signatures…</div>';
+      '<div id="tsd-ssd-registered" style="padding:14px;display:flex;flex-direction:column;gap:10px;flex:1;overflow-y:auto;font-size:12px;color:#5a6676;">Loading approved signatures…</div>';
     document.body.appendChild(drawer);
 
-    function applyGraphicToStamp(sigData, labelNote) {
+    function applyGraphicToStamp(sigData, labelNote, attestation) {
+      if (!attestation || !attestation.signature_attestation || !attestation.signature_digest) {
+        if (typeof showToast === 'function') showToast('TrustSeal attestation required; signature was not applied.');
+        return;
+      }
       var curSvg = stampEl.querySelector('svg');
       if (!curSvg) return;
       var updatedMarkup = _embedSignatureIntoStampSvg(curSvg.outerHTML, sigData);
@@ -1891,79 +1906,18 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
         newSvg.style.cssText = curSvg.style.cssText || 'display:block;width:168px;max-width:100%;height:auto;overflow:visible;';
         curSvg.replaceWith(newSvg);
         stampEl.classList.add('ts-sig-doc-protected');
+        stampEl.setAttribute('data-tsd-sig-id', String(attestation.signature_id));
+        stampEl.setAttribute('data-tsd-sig-usage', String(attestation.usage_log_id));
+        stampEl.setAttribute('data-tsd-sig-digest', attestation.signature_digest);
+        stampEl.setAttribute('data-tsd-sig-attestation', attestation.signature_attestation);
         scheduleSave();
+        setTimeout(save, 0);
         if (typeof showToast === 'function') showToast(labelNote || 'Signature applied to stamp.');
       }
       drawer.remove();
     }
 
     document.getElementById('tsd-ssd-close').addEventListener('click', function () { drawer.remove(); });
-    drawer.querySelectorAll('[data-ssd-tab]').forEach(function (tabBtn) {
-      tabBtn.addEventListener('click', function () {
-        var t = tabBtn.getAttribute('data-ssd-tab');
-        drawer.querySelectorAll('[data-ssd-tab]').forEach(function (b) {
-          var on = b === tabBtn;
-          b.style.background = on ? '#002769' : '#fff';
-          b.style.color = on ? '#fff' : '#1d3648';
-          b.style.borderColor = on ? '#002769' : '#cbd5e1';
-        });
-        document.getElementById('tsd-ssd-direct').hidden = (t !== 'direct');
-        document.getElementById('tsd-ssd-registered').hidden = (t !== 'registered');
-      });
-    });
-
-    // Direct TS HQ Pressure Signature Canvas (one-time, never stored)
-    var cvs = document.getElementById('tsd-ssd-canvas');
-    var c2d = cvs.getContext('2d');
-    var inkSel = document.getElementById('tsd-ssd-ink');
-    var tele = document.getElementById('tsd-ssd-tele');
-    var strokes = [];
-    var cur = null;
-    function cpt(e) {
-      var r = cvs.getBoundingClientRect();
-      var p = (typeof e.pressure === 'number' && e.pressure > 0 && e.pressure <= 1) ? e.pressure : 0.5;
-      return { x: (e.clientX - r.left) * (cvs.width / r.width), y: (e.clientY - r.top) * (cvs.height / r.height), p: p, pt: e.pointerType || 'mouse' };
-    }
-    cvs.addEventListener('pointerdown', function (e) {
-      var p = cpt(e);
-      cur = [p]; strokes.push(cur);
-      cvs.setPointerCapture(e.pointerId);
-      tele.textContent = 'Input: ' + p.pt.toUpperCase() + ' · Pressure: ' + Math.round(p.p * 100) + '%';
-    });
-    cvs.addEventListener('pointermove', function (e) {
-      if (!cur) return;
-      var p = cpt(e), prev = cur[cur.length - 1];
-      cur.push(p);
-      c2d.strokeStyle = inkSel.value || '#002769';
-      c2d.lineCap = 'round'; c2d.lineJoin = 'round';
-      c2d.lineWidth = Math.max(1.2, Math.min(4.8, 1.3 + p.p * 3.1));
-      c2d.beginPath(); c2d.moveTo(prev.x, prev.y); c2d.lineTo(p.x, p.y); c2d.stroke();
-    });
-    cvs.addEventListener('pointerup', function () { cur = null; });
-    document.getElementById('tsd-ssd-clear').addEventListener('click', function () {
-      c2d.clearRect(0, 0, cvs.width, cvs.height); strokes = []; cur = null;
-    });
-    document.getElementById('tsd-ssd-apply').addEventListener('click', function () {
-      if (!strokes.length) { alert('Please draw your signature first.'); return; }
-      var ink = inkSel.value || '#002769';
-      var minX = 9999, minY = 9999, maxX = 0, maxY = 0;
-      strokes.forEach(function (st) { st.forEach(function (pt) { if (pt.x < minX) minX = pt.x; if (pt.y < minY) minY = pt.y; if (pt.x > maxX) maxX = pt.x; if (pt.y > maxY) maxY = pt.y; }); });
-      var pad = 10, vx = Math.max(0, Math.floor(minX - pad)), vy = Math.max(0, Math.floor(minY - pad));
-      var vw = Math.max(60, Math.ceil(maxX - minX + pad * 2)), vh = Math.max(30, Math.ceil(maxY - minY + pad * 2));
-      var paths = strokes.map(function (st) {
-        if (st.length < 2) return '<circle cx="' + st[0].x.toFixed(1) + '" cy="' + st[0].y.toFixed(1) + '" r="1.8" fill="' + ink + '"/>';
-        var d = 'M ' + st[0].x.toFixed(1) + ' ' + st[0].y.toFixed(1), ap = 0;
-        for (var i = 1; i < st.length; i++) {
-          var mx = ((st[i - 1].x + st[i].x) / 2).toFixed(1), my = ((st[i - 1].y + st[i].y) / 2).toFixed(1);
-          d += ' Q ' + st[i - 1].x.toFixed(1) + ' ' + st[i - 1].y.toFixed(1) + ' ' + mx + ' ' + my;
-          ap += st[i].p;
-        }
-        var sw = Math.max(1.5, Math.min(4.0, 1.5 + (ap / (st.length - 1)) * 2.4)).toFixed(2);
-        return '<path d="' + d + '" fill="none" stroke="' + ink + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>';
-      }).join('');
-      var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + vx + ' ' + vy + ' ' + vw + ' ' + vh + '" width="220" height="72" data-ts-direct-sig="1">' + paths + '</svg>';
-      applyGraphicToStamp(svg, 'Direct one-time signature applied to stamp (not stored).');
-    });
 
     // Load Registered Signatures (OTP-verified)
     fetch('/api/signatures/registered', { credentials: 'same-origin' })
@@ -1972,7 +1926,7 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
         var box = document.getElementById('tsd-ssd-registered');
         var sigs = (d && d.signatures) || [];
         if (!sigs.length) {
-          box.innerHTML = '<div style="padding:14px;border:1px dashed #cbd5e1;text-align:center;">No approved signatures registered yet. Use <strong>Sign Directly</strong> or register under <a href="/signatures" target="_blank">Brand &amp; Assets → Signatures</a>.</div>';
+          box.innerHTML = '<div style="padding:14px;border:1px dashed #cbd5e1;text-align:center;">No approved signatures registered yet. Register one under <a href="/signatures" target="_blank">Brand &amp; Assets → Signatures</a>.</div>';
           return;
         }
         box.innerHTML = '';
@@ -2003,7 +1957,7 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
                     headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
                     body: JSON.stringify({ otp: code }),
                   }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); })
-                    .then(function (ver) { applyGraphicToStamp(ver.signature_data, 'OTP-verified signature applied to stamp (#' + ver.usage_log_id + ').'); })
+                    .then(function (ver) { applyGraphicToStamp(ver.signature_data, 'OTP-verified, TS-attested signature applied to stamp (#' + ver.usage_log_id + ').', ver); })
                     .catch(function (err) { alert(err.message); });
                 });
               }).catch(function (err) { z.textContent = err.message; });
@@ -2409,6 +2363,7 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
       }
       try { node.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) {}
       scheduleSave();
+      setTimeout(save, 0);
     }
 
     document.getElementById('tsd-sig-close').addEventListener('click', function () { drawer.remove(); });
@@ -2496,7 +2451,7 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
                           ? '<div style="max-width:220px;line-height:0;margin-bottom:2pt;pointer-events:none;user-select:none;">' + ver.signature_data + '</div>'
                           : '<div style="font-family:Georgia,serif;font-style:italic;font-size:22pt;color:#002769;user-select:none;">' + String(ver.staff_name || '').replace(/</g, '&lt;') + '</div>');
                       placeSigNode(
-                        '<div class="tsd-sig-block ts-sig-doc-protected" data-tsd-sig-id="' + ver.signature_id + '" data-tsd-sig-usage="' + ver.usage_log_id + '" contenteditable="false" oncontextmenu="return false;" style="margin:14pt 0 8pt;display:inline-block;vertical-align:bottom;min-width:200pt;user-select:none;-webkit-user-select:none;">' +
+                        '<div class="tsd-sig-block ts-sig-doc-protected" data-tsd-sig-id="' + ver.signature_id + '" data-tsd-sig-usage="' + ver.usage_log_id + '" data-tsd-sig-digest="' + ver.signature_digest + '" data-tsd-sig-attestation="' + ver.signature_attestation + '" contenteditable="false" oncontextmenu="return false;" style="margin:14pt 0 8pt;display:inline-block;vertical-align:bottom;min-width:200pt;user-select:none;-webkit-user-select:none;">' +
                           sigGraphic +
                           '<div style="border-top:1px solid #1d3648;padding-top:3pt;font-size:9pt;font-weight:700;color:#091e42;">' + String(ver.staff_name || '').replace(/</g, '&lt;') + '</div>' +
                           '<div style="font-size:8pt;color:#5a6676;">' + String(ver.name || 'Authorized Signatory').replace(/</g, '&lt;') + ' · OTP Verified #' + ver.usage_log_id + ' · ' + today + '</div>' +
@@ -2884,6 +2839,7 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
       setTimeout(function () { node.classList.remove('tsd-verify-flash'); }, 1400);
     } catch (_e) {}
     scheduleSave();
+    setTimeout(save, 0);
   }
 
   function _stampHasSignArea(stampObj, svgMarkup) {
@@ -2946,7 +2902,8 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
     }
   }
 
-  function _finalizeAndInsertStamp(sid, stampObj, chosenDate, svgMarkup, sigUsageId) {
+  function _finalizeAndInsertStamp(sid, stampObj, chosenDate, svgMarkup, sigAttestation) {
+    var sigUsageId = sigAttestation && sigAttestation.usage_log_id;
     var rndToggle = document.getElementById('tsd-stamp-randomize');
     var stampAutoRnd = !!(stampObj && stampObj.layout && stampObj.layout.effects && stampObj.layout.effects.randomize_on_insert);
     if ((rndToggle && rndToggle.checked) || stampAutoRnd) {
@@ -2977,10 +2934,17 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
       );
       var fpBadge = receipt.forensic_fingerprint ? (' · ' + receipt.forensic_fingerprint) : '';
       var sigCls = sigUsageId ? ' ts-sig-doc-protected' : '';
+      var sigAttrs = sigUsageId
+        ? (' data-tsd-sig-id="' + sigAttestation.signature_id + '"' +
+           ' data-tsd-sig-usage="' + sigAttestation.usage_log_id + '"' +
+           ' data-tsd-sig-digest="' + sigAttestation.signature_digest + '"' +
+           ' data-tsd-sig-attestation="' + sigAttestation.signature_attestation + '"')
+        : '';
       var wrapper =
         '<span class="tsd-stamp-mark' + sigCls + '" data-tsd-stamp-receipt="' + receipt.receipt_id + '"' +
         ' data-tsd-stamp-nonce="' + receipt.nonce + '"' +
         ' data-tsd-stamp-date="' + chosenDate + '"' +
+        sigAttrs +
         ' style="display:inline-block;vertical-align:middle;margin:6pt;width:168px;max-width:220px;"' +
         ' contenteditable="false" title="TSD Forensically Sealed Stamp (' + chosenDate + ') · receipt #' + receipt.receipt_id + fpBadge + '">' +
         stamped + '</span>';
@@ -3064,7 +3028,7 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
               .then(function (ver) {
                 otpBox.hidden = true;
                 var signedSvg = _embedSignatureIntoStampSvg(svgMarkup, ver.signature_data);
-                _finalizeAndInsertStamp(sid, stampObj, chosenDate, signedSvg, ver.usage_log_id);
+                _finalizeAndInsertStamp(sid, stampObj, chosenDate, signedSvg, ver);
               }).catch(function (err) {
                 okBtn.disabled = false;
                 alert(err.message);
@@ -4025,10 +3989,15 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
         var html = (data.content && data.content.html) || '';
         editor.innerHTML = html;
         editor._initialHtml = html;   // handed to the PM init as fallback seed
+        _contentReady = true;
         updateWords(); rebuildOutline();
         refreshDynamicStampDates();
+        requestAnimationFrame(_syncDocumentPagination);
         setSave('● Saved · v' + data.version, 'saved');
-      }).catch(function (e) { setSave('Load failed: ' + e.message, 'error'); });
+      }).catch(function (e) {
+        _contentReady = true;
+        setSave('Load failed: ' + e.message, 'error');
+      });
   }
 
   // Dynamic date stamps — rewrite [data-stamp-date] text to today's date
@@ -4061,7 +4030,7 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
   var _saveInFlight = false;
   var _saveQueued = false;
   function _doTsdPut(url, method, payload, retried) {
-    return fetch(url, { method: method, credentials: 'same-origin', headers: headers(), body: JSON.stringify(payload) })
+    return fetch(url, { method: method, credentials: 'same-origin', headers: headers(), body: JSON.stringify(payload), keepalive: true })
       .then(function (r) {
         if (r.status === 412 && !retried) {
           return r.json().catch(function () { return {}; }).then(function (body) {
@@ -4090,7 +4059,7 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
       title: title,
       tags: (tagsInput && tagsInput.value) || '',
       export_policy: (exportSel && exportSel.value) || 'pdf_allowed',
-      content_html: editor.innerHTML || '',
+      content_html: serializeNativeEditorHtml(),
     };
     var url = tsdId ? '/api/tsd/' + tsdId : '/api/tsd/';
     var method = tsdId ? 'PUT' : 'POST';
@@ -4109,6 +4078,13 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
   }
   editor.addEventListener('input', scheduleSave);
   titleInput.addEventListener('input', scheduleSave);
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden && saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+      save();
+    }
+  });
 
   // ===================================================================== OUTLINE
   var outlineBody = document.getElementById('tsd-outline-body');
@@ -5300,6 +5276,13 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
         if (el.closest('.tsd-stamp-mark, .tsd-sig-block') !== el) return;
         var cl = el.cloneNode(true);
         cl.classList.remove('tsd-obj-selected', 'tsd-verify-flash');
+        if (cl.hasAttribute('data-tsd-auto-page-offset')) {
+          var origStyle = cl.getAttribute('data-tsd-auto-page-original-style');
+          if (origStyle === null || origStyle === '') cl.removeAttribute('style');
+          else cl.setAttribute('style', origStyle);
+          cl.removeAttribute('data-tsd-auto-page-offset');
+          cl.removeAttribute('data-tsd-auto-page-original-style');
+        }
         savedMarks.push(cl.outerHTML);
       });
       if (savedMarks.length) {
@@ -5374,7 +5357,9 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
   }
 
   function tryStartPM() {
-    if (window.PM && rtSocket && rtSocket.connected) {
+    if (!_contentReady) {
+      setTimeout(tryStartPM, 100);
+    } else if (window.PM && rtSocket && rtSocket.connected) {
       initPMCrdt();
     } else {
       setTimeout(tryStartPM, 150);
@@ -5398,11 +5383,114 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
     }
   });
 
+  // ===================================================================== AUTO-PAGINATION
+  function _getPageHeightPx() {
+    var cs = window.getComputedStyle(page);
+    var h = parseFloat(cs.getPropertyValue('--ed-pageh')) || 1123;
+    return Math.max(400, h);
+  }
+  var _lastPageCount = 1;
+  var _paginationFrame = 0;
+  function _schedulePagination() {
+    if (_paginationFrame) return;
+    _paginationFrame = requestAnimationFrame(function () {
+      _paginationFrame = 0;
+      _syncDocumentPagination();
+    });
+  }
+  function _clearAutomaticPageOffsets() {
+    editor.querySelectorAll('[data-tsd-auto-page-offset]').forEach(function (el) {
+      var original = el.getAttribute('data-tsd-auto-page-original-style');
+      if (original === null || original === '') el.removeAttribute('style');
+      else el.setAttribute('style', original);
+      el.removeAttribute('data-tsd-auto-page-offset');
+      el.removeAttribute('data-tsd-auto-page-original-style');
+    });
+  }
+  function _flowBlocks() {
+    var root = (window._pmView && window._pmView.dom) ? window._pmView.dom : editor;
+    var blocks = Array.prototype.slice.call(root.children || []);
+    var marks = document.getElementById('tsd-marks-layer');
+    if (marks && blocks.indexOf(marks) === -1) blocks.push(marks);
+    return blocks.filter(function (el) {
+      return el && el.nodeType === 1 && el.id !== 'tsd-marks-layer' ? true : !!(el && el.children && el.children.length);
+    });
+  }
+  function _syncDocumentPagination() {
+    var printable = document.getElementById('tsd-printable');
+    var brkLayer = document.getElementById('tsd-page-breaks-layer');
+    if (!printable || !page || !brkLayer) return;
+    var pageH = _getPageHeightPx();
+    var GAP = 28;
+    var marginY = parseFloat(getComputedStyle(shell).getPropertyValue('--ed-margy')) || 94;
+    var footerReserve = document.getElementById('tsd-pagefooter') && !document.getElementById('tsd-pagefooter').hidden ? 46 : 18;
+    var usableBottom = pageH - marginY - footerReserve;
+    var usableHeight = Math.max(120, usableBottom - marginY);
+    var cycle = pageH + GAP;
+
+    // Remove prior runtime-only offsets, then move each complete top-level
+    // block to the next sheet when it no longer fits the current sheet. This
+    // creates real flow space rather than merely painting a separator over
+    // overflowing content. Offsets are deliberately stripped during save.
+    _clearAutomaticPageOffsets();
+    var pageRect = page.getBoundingClientRect();
+    _flowBlocks().forEach(function (block) {
+      var rect = block.getBoundingClientRect();
+      var top = rect.top - pageRect.top;
+      var height = rect.height;
+      var pageIndex = Math.max(0, Math.floor(top / cycle));
+      var pageEnd = pageIndex * cycle + usableBottom;
+      if (top + height > pageEnd + 1 && height <= usableHeight) {
+        var nextStart = (pageIndex + 1) * cycle + marginY;
+        var shift = Math.max(0, Math.ceil(nextStart - top));
+        if (shift) {
+          block.setAttribute('data-tsd-auto-page-original-style', block.getAttribute('style') || '');
+          block.setAttribute('data-tsd-auto-page-offset', String(shift));
+          var basePadding = parseFloat(getComputedStyle(block).paddingTop) || 0;
+          block.style.setProperty('padding-top', (basePadding + shift) + 'px', 'important');
+        }
+      }
+    });
+
+    var contentH = Math.max(pageH, printable.scrollHeight);
+    var pageCount = Math.max(1, Math.ceil((contentH + GAP) / cycle));
+    var totalMinH = pageCount * pageH + (pageCount - 1) * GAP;
+    page.style.minHeight = totalMinH + 'px';
+
+    if (pageCount !== _lastPageCount || brkLayer.children.length !== Math.max(0, pageCount - 1)) {
+      _lastPageCount = pageCount;
+      var html = '';
+      for (var k = 1; k < pageCount; k++) {
+        var topPx = k * pageH + (k - 1) * GAP;
+        html += '<div class="tsd-page-break-band" style="top:' + topPx + 'px;">' +
+          '<span>End of Page ' + k + ' of ' + pageCount + '</span>' +
+          '<span>Page ' + (k + 1) + ' of ' + pageCount + ' ↓</span>' +
+        '</div>';
+      }
+      brkLayer.innerHTML = html;
+      var sbP = document.getElementById('tsd-sb-pages');
+      if (sbP) sbP.textContent = 'Page 1 of ' + pageCount + (pageCount > 1 ? (' (' + pageCount + ' pages)') : '');
+      var pfR = document.getElementById('tsd-pf-right');
+      if (pfR && /^Page\s+\d+\s+of\s+\d+/i.test((pfR.textContent || '').trim())) {
+        pfR.textContent = 'Page 1 of ' + pageCount;
+      }
+    }
+  }
+  if (editor) {
+    editor.addEventListener('input', _schedulePagination);
+  }
+  if (typeof ResizeObserver === 'function') {
+    var _pgObs = new ResizeObserver(_schedulePagination);
+    var _prEl = document.getElementById('tsd-printable');
+    if (_prEl) _pgObs.observe(_prEl);
+  }
+
   // ===================================================================== INIT
   updateWords();
   rebuildOutline();
   applyPageSize();
   applyMargins();
+  setTimeout(_syncDocumentPagination, 120);
   setTimeout(drawRulers, 50);
   window.addEventListener('resize', function () { clearTimeout(window._tsdRulerT); window._tsdRulerT = setTimeout(drawRulers, 100); });
 })();

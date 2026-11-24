@@ -51,6 +51,11 @@ from app.services.tsd_format import (
 from app.services.tsd_ingest import IngestError, ingest
 from app.services.tsd_pdf import PdfExportError, render_html_to_pdf
 from app.services import tsd_templates
+from app.services.signature_attestations import (
+    SignatureAttestationError,
+    extract_signature_markers,
+    validate_document_signatures,
+)
 
 
 tsd_api = Blueprint("tsd_api", __name__, url_prefix="/api/tsd")
@@ -229,6 +234,15 @@ def create_tsd():
         return jsonify({"error": "invalid_export_policy"}), 400
 
     safe_html = sanitize_html(payload.get("content_html") or "")
+    try:
+        validate_document_signatures(
+            html=safe_html,
+            organization_id=actor.organization_id,
+            document_id=None,
+        )
+    except SignatureAttestationError as exc:
+        record_tsd_operation("create", "invalid_signature")
+        return jsonify({"error": "invalid_signature", "message": str(exc)}), 400
 
     try:
         plaintext = pack_content(html=safe_html, description=description, tags=tags_list)
@@ -361,6 +375,26 @@ def update_tsd(tsd_id: int):
 
     if "content_html" in payload:
         safe_html = sanitize_html(payload.get("content_html") or "")
+        # Pre-attestation signatures already present in this exact document may
+        # round-trip, but newly introduced signatures must carry a platform
+        # attestation issued after owner authorization.
+        allowed_legacy: set[tuple[int, int]] = set()
+        try:
+            previous = decrypt_content_envelope(
+                row.ciphertext, organization_id=row.organization_id
+            )
+            for marker in extract_signature_markers(previous.get("html") or ""):
+                if not marker.digest or not marker.attestation:
+                    allowed_legacy.add(marker.legacy_key)
+            validate_document_signatures(
+                html=safe_html,
+                organization_id=row.organization_id,
+                document_id=row.id,
+                allowed_legacy=allowed_legacy,
+            )
+        except SignatureAttestationError as exc:
+            record_tsd_operation("update", "invalid_signature")
+            return jsonify({"error": "invalid_signature", "message": str(exc)}), 400
         try:
             plaintext = pack_content(
                 html=safe_html,
@@ -547,6 +581,15 @@ def ingest_tsd():
         return jsonify({"error": "ingest_failed", "message": str(exc)}), 400
 
     safe_html = sanitize_html(raw_html)
+    try:
+        validate_document_signatures(
+            html=safe_html,
+            organization_id=actor.organization_id,
+            document_id=None,
+        )
+    except SignatureAttestationError as exc:
+        record_tsd_ingest(meta.get("source_type", "unknown"), "invalid_signature")
+        return jsonify({"error": "invalid_signature", "message": str(exc)}), 400
 
     title = (request.form.get("title") or "").strip()
     if not title:
@@ -1370,6 +1413,23 @@ def set_tsd_status(tsd_id: int):
     raw_html = payload.get("content_html")
     if isinstance(raw_html, str) and raw_html.strip():
         safe_html = sanitize_html(raw_html)
+        allowed_legacy: set[tuple[int, int]] = set()
+        try:
+            previous = decrypt_content_envelope(
+                row.ciphertext, organization_id=row.organization_id
+            )
+            for marker in extract_signature_markers(previous.get("html") or ""):
+                if not marker.digest or not marker.attestation:
+                    allowed_legacy.add(marker.legacy_key)
+            validate_document_signatures(
+                html=safe_html,
+                organization_id=row.organization_id,
+                document_id=row.id,
+                allowed_legacy=allowed_legacy,
+            )
+        except SignatureAttestationError as exc:
+            record_tsd_operation("status", "invalid_signature")
+            return jsonify({"error": "invalid_signature", "message": str(exc)}), 400
         tags_list = [t.strip() for t in (row.tags or "").split(",") if t.strip()]
         extras = {}
         if payload.get("letterhead_id"):

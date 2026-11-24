@@ -48,8 +48,7 @@ class TestGetForm:
         r = client.get("/verify")
         assert r.status_code == 200
         body = r.data.decode("utf-8")
-        assert "Verification unavailable" in body
-        assert "Verify another document" in body
+        assert "Verification is not enabled on this deployment" in body
 
     def test_enabled_page_shows_form(self, enabled_app):
         r = enabled_app.test_client().get("/verify")

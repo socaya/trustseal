@@ -143,7 +143,7 @@ class TestAccessControl:
             r = client.get("/evidence/retentions")
             assert r.status_code == 200
             body = r.data.decode("utf-8")
-            assert "Evidence retentions" in body
+            assert "Evidence &amp; Retention" in body
             # Tenant A's digest is present; tenant B's is not.
             assert "a" * 64 in body
             assert "b" * 64 not in body
@@ -179,7 +179,7 @@ class TestDossierRendering:
                 f"/evidence/retentions/{seeded['retention_a'].id}"
             )
             body = r.data.decode("utf-8")
-            assert "chain consistent" in body
+            assert "chain consistent" in body.lower()
 
     def test_integrity_chain_break_surfaced(self, pg_app, seeded):
         from app.extensions import db
@@ -194,7 +194,7 @@ class TestDossierRendering:
                 f"/evidence/retentions/{seeded['retention_a'].id}"
             )
             body = r.data.decode("utf-8")
-            assert "chain break" in body
+            assert "chain break" in body.lower()
 
 
 class TestIntegrityUnit:

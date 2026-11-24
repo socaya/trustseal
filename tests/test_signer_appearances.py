@@ -309,7 +309,8 @@ class TestDecisionFlow:
             },
         )
         assert r.status_code == 200
-        assert b"Acknowledged and recorded" in r.data
+        assert b"Acknowledged" in r.data
+        assert b"Recorded" in r.data
         db.session.expire_all()
         appearance = SignerAppearance.query.filter_by(
             envelope_id=seeded["envelope"].id

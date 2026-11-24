@@ -193,6 +193,27 @@ def test_sanitize_allows_image_data_uri():
     assert 'data:image/png;base64,' in clean
 
 
+def test_sanitize_preserves_persisted_stamp_and_signature_metadata():
+    from app.services.tsd_format import sanitize_html
+
+    raw = (
+        '<div class="tsd-persisted-marks" data-tsd-marks="1">'
+        '<span class="tsd-stamp-mark" data-tsd-stamp-receipt="41" '
+        'data-tsd-stamp-nonce="abc"><svg viewBox="0 0 10 10">'
+        '<circle cx="5" cy="5" r="4"/></svg></span>'
+        '<div class="tsd-sig-block" data-tsd-sig-id="7" '
+        'data-tsd-sig-usage="12" data-tsd-sig-digest="' + ('a' * 64) + '" '
+        'data-tsd-sig-attestation="' + ('b' * 64) + '"></div></div>'
+    )
+    clean = sanitize_html(raw)
+    assert 'class="tsd-stamp-mark"' in clean
+    assert 'data-tsd-stamp-receipt="41"' in clean
+    assert '<svg' in clean and '<circle' in clean
+    assert 'data-tsd-sig-id="7"' in clean
+    assert 'data-tsd-sig-digest="' + ('a' * 64) + '"' in clean
+    assert 'data-tsd-sig-attestation="' + ('b' * 64) + '"' in clean
+
+
 # ================================================================ API auth
 
 
@@ -258,6 +279,365 @@ def test_api_sanitizes_on_create(pg_app, tenant_pair):
     html = r.get_json()["content"]["html"]
     assert "<script" not in html.lower()
     assert "<p>ok</p>" in html
+
+
+def test_api_roundtrips_applied_stamp_markup(pg_app, tenant_pair):
+    """Applied stamp objects remain in encrypted HTML after reopen."""
+    user = db.session.get(User, tenant_pair["user_a"])
+    client = pg_app.test_client()
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(user.id)
+        sess["_fresh"] = True
+        sess["_id"] = "stamp-roundtrip"
+
+    stamp_html = (
+        '<p>Approved content</p><div class="tsd-persisted-marks" data-tsd-marks="1">'
+        '<span class="tsd-stamp-mark" data-tsd-stamp-receipt="41" '
+        'data-tsd-stamp-nonce="abcdef" contenteditable="false">'
+        '<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8"/></svg>'
+        '</span></div>'
+    )
+    made = client.post(
+        "/api/tsd/", json={"title": "Stamped", "content_html": stamp_html},
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert made.status_code == 201
+    opened = client.get(f"/api/tsd/{made.get_json()['id']}/content")
+    assert opened.status_code == 200
+    stored = opened.get_json()["content"]["html"]
+    assert 'class="tsd-stamp-mark"' in stored
+    assert 'data-tsd-stamp-receipt="41"' in stored
+    assert "<svg" in stored and "<circle" in stored
+
+
+def test_platform_signature_attestation_validates_and_detects_tampering(pg_app, tenant_pair):
+    from datetime import datetime, timedelta
+    from app.models.esignature import SignatureProfile
+    from app.models.signature_governance import SignatureUsageLog
+    from app.services.signature_attestations import (
+        SignatureAttestationError,
+        issue_signature_attestation,
+        validate_document_signatures,
+    )
+
+    sig = SignatureProfile(
+        name="Director", signature_type="drawn",
+        signature_data='<svg viewBox="0 0 10 4"><path d="M0 2L10 2"/></svg>',
+        user_id=tenant_pair["user_a"],
+    )
+    db.session.add(sig)
+    db.session.flush()
+    usage = SignatureUsageLog(
+        organization_id=tenant_pair["org_a"],
+        signature_profile_id=sig.id,
+        owner_user_id=tenant_pair["user_a"],
+        requester_user_id=tenant_pair["user_a"],
+        document_id=None,
+        document_title="Attested document",
+        otp_code_hash=SignatureUsageLog.hash_otp("123456"),
+        otp_last2="56",
+        otp_expires_at=datetime.utcnow() + timedelta(minutes=5),
+        status="applied",
+        approved_at=datetime.utcnow(),
+        applied_at=datetime.utcnow(),
+    )
+    db.session.add(usage)
+    db.session.commit()
+
+    att = issue_signature_attestation(
+        organization_id=tenant_pair["org_a"], document_id=None,
+        signature=sig, usage_log=usage,
+    )
+    db.session.commit()
+    from app.services.tsd_format import sanitize_html
+    graphic = sanitize_html(sig.signature_data)
+    html = (
+        f'<div class="tsd-sig-block" data-tsd-sig-id="{sig.id}" '
+        f'data-tsd-sig-usage="{usage.id}" '
+        f'data-tsd-sig-digest="{att["signature_digest"]}" '
+        f'data-tsd-sig-attestation="{att["signature_attestation"]}">{graphic}</div>'
+    )
+    assert validate_document_signatures(
+        html=html, organization_id=tenant_pair["org_a"], document_id=None,
+    ) == 1
+
+    tampered = html.replace(att["signature_digest"], "0" * 64)
+    with pytest.raises(SignatureAttestationError, match="signature_graphic_modified"):
+        validate_document_signatures(
+            html=tampered, organization_id=tenant_pair["org_a"], document_id=None,
+        )
+
+    with pytest.raises(SignatureAttestationError, match="signature_graphic_missing_or_modified"):
+        validate_document_signatures(
+            html=html.replace(graphic, ""),
+            organization_id=tenant_pair["org_a"], document_id=None,
+        )
+
+
+def test_signature_attestation_blocks_cross_document_replay(pg_app, tenant_pair):
+    """An attestation bound to doc A must be rejected on new docs (None) and doc B."""
+    from datetime import datetime, timedelta
+    from app.models.esignature import SignatureProfile
+    from app.models.signature_governance import SignatureUsageLog
+    from app.services.signature_attestations import (
+        SignatureAttestationError,
+        issue_signature_attestation,
+        validate_document_signatures,
+    )
+    from app.services.tsd_format import sanitize_html
+
+    user = db.session.get(User, tenant_pair["user_a"])
+    client = pg_app.test_client()
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(user.id)
+        sess["_fresh"] = True
+        sess["_id"] = "sig-replay-test"
+
+    doc1 = client.post(
+        "/api/tsd/", json={"title": "Doc 1", "content_html": "<p>One</p>"},
+        headers={"X-Requested-With": "fetch"},
+    ).get_json()
+    doc2 = client.post(
+        "/api/tsd/", json={"title": "Doc 2", "content_html": "<p>Two</p>"},
+        headers={"X-Requested-With": "fetch"},
+    ).get_json()
+
+    sig = SignatureProfile(
+        name="CFO", signature_type="drawn",
+        signature_data='<svg viewBox="0 0 10 4"><path d="M0 2L10 2"/></svg>',
+        user_id=user.id,
+    )
+    db.session.add(sig)
+    db.session.flush()
+    usage = SignatureUsageLog(
+        organization_id=tenant_pair["org_a"],
+        signature_profile_id=sig.id,
+        owner_user_id=user.id,
+        requester_user_id=user.id,
+        document_id=doc1["id"],
+        document_title="Doc 1",
+        otp_code_hash=SignatureUsageLog.hash_otp("654321"),
+        otp_last2="21",
+        otp_expires_at=datetime.utcnow() + timedelta(minutes=5),
+        status="applied",
+        approved_at=datetime.utcnow(),
+        applied_at=datetime.utcnow(),
+    )
+    db.session.add(usage)
+    db.session.commit()
+
+    att = issue_signature_attestation(
+        organization_id=tenant_pair["org_a"], document_id=doc1["id"],
+        signature=sig, usage_log=usage,
+    )
+    db.session.commit()
+    graphic = sanitize_html(sig.signature_data)
+    signed_html = (
+        f'<div class="tsd-sig-block" data-tsd-sig-id="{sig.id}" '
+        f'data-tsd-sig-usage="{usage.id}" '
+        f'data-tsd-sig-digest="{att["signature_digest"]}" '
+        f'data-tsd-sig-attestation="{att["signature_attestation"]}">{graphic}</div>'
+    )
+
+    # Valid on doc1
+    assert validate_document_signatures(
+        html=signed_html, organization_id=tenant_pair["org_a"], document_id=doc1["id"],
+    ) == 1
+    # Rejected on brand-new document (document_id=None)
+    with pytest.raises(SignatureAttestationError, match="signature_document_mismatch"):
+        validate_document_signatures(
+            html=signed_html, organization_id=tenant_pair["org_a"], document_id=None,
+        )
+    # Rejected via POST /api/tsd/
+    r_create = client.post(
+        "/api/tsd/", json={"title": "Replay New", "content_html": signed_html},
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert r_create.status_code == 400
+    assert r_create.get_json()["error"] == "invalid_signature"
+    # Rejected via PUT /api/tsd/<doc2>
+    r_put = client.put(
+        f"/api/tsd/{doc2['id']}", json={"content_html": signed_html},
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert r_put.status_code == 400
+    assert r_put.get_json()["error"] == "invalid_signature"
+
+
+def test_status_ingest_and_letterhead_reject_forged_signatures(pg_app, tenant_pair):
+    """Every TSD write path (status transition, ingest, letterhead) must enforce signature attestation."""
+    import io
+    from app.models.tsd_letterhead import TSDLetterhead
+
+    user = db.session.get(User, tenant_pair["user_a"])
+    client = pg_app.test_client()
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(user.id)
+        sess["_fresh"] = True
+        sess["_id"] = "sig-write-paths"
+
+    forged = (
+        '<p>Contract</p><div class="tsd-sig-block" data-tsd-sig-id="99" '
+        'data-tsd-sig-usage="99" data-tsd-sig-digest="' + ("a" * 64) + '" '
+        'data-tsd-sig-attestation="' + ("b" * 64) + '">Forged</div>'
+    )
+
+    doc = client.post(
+        "/api/tsd/", json={"title": "Target", "content_html": "<p>Clean</p>"},
+        headers={"X-Requested-With": "fetch"},
+    ).get_json()
+
+    # 1. set_tsd_status rejects forged signature HTML
+    r_status = client.post(
+        f"/api/tsd/{doc['id']}/status",
+        json={"status": "finalized", "content_html": forged},
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert r_status.status_code == 400
+    assert r_status.get_json()["error"] == "invalid_signature"
+
+    # 2. ingest_tsd rejects forged signature HTML
+    r_ingest = client.post(
+        "/api/tsd/ingest",
+        data={
+            "title": "Forged Upload",
+            "file": (io.BytesIO(forged.encode("utf-8")), "forged.html"),
+        },
+        content_type="multipart/form-data",
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert r_ingest.status_code == 400
+    assert r_ingest.get_json()["error"] == "invalid_signature"
+
+    # 3. create_document_from_letterhead sanitizes & rejects forged signature HTML
+    lh = TSDLetterhead(
+        organization_id=tenant_pair["org_a"],
+        created_by_id=user.id,
+        name="Corp LH",
+        layout={},
+        header_html="<header>Corp</header>",
+        footer_html="<footer>Footer</footer>",
+    )
+    db.session.add(lh)
+    db.session.commit()
+
+    r_lh = client.post(
+        f"/api/letterheads/{lh.id}/create-document",
+        json={"title": "LH Forged", "body_html": forged},
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert r_lh.status_code == 400
+    assert r_lh.get_json()["error"] == "invalid_signature"
+
+
+def test_signature_otp_verify_enforces_approval_caller_and_hub_seals_pixels(pg_app, tenant_pair):
+    """Signatures hub never leaks pixels; OTP verify enforces live approval + caller scope."""
+    from app.models.esignature import SignatureProfile
+    from app.models.signature_governance import SignatureApprovalState
+
+    owner = db.session.get(User, tenant_pair["user_a"])
+    colleague = User(
+        username="colleague-a", email="colleague@a.test",
+        first_name="Col", last_name="League",
+        is_active=True, organization_id=tenant_pair["org_a"],
+    )
+    colleague.set_password("colleague-password-for-tests-only")
+    db.session.add(colleague)
+    db.session.flush()
+
+    secret_svg = '<svg viewBox="0 0 20 8"><path d="M1 4L19 4" id="secret-sig-pixel-marker"/></svg>'
+    sig = SignatureProfile(
+        name="CEO Secret", signature_type="drawn",
+        signature_data=secret_svg, user_id=owner.id,
+    )
+    db.session.add(sig)
+    db.session.flush()
+    state = SignatureApprovalState(
+        organization_id=tenant_pair["org_a"],
+        signature_profile_id=sig.id,
+        approval_status="approved",
+        capture_engine="stylus_pen",
+    )
+    db.session.add(state)
+    db.session.commit()
+
+    owner_client = pg_app.test_client()
+    with owner_client.session_transaction() as sess:
+        sess["_user_id"] = str(owner.id)
+        sess["_fresh"] = True
+        sess["_id"] = "owner-sig-sess"
+
+    # Registry page must never expose raw signature pixels
+    hub = owner_client.get("/signatures")
+    assert hub.status_code == 200
+    assert b"secret-sig-pixel-marker" not in hub.data
+    assert b"SEALED BY TRUSTSEAL" in hub.data
+
+    # Request OTP as owner
+    req = owner_client.post(
+        f"/api/signatures/{sig.id}/request-otp",
+        json={"document_title": "Board Resolution"},
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert req.status_code == 201
+    req_json = req.get_json()
+    log_id = req_json["usage_log_id"]
+    otp = req_json["dev_otp_code"]
+
+    # Another org user cannot hijack the pending OTP
+    from flask import g as _flask_g
+    _flask_g.pop("_login_user", None)
+    colleague_client = pg_app.test_client()
+    with colleague_client.session_transaction() as sess:
+        sess["_user_id"] = str(colleague.id)
+        sess["_fresh"] = True
+        sess["_id"] = "colleague-sig-sess"
+    hijack = colleague_client.post(
+        f"/api/signatures/usage/{log_id}/verify-otp",
+        json={"otp": otp},
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert hijack.status_code == 403
+
+    # Revoking signature after OTP request must block verification
+    _flask_g.pop("_login_user", None)
+    state.approval_status = "revoked"
+    db.session.commit()
+    revoked_try = owner_client.post(
+        f"/api/signatures/usage/{log_id}/verify-otp",
+        json={"otp": otp},
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert revoked_try.status_code == 403
+
+    # Re-approving allows verification and yields a platform attestation accepted by POST /api/tsd/
+    state.approval_status = "approved"
+    db.session.commit()
+    ver = owner_client.post(
+        f"/api/signatures/usage/{log_id}/verify-otp",
+        json={"otp": otp},
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert ver.status_code == 200
+    vjson = ver.get_json()
+    assert len(vjson["signature_digest"]) == 64
+    assert len(vjson["signature_attestation"]) == 64
+
+    from app.services.tsd_format import sanitize_html
+    graphic = sanitize_html(vjson["signature_data"])
+    signed_html = (
+        f'<p>Resolved.</p><div class="tsd-sig-block" '
+        f'data-tsd-sig-id="{vjson["signature_id"]}" '
+        f'data-tsd-sig-usage="{vjson["usage_log_id"]}" '
+        f'data-tsd-sig-digest="{vjson["signature_digest"]}" '
+        f'data-tsd-sig-attestation="{vjson["signature_attestation"]}">{graphic}</div>'
+    )
+    saved = owner_client.post(
+        "/api/tsd/",
+        json={"title": "Signed Resolution", "content_html": signed_html},
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert saved.status_code == 201
 
 
 

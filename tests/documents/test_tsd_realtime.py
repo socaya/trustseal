@@ -160,3 +160,127 @@ def test_can_access_denies_outsider(realtime_tenant):
     db.session.add(doc); db.session.commit()
 
     assert _can_access(outsider, doc.id) is False
+
+
+def test_crdt_snapshot_preserves_persisted_stamps_and_attested_signatures(pg_app, realtime_tenant):
+    """CRDT text snapshots must preserve .tsd-persisted-marks (stamps & attested signatures)."""
+    from datetime import datetime, timedelta
+    from app.models.esignature import SignatureProfile
+    from app.models.signature_governance import SignatureUsageLog
+    from app.models.tsd_document import TSDocument
+    from app.services import tsd_format
+    from app.services.signature_attestations import issue_signature_attestation
+    from app.services.tsd_realtime import _DOC_CACHE, _get_or_create_session, _snapshot_session
+
+    alice = realtime_tenant["alice"]
+    org_id = realtime_tenant["org"]
+
+    sig = SignatureProfile(
+        name="Alice Dir", signature_type="drawn",
+        signature_data='<svg viewBox="0 0 12 4"><path d="M0 2L12 2"/></svg>',
+        user_id=alice.id,
+    )
+    db.session.add(sig)
+    db.session.flush()
+
+    pt0 = tsd_format.pack_content(html="<p>Initial text</p>")
+    ct0 = tsd_format.encrypt_content_envelope(pt0, organization_id=org_id)
+    doc = TSDocument(
+        organization_id=org_id,
+        created_by_id=alice.id,
+        title="crdt-marks-preserve", ciphertext=ct0,
+        ciphertext_sha256=tsd_format.sha256_hex(ct0),
+        plaintext_bytes=len(pt0),
+    )
+    db.session.add(doc)
+    db.session.flush()
+
+    usage = SignatureUsageLog(
+        organization_id=org_id,
+        signature_profile_id=sig.id,
+        owner_user_id=alice.id,
+        requester_user_id=alice.id,
+        document_id=doc.id,
+        document_title=doc.title,
+        otp_code_hash=SignatureUsageLog.hash_otp("112233"),
+        otp_last2="33",
+        otp_expires_at=datetime.utcnow() + timedelta(minutes=5),
+        status="applied",
+        approved_at=datetime.utcnow(),
+        applied_at=datetime.utcnow(),
+    )
+    db.session.add(usage)
+    db.session.flush()
+
+    att = issue_signature_attestation(
+        organization_id=org_id, document_id=doc.id, signature=sig, usage_log=usage,
+    )
+    graphic = tsd_format.sanitize_html(sig.signature_data)
+    stored_html = (
+        '<p>Initial text</p>'
+        '<div class="tsd-persisted-marks" data-tsd-marks="1">'
+        '<span class="tsd-stamp-mark" data-tsd-stamp-receipt="77" data-tsd-stamp-nonce="xyz">'
+        '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"></circle></svg></span>'
+        f'<div class="tsd-sig-block" data-tsd-sig-id="{sig.id}" '
+        f'data-tsd-sig-usage="{usage.id}" '
+        f'data-tsd-sig-digest="{att["signature_digest"]}" '
+        f'data-tsd-sig-attestation="{att["signature_attestation"]}">{graphic}</div>'
+        '</div>'
+    )
+    pt1 = tsd_format.pack_content(html=stored_html)
+    ct1 = tsd_format.encrypt_content_envelope(pt1, organization_id=org_id)
+    doc.ciphertext = ct1
+    doc.ciphertext_sha256 = tsd_format.sha256_hex(ct1)
+    doc.plaintext_bytes = len(pt1)
+    db.session.commit()
+
+    sess = _get_or_create_session(doc.id)
+    try:
+        # Simulate ProseMirror CRDT fragment containing ONLY the edited text (no marks)
+        sess._initial_html = "<p>Initial text</p><p>Edited via CRDT</p>"
+        sess.dirty = True
+        assert _snapshot_session(sess, force=True) is True
+
+        db.session.refresh(doc)
+        decrypted = tsd_format.decrypt_content_envelope(doc.ciphertext, organization_id=org_id)
+        html_after = decrypted["html"]
+        assert "Edited via CRDT" in html_after
+        assert 'data-tsd-stamp-receipt="77"' in html_after
+        assert f'data-tsd-sig-attestation="{att["signature_attestation"]}"' in html_after
+    finally:
+        _DOC_CACHE.pop(doc.id, None)
+
+
+def test_crdt_snapshot_rejects_forged_signature_markup(pg_app, realtime_tenant):
+    """CRDT snapshots must refuse to persist forged/unattested signature markers."""
+    from app.models.tsd_document import TSDocument
+    from app.services import tsd_format
+    from app.services.tsd_realtime import _DOC_CACHE, _get_or_create_session, _snapshot_session
+
+    org_id = realtime_tenant["org"]
+    pt = tsd_format.pack_content(html="<p>Clean</p>")
+    ct = tsd_format.encrypt_content_envelope(pt, organization_id=org_id)
+    doc = TSDocument(
+        organization_id=org_id,
+        created_by_id=realtime_tenant["alice"].id,
+        title="crdt-forged-sig", ciphertext=ct,
+        ciphertext_sha256=tsd_format.sha256_hex(ct),
+        plaintext_bytes=len(pt),
+    )
+    db.session.add(doc)
+    db.session.commit()
+    orig_version = doc.version
+
+    sess = _get_or_create_session(doc.id)
+    try:
+        sess._initial_html = (
+            '<p>Clean</p><div class="tsd-sig-block" data-tsd-sig-id="1" '
+            'data-tsd-sig-usage="1" data-tsd-sig-digest="' + ("0" * 64) + '" '
+            'data-tsd-sig-attestation="' + ("f" * 64) + '">Fake</div>'
+        )
+        sess.dirty = True
+        assert _snapshot_session(sess, force=True) is False
+        db.session.refresh(doc)
+        assert doc.version == orig_version
+    finally:
+        _DOC_CACHE.pop(doc.id, None)

@@ -389,6 +389,7 @@ _ALLOWED_ATTRS = {
         "style", "class", "title", "contenteditable",
         "data-tsd-marks", "data-tsd-stamp-receipt", "data-tsd-stamp-nonce",
         "data-tsd-stamp-date", "data-tsd-sig-id", "data-tsd-sig-usage",
+        "data-tsd-sig-digest", "data-tsd-sig-attestation",
         "data-tsd-group", "data-align",
     ],
     "a": ["href", "title", "rel", "target"],

@@ -501,7 +501,16 @@ def preview_letterhead_pdf(lh_id: int):
 def create_document_from_letterhead(lh_id: int):
     """Create a new encrypted TrustSeal Document pre-wrapped with this official letterhead."""
     from app.models.tsd_document import TSDocument
-    from app.services.tsd_format import encrypt_content_envelope, pack_content, sha256_hex
+    from app.services.signature_attestations import (
+        SignatureAttestationError,
+        validate_document_signatures,
+    )
+    from app.services.tsd_format import (
+        encrypt_content_envelope,
+        pack_content,
+        sanitize_html,
+        sha256_hex,
+    )
 
     actor = _actor()
     _ensure_tables()
@@ -513,13 +522,21 @@ def create_document_from_letterhead(lh_id: int):
     title = (payload.get("title") or f"Official Document · {lh.name}").strip()[:240]
     custom_body = (payload.get("body_html") or "").strip()
     inner_body = custom_body if custom_body else '<p><strong>RE: </strong></p><p><br></p>'
-    body_html = (
+    body_html = sanitize_html(
         (lh.header_html or "")
         + '<div class="tsd-letterhead-body" style="min-height:260pt;padding:8pt 0;">'
         + inner_body
         + '</div>'
         + (lh.footer_html or "")
     )
+    try:
+        validate_document_signatures(
+            html=body_html,
+            organization_id=actor.organization_id,
+            document_id=None,
+        )
+    except SignatureAttestationError as exc:
+        return jsonify({"error": "invalid_signature", "message": str(exc)}), 400
     plaintext = pack_content(
         html=body_html,
         description=f"Drafted on letterhead: {lh.name}",

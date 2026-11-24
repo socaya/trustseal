@@ -298,7 +298,8 @@ class TestDecisionFlow:
             follow_redirects=False,
         )
         assert r.status_code == 200
-        assert b"Acknowledged and recorded" in r.data
+        assert b"Acknowledged" in r.data
+        assert b"Recorded" in r.data
         decision = SignerDecision.query.filter_by(
             envelope_id=seeded["envelope"].id,
             participant_id=seeded["participant"].id,
@@ -329,7 +330,8 @@ class TestDecisionFlow:
             data={"choice": "declined"},
         )
         assert r.status_code == 200
-        assert b"Declined and recorded" in r.data
+        assert b"Declined" in r.data
+        assert b"Recorded" in r.data
         decision = SignerDecision.query.filter_by(
             envelope_id=seeded["envelope"].id,
             participant_id=seeded["participant"].id,

@@ -585,7 +585,16 @@ def use_builtin_tsd_template(slug: str):
 @workspace_assets_views.route("/templates/<int:tpl_id>/use", methods=["POST"])
 @login_required
 def use_template_create_tsd(tpl_id: int):
-    from app.services.tsd_format import encrypt_content_envelope, pack_content, sha256_hex
+    from app.services.signature_attestations import (
+        SignatureAttestationError,
+        validate_document_signatures,
+    )
+    from app.services.tsd_format import (
+        encrypt_content_envelope,
+        pack_content,
+        sanitize_html,
+        sha256_hex,
+    )
 
     actor = _actor()
     tpl = db.session.get(DocumentTemplate, tpl_id)
@@ -593,7 +602,16 @@ def use_template_create_tsd(tpl_id: int):
         abort(404)
 
     title = (request.form.get("title") or tpl.name or "Untitled Document").strip()[:240]
-    body_html = (tpl.content or "").strip() or f"<h1>{tpl.name}</h1><p></p>"
+    body_html = sanitize_html((tpl.content or "").strip() or f"<h1>{tpl.name}</h1><p></p>")
+    try:
+        validate_document_signatures(
+            html=body_html,
+            organization_id=actor.organization_id,
+            document_id=None,
+        )
+    except SignatureAttestationError:
+        flash("Template contains an untrusted signature marker and cannot be instantiated.", "danger")
+        return redirect(url_for("workspace_assets_views.templates_hub_page"))
     plaintext = pack_content(
         html=body_html,
         description=tpl.description or f"Created from template: {tpl.name}",
@@ -779,7 +797,6 @@ def signatures_hub_page():
                 "id": sp.id,
                 "name": sp.name,
                 "signature_type": sp.signature_type or "drawn",
-                "signature_data": sp.signature_data or "",
                 "initials_data": sp.initials_data or "",
                 "is_default": bool(sp.is_default),
                 "user_id": sp.user_id,
@@ -982,17 +999,23 @@ def request_signature_usage_otp(sig_id: int):
 @workspace_assets_views.route("/api/signatures/usage/<int:log_id>/verify-otp", methods=["POST"])
 @login_required
 def verify_signature_usage_otp(log_id: int):
-    """Verify Owner OTP (or Owner in-app approval) and release the protected signature payload once."""
+    """Verify Owner OTP and release one platform-attested impression once."""
     from datetime import datetime
     from flask import jsonify
     from app.models.esignature import SignatureProfile
-    from app.models.signature_governance import SignatureUsageLog, ensure_signature_governance_tables
+    from app.models.signature_governance import (
+        SignatureApprovalState,
+        SignatureUsageLog,
+        ensure_signature_governance_tables,
+    )
 
     ensure_signature_governance_tables()
     actor = _actor()
     log = db.session.get(SignatureUsageLog, log_id)
     if not log or log.organization_id != actor.organization_id:
         return jsonify({"error": "Usage request not found."}), 404
+    if actor.id not in (log.requester_user_id, log.owner_user_id):
+        return jsonify({"error": "Only the requester or signature owner can verify this OTP."}), 403
     if log.status == "denied":
         return jsonify({"error": "Signature usage was denied by the owner."}), 403
     if log.status == "applied":
@@ -1012,12 +1035,24 @@ def verify_signature_usage_otp(log_id: int):
     owner = db.session.get(User, log.owner_user_id)
     if not sp or not owner:
         return jsonify({"error": "Signature record missing."}), 404
+    st = SignatureApprovalState.query.filter_by(signature_profile_id=sp.id).first()
+    if not st or st.approval_status != "approved":
+        return jsonify({"error": "This signature is no longer approved for use."}), 403
 
     now = datetime.utcnow()
     log.status = "applied"
     log.approved_at = log.approved_at or now
     log.applied_at = now
     db.session.commit()
+
+    from app.services.signature_attestations import issue_signature_attestation
+    attestation = issue_signature_attestation(
+        organization_id=actor.organization_id,
+        document_id=log.document_id,
+        signature=sp,
+        usage_log=log,
+    )
+    db.session.commit()  # persist a lazily provisioned tenant signing key
 
     owner_name = ((owner.get_full_name() or "").strip() if hasattr(owner, "get_full_name") else "") or owner.email or f"User #{owner.id}"
     return jsonify({
@@ -1028,6 +1063,7 @@ def verify_signature_usage_otp(log_id: int):
         "signature_type": sp.signature_type,
         "signature_data": sp.signature_data,
         "verified_at": now.strftime("%Y-%m-%d %H:%M UTC"),
+        **attestation,
     })
 
 
