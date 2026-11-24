@@ -217,3 +217,68 @@ class TestPruning:
         assert removed == 1
         assert IdempotencyRecord.query.filter_by(key="live").first() is not None
         assert IdempotencyRecord.query.filter_by(key="expired").first() is None
+
+
+class _FakeRedis:
+    """Minimal in-memory Redis client implementing get() and set(..., ex=, nx=)."""
+
+    def __init__(self):
+        self.store: dict[str, str] = {}
+
+    def get(self, key: str):
+        return self.store.get(key)
+
+    def set(self, key: str, value: str, *, ex: int | None = None, nx: bool = False) -> bool:
+        if nx and key in self.store:
+            return False
+        self.store[key] = value
+        return True
+
+
+class TestPluggableRedisRepository:
+    def test_redis_adapter_replays_conflicts_and_retries(self, app, seeded):
+        from app.services.idempotency import (
+            IdempotencyRepository,
+            PostgresIdempotencyRepository,
+            RedisIdempotencyRepository,
+        )
+
+        redis_repo = RedisIdempotencyRepository(_FakeRedis())
+        assert isinstance(redis_repo, IdempotencyRepository)
+        assert isinstance(PostgresIdempotencyRepository(), IdempotencyRepository)
+
+        app.config["IDEMPOTENCY_REPOSITORY"] = redis_repo
+        try:
+            headers = {"Idempotency-Key": "xr-key-1", **auth(seeded["token"])}
+            r1 = app.test_client().post(
+                "/api/_test/idempotent", json={"amount": 100}, headers=headers
+            )
+            assert r1.status_code == 201
+            assert r1.headers.get("Idempotent-Replay") is None
+
+            # Cross-region replay hits Redis and returns identical response
+            r2 = app.test_client().post(
+                "/api/_test/idempotent", json={"amount": 100}, headers=headers
+            )
+            assert r2.status_code == 201
+            assert r2.headers.get("Idempotent-Replay") == "true"
+            assert r2.get_json() == r1.get_json()
+
+            # Body conflict on same key returns 409
+            r3 = app.test_client().post(
+                "/api/_test/idempotent", json={"amount": 200}, headers=headers
+            )
+            assert r3.status_code == 409
+
+            # Failed attempt marks failed and allows retry
+            fail_headers = {"Idempotency-Key": "xr-fail-1", **auth(seeded["token"])}
+            rf = app.test_client().post(
+                "/api/_test/idempotent-fails", json={}, headers=fail_headers
+            )
+            assert rf.status_code == 500
+            entry = redis_repo.get(
+                tenant_id=seeded["tenant_id"], endpoint="test.fail", key="xr-fail-1"
+            )
+            assert entry is not None and entry.state == "failed"
+        finally:
+            app.config.pop("IDEMPOTENCY_REPOSITORY", None)

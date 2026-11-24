@@ -1,0 +1,171 @@
+groups:
+  - name: trustseal_slo_availability_burn_rate
+    interval: 30s
+    rules:
+      # --- public_verify (99.9% SLO -> error budget = 0.001) ---
+      - alert: TrustSealPublicVerifyFastBurn
+        expr: |
+          (
+            sum(rate(http_requests_total{endpoint=~"/verify.*",status="5xx"}[5m]))
+            /
+            clamp_min(sum(rate(http_requests_total{endpoint=~"/verify.*"}[5m])), 1e-9)
+          ) > (14.4 * 0.001)
+          and
+          (
+            sum(rate(http_requests_total{endpoint=~"/verify.*",status="5xx"}[1h]))
+            /
+            clamp_min(sum(rate(http_requests_total{endpoint=~"/verify.*"}[1h])), 1e-9)
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          endpoint_class: public_verify
+          burn_window: fast
+        annotations:
+          summary: "TrustSeal public_verify fast error-budget burn (14.4x)"
+          runbook_url: "docs/runbooks/SLOs.md"
+
+      - alert: TrustSealPublicVerifySlowBurn
+        expr: |
+          (
+            sum(rate(http_requests_total{endpoint=~"/verify.*",status="5xx"}[30m]))
+            /
+            clamp_min(sum(rate(http_requests_total{endpoint=~"/verify.*"}[30m])), 1e-9)
+          ) > (6 * 0.001)
+          and
+          (
+            sum(rate(http_requests_total{endpoint=~"/verify.*",status="5xx"}[6h]))
+            /
+            clamp_min(sum(rate(http_requests_total{endpoint=~"/verify.*"}[6h])), 1e-9)
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          endpoint_class: public_verify
+          burn_window: slow
+        annotations:
+          summary: "TrustSeal public_verify slow error-budget burn (6x)"
+          runbook_url: "docs/runbooks/SLOs.md"
+
+      # --- signer (99.9% SLO -> error budget = 0.001) ---
+      - alert: TrustSealSignerFastBurn
+        expr: |
+          (
+            sum(rate(http_requests_total{endpoint=~"(/sign|/api/signer-intent).*",status="5xx"}[5m]))
+            /
+            clamp_min(sum(rate(http_requests_total{endpoint=~"(/sign|/api/signer-intent).*"}[5m])), 1e-9)
+          ) > (14.4 * 0.001)
+          and
+          (
+            sum(rate(http_requests_total{endpoint=~"(/sign|/api/signer-intent).*",status="5xx"}[1h]))
+            /
+            clamp_min(sum(rate(http_requests_total{endpoint=~"(/sign|/api/signer-intent).*"}[1h])), 1e-9)
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          endpoint_class: signer
+          burn_window: fast
+        annotations:
+          summary: "TrustSeal signer fast error-budget burn (14.4x)"
+          runbook_url: "docs/runbooks/SLOs.md"
+
+      - alert: TrustSealSignerSlowBurn
+        expr: |
+          (
+            sum(rate(http_requests_total{endpoint=~"(/sign|/api/signer-intent).*",status="5xx"}[30m]))
+            /
+            clamp_min(sum(rate(http_requests_total{endpoint=~"(/sign|/api/signer-intent).*"}[30m])), 1e-9)
+          ) > (6 * 0.001)
+          and
+          (
+            sum(rate(http_requests_total{endpoint=~"(/sign|/api/signer-intent).*",status="5xx"}[6h]))
+            /
+            clamp_min(sum(rate(http_requests_total{endpoint=~"(/sign|/api/signer-intent).*"}[6h])), 1e-9)
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          endpoint_class: signer
+          burn_window: slow
+        annotations:
+          summary: "TrustSeal signer slow error-budget burn (6x)"
+          runbook_url: "docs/runbooks/SLOs.md"
+
+      # --- admin_api (99.5% SLO -> error budget = 0.005) ---
+      - alert: TrustSealAdminApiFastBurn
+        expr: |
+          (
+            sum(rate(http_requests_total{endpoint=~"/api/.*",endpoint!~"/api/signer-intent.*",status="5xx"}[5m]))
+            /
+            clamp_min(sum(rate(http_requests_total{endpoint=~"/api/.*",endpoint!~"/api/signer-intent.*"}[5m])), 1e-9)
+          ) > (14.4 * 0.005)
+          and
+          (
+            sum(rate(http_requests_total{endpoint=~"/api/.*",endpoint!~"/api/signer-intent.*",status="5xx"}[1h]))
+            /
+            clamp_min(sum(rate(http_requests_total{endpoint=~"/api/.*",endpoint!~"/api/signer-intent.*"}[1h])), 1e-9)
+          ) > (14.4 * 0.005)
+        for: 2m
+        labels:
+          severity: critical
+          endpoint_class: admin_api
+          burn_window: fast
+        annotations:
+          summary: "TrustSeal admin_api fast error-budget burn (14.4x)"
+          runbook_url: "docs/runbooks/SLOs.md"
+
+      - alert: TrustSealAdminApiSlowBurn
+        expr: |
+          (
+            sum(rate(http_requests_total{endpoint=~"/api/.*",endpoint!~"/api/signer-intent.*",status="5xx"}[30m]))
+            /
+            clamp_min(sum(rate(http_requests_total{endpoint=~"/api/.*",endpoint!~"/api/signer-intent.*"}[30m])), 1e-9)
+          ) > (6 * 0.005)
+          and
+          (
+            sum(rate(http_requests_total{endpoint=~"/api/.*",endpoint!~"/api/signer-intent.*",status="5xx"}[6h]))
+            /
+            clamp_min(sum(rate(http_requests_total{endpoint=~"/api/.*",endpoint!~"/api/signer-intent.*"}[6h])), 1e-9)
+          ) > (6 * 0.005)
+        for: 15m
+        labels:
+          severity: warning
+          endpoint_class: admin_api
+          burn_window: slow
+        annotations:
+          summary: "TrustSeal admin_api slow error-budget burn (6x)"
+          runbook_url: "docs/runbooks/SLOs.md"
+
+  - name: trustseal_slo_latency
+    interval: 30s
+    rules:
+      - alert: TrustSealPublicVerifyLatencyP95Breach
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{endpoint=~"/verify.*"}[15m])) by (le)) > 0.5
+        for: 15m
+        labels:
+          severity: warning
+          endpoint_class: public_verify
+        annotations:
+          summary: "TrustSeal public_verify p95 latency exceeded 500ms"
+          runbook_url: "docs/runbooks/SLOs.md"
+
+      - alert: TrustSealSignerLatencyP95Breach
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{endpoint=~"(/sign|/api/signer-intent).*"}[15m])) by (le)) > 1.0
+        for: 15m
+        labels:
+          severity: warning
+          endpoint_class: signer
+        annotations:
+          summary: "TrustSeal signer p95 latency exceeded 1000ms"
+          runbook_url: "docs/runbooks/SLOs.md"
+
+      - alert: TrustSealAdminApiLatencyP95Breach
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{endpoint=~"/api/.*",endpoint!~"/api/signer-intent.*"}[15m])) by (le)) > 2.0
+        for: 15m
+        labels:
+          severity: warning
+          endpoint_class: admin_api
+        annotations:
+          summary: "TrustSeal admin_api p95 latency exceeded 2000ms"
+          runbook_url: "docs/runbooks/SLOs.md"

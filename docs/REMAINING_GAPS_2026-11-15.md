@@ -1,98 +1,79 @@
-# Remaining Gaps — 2026-11-15
+# Remaining Gaps — Status & Closure Ledger
 
-All code-addressable gaps from the 2026-11-14 remediation plan are
-closed. What remains is **process**, **governance**, and **third-party
-engagements** that cannot be implemented inside this repository. Each
-item below carries an owner, required artefact, and the first evidence
-that will close it.
+All code-addressable gaps from the 2026-11-14 remediation plan and the
+subsequent 2026-11-15 follow-up items are now implemented and test-verified
+inside this repository. Only **external third-party engagements** and
+**production infrastructure topology sign-offs** remain open outside code.
 
-## G3 — Cross-region idempotency replay
+## Closed since 2026-11-15
 
-**Status:** single-region ON CONFLICT upsert is production grade. Cross-
-region active-active replay is a *deployment topology* decision, not a
-code change — a second region requires either (a) global Postgres (Aurora
-Global, Spanner, CockroachDB) or (b) a Redis-backed idempotency cache
-with eventual convergence. Both change the operating model.
+### G3 (Code Layer) — Pluggable cross-region idempotency repository
+* **Closed in code:** `app/services/idempotency.py` exposes the pluggable
+  `IdempotencyRepository` protocol with `PostgresIdempotencyRepository`
+  (default) and `RedisIdempotencyRepository` (for active-active edge
+  coordination via `app.config["IDEMPOTENCY_REPOSITORY"]`), verified in
+  `tests/test_idempotency.py`.
+* **Remaining external sign-off:** Platform infrastructure Target Operating
+  Model selection for active-active multi-region deployment
+  (`docs/CROSS_REGION_READINESS.md`).
 
-**Owner:** Platform infrastructure.
+### G5 — Automated browser accessibility (Playwright + WCAG 2.1 AA / axe-core)
+* **Closed:** `tests/test_accessibility_playwright.py` boots the real Flask
+  application and audits rendered DOM, ARIA labels, landmarks, keyboard
+  focus, and runtime JS errors in headless Chromium (plus optional
+  `axe-core` execution) across:
+  * Public verify (`/verify`)
+  * Sign landing + review (`/sign/<token>`)
+  * Evidence retention browser (`/evidence/retentions`)
+  * Stamp library / custody dashboard (`/stamps`)
+  * Sealed signatures vault (`/signatures`)
+* Complemented by static template checks in `tests/test_accessibility.py`.
 
-**Closes when:** a Target Operating Model is signed off that names the
-chosen replica topology; the service layer already accepts a pluggable
-idempotency backend (`app.services.idempotency.IdempotencyRepository`).
+### SSO SAML 2.0 + SP-Signed AuthnRequests
+* **Closed:** Pure-Python SAML 2.0 SSO with assertion replay protection and
+  SP-signed AuthnRequests is implemented and verified in
+  `tests/test_saml_sso.py` and `tests/test_saml_sp_signing.py`.
 
-## G5 — Automated accessibility (axe-core + Playwright)
+### Enterprise SLOs, Error Budgets & Burn-Rate Alerting
+* **Closed:** Live SLO computation and `GET /api/_internal/slo` ship in
+  `app/services/slo.py`. The operational SLO runbook (`docs/runbooks/SLOs.md`)
+  and Prometheus/AlertManager multi-window fast/slow burn-rate & p95 latency
+  rules (`docs/runbooks/slo-alerts.prometheus.yml`) are versioned and
+  validated in `tests/test_slo.py`.
 
-**Status:** `tests/test_accessibility.py` covers the static HTML
-templates with pytest-selenium-free assertions; it catches missing
-labels, aria-roles, and heading order. A full browser-level axe-core
-sweep requires a Playwright suite running against the real UI.
+### G9 — SBOM & SAST tooling
+* **Closed:** CycloneDX 1.5 SBOM generation (`scripts/generate_sbom.py`,
+  `tests/test_sbom_generator.py`) and SAST / secret scanning
+  (`scripts/run_sast.py`, `tests/test_sast_runner.py`) are implemented.
 
-**Owner:** Frontend quality.
+## Open external / non-code items
 
-**Closes when:** a Playwright axe-core run exists against:
+### G6 — External penetration test
+* **Status:** Threat model v2 (`docs/threat-model.md`), automated SAST/SBOM,
+  and pre-engagement scope/evidence (`docs/security/PENTEST_SCOPE_AND_EVIDENCE.md`)
+  are complete. What remains is commissioning an external penetration-testing
+  firm.
+* **Owner:** Security.
+* **Closes when:** A signed pen-test report lands in
+  `docs/security/pentest-reports/` and all Critical / High findings are
+  remediated and re-tested.
 
-* Public verify (`/verify`, `/verify/pdf`).
-* Sign landing + review (`/sign/<token>`).
-* Evidence retention browser (`/evidence/retentions`).
-* Stamp custody dashboard.
+### G3 (Infrastructure Sign-Off) — Active-active deployment topology
+* **Status:** Single-region and active-passive are production-ready; the
+  codebase exposes `RedisIdempotencyRepository` for active-active edge
+  coordination.
+* **Owner:** Platform infrastructure.
+* **Closes when:** The Target Operating Model selects the production
+  active-active database / Redis Cluster topology.
 
-## G6 — External penetration test
-
-**Status:** threat-model v2 is current (`docs/threat-model.md`).
-What remains is an engagement with an external firm.
-
-**Owner:** Security.
-
-**Closes when:** a signed pen-test report lands in
-`docs/security/pentest-reports/` and all high / critical findings are
-tracked to closure in GitHub issues.
-
-## SSO SAML (deferred)
-
-**Status:** OIDC SSO is fully implemented (`tests/test_oidc_sso.py`).
-SAML is a separate protocol with its own test matrix and IdP
-onboarding runbook.
-
-**Owner:** Identity.
-
-**Closes when:** a design doc selects an IdP library
-(`python-saml` vs `authlib-saml`), the service-provider metadata
-endpoint is implemented, and three IdPs (Azure AD, Okta, Google
-Workspace) have signed-off integration tests.
-
-## Enterprise SLOs & error budgets
-
-**Status:** `docs/perf/` carries a load-test checkpoint. Prometheus
-metrics are emitted. What remains is codifying SLO targets, error
-budgets, and the burn-rate alert policy.
-
-**Owner:** SRE.
-
-**Closes when:** `docs/runbooks/SLOs.md` defines:
-
-* Availability SLO per API family (public verify, sign, admin).
-* Latency SLO (p95, p99) per endpoint class.
-* Error-budget burn-rate alerting (fast + slow) wired through
-  AlertManager.
-
-## Threat-model residuals already closed
-
-For reference, the remediation plan's G1, G2, G4, G7–G13 are closed:
+## Threat-model residuals already closed (2026-11-14)
 
 * G1 — JWT revocation + refresh rotation (`app/services/token_security.py`).
 * G2 — PostgreSQL RLS defence-in-depth (migration `h8e206f1c0a7`).
-* G4 — PDF signing via AWS KMS (`app/services/pdf_sealing.py`,
-  `tests/test_kms_sealing.py`).
-* G7 — Durable audit chain + signed anchors
-  (`app/services/audit_chain.py`, `AuditChainAnchor`).
-* G8 — Durable rate limiter (`app/services/rate_limiting.py`,
-  `RateLimitBucket`).
-* G9 — SBOM + provenance tooling is a policy decision; not wired here.
-* G10 — PDF.js + drawn-signature capture on `/sign`
-  (`app/static/vendor/pdfjs/`, `app/static/vendor/signature_pad/`,
-  `SignerAppearance`).
+* G4 — PDF signing via AWS KMS (`app/services/pdf_sealing.py`, `tests/test_kms_sealing.py`).
+* G7 — Durable audit chain + signed anchors (`app/services/audit_chain.py`, `AuditChainAnchor`).
+* G8 — Durable rate limiter (`app/services/rate_limiting.py`, `RateLimitBucket`).
+* G10 — PDF.js + drawn-signature capture on `/sign` (`app/static/vendor/pdfjs/`, `app/static/vendor/signature_pad/`, `SignerAppearance`).
 * G11 — OpenTelemetry tracing + Prometheus (`app/tracing.py`).
-* G12 — Validation-dossier retention + export
-  (`app/services/validation_dossier.py`).
-* G13 — Public verification wired to validation dossier
-  (`app/blueprints/trust/views/verify_views.py`).
+* G12 — Validation-dossier retention + export (`app/services/validation_dossier.py`).
+* G13 — Public verification wired to validation dossier (`app/blueprints/trust/views/verify_views.py`).

@@ -85,9 +85,10 @@ Options:
   but weakens the single-source-of-truth property: a Redis
   partition briefly allows duplicate writes.
 
-The existing `app/services/idempotency.py` already isolates its
-backend behind a service interface. Adding a Redis-backed
-alternative is a straight-line adapter swap.
+The existing `app/services/idempotency.py` isolates its backend behind the
+`IdempotencyRepository` protocol and ships both `PostgresIdempotencyRepository`
+(default) and `RedisIdempotencyRepository` (configurable via
+`app.config["IDEMPOTENCY_REPOSITORY"]`), verified in `tests/test_idempotency.py`.
 
 ### 3.2 Audit chain consolidation
 

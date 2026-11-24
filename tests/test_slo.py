@@ -132,3 +132,34 @@ class TestEndpoint:
             "signer",
             "admin_api",
         }
+
+
+class TestRunbookAndAlertRules:
+    def test_slo_runbook_and_prometheus_alerts_match_targets(self):
+        from pathlib import Path
+        import yaml
+        from app.services.slo import DEFAULT_TARGETS
+
+        root = Path(__file__).resolve().parent.parent
+        runbook = (root / "docs" / "runbooks" / "SLOs.md").read_text(encoding="utf-8")
+        alerts_raw = (root / "docs" / "runbooks" / "slo-alerts.prometheus.yml").read_text(
+            encoding="utf-8"
+        )
+        parsed = yaml.safe_load(alerts_raw)
+        groups = {g["name"]: g["rules"] for g in parsed["groups"]}
+        assert "trustseal_slo_availability_burn_rate" in groups
+        assert "trustseal_slo_latency" in groups
+
+        burn_rules = groups["trustseal_slo_availability_burn_rate"]
+        latency_rules = groups["trustseal_slo_latency"]
+        for cls in DEFAULT_TARGETS:
+            assert cls in runbook
+            cls_burns = {
+                r["labels"]["burn_window"]
+                for r in burn_rules
+                if r["labels"].get("endpoint_class") == cls
+            }
+            assert cls_burns == {"fast", "slow"}, f"Missing fast/slow burn alerts for {cls}"
+            assert any(
+                r["labels"].get("endpoint_class") == cls for r in latency_rules
+            ), f"Missing p95 latency alert for {cls}"
