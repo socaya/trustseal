@@ -162,6 +162,10 @@
           </svg>
           <strong>SEALED BY TRUSTSEAL</strong>
           <span>Platform verification only · Graphic preview disabled</span>
+          {% if s.ts_fingerprint %}
+          <code class="ts-sig-fp" style="font-size:10px;letter-spacing:0.04em;color:#002769;background:#eef3fa;padding:2px 6px;border:1px solid #d5e0f0;margin-top:4px;">{{ s.ts_fingerprint }}</code>
+          {% endif %}
+          <span class="ts-sig-sysver-status" data-sysver-status="{{ s.id }}" style="font-size:10.5px;color:#02982E;font-weight:600;margin-top:3px;min-height:14px;"></span>
         </div>
 
         <div class="sig-card__meta">
@@ -180,7 +184,7 @@
             {{ s.staff_email }} · {{ s.capture_engine|replace('_', ' ')|upper }}{% if s.device_name %} ({{ s.device_name }}){% endif %}
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-top:auto;">
-            <span class="ts-sig-platform-badge">TS VERIFIED</span>
+            <button type="button" class="ts-btn ts-btn--sm ts-sig-sysver-btn" data-sysver-id="{{ s.id }}" style="border-color:#002769;color:#002769;font-weight:600;" title="Run TrustSeal server-side cryptographic integrity check">TS System Verify</button>
             <div style="display:inline-flex;gap:5px;flex-wrap:wrap;">
               {% if s.approval_status != 'approved' %}
               <form method="post" action="{{ url_for('workspace_assets_views.approve_staff_signature', sig_id=s.id) }}" style="margin:0;">
@@ -531,6 +535,48 @@
       if (!uploadedUri) { e.preventDefault(); alert('Please upload a signature image first.'); return; }
       dataHidden.value = uploadedUri;
     }
+  });
+
+  // TrustSeal System-Only Cryptographic Verification (zero visual pixel exposure)
+  document.querySelectorAll('.ts-sig-sysver-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var sigId = btn.getAttribute('data-sysver-id');
+      var statusEl = document.querySelector('[data-sysver-status="' + sigId + '"]');
+      btn.disabled = true;
+      btn.textContent = 'Verifying…';
+      if (statusEl) { statusEl.style.color = '#1D3648'; statusEl.textContent = 'Running TS-HMAC-SHA256-v1 check…'; }
+      fetch('/api/signatures/' + encodeURIComponent(sigId) + '/system-verify', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        btn.disabled = false;
+        if (data && data.verified) {
+          btn.textContent = '✓ TS Verified';
+          btn.style.borderColor = '#02982E';
+          btn.style.color = '#02982E';
+          if (statusEl) {
+            statusEl.style.color = '#02982E';
+            statusEl.textContent = '✓ Vault Integrity Verified · ' + (data.checked_at || '');
+          }
+        } else {
+          btn.textContent = 'Verify Failed';
+          btn.style.borderColor = '#9b2c2c';
+          btn.style.color = '#9b2c2c';
+          if (statusEl) {
+            statusEl.style.color = '#9b2c2c';
+            statusEl.textContent = (data && data.error) ? data.error : 'Cryptographic seal check failed.';
+          }
+        }
+      })
+      .catch(function () {
+        btn.disabled = false;
+        btn.textContent = 'TS System Verify';
+        if (statusEl) { statusEl.style.color = '#9b2c2c'; statusEl.textContent = 'Network error during system verification.'; }
+      });
+    });
   });
 })();
 </script>

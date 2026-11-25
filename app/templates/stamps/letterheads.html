@@ -138,8 +138,8 @@
         <option value="garamond">Garamond</option>
         <option value="mono">Mono</option>
       </select>
-      <input type="color" id="lh-rib-accent" class="lh-rib-col" value="#0f213d" title="Brand primary">
-      <input type="color" id="lh-rib-brand2" class="lh-rib-col" value="#c59b27" title="Brand accent">
+      <input type="color" id="lh-rib-accent" class="lh-rib-col" value="#002769" title="Brand primary">
+      <input type="color" id="lh-rib-brand2" class="lh-rib-col" value="#02982E" title="Brand accent">
       <span class="lh-rib-sep" aria-hidden="true"></span>
       <button type="button" class="lh-rib-btn" data-rib-align="left" title="Align text left">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 3h12M2 6.5h8M2 10h12M2 13.5h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -263,15 +263,15 @@
                   <div class="lh-col-cell">
                     <label for="lh-accent">Primary</label>
                     <div class="lh-hex-pair">
-                      <input type="color" id="lh-accent" class="lh-col-mini" value="#0f213d">
-                      <input type="text" id="lh-accent-hex" class="lh-hex-inp" value="#0f213d" maxlength="7">
+                      <input type="color" id="lh-accent" class="lh-col-mini" value="#002769">
+                      <input type="text" id="lh-accent-hex" class="lh-hex-inp" value="#002769" maxlength="7">
                     </div>
                   </div>
                   <div class="lh-col-cell">
                     <label for="lh-brand2">Accent</label>
                     <div class="lh-hex-pair">
-                      <input type="color" id="lh-brand2" class="lh-col-mini" value="#c59b27">
-                      <input type="text" id="lh-brand2-hex" class="lh-hex-inp" value="#c59b27" maxlength="7">
+                      <input type="color" id="lh-brand2" class="lh-col-mini" value="#02982E">
+                      <input type="text" id="lh-brand2-hex" class="lh-hex-inp" value="#02982E" maxlength="7">
                     </div>
                   </div>
                   <div class="lh-col-cell">
@@ -1781,8 +1781,8 @@
   document.getElementById('lh-swatches').addEventListener('click', function (e) {
     var sw = e.target.closest('.lh-sw');
     if (!sw) return;
-    F.accent.value = sw.getAttribute('data-p') || '#0f213d';
-    F.brand2.value = sw.getAttribute('data-b') || '#c59b27';
+    F.accent.value = sw.getAttribute('data-p') || '#002769';
+    F.brand2.value = sw.getAttribute('data-b') || '#02982E';
     F.sec.value = sw.getAttribute('data-s') || '#334155';
     syncHexFromPickers();
     renderPreview();
@@ -1855,8 +1855,8 @@
       var sharedSvg = window.buildTsLhPatternSvg(pattern, primary, brand2, opacityPct);
       if (sharedSvg) return sharedSvg;
     }
-    var p = primary || '#0f213d';
-    var b = brand2 || '#c59b27';
+    var p = primary || '#002769';
+    var b = brand2 || '#02982E';
     var op = (Math.max(5, Math.min(100, opacityPct != null ? opacityPct : 85)) / 100).toFixed(2);
     var uid = 'p' + (++patUid);
     if (pattern === 'geometric_corners') {
@@ -1986,8 +1986,8 @@
   }
 
   function buildMiniHeaderHtml(c, scale) {
-    var accent = escH(c.accent_color || '#0f213d');
-    var brand2 = escH(c.brand_secondary || '#c59b27');
+    var accent = escH(c.accent_color || '#002769');
+    var brand2 = escH(c.brand_secondary || '#02982E');
     var sec = escH(c.secondary_color || '#42526e');
     var align = c.header_align || 'left';
     var isBanner = (align === 'banner' || c.header_bg === 'solid');
@@ -2051,7 +2051,7 @@
         return '<article class="lh-card" data-lh-card="' + lh.id + '">' +
           '<div class="lh-card__preview" data-open-lh="' + lh.id + '">' +
             '<div class="lh-card__sheet' + landCls + '" style="font-family:' + (FONT_STACKS[lay.font_style] || FONT_STACKS.sans) + ';background:' + escH(lay.paper_bg || '#ffffff') + ';">' +
-              buildBgPatternSvg(lay.bg_pattern, escH(lay.accent_color || '#0f213d'), escH(lay.brand_secondary || '#c59b27'), lay.bg_pattern_opacity != null ? lay.bg_pattern_opacity : 85) +
+              buildBgPatternSvg(lay.bg_pattern, escH(lay.accent_color || '#002769'), escH(lay.brand_secondary || '#02982E'), lay.bg_pattern_opacity != null ? lay.bg_pattern_opacity : 85) +
               buildMiniHeaderHtml(lay, 0.42) +
             '</div>' +
           '</div>' +
@@ -2107,7 +2107,7 @@
       return '<article class="lh-card">' +
         '<div class="lh-card__preview" data-use-tpl="' + escH(p.slug) + '">' +
           '<div class="lh-card__sheet' + landCls + '" style="font-family:' + (FONT_STACKS[lay.font_style] || FONT_STACKS.sans) + ';background:' + escH(lay.paper_bg || '#ffffff') + ';">' +
-            buildBgPatternSvg(lay.bg_pattern, escH(lay.accent_color || '#0f213d'), escH(lay.brand_secondary || '#c59b27'), lay.bg_pattern_opacity != null ? lay.bg_pattern_opacity : 85) +
+            buildBgPatternSvg(lay.bg_pattern, escH(lay.accent_color || '#002769'), escH(lay.brand_secondary || '#02982E'), lay.bg_pattern_opacity != null ? lay.bg_pattern_opacity : 85) +
             buildMiniHeaderHtml(lay, 0.4) +
           '</div>' +
         '</div>' +
@@ -2171,8 +2171,8 @@
       footer_bg: F.ftrBg.value || 'none',
       footer_min_height: parseInt(F.ftrMinH.value || '0', 10) || 0,
       footer_pad_y: parseInt(F.ftrPadY.value || '10', 10) || 10,
-      accent_color: F.accent.value || '#0f213d',
-      brand_secondary: F.brand2.value || '#c59b27',
+      accent_color: F.accent.value || '#002769',
+      brand_secondary: F.brand2.value || '#02982E',
       secondary_color: F.sec.value || '#334155',
       font_style: F.font.value || 'sans',
       body_font_pt: parseFloat(F.bodyPt.value || '10') || 10,
@@ -2573,7 +2573,7 @@
     if (mpat) mpat.textContent = PATTERN_LABELS[c.bg_pattern] || 'Clean paper';
 
     var accent = escH(c.accent_color);
-    var brand2 = escH(c.brand_secondary || '#c59b27');
+    var brand2 = escH(c.brand_secondary || '#02982E');
     var sec = escH(c.secondary_color);
     var spec = PAPER_DIMS_PX[c.paper_size] || PAPER_DIMS_PX.a4;
     var isLand = c.orientation === 'landscape';
@@ -3173,8 +3173,8 @@
     F.ftrMinH.value = lay.footer_min_height || 0;
     F.ftrPadY.value = lay.footer_pad_y != null ? lay.footer_pad_y : 10;
     activeZone = null;
-    F.accent.value = lay.accent_color || '#0f213d';
-    F.brand2.value = lay.brand_secondary || '#c59b27';
+    F.accent.value = lay.accent_color || '#002769';
+    F.brand2.value = lay.brand_secondary || '#02982E';
     F.sec.value = lay.secondary_color || '#334155';
     syncHexFromPickers();
     F.font.value = lay.font_style || 'sans';

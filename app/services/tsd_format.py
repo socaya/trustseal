@@ -390,6 +390,7 @@ _ALLOWED_ATTRS = {
         "data-tsd-marks", "data-tsd-stamp-receipt", "data-tsd-stamp-nonce",
         "data-tsd-stamp-date", "data-tsd-sig-id", "data-tsd-sig-usage",
         "data-tsd-sig-digest", "data-tsd-sig-attestation",
+        "data-ts-sig-seal", "data-ts-sig-fp",
         "data-tsd-group", "data-align",
     ],
     "a": ["href", "title", "rel", "target"],
@@ -411,7 +412,7 @@ _ALLOWED_STYLES = {
 _ALLOWED_PROTOCOLS = {"http", "https", "mailto", "data"}
 
 _SAFE_SVG_TAGS = frozenset({
-    "svg", "g", "defs", "path", "circle", "ellipse", "rect", "polygon",
+    "svg", "g", "defs", "metadata", "path", "circle", "ellipse", "rect", "polygon",
     "polyline", "line", "text", "textPath", "tspan", "image", "clipPath",
     "mask", "filter", "linearGradient", "radialGradient", "stop",
     "feTurbulence", "feDisplacementMap", "feColorMatrix", "feComposite",

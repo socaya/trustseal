@@ -770,6 +770,7 @@ def signatures_hub_page():
         from app.models.signature_governance import (
             SignatureApprovalState,
             SignatureUsageLog,
+            compute_ts_signature_seal,
             ensure_signature_governance_tables,
         )
         ensure_signature_governance_tables()
@@ -793,6 +794,12 @@ def signatures_hub_page():
             u = user_by_id.get(sp.user_id) or db.session.get(User, sp.user_id)
             full = (u.get_full_name() or "").strip() if (u and hasattr(u, "get_full_name")) else ""
             st = states_by_sig.get(sp.id)
+            _, ts_fp = compute_ts_signature_seal(
+                organization_id=actor.organization_id,
+                signature_profile_id=sp.id,
+                owner_user_id=sp.user_id,
+                signature_data=sp.signature_data or "",
+            )
             registered_signatures.append({
                 "id": sp.id,
                 "name": sp.name,
@@ -806,6 +813,7 @@ def signatures_hub_page():
                 "approval_status": st.approval_status if st else "pending",
                 "capture_engine": st.capture_engine if st else (sp.signature_type or "ts_hq_engine"),
                 "device_name": (st.device_name if st else "") or "",
+                "ts_fingerprint": ts_fp,
                 "created_at": sp.created_at.strftime("%Y-%m-%d") if sp.created_at else "",
             })
 
@@ -1054,6 +1062,20 @@ def verify_signature_usage_otp(log_id: int):
     )
     db.session.commit()  # persist a lazily provisioned tenant signing key
 
+    from app.models.signature_governance import compute_ts_signature_seal, embed_ts_forensic_seal
+    seal_hash, ts_fp = compute_ts_signature_seal(
+        organization_id=actor.organization_id,
+        signature_profile_id=sp.id,
+        owner_user_id=sp.user_id,
+        signature_data=sp.signature_data or "",
+    )
+    sealed_sig_data = embed_ts_forensic_seal(
+        sp.signature_data or "",
+        seal_hash=seal_hash,
+        fingerprint=ts_fp,
+        usage_log_id=log.id,
+    )
+
     owner_name = ((owner.get_full_name() or "").strip() if hasattr(owner, "get_full_name") else "") or owner.email or f"User #{owner.id}"
     return jsonify({
         "usage_log_id": log.id,
@@ -1061,9 +1083,55 @@ def verify_signature_usage_otp(log_id: int):
         "name": sp.name,
         "staff_name": owner_name,
         "signature_type": sp.signature_type,
-        "signature_data": sp.signature_data,
+        "signature_data": sealed_sig_data,
+        "ts_fingerprint": ts_fp,
+        "ts_seal_hash": seal_hash[:32],
+        "ts_seal_engine": "TS-HMAC-SHA256-v1",
         "verified_at": now.strftime("%Y-%m-%d %H:%M UTC"),
         **attestation,
+    })
+
+
+@workspace_assets_views.route("/api/signatures/<int:sig_id>/system-verify", methods=["POST"])
+@login_required
+def system_verify_staff_signature(sig_id):
+    """TrustSeal platform-only cryptographic integrity check for a registered signature.
+
+    Never returns raw signature pixels; executes server-side HMAC-SHA256 verification
+    and confirms approval state and vault integrity.
+    """
+    from app.models.esignature import SignatureProfile
+    from app.models.signature_governance import (
+        SignatureApprovalState,
+        verify_ts_signature_integrity,
+        ensure_signature_governance_tables,
+    )
+
+    ensure_signature_governance_tables()
+    actor = _actor()
+    sp = db.session.get(SignatureProfile, sig_id)
+    if not sp:
+        return jsonify({"verified": False, "error": "Signature not found."}), 404
+    owner = db.session.get(User, sp.user_id)
+    if not owner or owner.organization_id != actor.organization_id:
+        return jsonify({"verified": False, "error": "Unauthorized organization scope."}), 403
+
+    st = SignatureApprovalState.query.filter_by(signature_profile_id=sp.id).first()
+    approval_status = st.approval_status if st else "pending"
+    integrity = verify_ts_signature_integrity(
+        organization_id=actor.organization_id,
+        signature_profile_id=sp.id,
+        owner_user_id=sp.user_id,
+        signature_data=sp.signature_data or "",
+    )
+    return jsonify({
+        "verified": bool(integrity.get("verified")),
+        "signature_id": sp.id,
+        "approval_status": approval_status,
+        "fingerprint": integrity.get("fingerprint", ""),
+        "engine": integrity.get("engine", "TS-HMAC-SHA256-v1"),
+        "format": integrity.get("format", ""),
+        "checked_at": integrity.get("verified_at", ""),
     })
 
 
