@@ -3,16 +3,63 @@
 
 {% block title %}Evidence &amp; Retention · TRUSTSEAL{% endblock %}
 {% block page_title %}Evidence &amp; Retention{% endblock %}
-{% block page_description %}{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Cryptographic preservation records, RFC 3161 timestamps, legal holds, and validation dossiers.
+  </p>
+{% endblock %}
 {% block page_actions %}
   {% if 'audit_security_views.index' in url_map_endpoints %}
-  <a class="ts-btn" href="{{ url_for('audit_security_views.index') }}">Audit log</a>
+  <a class="ts-btn ts-btn--secondary" href="{{ url_for('audit_security_views.index') }}">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4 4h16v6H4zM4 14h16v6H4zM8 7h2M8 17h2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    </svg>
+    Audit log
+  </a>
   {% endif %}
 {% endblock %}
 
 {% block content %}
 <div class="st-flat">
   {% include "stamps/_flat_ui.html" %}
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="ts-stack--tight" style="margin-bottom: 16px;">
+        {% for category, message in messages %}
+          {% set tone = 'success' if category == 'success' else ('danger' if category in ('error', 'danger') else 'info') %}
+          <div class="ts-inline ts-inline--{{ tone }}" role="status">
+            <span class="ts-inline__icon" aria-hidden="true">{{ '✓' if tone == 'success' else ('✕' if tone == 'danger' else '●') }}</span>
+            <div class="ts-inline__body">{{ message }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  {% set s = summary if summary is defined else {'total': retentions|length, 'preserved': retentions|length, 'holds': 0, 'due': 0} %}
+  <section class="st-metrics" aria-label="Retention summary">
+    <div class="st-metric">
+      <span class="st-metric__label">Total Retentions</span>
+      <span class="st-metric__value">{{ s.total }}</span>
+      <span class="st-metric__sub">Preserved artifacts</span>
+    </div>
+    <div class="st-metric">
+      <span class="st-metric__label">Active Preservation</span>
+      <span class="st-metric__value" style="color: #17633a;">{{ s.preserved }}</span>
+      <span class="st-metric__sub">Within retention window</span>
+    </div>
+    <div class="st-metric">
+      <span class="st-metric__label">Legal Holds</span>
+      <span class="st-metric__value" {% if s.holds %}style="color: #9b2c2c;"{% endif %}>{{ s.holds }}</span>
+      <span class="st-metric__sub">Protected from purge</span>
+    </div>
+    <div class="st-metric">
+      <span class="st-metric__label">Retention Due</span>
+      <span class="st-metric__value" {% if s.due %}style="color: #8a5300;"{% endif %}>{{ s.due }}</span>
+      <span class="st-metric__sub">Past scheduled date</span>
+    </div>
+  </section>
 
   <section class="st-toolbar">
     <div class="st-search">
@@ -23,6 +70,7 @@
       <input type="search" id="ev-search" aria-label="Search evidence retentions" placeholder="Search artifact ID, type, or SHA-256 digest…">
     </div>
     <div class="st-toolbar__right">
+      <span id="ev-count" class="ev-count" aria-live="polite"></span>
       <select id="ev-status" class="st-select" aria-label="Filter retention status">
         <option value="all">All statuses</option>
         <option value="preserved">Preserved</option>
@@ -37,12 +85,12 @@
     <table class="st-table">
       <thead>
         <tr>
-          <th style="width:60px;">#</th>
+          <th style="width:64px;">#</th>
           <th>Artifact</th>
           <th>SHA-256</th>
           <th>Status</th>
           <th>Retain Until</th>
-          <th>Recorded</th>
+          <th>Recorded (UTC)</th>
           <th style="width:44px;text-align:right;"></th>
         </tr>
       </thead>
@@ -54,16 +102,17 @@
           <tr data-id="{{ r.id }}"
               data-status="{{ state_key }}"
               data-hold="{{ '1' if hold else '0' }}"
+              data-label="{{ r.artifact_type|replace('_',' ')|capitalize }} #{{ r.artifact_id }}"
               data-sha="{{ r.artifact_sha256 }}"
               data-url="{{ url_for('evidence_views.show_retention', retention_id=r.id) }}"
               data-hay="{{ (r.artifact_type ~ ' #' ~ r.artifact_id ~ ' ' ~ r.artifact_sha256)|lower }}">
-            <td style="font-family:var(--ts-font-mono);color:#64748b;">{{ r.id }}</td>
+            <td style="font-family:var(--ts-font-mono);color:var(--ts-text-subtle);">{{ r.id }}</td>
             <td style="font-weight:600;">
-              <a href="{{ url_for('evidence_views.show_retention', retention_id=r.id) }}" style="color:#091e42;text-decoration:none;">
+              <a href="{{ url_for('evidence_views.show_retention', retention_id=r.id) }}" class="ev-row-link">
                 {{ r.artifact_type|replace('_',' ')|capitalize }} #{{ r.artifact_id }}
               </a>
             </td>
-            <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#42526e;" title="{{ r.artifact_sha256 }}">
+            <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:var(--ts-text-muted);" title="{{ r.artifact_sha256 }}">
               {{ r.artifact_sha256[:18] }}…
             </td>
             <td>
@@ -75,8 +124,8 @@
                 <span class="st-tag st-tag--ok">Preserved</span>
               {% endif %}
             </td>
-            <td style="color:#42526e;">{{ r.retain_until.strftime('%Y-%m-%d') if r.retain_until else 'Indefinite' }}</td>
-            <td style="color:#64748b;">{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '—' }}</td>
+            <td style="color:var(--ts-text-secondary);">{{ r.retain_until.strftime('%Y-%m-%d') if r.retain_until else 'Indefinite' }}</td>
+            <td style="color:var(--ts-text-subtle);">{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '—' }}</td>
             <td style="text-align:right;">
               <button type="button" class="ev-more" aria-label="Retention actions">⋮</button>
             </td>
@@ -87,10 +136,22 @@
   </section>
   {% else %}
   <section class="st-empty">
+    <div class="st-empty__icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <path d="M4 5h16v14H4z" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M8 9h8M8 13h8M8 17h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
     <div class="st-empty__title">No evidence retentions recorded yet</div>
+    <p class="st-empty__desc">
+      Evidence retentions are created automatically when sealed PDFs are preserved under your organization's compliance policy, capturing RFC 3161 timestamps, OCSP/CRL snapshots, and validation dossiers.
+    </p>
     <div class="st-empty__actions">
+      {% if 'verify_views.verify_form' in url_map_endpoints %}
+      <a class="ts-btn ts-btn--primary" href="{{ url_for('verify_views.verify_form') }}">Verify a document</a>
+      {% endif %}
       {% if 'audit_security_views.index' in url_map_endpoints %}
-      <a class="ts-btn" href="{{ url_for('audit_security_views.index') }}">Open audit log</a>
+      <a class="ts-btn ts-btn--secondary" href="{{ url_for('audit_security_views.index') }}">Open audit log</a>
       {% endif %}
     </div>
   </section>
@@ -110,21 +171,78 @@
   <button type="button" class="ev-ctx__item" data-act="hold" id="ev-ctx-hold">Place Legal Hold</button>
 </div>
 
+<!-- Legal Hold Modal -->
+<div id="ev-hold-overlay" class="ts-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="ev-hold-title">
+  <div class="ts-modal">
+    <h2 id="ev-hold-title" class="ts-modal__title">Place Legal Hold</h2>
+    <p id="ev-hold-sub" style="margin:0 0 14px;font-size:13px;color:var(--ts-text-muted);"></p>
+    <div class="ts-field">
+      <label class="ts-field__label" for="ev-hold-reason">Reason</label>
+      <input type="text" id="ev-hold-reason" class="ts-input" maxlength="500" placeholder="Enter compliance or legal review reason">
+    </div>
+    <div class="ts-modal__actions">
+      <button type="button" class="ts-btn ts-btn--secondary" id="ev-hold-cancel">Cancel</button>
+      <button type="button" class="ts-btn ts-btn--primary" id="ev-hold-confirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <style>
-  .ev-more { border: 0; background: transparent; color: #64748b; width: 28px; height: 28px; cursor: pointer; font-size: 15px; }
-  .ev-more:hover { background: #eef2f7; color: #091e42; }
+  .ev-count {
+    font-size: 12px;
+    color: var(--ts-text-subtle, #718494);
+    font-variant-numeric: tabular-nums;
+  }
+  .ev-row-link {
+    color: var(--ts-text, #1d3648);
+    text-decoration: none;
+  }
+  .ev-row-link:hover {
+    color: var(--ts-brand-primary, #002769);
+    text-decoration: underline;
+  }
+  .ev-more {
+    border: 0;
+    background: transparent;
+    color: var(--ts-text-subtle, #718494);
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    font-size: 15px;
+  }
+  .ev-more:hover {
+    background: var(--ts-surface-hover, #eef2f7);
+    color: var(--ts-text, #1d3648);
+  }
   .ev-ctx {
-    position: fixed; z-index: 1200; min-width: 195px;
-    background: #ffffff; box-shadow: 0 8px 24px rgba(9, 30, 66, 0.14);
+    position: fixed;
+    z-index: 1200;
+    min-width: 200px;
+    background: var(--ts-surface, #ffffff);
+    border: 1px solid var(--ts-border, #ebeef2);
+    box-shadow: var(--ts-shadow-overlay, 0 10px 28px rgba(16, 24, 40, 0.12));
     padding: 4px 0;
   }
   .ev-ctx__item {
-    display: block; width: 100%; text-align: left; border: 0;
-    background: transparent; padding: 8px 14px; font-size: 12.5px;
-    color: #091e42; cursor: pointer;
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: 0;
+    background: transparent;
+    padding: 8px 14px;
+    font-size: 12.5px;
+    color: var(--ts-text, #1d3648);
+    cursor: pointer;
   }
-  .ev-ctx__item:hover { background: #f1f5f9; color: #1e4b9e; }
-  .ev-ctx__sep { height: 1px; background: rgba(15, 23, 42, 0.06); margin: 4px 0; }
+  .ev-ctx__item:hover {
+    background: var(--ts-surface-alt, #f9fafc);
+    color: var(--ts-brand-primary, #002769);
+  }
+  .ev-ctx__sep {
+    height: 1px;
+    background: var(--ts-border, #ebeef2);
+    margin: 4px 0;
+  }
 </style>
 
 <script>
@@ -132,15 +250,33 @@
   var tbody = document.getElementById('ev-tbody');
   var searchEl = document.getElementById('ev-search');
   var statusEl = document.getElementById('ev-status');
+  var countEl = document.getElementById('ev-count');
+
+  function showToast(msg, tone) {
+    var region = document.getElementById('ts-toasts');
+    if (!region) return;
+    var el = document.createElement('div');
+    el.className = 'ts-toast ts-toast--' + (tone || 'info');
+    el.textContent = msg;
+    region.appendChild(el);
+    setTimeout(function () { el.remove(); }, 2800);
+  }
+
   function apply() {
     if (!tbody) return;
     var q = (searchEl.value || '').trim().toLowerCase();
     var s = statusEl.value;
-    tbody.querySelectorAll('tr').forEach(function (r) {
+    var rows = tbody.querySelectorAll('tr');
+    var shown = 0;
+    rows.forEach(function (r) {
       var ok = (!q || (r.dataset.hay || '').indexOf(q) !== -1)
         && (s === 'all' || r.dataset.status === s);
       r.style.display = ok ? '' : 'none';
+      if (ok) shown += 1;
     });
+    if (countEl) {
+      countEl.textContent = shown === rows.length ? '' : (shown + ' of ' + rows.length + ' shown');
+    }
   }
   if (searchEl) searchEl.addEventListener('input', apply);
   if (statusEl) statusEl.addEventListener('change', apply);
@@ -149,25 +285,50 @@
   var holdItem = document.getElementById('ev-ctx-hold');
   var form = document.getElementById('ev-action-form');
   var reasonInput = document.getElementById('ev-reason-input');
+  var overlay = document.getElementById('ev-hold-overlay');
+  var holdTitle = document.getElementById('ev-hold-title');
+  var holdSub = document.getElementById('ev-hold-sub');
+  var holdReason = document.getElementById('ev-hold-reason');
+  var holdCancel = document.getElementById('ev-hold-cancel');
+  var holdConfirm = document.getElementById('ev-hold-confirm');
   var activeRow = null;
+  var pendingHoldId = null;
 
   function hide() { if (menu) menu.hidden = true; activeRow = null; }
+  function closeModal() { if (overlay) overlay.hidden = true; pendingHoldId = null; }
+
   function openMenu(row, x, y) {
     activeRow = row;
     var onHold = row.dataset.hold === '1';
     if (holdItem) holdItem.textContent = onHold ? 'Release Legal Hold' : 'Place Legal Hold';
     menu.hidden = false;
-    var mw = menu.offsetWidth || 195, mh = menu.offsetHeight || 150;
+    var mw = menu.offsetWidth || 200, mh = menu.offsetHeight || 150;
     menu.style.left = Math.min(x, window.innerWidth - mw - 8) + 'px';
     menu.style.top = Math.min(y, window.innerHeight - mh - 8) + 'px';
   }
+
+  if (holdCancel) holdCancel.addEventListener('click', closeModal);
+  if (overlay) {
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) closeModal();
+    });
+  }
+  if (holdConfirm) {
+    holdConfirm.addEventListener('click', function () {
+      if (!pendingHoldId) return;
+      reasonInput.value = (holdReason.value || '').trim();
+      form.action = '/evidence/retentions/' + pendingHoldId + '/legal-hold';
+      form.submit();
+    });
+  }
+
   if (tbody && menu) {
     tbody.addEventListener('click', function (e) {
       var btn = e.target.closest('.ev-more');
       if (!btn) return;
       e.stopPropagation();
       var r = btn.getBoundingClientRect();
-      openMenu(btn.closest('tr'), r.right - 195, r.bottom + 4);
+      openMenu(btn.closest('tr'), r.right - 200, r.bottom + 4);
     });
     tbody.addEventListener('contextmenu', function (e) {
       var tr = e.target.closest('tr');
@@ -182,25 +343,31 @@
       var act = item.dataset.act;
       var url = activeRow.dataset.url;
       var sha = activeRow.dataset.sha;
+      var label = activeRow.dataset.label || ('Retention #' + id);
       var onHold = activeRow.dataset.hold === '1';
       hide();
       if (act === 'open') {
         window.location = url;
       } else if (act === 'copy' && navigator.clipboard) {
-        navigator.clipboard.writeText(sha);
+        navigator.clipboard.writeText(sha).then(function () {
+          showToast('Copied SHA-256 digest to clipboard', 'success');
+        });
       } else if (act === 'extend') {
         form.action = '/evidence/retentions/' + id + '/extend';
         form.submit();
-      } else if (act === 'hold') {
-        var r = prompt(onHold ? 'Reason for releasing legal hold:' : 'Reason for placing legal hold:', onHold ? 'Cleared by legal review' : 'Pending compliance investigation');
-        if (r === null) return;
-        reasonInput.value = r;
-        form.action = '/evidence/retentions/' + id + '/legal-hold';
-        form.submit();
+      } else if (act === 'hold' && overlay) {
+        pendingHoldId = id;
+        holdTitle.textContent = onHold ? 'Release Legal Hold' : 'Place Legal Hold';
+        holdSub.textContent = (onHold ? 'Release the active legal hold on ' : 'Prevent scheduled purge on ') + label + '.';
+        holdReason.value = onHold ? 'Cleared by legal review' : 'Pending compliance investigation';
+        overlay.hidden = false;
+        holdReason.focus();
       }
     });
     document.addEventListener('click', hide);
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { hide(); closeModal(); }
+    });
   }
 })();
 </script>

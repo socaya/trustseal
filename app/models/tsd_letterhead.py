@@ -378,6 +378,10 @@ LETTERHEAD_PRESETS: list[dict] = [
     },
 ]
 
+from app.models.letterhead_presets_catalog import build_extended_letterhead_presets as _build_ext_lh_presets
+
+LETTERHEAD_PRESETS.extend(_build_ext_lh_presets(_brand_emblem_uri))
+
 
 def render_letterhead_parts(layout: dict | None) -> tuple[str, str]:
     """Build clean, print-ready HTML snippets for ``(header_html, footer_html)``."""

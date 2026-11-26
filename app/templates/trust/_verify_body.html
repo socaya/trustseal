@@ -14,10 +14,13 @@
 #}
 
 {% if not enabled %}
-  <div class="ts-inline ts-inline--warning" style="margin-bottom: var(--ts-space-5);">
+  <div class="ts-inline ts-inline--warning" style="margin-bottom: var(--ts-space-5);" role="status">
+    <span class="ts-inline__icon" aria-hidden="true">⚠</span>
     <div class="ts-inline__body">
       <div class="ts-inline__title">Verification is not enabled on this deployment</div>
-      <p style="margin-top: 4px;">Contact the document sender for an alternative method.</p>
+      <p style="margin-top: 4px;">
+        Public PDF verification is currently turned off in this environment. Contact your workspace administrator or the document sender for an alternative method.
+      </p>
     </div>
   </div>
 {% endif %}
@@ -25,120 +28,397 @@
 {% if error %}
   <div class="ts-inline ts-inline--danger" style="margin-bottom: var(--ts-space-5);"
        role="alert" aria-live="polite">
+    <span class="ts-inline__icon" aria-hidden="true">✕</span>
     <div class="ts-inline__body">
-      <div class="ts-inline__title">Request rejected</div>
+      <div class="ts-inline__title">✕ Request rejected</div>
       <p style="margin-top: 4px;">{{ error }}</p>
     </div>
   </div>
 {% endif %}
 
-{% if verdict %}
-  {% set verdict_tone = {
-      'valid':     'success',
-      'untrusted': 'warning',
-      'mismatch':  'danger',
-      'invalid':   'danger'
-  }.get(verdict, 'indeterminate') %}
-  {% set verdict_label = {
-      'valid':     'Valid',
-      'untrusted': 'Untrusted',
-      'mismatch':  'Invalid',
-      'invalid':   'Invalid'
-  }.get(verdict, 'Indeterminate') %}
-
-  <section class="ts-panel" aria-labelledby="verdict-heading" style="margin-bottom: var(--ts-space-5);">
-    <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ts-space-3);">
-      <h2 id="verdict-heading" class="ts-panel__title" style="margin: 0;">Verification result</h2>
-      <span class="ts-status ts-status--{{ verdict_tone }}">{{ verdict_label }}</span>
+<div class="vf-grid">
+  <!-- Left column: Verification input form -->
+  <section class="st-panel vf-card" aria-labelledby="form-heading">
+    <div class="st-panel__head">
+      <h2 id="form-heading" class="st-panel__title">
+        {% if verdict %}Verify another document{% else %}Verify a document{% endif %}
+      </h2>
+      <span class="st-tag st-tag--info">SHA-256 · PDF</span>
     </div>
-    <p style="margin-top: var(--ts-space-3); color: var(--ts-text);">{{ verdict_detail }}</p>
 
-    {% set rows = [] %}
-    {% set _ = rows.append({
-      'label': 'Document integrity',
-      'value': 'Bytes match the recorded SHA-256.' if verdict == 'valid'
-               else 'Byte comparison against the evidence digest failed.',
-      'state_label': 'Valid' if verdict == 'valid'
-                     else ('Invalid' if verdict in ['mismatch', 'invalid'] else 'Indeterminate'),
-      'tone': 'success' if verdict == 'valid'
-              else ('danger' if verdict in ['mismatch', 'invalid'] else 'indeterminate'),
-    }) %}
-    {% set _ = rows.append({
-      'label': 'Platform certificate',
-      'value': 'Signature was produced by the pinned platform certificate.' if verdict == 'valid'
-               else 'The embedded signer certificate did not match the pinned platform certificate.',
-      'state_label': 'Valid' if verdict == 'valid'
-                     else ('Invalid' if verdict == 'untrusted' else 'Indeterminate'),
-      'tone': 'success' if verdict == 'valid'
-              else ('warning' if verdict == 'untrusted' else 'indeterminate'),
-    }) %}
-    {% if document_sha256 %}
-      {% set _ = rows.append({'label': 'Document SHA-256', 'value': document_sha256, 'state_label': 'Captured', 'tone': 'neutral', 'mono': True}) %}
-    {% endif %}
-    {% if evidence_sha256 %}
-      {% set _ = rows.append({'label': 'Evidence digest (input)', 'value': evidence_sha256, 'state_label': 'Captured', 'tone': 'neutral', 'mono': True}) %}
-    {% endif %}
-    {% if certificate_sha256 %}
-      {% set _ = rows.append({'label': 'Signer certificate SHA-256', 'value': certificate_sha256, 'state_label': 'Captured', 'tone': 'neutral', 'mono': True}) %}
-    {% endif %}
-    {% set _ = rows.append({
-      'label': 'Assurance tier',
-      'value': 'Platform certificate seal — not an individual signer certificate. A platform-sealed PDF proves that the TRUSTSEAL key signed these bytes; it does not independently prove that each named signatory separately produced a cryptographic signature.',
-      'state_label': 'Noted',
-      'tone': 'info',
-    }) %}
-    <div style="margin-top: var(--ts-space-4);">
-      {% include "components_ds/evidence_summary.html" %}
+    <div class="vf-card__body">
+      <p class="vf-lead">
+        Supply both the 64-character evidence digest issued with the document and the sealed PDF. Uploaded bytes are hashed in memory and immediately discarded.
+      </p>
+
+      <form method="POST" enctype="multipart/form-data"
+            action="{{ url_for('verify_views.verify_pdf') }}" novalidate
+            class="ts-stack" id="vf-form">
+        <div class="ts-field">
+          <div class="vf-label-row">
+            <label class="ts-field__label" data-required="true" for="evidence_sha256">
+              Evidence digest (SHA-256)
+            </label>
+            <span class="vf-char-count" id="vf-hex-count" aria-live="polite">0 / 64 hex</span>
+          </div>
+          <input type="text" id="evidence_sha256" name="evidence_sha256"
+                 value="{{ evidence_sha256 or '' }}"
+                 required pattern="[0-9a-fA-F]{64}" minlength="64" maxlength="64"
+                 autocomplete="off" spellcheck="false"
+                 placeholder="e.g. 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+                 class="ts-input ts-input--mono"
+                 aria-describedby="evidence-help">
+          <span id="evidence-help" class="ts-field__hint">
+            The 64-character hexadecimal digest supplied by the issuer in the document's evidence package.
+          </span>
+        </div>
+
+        <div class="ts-field">
+          <label class="ts-field__label" data-required="true" for="pdf">Sealed PDF</label>
+          <div class="vf-drop" id="vf-drop">
+            <input type="file" id="pdf" name="pdf"
+                   accept="application/pdf,.pdf" required
+                   class="vf-drop__input"
+                   aria-describedby="pdf-help">
+            <div class="vf-drop__icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path d="M6 3h8l4 4v14H6V3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M14 3v4h4M12 11v6m0-6-2.5 2.5M12 11l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="vf-drop__title" id="vf-file-label">
+              Drop sealed PDF here, or <span class="vf-drop__browse">browse files</span>
+            </div>
+            <div class="vf-drop__sub" id="vf-file-meta">PDF up to 16 MiB · Zero server retention</div>
+          </div>
+          <span id="pdf-help" class="ts-field__hint">
+            Uploaded bytes are compared server-side and immediately discarded — nothing is stored.
+          </span>
+        </div>
+
+        <div class="vf-actions">
+          <button type="submit" class="ts-btn ts-btn--primary"
+                  {% if not enabled %}disabled aria-disabled="true" title="Public verification is disabled on this deployment"{% endif %}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 3l8 3v6c0 4-3.5 7.5-8 9-4.5-1.5-8-5-8-9V6l8-3z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+              <path d="M8.5 12l2.5 2.5L15.5 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Verify document
+          </button>
+          {% if not enabled %}
+          <span class="vf-disabled-note">Disabled on this deployment</span>
+          {% endif %}
+        </div>
+      </form>
     </div>
   </section>
-{% endif %}
 
-<section class="ts-panel" aria-labelledby="form-heading">
-  <h2 id="form-heading" class="ts-panel__title">
-    {% if verdict %}Verify another document{% else %}Verify a document{% endif %}
-  </h2>
-  <p class="ts-panel__meta" style="margin-bottom: var(--ts-space-4);">
-    Supply both the evidence digest issued with the document and the sealed
-    PDF. Results describe exactly which checks ran.
-  </p>
-  <form method="POST" enctype="multipart/form-data"
-        action="{{ url_for('verify_views.verify_pdf') }}" novalidate
-        class="ts-stack">
-    <div class="ts-field">
-      <label class="ts-field__label" data-required="true" for="evidence_sha256">
-        Evidence digest (SHA-256)
-      </label>
-      <input type="text" id="evidence_sha256" name="evidence_sha256"
-             required pattern="[0-9a-fA-F]{64}" minlength="64" maxlength="64"
-             autocomplete="off"
-             class="ts-input ts-input--mono"
-             aria-describedby="evidence-help">
-      <span id="evidence-help" class="ts-field__hint">
-        The 64-character hex digest supplied by the issuer in the document's
-        evidence package.
-      </span>
-    </div>
+  <!-- Right column: Verdict result OR Verification Scope guide -->
+  {% if verdict %}
+    {% set verdict_tone = {
+        'valid':     'success',
+        'untrusted': 'warning',
+        'mismatch':  'danger',
+        'invalid':   'danger'
+    }.get(verdict, 'indeterminate') %}
+    {% set verdict_label = {
+        'valid':     '✓ Valid',
+        'untrusted': '⚠ Untrusted',
+        'mismatch':  '✕ Invalid',
+        'invalid':   '✕ Invalid'
+    }.get(verdict, '● Indeterminate') %}
 
-    <div class="ts-field">
-      <label class="ts-field__label" data-required="true" for="pdf">Sealed PDF</label>
-      <input type="file" id="pdf" name="pdf"
-             accept="application/pdf,.pdf" required
-             class="ts-input"
-             aria-describedby="pdf-help">
-      <span id="pdf-help" class="ts-field__hint">
-        Up to 16 MiB. Uploaded bytes are hashed and immediately discarded —
-        nothing is stored on this server.
-      </span>
-    </div>
+    <section class="st-panel vf-card" aria-labelledby="verdict-heading">
+      <div class="st-panel__head">
+        <h2 id="verdict-heading" class="st-panel__title">Verification Result</h2>
+        <span class="ts-status ts-status--{{ verdict_tone }}">{{ verdict_label }}</span>
+      </div>
+      <div class="vf-card__body">
+        <div class="vf-verdict-banner vf-verdict-banner--{{ verdict_tone }}" role="status">
+          <strong>{{ verdict_label }}</strong>
+          <span>{{ verdict_detail }}</span>
+        </div>
 
-    <div class="ts-form-actions">
-      <button type="submit" class="ts-btn ts-btn--primary">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M12 3l8 3v6c0 4-3.5 7.5-8 9-4.5-1.5-8-5-8-9V6l8-3z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
-          <path d="M8.5 12l2.5 2.5L15.5 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        Verify document
-      </button>
-    </div>
-  </form>
-</section>
+        {% set rows = [] %}
+        {% set _ = rows.append({
+          'label': 'Document integrity',
+          'value': 'Bytes match the recorded SHA-256.' if verdict == 'valid'
+                   else 'Byte comparison against the evidence digest failed.',
+          'state_label': 'Valid' if verdict == 'valid'
+                         else ('Invalid' if verdict in ['mismatch', 'invalid'] else 'Indeterminate'),
+          'tone': 'success' if verdict == 'valid'
+                  else ('danger' if verdict in ['mismatch', 'invalid'] else 'indeterminate'),
+        }) %}
+        {% set _ = rows.append({
+          'label': 'Platform certificate',
+          'value': 'Signature was produced by the pinned platform certificate.' if verdict == 'valid'
+                   else 'The embedded signer certificate did not match the pinned platform certificate.',
+          'state_label': 'Valid' if verdict == 'valid'
+                         else ('Invalid' if verdict == 'untrusted' else 'Indeterminate'),
+          'tone': 'success' if verdict == 'valid'
+                  else ('warning' if verdict == 'untrusted' else 'indeterminate'),
+        }) %}
+        {% if document_sha256 %}
+          {% set _ = rows.append({'label': 'Document SHA-256', 'value': document_sha256, 'state_label': 'Captured', 'tone': 'neutral', 'mono': True}) %}
+        {% endif %}
+        {% if evidence_sha256 %}
+          {% set _ = rows.append({'label': 'Evidence digest (input)', 'value': evidence_sha256, 'state_label': 'Captured', 'tone': 'neutral', 'mono': True}) %}
+        {% endif %}
+        {% if certificate_sha256 %}
+          {% set _ = rows.append({'label': 'Signer certificate SHA-256', 'value': certificate_sha256, 'state_label': 'Captured', 'tone': 'neutral', 'mono': True}) %}
+        {% endif %}
+        {% set _ = rows.append({
+          'label': 'Assurance tier',
+          'value': 'Platform certificate seal — proves that the TRUSTSEAL key signed these exact bytes; does not independently prove individual signatory keys.',
+          'state_label': 'Noted',
+          'tone': 'info',
+        }) %}
+        {% include "components_ds/evidence_summary.html" %}
+      </div>
+    </section>
+  {% else %}
+    <section class="st-panel vf-card" aria-labelledby="scope-heading">
+      <div class="st-panel__head">
+        <h2 id="scope-heading" class="st-panel__title">Verification Checks</h2>
+        <span class="st-tag">Zero-Retention</span>
+      </div>
+      <div class="vf-card__body">
+        <ol class="vf-steps">
+          <li class="vf-step">
+            <span class="vf-step__num">01</span>
+            <div>
+              <div class="vf-step__title">Byte-level SHA-256 Integrity</div>
+              <div class="vf-step__desc">Hashes the uploaded PDF and confirms an exact cryptographic match against the supplied evidence digest.</div>
+            </div>
+          </li>
+          <li class="vf-step">
+            <span class="vf-step__num">02</span>
+            <div>
+              <div class="vf-step__title">Pinned Platform Certificate</div>
+              <div class="vf-step__desc">Inspects the embedded PDF digital signature and validates it against the deployment's pinned platform certificate.</div>
+            </div>
+          </li>
+          <li class="vf-step">
+            <span class="vf-step__num">03</span>
+            <div>
+              <div class="vf-step__title">Privacy-Preserving Execution</div>
+              <div class="vf-step__desc">No tenant lookup is performed and uploaded files are discarded immediately after hashing.</div>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
+  {% endif %}
+</div>
+
+<style>
+.vf-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 18px;
+  align-items: start;
+}
+.ts-public-main--narrow .vf-grid {
+  grid-template-columns: 1fr;
+}
+@media (max-width: 960px) {
+  .vf-grid { grid-template-columns: 1fr; }
+}
+.vf-card {
+  background: var(--ts-surface, #ffffff);
+  border: 1px solid var(--ts-border, #ebeef2);
+}
+.vf-card__body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.vf-lead {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ts-text-muted, #4c6273);
+}
+.vf-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.vf-char-count {
+  font-family: var(--ts-font-mono);
+  font-size: 11px;
+  color: var(--ts-text-subtle, #718494);
+  font-variant-numeric: tabular-nums;
+}
+.vf-char-count.is-valid {
+  color: #17633a;
+  font-weight: 600;
+}
+.vf-drop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 28px 18px;
+  border: 1px dashed var(--ts-border-strong, #b8c2d1);
+  background: var(--ts-surface-alt, #f9fafc);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.vf-drop:hover,
+.vf-drop.is-drag,
+.vf-drop:focus-within {
+  border-color: var(--ts-brand-primary, #002769);
+  background: var(--ts-brand-primary-soft, #eef3fa);
+}
+.vf-drop__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.vf-drop__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--ts-surface, #ffffff);
+  border: 1px solid var(--ts-border, #ebeef2);
+  color: var(--ts-brand-primary, #002769);
+  margin-bottom: 2px;
+}
+.vf-drop__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ts-text, #1d3648);
+  word-break: break-word;
+}
+.vf-drop__browse {
+  color: var(--ts-brand-primary, #002769);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.vf-drop__sub {
+  font-size: 11.5px;
+  color: var(--ts-text-subtle, #718494);
+}
+.vf-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ts-border, #ebeef2);
+}
+.vf-disabled-note {
+  font-size: 12px;
+  color: var(--ts-text-subtle, #718494);
+}
+.vf-verdict-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--ts-border-strong);
+  background: var(--ts-surface-alt);
+  font-size: 13px;
+}
+.vf-verdict-banner--success { background: var(--ts-green-soft); border-left-color: var(--ts-brand-green); color: #14532d; }
+.vf-verdict-banner--warning { background: var(--ts-warning-soft); border-left-color: var(--ts-warning); color: var(--ts-warning); }
+.vf-verdict-banner--danger  { background: var(--ts-danger-soft); border-left-color: var(--ts-danger); color: var(--ts-danger); }
+.vf-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.vf-step {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.vf-step__num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-family: var(--ts-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ts-brand-primary, #002769);
+  background: var(--ts-brand-primary-soft, #eef3fa);
+}
+.vf-step__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ts-text, #1d3648);
+  margin-bottom: 3px;
+}
+.vf-step__desc {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ts-text-muted, #4c6273);
+}
+</style>
+
+<script>
+(function () {
+  var hexEl = document.getElementById('evidence_sha256');
+  var countEl = document.getElementById('vf-hex-count');
+  var dropEl = document.getElementById('vf-drop');
+  var fileEl = document.getElementById('pdf');
+  var fileLbl = document.getElementById('vf-file-label');
+  var fileMeta = document.getElementById('vf-file-meta');
+
+  function updateHex() {
+    if (!hexEl || !countEl) return;
+    var val = (hexEl.value || '').trim();
+    var valid = /^[0-9a-fA-F]{64}$/.test(val);
+    countEl.textContent = valid ? '64 / 64 hex ✓' : (val.length + ' / 64 hex');
+    countEl.classList.toggle('is-valid', valid);
+  }
+  if (hexEl) {
+    hexEl.addEventListener('input', updateHex);
+    updateHex();
+  }
+
+  function formatBytes(n) {
+    if (!n) return '';
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KiB';
+    return (n / 1048576).toFixed(2) + ' MiB';
+  }
+
+  if (fileEl && fileLbl && fileMeta) {
+    fileEl.addEventListener('change', function () {
+      var f = fileEl.files && fileEl.files[0];
+      if (f) {
+        fileLbl.textContent = f.name;
+        fileMeta.textContent = formatBytes(f.size) + ' · Ready to verify';
+      } else {
+        fileLbl.innerHTML = 'Drop sealed PDF here, or <span class="vf-drop__browse">browse files</span>';
+        fileMeta.textContent = 'PDF up to 16 MiB · Zero server retention';
+      }
+    });
+  }
+  if (dropEl) {
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      dropEl.addEventListener(ev, function () { dropEl.classList.add('is-drag'); });
+    });
+    ['dragleave', 'drop'].forEach(function () {
+      dropEl.classList.remove('is-drag');
+    });
+  }
+})();
+</script>

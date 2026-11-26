@@ -22,15 +22,20 @@
       <strong>CONTRACTS</strong><small>LIFECYCLE</small>
     </div>
     <span class="ts-ed__divider" aria-hidden="true"></span>
-    <nav class="ct-nav-pills" id="ct-stage-tabs" role="tablist" aria-label="Contract lifecycle stages">
-      <button type="button" role="tab" class="ct-pill is-active" data-stage="all">All <span>{{ counts.all }}</span></button>
-      {% for key, lbl in stages %}
-      <button type="button" role="tab" class="ct-pill" data-stage="{{ key }}">{{ lbl }} <span>{{ counts[key] }}</span></button>
+    <nav class="ct-nav-pills" id="ct-stage-tabs" role="tablist" aria-label="Contract canonical statuses">
+      <button type="button" role="tab" class="ct-pill is-active" data-cstatus="ALL">All <span>{{ status_counts.ALL if status_counts is defined else counts.all }}</span></button>
+      {% for skey, slbl in (contract_statuses if contract_statuses is defined else [('DRAFT','Draft'),('SIGNED','Signed'),('SUSPENDED','Suspended'),('TERMINATED','Terminated')]) %}
+      <button type="button" role="tab" class="ct-pill" data-cstatus="{{ skey }}">{{ slbl }} <span>{{ status_counts[skey] if status_counts is defined else 0 }}</span></button>
       {% endfor %}
     </nav>
     <div class="ts-ed__spacer"></div>
-    <a class="ts-ed__btn ts-ed__btn--ghost" href="{{ url_for('workspace_assets_views.letterheads_page') }}">Letterheads</a>
-    <a class="ts-ed__btn ts-ed__btn--ghost" href="{{ url_for('tsd_stamps_views.verify_page') }}">Verify</a>
+    {% if 'contracts_views.projects_page' in url_map_endpoints %}
+    <a class="ts-ed__btn ts-ed__btn--ghost" href="{{ url_for('contracts_views.projects_page') }}">Projects</a>
+    {% endif %}
+    {% if 'contracts_views.contract_templates_page' in url_map_endpoints %}
+    <a class="ts-ed__btn ts-ed__btn--ghost" href="{{ url_for('contracts_views.contract_templates_page') }}">Templates</a>
+    {% endif %}
+    <button type="button" class="ts-ed__btn" id="ct-open-upload">↑ Upload signed</button>
     <button type="button" class="ts-ed__btn ts-ed__btn--primary" id="ct-open-new">+ New contract</button>
   </header>
 
@@ -40,10 +45,12 @@
       <button type="button" class="st-menu__btn" aria-haspopup="true" aria-expanded="false">File</button>
       <div class="st-menu__panel" role="menu" hidden>
         <button type="button" class="st-menu__item" data-mcmd="new">New contract</button>
-        <button type="button" class="st-menu__item" data-mcmd="letterheads">Letterhead Studio…</button>
-        <button type="button" class="st-menu__item" data-mcmd="stamps">Stamp Studio…</button>
+        <button type="button" class="st-menu__item" data-mcmd="upload">Upload signed contract…</button>
+        <button type="button" class="st-menu__item" data-mcmd="templates">Contract templates…</button>
+        <button type="button" class="st-menu__item" data-mcmd="projects">Project portfolio…</button>
         <div class="st-menu__sep"></div>
-        <button type="button" class="st-menu__item" data-mcmd="verify">Forensic verify…</button>
+        <button type="button" class="st-menu__item" data-mcmd="export_csv">Export portfolio CSV</button>
+        <button type="button" class="st-menu__item" data-mcmd="print">Print portfolio register</button>
       </div>
     </div>
     <div class="st-menu" data-menu="view">
@@ -66,6 +73,13 @@
       <input type="search" id="ct-search" placeholder="Search contracts, counterparty, owner…">
     </div>
 
+    <select id="ct-project-filter" class="ct-rib-sel" aria-label="Filter by project">
+      <option value="all">All projects</option>
+      {% for p in (projects if projects is defined else []) %}
+      <option value="{{ p.id }}" {% if selected_project_id == p.id %}selected{% endif %}>{{ p.project_code }} · {{ p.name }}</option>
+      {% endfor %}
+    </select>
+
     <select id="ct-source" class="ct-rib-sel" aria-label="Filter source">
       <option value="all">All sources</option>
       <option value="tsd">TS Documents</option>
@@ -85,7 +99,7 @@
   </nav>
 
   {# ======================= 3. STUDIO WORKSPACE + DYNAMIC RIGHT PANE ======================= #}
-  <main class="st-canvas ct-workspace" id="ct-workspace">
+  <div class="st-canvas ct-workspace" id="ct-workspace">
     <section class="st-canvas__stage ct-stage">
       {# Sleek < > Pane Divider Rail #}
       <button type="button" class="ct-pane-rail" id="ct-pane-toggle" aria-expanded="true" title="Collapse / expand inspector">
@@ -95,18 +109,43 @@
       </button>
 
       <div class="ct-stage-scroll">
+        {# ---- CLM PORTFOLIO KPI STRIP ---- #}
+        {% set k = kpi if kpi is defined else {'total': counts.all, 'draft': counts.draft, 'signed': counts.signed, 'suspended': 0, 'terminated': 0} %}
+        <div class="st-metrics" style="margin-bottom:14px;">
+          <div class="st-metric">
+            <span class="st-metric__label">Total Contracts</span>
+            <span class="st-metric__value">{{ k.total }}</span>
+            <span class="st-metric__sub">{{ k.draft if k.draft is defined else k.in_flight }} in DRAFT</span>
+          </div>
+          <div class="st-metric">
+            <span class="st-metric__label">Signed / Active</span>
+            <span class="st-metric__value" style="color:#17633a;">{{ k.signed if k.signed is defined else k.active }}</span>
+            <span class="st-metric__sub">Executed &amp; sealed</span>
+          </div>
+          <div class="st-metric">
+            <span class="st-metric__label">Suspended</span>
+            <span class="st-metric__value" {% if k.suspended %}style="color:#8a5300;"{% endif %}>{{ k.suspended if k.suspended is defined else 0 }}</span>
+            <span class="st-metric__sub">Timers paused</span>
+          </div>
+          <div class="st-metric">
+            <span class="st-metric__label">Terminated</span>
+            <span class="st-metric__value" {% if k.terminated %}style="color:#9b2c2c;"{% endif %}>{{ k.terminated if k.terminated is defined else 0 }}</span>
+            <span class="st-metric__sub">Closed / expired</span>
+          </div>
+        </div>
+
         {% if contracts %}
         {# ---- TABLE VIEW ---- #}
         <div id="ct-view-table" class="ct-table-card">
           <table class="st-table ct-table" id="ct-table">
             <thead>
               <tr>
+                <th style="width:105px;">Ref #</th>
                 <th>Contract Title</th>
+                <th>Project</th>
                 <th>Counterparty</th>
-                <th>Lifecycle Stage</th>
-                <th>Source</th>
-                <th>Owner</th>
-                <th>Stamps</th>
+                <th>Status</th>
+                <th>Deliverables</th>
                 <th>Updated</th>
                 <th style="width:42px;"></th>
               </tr>
@@ -115,6 +154,9 @@
               {% for c in contracts %}
               <tr data-id="{{ c.id }}"
                   data-source="{{ c.source }}"
+                  data-project="{{ c.project_id }}"
+                  data-cstatus="{{ c.contract_status }}"
+                  data-num="{{ c.contract_number }}"
                   data-title="{{ c.title }}"
                   data-title-lc="{{ c.title|lower }}"
                   data-party="{{ c.counterparty or '' }}"
@@ -129,16 +171,20 @@
                   data-date="{{ c.updated_iso }}"
                   data-url="{{ c.open_url }}"
                   data-wf-url="{{ c.workflow_url }}">
-                <td style="font-weight:600;max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#718494;">{{ c.contract_number }}</td>
+                <td style="font-weight:600;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                   <a href="{{ c.workflow_url }}" style="color:#1d3648;text-decoration:none;">{{ c.title }}</a>
                 </td>
-                <td style="color:#4c6273;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;">{{ c.counterparty or '—' }}</td>
-                <td style="white-space:nowrap;">
-                  <span class="ct-stage-dot ct-stage-dot--{{ c.stage }}">{{ c.stage_label }}</span>
+                <td style="font-size:11.5px;color:#002769;white-space:nowrap;max-width:145px;overflow:hidden;text-overflow:ellipsis;" title="{{ c.project_code }} · {{ c.project_name }}">
+                  {{ c.project_name }}
                 </td>
-                <td style="color:#4c6273;white-space:nowrap;">{{ c.source_label }}</td>
-                <td style="color:#4c6273;white-space:nowrap;">{{ c.owner }}</td>
-                <td style="color:#1d3648;white-space:nowrap;">{{ c.stamps }}</td>
+                <td style="color:#4c6273;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;">{{ c.counterparty or '—' }}</td>
+                <td style="white-space:nowrap;">
+                  <span class="ct-cbadge ct-cbadge--{{ c.contract_status|lower }}">{{ c.contract_status }}</span>
+                </td>
+                <td style="color:#4c6273;white-space:nowrap;font-variant-numeric:tabular-nums;font-size:11.5px;">
+                  {% if c.deliverables_total %}{{ c.deliverables_pct }}% ({{ c.deliverables_total }}){% elif c.probation_status %}Probation: {{ c.probation_status }}{% else %}—{% endif %}
+                </td>
                 <td style="color:#718494;white-space:nowrap;">{{ c.updated_at }}</td>
                 <td style="text-align:right;white-space:nowrap;">
                   <button type="button" class="ct-dots" data-ct-dots="{{ c.id }}" aria-label="Actions">⋮</button>
@@ -251,25 +297,39 @@
         {# TAB 2: CREATE NEW CONTRACT #}
         <div data-rpane="create" hidden>
           <section class="ts-ed__grp">
-            <div class="ts-ed__grp-label">Agreement Details</div>
+            <div class="ts-ed__grp-label">Project &amp; Agreement Details</div>
+            <div class="ts-ed__grp--labeled st-field-full">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <label for="ct-new-proj">Associated Project *</label>
+                {% if 'contracts_views.projects_page' in url_map_endpoints %}
+                <a href="{{ url_for('contracts_views.projects_page') }}" style="font-size:10px;color:#002769;text-decoration:none;font-weight:700;">Manage ↗</a>
+                {% endif %}
+              </div>
+              <select id="ct-new-proj">
+                {% for p in (projects if projects is defined else []) %}
+                <option value="{{ p.id }}">{{ p.project_code }} · {{ p.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
             <div class="ts-ed__grp--labeled st-field-full">
               <label for="ct-new-title">Contract Title</label>
               <input type="text" id="ct-new-title" placeholder="Master Service Agreement — Acme Ltd">
             </div>
             <div class="ts-ed__grp--labeled st-field-full">
-              <label for="ct-new-party">Counterparty / Client</label>
+              <label for="ct-new-party">Counterparty / Employee</label>
               <input type="text" id="ct-new-party" placeholder="Acme Holdings Limited">
             </div>
             <div class="ts-ed__grp--labeled st-field-full">
-              <label for="ct-new-tpl">Template</label>
-              <select id="ct-new-tpl">
-                <option value="msa">Master Service Agreement (MSA)</option>
-                <option value="nda">Mutual Non-Disclosure Agreement</option>
-                <option value="employment">Executive Employment Agreement</option>
-                <option value="lease">Commercial Lease Agreement</option>
-                <option value="supply">Vendor &amp; Supply Contract</option>
-                <option value="resolution">Board Resolution / Mandate</option>
-                <option value="blank">Blank Contract</option>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <label for="ct-new-tpl-id">Published Contract Template</label>
+                {% if 'contracts_views.contract_templates_page' in url_map_endpoints %}
+                <a href="{{ url_for('contracts_views.contract_templates_page') }}" style="font-size:10px;color:#002769;text-decoration:none;font-weight:700;">Studio ↗</a>
+                {% endif %}
+              </div>
+              <select id="ct-new-tpl-id">
+                {% for t in (contract_templates if contract_templates is defined else []) %}
+                <option value="{{ t.id }}">{{ t.name }} ({{ t.default_key_terms|length }} terms · {{ t.default_deliverables|length }} milestones)</option>
+                {% endfor %}
               </select>
             </div>
           </section>
@@ -310,7 +370,7 @@
         <div class="st-meta-row"><span>Pending Signing</span><b style="color:#002769;">{{ counts.signature }}</b></div>
       </div>
     </aside>
-  </main>
+  </div>
 
   {# ======================= 4. STUDIO STATUS BAR ======================= #}
   <footer class="ts-ed__statusbar">
@@ -336,8 +396,8 @@
   <button type="button" class="ct-ctx__item" data-ct-stage="{{ key }}" role="menuitem">{{ lbl }}</button>
   {% endfor %}
   <div class="ct-ctx__sep"></div>
+  <button type="button" class="ct-ctx__item" data-ct-act="pdf" role="menuitem">Preview / Export PDF</button>
   <button type="button" class="ct-ctx__item" data-ct-act="download" role="menuitem">Download .tsd backup</button>
-  <button type="button" class="ct-ctx__item" data-ct-act="verify" role="menuitem">Forensic verify</button>
 </div>
 
 <style>
@@ -349,11 +409,13 @@
 }
 #ct-shell > * { min-height: 0; }
 
-.ct-nav-pills { display: inline-flex; align-items: center; gap: 2px; overflow-x: auto; }
+.ct-nav-pills { display: inline-flex; align-items: center; gap: 2px; overflow-x: auto; flex: 1 1 auto; min-width: 0; scrollbar-width: none; }
+.ct-nav-pills::-webkit-scrollbar { display: none; }
 .ct-pill {
-  border: 0; background: transparent; padding: 5px 9px; font-size: 11.5px; font-weight: 500;
-  color: #4c6273; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px;
+  border: 0; background: transparent; padding: 5px 7px; font-size: 11px; font-weight: 500;
+  color: #4c6273; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto;
 }
+#ct-shell .st-metric__label { white-space: nowrap; font-size: 10.5px; }
 .ct-pill:hover { color: #002769; background: #f4f6f9; }
 .ct-pill.is-active { color: #002769; font-weight: 600; background: rgba(0, 39, 105, 0.08); }
 .ct-pill span { font-size: 10.5px; color: #718494; font-variant-numeric: tabular-nums; }
@@ -412,12 +474,21 @@
 .ct-stage-dot--signed::before    { background: #02982e; }
 .ct-stage-dot--signature { color: #002769; }
 .ct-stage-dot--signature::before { background: #002769; }
+.ct-stage-dot--negotiation { color: #0369a1; }
+.ct-stage-dot--negotiation::before { background: #0369a1; }
 .ct-stage-dot--review, .ct-stage-dot--approval { color: #8a5300; }
 .ct-stage-dot--review::before, .ct-stage-dot--approval::before { background: #d97706; }
+.ct-stage-dot--expired   { color: #9b2c2c; }
+.ct-stage-dot--expired::before   { background: #9b2c2c; }
 .ct-stage-dot--draft     { color: #4c6273; }
 .ct-stage-dot--draft::before     { background: #94a3b8; }
 .ct-stage-dot--closed    { color: #718494; }
 .ct-stage-dot--closed::before    { background: #cbd5e1; }
+.ct-cbadge { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; padding: 2px 7px; }
+.ct-cbadge--draft      { background: #eef2f7; color: #4c6273; }
+.ct-cbadge--signed     { background: #eaf9ee; color: #17633a; }
+.ct-cbadge--suspended  { background: #fff6df; color: #8a5300; }
+.ct-cbadge--terminated { background: #fff0f0; color: #9b2c2c; }
 .ct-dots { border: 0; background: transparent; color: #718494; width: 26px; height: 26px; cursor: pointer; font-size: 15px; }
 .ct-dots:hover { background: #eef3fa; color: #002769; }
 
@@ -482,12 +553,13 @@
   var viewBoard = document.getElementById('ct-view-board');
   var rpTitle = document.getElementById('ct-rp-title');
   var ctxMenu = document.getElementById('ct-ctx');
-  var activeStage = 'all';
+  var activeStatus = 'ALL';
+  var projFilterEl = document.getElementById('ct-project-filter');
   var viewMode = 'table';
   var selectedRow = null;
   var ctxRow = null;
 
-  var STAGE_ORDER = { draft: 1, review: 2, approval: 3, signature: 4, signed: 5, closed: 6 };
+  var STAGE_ORDER = { draft: 1, review: 2, negotiation: 3, approval: 4, signature: 5, signed: 6, expired: 7, closed: 8 };
   var CONTRACT_BOILERPLATE = {
     msa: '<h2>MASTER SERVICE AGREEMENT</h2><p>This Master Service Agreement ("Agreement") is entered into between the Organization and <strong>{{PARTY}}</strong>.</p><h3>1. Scope of Services</h3><p>Provider shall deliver services per each executed Statement of Work (SOW).</p><h3>2. Fees &amp; Payment</h3><p>Invoices are payable within thirty (30) calendar days of receipt.</p>',
     nda: '<h2>MUTUAL NON-DISCLOSURE AGREEMENT</h2><p>This Mutual NDA is made between the Organization and <strong>{{PARTY}}</strong> to protect confidential disclosures for five (5) years.</p>',
@@ -521,11 +593,46 @@
 
   function openNewContractTab() {
     switchRightTab('create');
-    document.getElementById('ct-new-title').focus();
+    var el = document.getElementById('ct-new-title');
+    if (el) el.focus();
   }
   document.getElementById('ct-open-new').addEventListener('click', openNewContractTab);
   var emptyNew = document.getElementById('ct-empty-new');
   if (emptyNew) emptyNew.addEventListener('click', openNewContractTab);
+
+  var createBtn = document.getElementById('ct-create-submit');
+  if (createBtn) {
+    createBtn.addEventListener('click', function () {
+      var tplId = document.getElementById('ct-new-tpl-id') && document.getElementById('ct-new-tpl-id').value;
+      var projId = document.getElementById('ct-new-proj') && document.getElementById('ct-new-proj').value;
+      var title = (document.getElementById('ct-new-title').value || '').trim();
+      var party = (document.getElementById('ct-new-party').value || '').trim();
+      if (!tplId) return;
+      createBtn.disabled = true;
+      fetch('/api/contract-templates/' + tplId + '/instantiate', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({
+          project_id: projId,
+          title: title,
+          variables: { counterparty_name: party || 'Counterparty' },
+        }),
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d.ok && d.url) window.location = d.url;
+      }).finally(function () { createBtn.disabled = false; });
+    });
+  }
+  document.querySelectorAll('#ct-stage-tabs [data-cstatus]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('#ct-stage-tabs [data-cstatus]').forEach(function (x) { x.classList.toggle('is-active', x === b); });
+      activeStatus = b.getAttribute('data-cstatus') || 'ALL';
+      applyFilter();
+    });
+  });
+  if (projFilterEl) {
+    projFilterEl.addEventListener('change', applyFilter);
+  }
 
   /* Menus */
   function closeMenus() {
@@ -549,9 +656,31 @@
     b.addEventListener('click', function () {
       var c = b.getAttribute('data-mcmd'); closeMenus();
       if (c === 'new') openNewContractTab();
-      else if (c === 'letterheads') window.location.href = '{{ url_for("workspace_assets_views.letterheads_page") }}';
-      else if (c === 'stamps') window.location.href = '{{ url_for("tsd_stamps_views.studio_new") }}';
-      else if (c === 'verify') window.location.href = '{{ url_for("tsd_stamps_views.verify_page") }}';
+      else if (c === 'templates') window.location.href = '{{ url_for("contracts_views.contract_templates_page") }}';
+      else if (c === 'projects') window.location.href = '{{ url_for("contracts_views.projects_page") }}';
+      else if (c === 'print') window.print();
+      else if (c === 'export_csv') {
+        var rows = [['Title', 'Counterparty', 'Status', 'Value', 'Owner', 'Updated']];
+        document.querySelectorAll('#ct-tbody tr').forEach(function (tr) {
+          if (tr.hidden || tr.style.display === 'none') return;
+          rows.push([
+            tr.dataset.title || '',
+            tr.dataset.party || '',
+            tr.dataset.cstatus || tr.dataset.stage || '',
+            tr.dataset.value || '',
+            tr.dataset.owner || '',
+            tr.dataset.updated || '',
+          ]);
+        });
+        var csv = rows.map(function (r) {
+          return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
+        }).join('\n');
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'trustseal-contracts-portfolio.csv';
+        a.click();
+      }
     });
   });
   document.querySelectorAll('[data-vcmd]').forEach(function (b) {
@@ -601,10 +730,12 @@
     var src = sourceEl.value;
     var srt = sortEl.value;
     var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+    var projVal = projFilterEl ? projFilterEl.value : 'all';
     var visibleRows = [];
     rows.forEach(function (r) {
-      var hay = (r.dataset.titleLc || '') + ' ' + (r.dataset.party || '').toLowerCase() + ' ' + (r.dataset.ownerLc || '') + ' ' + (r.dataset.stage || '');
-      var hide = (activeStage !== 'all' && r.dataset.stage !== activeStage)
+      var hay = (r.dataset.titleLc || '') + ' ' + (r.dataset.party || '').toLowerCase() + ' ' + (r.dataset.ownerLc || '') + ' ' + (r.dataset.cstatus || '').toLowerCase();
+      var hide = (activeStatus !== 'ALL' && r.dataset.cstatus !== activeStatus)
+        || (projVal !== 'all' && r.dataset.project !== projVal)
         || (src !== 'all' && r.dataset.source !== src)
         || (q && hay.indexOf(q) === -1);
       r.style.display = hide ? 'none' : '';
@@ -725,8 +856,8 @@
     closeCtx();
     if (act === 'workflow' && row.dataset.wfUrl) window.location.href = row.dataset.wfUrl;
     else if (act === 'open' && row.dataset.url) window.location.href = row.dataset.url;
+    else if (act === 'pdf' && row.dataset.source === 'tsd') window.open('/api/contracts/' + row.dataset.id + '/pdf', '_blank');
     else if (act === 'download' && row.dataset.source === 'tsd') window.location.href = '/api/tsd/' + row.dataset.id + '/download';
-    else if (act === 'verify') window.location.href = '{{ url_for("tsd_stamps_views.verify_page") }}';
   });
 
   document.getElementById('ct-create-submit').addEventListener('click', function () {
@@ -766,6 +897,214 @@
       })
       .catch(function (err) { btn.disabled = false; btn.textContent = 'Create & Open Workflow →'; alert('Create failed: ' + err.message); });
   });
+
+  /* ---- Upload & Auto-Extract External Signed Contract Modal ---- */
+  function initUploadModal() {
+    var upModal = document.getElementById('ct-upload-modal');
+    var upFile = document.getElementById('ct-up-file');
+    var upStatus = document.getElementById('ct-up-status');
+    var upSubmit = document.getElementById('ct-up-submit');
+
+    function openUploadModal() {
+      if (!upModal) return;
+      upModal.hidden = false;
+    }
+    function closeUploadModal() {
+      if (!upModal) return;
+      upModal.hidden = true;
+    }
+    var openUpBtn = document.getElementById('ct-open-upload');
+    if (openUpBtn) openUpBtn.addEventListener('click', openUploadModal);
+    document.querySelectorAll('[data-mcmd="upload"]').forEach(function (b) {
+      b.addEventListener('click', function () { closeMenus(); openUploadModal(); });
+    });
+    document.querySelectorAll('[data-close-upload]').forEach(function (b) {
+      b.addEventListener('click', closeUploadModal);
+    });
+    if (upModal) {
+      upModal.addEventListener('click', function (e) { if (e.target === upModal) closeUploadModal(); });
+    }
+
+    if (upFile) {
+      upFile.addEventListener('change', function () {
+        var file = upFile.files && upFile.files[0];
+        if (!file) return;
+        upStatus.hidden = false;
+        upStatus.className = 'ts-inline ts-inline--info';
+        upStatus.innerHTML = '<div class="ts-inline__body"><div class="ts-inline__title">Extracting contract metadata from ' + file.name.replace(/</g, '&lt;') + '…</div></div>';
+        var fd = new FormData();
+        fd.append('file', file);
+        fetch('/api/contracts/extract', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'X-Requested-With': 'fetch' },
+          body: fd,
+        })
+          .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status)); return d; }); })
+          .then(function (d) {
+            var ex = d.extracted || {};
+            document.getElementById('ct-up-title').value = ex.title || '';
+            document.getElementById('ct-up-type').value = ex.contract_type || 'msa';
+            document.getElementById('ct-up-party').value = ex.counterparty_name || '';
+            document.getElementById('ct-up-curr').value = ex.currency || 'USD';
+            document.getElementById('ct-up-val').value = ex.deal_value || '';
+            document.getElementById('ct-up-eff').value = ex.effective_date || '';
+            document.getElementById('ct-up-exp').value = ex.expiration_date || '';
+            document.getElementById('ct-up-law').value = ex.governing_law || '';
+            document.getElementById('ct-up-prob').value = ex.probation_days || '';
+            document.getElementById('ct-up-sigs').value = (ex.signatories || []).join(', ');
+            upStatus.className = 'ts-inline ts-inline--success';
+            upStatus.innerHTML = '<div class="ts-inline__body"><div class="ts-inline__title">✓ Extracted from ' +
+              (ex.filename || file.name).replace(/</g, '&lt;') + ' (' + (ex.page_count || 1) + ' page' + ((ex.page_count || 1) === 1 ? '' : 's') +
+              ')</div><p style="margin:2px 0 0;font-family:monospace;font-size:11px;">SHA-256: ' + (ex.sha256 || '').slice(0, 24) + '… · Review extracted fields below and click File &amp; Archive Record.</p></div>';
+          })
+          .catch(function (err) {
+            upStatus.className = 'ts-inline ts-inline--warning';
+            upStatus.innerHTML = '<div class="ts-inline__body"><div class="ts-inline__title">Could not auto-extract: ' + err.message.replace(/</g, '&lt;') + '</div><p style="margin:2px 0 0;">You can still fill the details manually and file the record.</p></div>';
+          });
+      });
+    }
+
+    if (upSubmit) {
+      upSubmit.addEventListener('click', function () {
+        var file = upFile && upFile.files && upFile.files[0];
+        if (!file) { alert('Please select a signed contract file (.pdf, .docx, or .txt) first.'); return; }
+        upSubmit.disabled = true;
+        upSubmit.textContent = 'Filing & Sealing…';
+        var fd = new FormData();
+        fd.append('file', file);
+        fd.append('project_id', document.getElementById('ct-up-proj').value);
+        fd.append('title', document.getElementById('ct-up-title').value.trim());
+        fd.append('contract_type', document.getElementById('ct-up-type').value);
+        fd.append('counterparty_name', document.getElementById('ct-up-party').value.trim());
+        fd.append('currency', document.getElementById('ct-up-curr').value);
+        fd.append('deal_value', document.getElementById('ct-up-val').value.trim());
+        fd.append('effective_date', document.getElementById('ct-up-eff').value);
+        fd.append('expiration_date', document.getElementById('ct-up-exp').value);
+        fd.append('governing_law', document.getElementById('ct-up-law').value.trim());
+        fd.append('probation_days', document.getElementById('ct-up-prob').value.trim());
+        fd.append('signatories', document.getElementById('ct-up-sigs').value.trim());
+        fd.append('contract_status', document.getElementById('ct-up-status-sel').value);
+        fd.append('notes', document.getElementById('ct-up-notes').value.trim());
+
+        fetch('/api/contracts/upload', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'X-Requested-With': 'fetch' },
+          body: fd,
+        })
+          .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status)); return d; }); })
+          .then(function (d) { window.location.href = d.url || '/contracts'; })
+          .catch(function (err) {
+            upSubmit.disabled = false;
+            upSubmit.textContent = 'File & Archive Record';
+            alert('Upload failed: ' + err.message);
+          });
+      });
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initUploadModal);
+  } else {
+    setTimeout(initUploadModal, 0);
+  }
 })();
 </script>
+
+{# ======================= MODAL: UPLOAD & FILE EXTERNAL SIGNED CONTRACT ======================= #}
+<div id="ct-upload-modal" class="ts-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="ct-up-title-h" style="z-index:9500;">
+  <div class="ts-modal" style="max-width:720px;width:92vw;max-height:calc(100vh - 64px);overflow-y:auto;padding:18px 20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;">
+      <div>
+        <h2 id="ct-up-title-h" class="ts-modal__title" style="margin:0;">Upload &amp; File External Signed Contract</h2>
+        <p style="margin:3px 0 0;font-size:12px;color:#5a6676;">Upload an already-signed PDF, DOCX, or TXT contract. TrustSeal extracts key metadata automatically, archives the original file in the encrypted vault, and registers an Evidence Retention record.</p>
+      </div>
+      <button type="button" class="ts-btn ts-btn--ghost ts-btn--sm" data-close-upload aria-label="Close">✕</button>
+    </div>
+
+    <div style="border:1px dashed #9fb2c8;background:#f6f8fb;padding:14px;margin-bottom:12px;">
+      <label for="ct-up-file" style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#002769;margin-bottom:6px;">1. Select Signed Contract File (PDF, DOCX, TXT · max 15 MB)</label>
+      <input type="file" id="ct-up-file" accept=".pdf,.docx,.txt,.html" style="font-size:12.5px;width:100%;">
+    </div>
+
+    <div id="ct-up-status" class="ts-inline ts-inline--info" style="margin-bottom:12px;" hidden></div>
+
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">
+      <div class="ts-field" style="grid-column:1/-1;">
+        <label class="ts-field__label" for="ct-up-title">Contract Title</label>
+        <input type="text" id="ct-up-title" class="ts-input" placeholder="Auto-extracted from document…">
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="ct-up-proj">Associated Project *</label>
+        <select id="ct-up-proj" class="ts-select">
+          {% for p in (projects if projects is defined else []) %}
+          <option value="{{ p.id }}" {% if selected_project_id == p.id %}selected{% endif %}>{{ p.project_code }} · {{ p.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="ct-up-type">Contract Type</label>
+        <select id="ct-up-type" class="ts-select">
+          <option value="msa">Master Service Agreement (MSA)</option>
+          <option value="sow">Project Statement of Work (SOW)</option>
+          <option value="employment_probation">Employment (Probation)</option>
+          <option value="employment_permanent">Employment (Permanent)</option>
+          <option value="vendor_supply">Vendor / Supply</option>
+          <option value="commercial_lease">Commercial Lease</option>
+          <option value="nda">Non-Disclosure Agreement (NDA)</option>
+        </select>
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="ct-up-party">Counterparty / Employee</label>
+        <input type="text" id="ct-up-party" class="ts-input" placeholder="Auto-extracted counterparty">
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="ct-up-status-sel">Filing Status</label>
+        <select id="ct-up-status-sel" class="ts-select">
+          <option value="SIGNED" selected>SIGNED (Executed &amp; Sealed)</option>
+          <option value="DRAFT">DRAFT</option>
+          <option value="SUSPENDED">SUSPENDED</option>
+          <option value="TERMINATED">TERMINATED</option>
+        </select>
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="ct-up-curr">Currency</label>
+        <select id="ct-up-curr" class="ts-select">
+          <option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option><option value="KES">KES</option><option value="ZAR">ZAR</option>
+        </select>
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="ct-up-val">Deal Value</label>
+        <input type="text" id="ct-up-val" class="ts-input" placeholder="250,000">
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="ct-up-eff">Effective Date</label>
+        <input type="date" id="ct-up-eff" class="ts-input">
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="ct-up-exp">Expiration Date</label>
+        <input type="date" id="ct-up-exp" class="ts-input">
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="ct-up-law">Governing Law</label>
+        <input type="text" id="ct-up-law" class="ts-input" placeholder="Kenya / England &amp; Wales">
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="ct-up-prob">Probation Period (Days, optional)</label>
+        <input type="number" id="ct-up-prob" class="ts-input" min="1" max="365" placeholder="e.g. 90">
+      </div>
+      <div class="ts-field" style="grid-column:1/-1;">
+        <label class="ts-field__label" for="ct-up-sigs">Executed Signatories (comma-separated)</label>
+        <input type="text" id="ct-up-sigs" class="ts-input" placeholder="Jane Doe, John Smith">
+      </div>
+      <div class="ts-field" style="grid-column:1/-1;">
+        <label class="ts-field__label" for="ct-up-notes">Filing Notes</label>
+        <input type="text" id="ct-up-notes" class="ts-input" placeholder="e.g. Wet-ink executed copy countersigned in Nairobi">
+      </div>
+    </div>
+
+    <div class="ts-modal__actions" style="margin-top:16px;">
+      <button type="button" class="ts-btn ts-btn--secondary" data-close-upload>Cancel</button>
+      <button type="button" class="ts-btn ts-btn--primary" id="ct-up-submit">File &amp; Archive Record</button>
+    </div>
+  </div>
+</div>
 {% endblock %}

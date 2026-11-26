@@ -22,6 +22,9 @@ SESSION_AUTH_ALLOWED_PREFIXES = (
     "/api/media-library",
     "/api/letterheads",
     "/api/signatures",
+    "/api/contracts",
+    "/api/projects",
+    "/api/contract-templates",
 )
 
 PUBLIC_ENDPOINTS = frozenset((
@@ -51,7 +54,9 @@ TRUST_CRITICAL_PREFIXES = (
     "/api/document-signatures", "/api/signature-requests",
     "/api/stamps", "/api/usages", "/api/payments",
 )
-PRIVILEGED_ROLE_NAMES = frozenset(("admin", "administrator", "superadmin", "super_admin"))
+PRIVILEGED_ROLE_NAMES = frozenset(("admin", "administrator", "superadmin", "super_admin", "platform_admin", "ts_platform_admin"))
+PLATFORM_ADMIN_ROLE_NAMES = frozenset(("superadmin", "super_admin", "platform_admin", "ts_platform_admin"))
+ORG_ADMIN_ROLE_NAMES = frozenset(("admin", "administrator", "org_admin", "organization_admin", "owner")) | PLATFORM_ADMIN_ROLE_NAMES
 
 
 def _under(path, prefix):
@@ -63,6 +68,32 @@ def is_admin(user_id):
         UserRole, UserRole.role_id == Role.id
     ).filter(UserRole.user_id == user_id).all()
     return any(name and name.strip().lower() in PRIVILEGED_ROLE_NAMES for (name,) in rows)
+
+
+def get_user_nav_roles(user) -> dict:
+    """Return role visibility flags for the 3-tier sidebar navigation.
+
+    - Subscriber Member: nav_is_org_admin=False, nav_is_platform_admin=False
+    - Organization Admin: nav_is_org_admin=True, nav_is_platform_admin=False
+    - TS Platform Admin: nav_is_org_admin=True, nav_is_platform_admin=True
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return {"nav_is_org_admin": False, "nav_is_platform_admin": False}
+    try:
+        rows = db.session.query(Role.name).join(
+            UserRole, UserRole.role_id == Role.id
+        ).filter(UserRole.user_id == user.id).all()
+        names = {name.strip().lower() for (name,) in rows if name}
+    except Exception:
+        names = set()
+    is_plat = bool(names & PLATFORM_ADMIN_ROLE_NAMES)
+    is_org = bool(names & ORG_ADMIN_ROLE_NAMES)
+    # Primary platform administrator / seeded system admin (org 1 + admin role or admin@trustseal.local)
+    email = (getattr(user, "email", "") or "").strip().lower()
+    if not is_plat and (email == "admin@trustseal.local" or (is_org and getattr(user, "organization_id", None) == 1 and "admin" in names)):
+        is_plat = True
+        is_org = True
+    return {"nav_is_org_admin": is_org or is_plat, "nav_is_platform_admin": is_plat}
 
 
 def enforce_legacy_api_security():

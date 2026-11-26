@@ -52,32 +52,21 @@
        href="{{ url_for('system.main_views.home') }}"
        aria-label="TRUSTSEAL · Verified Integrity">
       <img src="{{ url_for('static', filename='brand/trustseal/trustseal-horizontal.png') }}"
-           alt="TRUSTSEAL" width="220" height="44">
+           alt="TRUSTSEAL" width="176" height="35">
     </a>
 
-    {% if current_user and current_user.is_authenticated and current_user.organization %}
-    <div class="ts-topbar__workspace" aria-label="Workspace">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M3 7l9-4 9 4-9 4-9-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-        <path d="M3 12l9 4 9-4M3 17l9 4 9-4" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-      </svg>
-      <span>{{ current_user.organization.name }}</span>
-    </div>
-    {% endif %}
-
-    <div class="ts-topbar__search" role="search">
-      <label class="ts-search">
-        <svg class="ts-search__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.75"/>
-          <path d="M20 20l-3.2-3.2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-        </svg>
-        <input type="search" class="ts-input"
-               placeholder="Search documents, requests, parties…"
-               aria-label="Search">
-      </label>
-    </div>
+    {% include "partials_ds/topbar_nav.html" ignore missing %}
 
     <nav class="ts-topbar__actions" aria-label="Account and alerts">
+      {% if current_user and current_user.is_authenticated and current_user.organization %}
+      <span class="ts-topbar__org-pill" title="Active Workspace: {{ current_user.organization.name }}">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M3 7l9-4 9 4-9 4-9-4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M3 12l9 4 9-4" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        </svg>
+        <span>{{ current_user.organization.name }}</span>
+      </span>
+      {% endif %}
       <a class="ts-btn ts-btn--primary ts-btn--sm"
          href="{{ url_for('document_views.create_document') if 'document_views.create_document' in url_map_endpoints else '#' }}">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -235,6 +224,34 @@
           try { localStorage.setItem('ts.sidebar.collapsed', collapsed ? '1' : '0'); } catch (e) {}
         });
       }
+
+      // Executive Topbar Dropdowns — click to toggle, click-outside / Escape to close.
+      var navDrops = Array.prototype.slice.call(document.querySelectorAll('[data-topnav-drop]'));
+      function closeAllTopDrops(exceptEl) {
+        navDrops.forEach(function (d) {
+          if (d === exceptEl) return;
+          d.setAttribute('data-open', 'false');
+          var t = d.querySelector('[data-topnav-trigger]');
+          if (t) t.setAttribute('aria-expanded', 'false');
+        });
+      }
+      navDrops.forEach(function (d) {
+        var btn = d.querySelector('[data-topnav-trigger]');
+        if (!btn) return;
+        btn.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          var willOpen = d.getAttribute('data-open') !== 'true';
+          closeAllTopDrops(d);
+          d.setAttribute('data-open', willOpen ? 'true' : 'false');
+          btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        });
+      });
+      document.addEventListener('click', function (ev) {
+        if (!ev.target.closest('[data-topnav-drop]')) closeAllTopDrops(null);
+      });
+      document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape') closeAllTopDrops(null);
+      });
 
       // Account dropdown — click to toggle, click-outside / Escape to close.
       var account = document.getElementById('ts-account');

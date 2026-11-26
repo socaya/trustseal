@@ -14,10 +14,28 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.extensions import db
 from app.models.contract_workflow import (
+    CONTRACT_STATUSES,
+    ContractDeliverable,
+    ContractKeyTerm,
+    ContractObligation,
+    ContractTemplate,
     ContractWorkflow,
+    Project,
     WORKFLOW_STAGES,
     STAGE_LABELS,
     ensure_contract_workflow_table,
+)
+from app.blueprints.contracts.lifecycle_service import (
+    actor_label as _actor_label,
+    append_workflow_event as _append_wf_event,
+    close_and_seal_contract,
+    compute_deliverable_progress,
+    ensure_default_project,
+    ensure_default_templates,
+    get_or_create_workflow as _get_or_create_workflow,
+    normalize_stage as _normalize_contract_stage,
+    stage_to_canonical_status,
+    transition_stage,
 )
 from app.models.documents.document_template import DocumentTemplate
 from app.models.tsd_document import TSDocument
@@ -36,86 +54,7 @@ def _actor():
     return current_user
 
 
-CONTRACT_LIFECYCLE_STAGES = [
-    ("draft",     "Draft"),
-    ("review",    "Pending Review"),
-    ("approval",  "Pending Approval"),
-    ("signature", "Pending Signature"),
-    ("signed",    "Executed"),
-    ("closed",    "Archived / Void"),
-]
-
-
-def _normalize_contract_stage(raw_status: str | None) -> str:
-    s = (raw_status or "draft").strip().lower().replace("-", "_").replace(" ", "_")
-    if s in ("finalized", "signed", "completed", "executed", "active", "prepared"):
-        return "signed"
-    if s in ("pending_signature", "awaiting_signature", "sent", "in_progress", "out_for_signature", "signature"):
-        return "signature"
-    if s in ("pending_approval", "approval", "awaiting_approval"):
-        return "approval"
-    if s in ("pending_review", "in_review", "review", "negotiation", "redline"):
-        return "review"
-    if s in ("void", "voided", "declined", "expired", "cancelled", "canceled", "archived", "closed"):
-        return "closed"
-    return "draft"
-
-
-def _actor_label(actor) -> str:
-    full = (actor.get_full_name() or "").strip() if hasattr(actor, "get_full_name") else ""
-    return full or getattr(actor, "username", None) or getattr(actor, "email", None) or f"User #{actor.id}"
-
-
-def _get_or_create_workflow(doc: TSDocument, actor) -> ContractWorkflow:
-    ensure_contract_workflow_table()
-    wf = ContractWorkflow.query.filter_by(document_id=doc.id, organization_id=doc.organization_id).first()
-    if wf is None:
-        init_stage = _normalize_contract_stage(doc.status)
-        wf = ContractWorkflow(
-            organization_id=doc.organization_id,
-            document_id=doc.id,
-            stage=init_stage,
-            checklist_json={
-                "commercial_terms": False,
-                "liability_indemnity": False,
-                "confidentiality_data": False,
-                "governing_law": False,
-            },
-            signers_json=[
-                {
-                    "id": "sig-org",
-                    "name": _actor_label(actor),
-                    "email": getattr(actor, "email", "") or "",
-                    "role": "Authorized Signatory (Organization)",
-                    "status": "signed" if init_stage == "signed" else "pending",
-                    "signed_at": "",
-                    "signature_text": "",
-                }
-            ],
-            events_json=[
-                {
-                    "at": datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
-                    "actor": _actor_label(actor),
-                    "action": "Workflow initialized",
-                    "detail": f"Stage: {STAGE_LABELS.get(init_stage, 'Draft')}",
-                }
-            ],
-        )
-        db.session.add(wf)
-        db.session.commit()
-    return wf
-
-
-def _append_wf_event(wf: ContractWorkflow, actor, action: str, detail: str = "") -> None:
-    events = list(wf.events_json or [])
-    events.insert(0, {
-        "at": datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
-        "actor": _actor_label(actor),
-        "action": action,
-        "detail": detail,
-    })
-    wf.events_json = events[:60]
-    flag_modified(wf, "events_json")
+CONTRACT_LIFECYCLE_STAGES = list(WORKFLOW_STAGES)
 
 
 @workspace_assets_views.route("/contracts", methods=["GET"])
@@ -125,6 +64,15 @@ def signed_contracts_page():
     actor = _actor()
     org_id = actor.organization_id
     ensure_contract_workflow_table()
+    default_proj = ensure_default_project(org_id, actor)
+    contract_templates = ensure_default_templates(org_id, actor)
+    projects_list = (
+        Project.query.filter_by(organization_id=org_id)
+        .order_by(Project.is_default.desc(), Project.name.asc())
+        .all()
+    )
+    proj_map = {p.id: p for p in projects_list}
+    selected_project_id = request.args.get("project", type=int)
 
     tsd_rows = (
         TSDocument.query
@@ -138,6 +86,12 @@ def signed_contracts_page():
         w.document_id: w
         for w in ContractWorkflow.query.filter_by(organization_id=org_id).all()
     }
+    deliv_by_wf: dict[int, list[ContractDeliverable]] = {}
+    for dl in ContractDeliverable.query.filter_by(organization_id=org_id).all():
+        deliv_by_wf.setdefault(dl.contract_id, []).append(dl)
+    prob_by_wf: dict[int, ContractKeyTerm] = {}
+    for kt in ContractKeyTerm.query.filter_by(organization_id=org_id, category="probation").all():
+        prob_by_wf[kt.contract_id] = kt
 
     stamp_counts = dict(
         db.session.query(
@@ -187,18 +141,40 @@ def signed_contracts_page():
     for d in tsd_rows:
         wf = wf_map.get(d.id)
         stage = wf.stage if wf else _normalize_contract_stage(d.status)
+        c_status = wf.canonical_status() if wf else stage_to_canonical_status(stage)
+        proj = proj_map.get(wf.project_id) if (wf and wf.project_id) else default_proj
+        signers = (wf.signers_json or []) if wf else []
+        signed_cnt = sum(1 for s in signers if s.get("status") == "signed")
+        prog = compute_deliverable_progress(deliv_by_wf.get(wf.id, [])) if wf else {"total": 0, "pct": 0}
+        prob = prob_by_wf.get(wf.id) if wf else None
         contracts.append({
             "id": d.id,
             "source": "tsd",
             "source_label": "TS Document",
+            "project_id": proj.id if proj else default_proj.id,
+            "project_code": proj.project_code if proj else default_proj.project_code,
+            "project_name": proj.name if proj else default_proj.name,
+            "contract_number": (wf.contract_number if (wf and wf.contract_number) else f"CTR-{d.id:04d}"),
+            "contract_type": (wf.contract_type if wf else "msa"),
+            "contract_status": c_status,
             "title": d.title,
             "counterparty": (wf.counterparty_name or "") if wf else "",
             "deal_value": (f"{wf.currency} {wf.deal_value}" if (wf and wf.deal_value) else ""),
+            "effective_date": (wf.effective_date or "") if wf else "",
+            "expiration_date": (wf.expiration_date or "") if wf else "",
+            "renewal_type": (wf.renewal_type or "none") if wf else "none",
             "owner": user_names.get(d.created_by_id, f"User #{d.created_by_id}"),
             "status": (d.status or "draft").lower(),
             "stage": stage,
             "stage_label": STAGE_LABELS.get(stage, "Draft"),
             "stamps": stamp_counts.get(d.id, 0),
+            "signers_total": len(signers),
+            "signers_signed": signed_cnt,
+            "deliverables_total": prog["total"],
+            "deliverables_pct": prog["pct"],
+            "probation_status": prob.status if prob else "",
+            "probation_end": prob.end_date if prob else "",
+            "evidence_retention_id": wf.evidence_retention_id if wf else None,
             "version": getattr(d, "version", 1),
             "updated_at": d.updated_at.strftime("%Y-%m-%d %H:%M") if d.updated_at else "",
             "updated_iso": d.updated_at.isoformat() if d.updated_at else "",
@@ -210,18 +186,35 @@ def signed_contracts_page():
         ts = getattr(ev, "prepared_at", None) or ev.created_at
         raw_st = (ev.state or "draft").lower()
         stage = _normalize_contract_stage(raw_st)
+        c_status = stage_to_canonical_status(stage)
         contracts.append({
             "id": ev.id,
             "source": "envelope",
             "source_label": "Signing Envelope",
+            "project_id": default_proj.id,
+            "project_code": default_proj.project_code,
+            "project_name": default_proj.name,
+            "contract_number": f"ENV-{ev.id:04d}",
+            "contract_type": "envelope",
+            "contract_status": c_status,
             "title": doc_titles.get(ev.document_id, f"Envelope #{ev.id}"),
             "counterparty": "",
             "deal_value": "",
+            "effective_date": "",
+            "expiration_date": "",
+            "renewal_type": "none",
             "owner": user_names.get(ev.created_by_id, f"User #{ev.created_by_id}"),
             "status": raw_st,
             "stage": stage,
             "stage_label": STAGE_LABELS.get(stage, "Draft"),
             "stamps": 0,
+            "signers_total": 0,
+            "signers_signed": 0,
+            "deliverables_total": 0,
+            "deliverables_pct": 0,
+            "probation_status": "",
+            "probation_end": "",
+            "evidence_retention_id": None,
             "version": 1,
             "updated_at": ts.strftime("%Y-%m-%d %H:%M") if ts else "",
             "updated_iso": ts.isoformat() if ts else "",
@@ -234,6 +227,31 @@ def signed_contracts_page():
     counts = {"all": len(contracts)}
     for key, _lbl in WORKFLOW_STAGES:
         counts[key] = sum(1 for c in contracts if c["stage"] == key)
+    status_counts = {"ALL": len(contracts)}
+    for skey, _slbl in CONTRACT_STATUSES:
+        status_counts[skey] = sum(1 for c in contracts if c["contract_status"] == skey)
+
+    obligations_pending = 0
+    try:
+        obligations_pending = (
+            ContractObligation.query.filter_by(organization_id=org_id)
+            .filter(ContractObligation.status != "completed")
+            .count()
+        )
+    except Exception:
+        obligations_pending = 0
+
+    kpi = {
+        "total": len(contracts),
+        "draft": status_counts["DRAFT"],
+        "signed": status_counts["SIGNED"],
+        "suspended": status_counts["SUSPENDED"],
+        "terminated": status_counts["TERMINATED"],
+        "in_flight": status_counts["DRAFT"],
+        "awaiting_sign": counts.get("signature", 0),
+        "active": status_counts["SIGNED"],
+        "obligations_pending": obligations_pending,
+    }
 
     letterheads = []
     try:
@@ -252,7 +270,13 @@ def signed_contracts_page():
         "workspace/signed_contracts.html",
         contracts=contracts,
         stages=WORKFLOW_STAGES,
+        contract_statuses=CONTRACT_STATUSES,
+        status_counts=status_counts,
         counts=counts,
+        kpi=kpi,
+        projects=[p.to_dict() for p in projects_list],
+        selected_project_id=selected_project_id,
+        contract_templates=[t.to_dict() for t in contract_templates if t.state == "published"],
         letterheads=letterheads,
         tsd_count=len(tsd_rows),
         env_count=len(env_rows),
@@ -269,11 +293,7 @@ def update_contract_stage(doc_id: int):
         abort(404)
     data = request.get_json(silent=True) or {}
     stage = (data.get("stage") or "").strip().lower()
-    if stage not in STAGE_LABELS:
-        return jsonify({"error": "invalid_stage"}), 400
     wf = _get_or_create_workflow(doc, actor)
-    prev = wf.stage
-    wf.stage = stage
     if data.get("counterparty_name"):
         wf.counterparty_name = str(data.get("counterparty_name"))[:200]
     if data.get("letterhead_id"):
@@ -281,25 +301,15 @@ def update_contract_stage(doc_id: int):
             wf.letterhead_id = int(data["letterhead_id"])
         except (TypeError, ValueError):
             pass
-    # Keep TSDocument.status strictly inside ('draft', 'finalized', 'archived')
-    if stage == "signed":
-        doc.status = "finalized"
-        wf.closed_at = wf.closed_at or datetime.utcnow()
-        wf.execution_sha256 = doc.ciphertext_sha256
-    elif stage == "closed":
-        doc.status = "archived"
-    else:
-        doc.status = "draft"
     note = (data.get("note") or "").strip()
-    _append_wf_event(
-        wf, actor,
-        f"Moved to {STAGE_LABELS[stage]}",
-        f"From {STAGE_LABELS.get(prev, prev)}" + (f" · {note}" if note else ""),
-    )
+    ok, err = transition_stage(doc=doc, wf=wf, actor=actor, target_stage=stage, note=note)
+    if not ok:
+        return jsonify({"error": err}), 400
     db.session.commit()
     return jsonify({"ok": True, "id": doc.id, "stage": wf.stage, "status": doc.status, "workflow": wf.to_dict()})
 
 
+@workspace_assets_views.route("/contracts/<int:doc_id>", methods=["GET"])
 @workspace_assets_views.route("/contracts/<int:doc_id>/workflow", methods=["GET"])
 @login_required
 def contract_workflow_page(doc_id: int):
@@ -436,32 +446,12 @@ def close_contract_deal(doc_id: int):
         abort(404)
     wf = _get_or_create_workflow(doc, actor)
     data = request.get_json(silent=True) or {}
-    if data.get("stamp_id"):
-        wf.stamp_id = int(data["stamp_id"])
+    stamp_id = int(data["stamp_id"]) if data.get("stamp_id") else None
     closing_note = str(data.get("note") or "").strip()[:300]
-
-    # Mark any remaining pending org signatory as signed if operator attests execution
-    signers = list(wf.signers_json or [])
-    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-    for s in signers:
-        if s.get("status") != "signed":
-            s["status"] = "signed"
-            s["signed_at"] = now_str
-            s["signature_text"] = s.get("signature_text") or s.get("name") or _actor_label(actor)
-    wf.signers_json = signers
-    flag_modified(wf, "signers_json")
-
-    wf.stage = "signed"
-    wf.closed_at = datetime.utcnow()
-    wf.execution_sha256 = doc.ciphertext_sha256
-    doc.status = "finalized"
-    _append_wf_event(
-        wf, actor,
-        "Deal Closed & Executed with TrustSeal",
-        f"SHA-256 {doc.ciphertext_sha256[:16]}…" + (f" · {closing_note}" if closing_note else ""),
+    res = close_and_seal_contract(
+        doc=doc, wf=wf, actor=actor, stamp_id=stamp_id, closing_note=closing_note
     )
-    db.session.commit()
-    return jsonify({"ok": True, "workflow": wf.to_dict(), "status": doc.status})
+    return jsonify({"ok": True, **res})
 
 
 @workspace_assets_views.route("/letterheads", methods=["GET"])
@@ -519,7 +509,7 @@ def templates_hub_page():
             full = (u.get_full_name() or "").strip() if hasattr(u, "get_full_name") else ""
             creators[u.id] = full or u.username or u.email or f"User #{u.id}"
 
-    tsd_templates = list_tsd_templates()
+    tsd_templates = list_tsd_templates(include_body=True)
     saved_letterheads = (
         TSDLetterhead.query
         .filter(TSDLetterhead.organization_id == actor.organization_id)
@@ -527,7 +517,20 @@ def templates_hub_page():
         .limit(100)
         .all()
     )
-    stamp_templates = list_stamp_templates()
+    from app.services.tsd_stamp_templates import get_stamp_catalog_summary
+    stamp_summary = get_stamp_catalog_summary()
+    from app.services.business_docs_catalog import (
+        get_business_doc_categories,
+        get_business_docs_catalog,
+    )
+    from app.models.contract_templates_catalog import (
+        get_catalog_categories_summary,
+        get_contract_template_catalog,
+    )
+    bib_total = len(get_business_docs_catalog())
+    bib_categories = get_business_doc_categories()
+    ctr_total = len(get_contract_template_catalog())
+    ctr_categories = get_catalog_categories_summary()
 
     return render_template(
         "workspace/templates.html",
@@ -536,11 +539,19 @@ def templates_hub_page():
         tsd_templates=tsd_templates,
         letterhead_presets=LETTERHEAD_PRESETS,
         saved_letterheads=saved_letterheads,
-        stamp_templates=stamp_templates,
+        stamp_templates=[],
+        stamp_total=stamp_summary["total"],
+        stamp_categories=stamp_summary["categories"],
+        stamp_styles=stamp_summary["styles"],
+        bib_total=bib_total,
+        bib_categories=bib_categories,
+        ctr_total=ctr_total,
+        ctr_categories=ctr_categories,
     )
 
 
 @workspace_assets_views.route("/templates/tsd/<slug>/use", methods=["POST"])
+@workspace_assets_views.route("/templates/builtin/<slug>/use", methods=["POST"])
 @login_required
 def use_builtin_tsd_template(slug: str):
     from app.services.tsd_format import encrypt_content_envelope, pack_content, sha256_hex
@@ -814,7 +825,7 @@ def signatures_hub_page():
                 "capture_engine": st.capture_engine if st else (sp.signature_type or "ts_hq_engine"),
                 "device_name": (st.device_name if st else "") or "",
                 "ts_fingerprint": ts_fp,
-                "created_at": sp.created_at.strftime("%Y-%m-%d") if sp.created_at else "",
+                "created_at": sp.created_at.strftime("%Y-%m-%d %H:%M") if sp.created_at else "—",
             })
 
         log_rows = (
@@ -908,9 +919,10 @@ def list_registered_signatures_api():
             "is_mine": sp.user_id == actor.id,
             "staff_name": full or (u.username if u else "") or (u.email if u else f"User #{sp.user_id}"),
             "staff_email": (u.email if u else "") or "",
+            "created_at": sp.created_at.strftime("%Y-%m-%d %H:%M") if getattr(sp, "created_at", None) else "—",
             "requires_otp": True,
         })
-    items.sort(key=lambda x: (not x["is_mine"], not x["is_default"], x["staff_name"].lower()))
+    items.sort(key=lambda x: (not x["is_mine"], not x["is_default"], -x["id"]))
     return jsonify({"signatures": items})
 
 
@@ -1133,6 +1145,168 @@ def system_verify_staff_signature(sig_id):
         "format": integrity.get("format", ""),
         "checked_at": integrity.get("verified_at", ""),
     })
+
+
+@workspace_assets_views.route("/api/signatures/studio-meta", methods=["GET"])
+@login_required
+def api_signatures_studio_meta():
+    from app.models.esignature import SignatureProfile
+    from app.models.signature_governance import SignatureUsageLog, ensure_signature_governance_tables
+
+    ensure_signature_governance_tables()
+    actor = _actor()
+    staff_rows = (
+        User.query
+        .filter(User.organization_id == actor.organization_id, User.is_active.is_(True))
+        .order_by(User.email.asc())
+        .limit(150)
+        .all()
+    )
+    staff = []
+    for u in staff_rows:
+        full = ((u.get_full_name() or "").strip() if hasattr(u, "get_full_name") else "") or u.username or u.email or f"User #{u.id}"
+        staff.append({"id": u.id, "name": full, "email": u.email or "", "is_me": (u.id == actor.id)})
+    org_uids = [u.id for u in staff_rows] or [actor.id]
+    sig_count = SignatureProfile.query.filter(SignatureProfile.user_id.in_(org_uids)).count()
+    usage_count = SignatureUsageLog.query.filter_by(organization_id=actor.organization_id).count()
+    return jsonify({
+        "ok": True,
+        "current_user_id": actor.id,
+        "staff": staff,
+        "counts": {"signatories": sig_count, "usage_logs": usage_count},
+    })
+
+
+@workspace_assets_views.route("/api/signatures/register-json", methods=["POST"])
+@login_required
+def api_register_staff_signature_json():
+    from datetime import datetime
+    from app.models.esignature import SignatureProfile
+    from app.models.signature_governance import (
+        SignatureApprovalState,
+        SignatureUsageLog,
+        compute_ts_signature_seal,
+        embed_ts_forensic_seal,
+        ensure_signature_governance_tables,
+    )
+    from app.services.signature_attestations import issue_signature_attestation
+
+    ensure_signature_governance_tables()
+    actor = _actor()
+    body = request.get_json(silent=True) or {}
+    staff_id = body.get("user_id") or actor.id
+    try:
+        staff_id = int(staff_id)
+    except (TypeError, ValueError):
+        staff_id = actor.id
+    target_user = User.query.filter_by(id=staff_id, organization_id=actor.organization_id).first() or actor
+
+    name = (body.get("name") or "").strip()[:100] or "Official Signature"
+    sig_type = (body.get("signature_type") or "drawn").strip().lower()
+    if sig_type not in ("drawn", "uploaded", "text"):
+        sig_type = "drawn"
+    capture_engine = (body.get("capture_engine") or "stylus_pen").strip().lower()
+    if capture_engine not in ("device_pad", "stylus_pen", "ts_hq_engine", "uploaded"):
+        capture_engine = "stylus_pen"
+    device_name = (body.get("device_name") or "").strip()[:120]
+    sig_data = (body.get("signature_data") or "").strip()
+    initials = (body.get("initials_data") or "").strip()[:16]
+    is_default = bool(body.get("is_default"))
+    approve_now = bool(body.get("approve_now")) and (target_user.id == actor.id)
+    apply_now = bool(body.get("apply_now")) and approve_now
+    document_id = body.get("document_id")
+    document_title = (body.get("document_title") or "TSD Document").strip()[:160]
+
+    if not sig_data:
+        return jsonify({"ok": False, "error": "Please capture, upload, or generate a signature first."}), 400
+
+    if is_default:
+        SignatureProfile.query.filter_by(user_id=target_user.id, is_default=True).update({"is_default": False})
+
+    now = datetime.utcnow()
+    sp = SignatureProfile(
+        user_id=target_user.id,
+        name=name,
+        signature_type=sig_type,
+        signature_data=sig_data,
+        initials_data=initials or None,
+        is_default=is_default or (SignatureProfile.query.filter_by(user_id=target_user.id).count() == 0),
+    )
+    db.session.add(sp)
+    db.session.flush()
+
+    st = SignatureApprovalState(
+        organization_id=actor.organization_id,
+        signature_profile_id=sp.id,
+        approval_status="approved" if approve_now else "pending",
+        capture_engine=capture_engine,
+        device_name=device_name or None,
+        approved_by_id=actor.id if approve_now else None,
+        approved_at=now if approve_now else None,
+    )
+    db.session.add(st)
+    db.session.commit()
+
+    owner_name = ((target_user.get_full_name() or "").strip() if hasattr(target_user, "get_full_name") else "") or target_user.email or f"User #{target_user.id}"
+    resp = {
+        "ok": True,
+        "signature_id": sp.id,
+        "name": sp.name,
+        "staff_name": owner_name,
+        "approval_status": st.approval_status,
+        "applied": False,
+    }
+
+    if apply_now:
+        log = SignatureUsageLog(
+            organization_id=actor.organization_id,
+            signature_profile_id=sp.id,
+            owner_user_id=target_user.id,
+            requester_user_id=actor.id,
+            document_id=int(document_id) if str(document_id or "").isdigit() else None,
+            document_title=document_title,
+            otp_code_hash="direct_owner_studio_capture",
+            otp_last2="00",
+            otp_expires_at=now,
+            status="applied",
+            approved_at=now,
+            applied_at=now,
+            ip_address=(request.headers.get("X-Forwarded-For") or request.remote_addr or "")[:64],
+            user_agent=(request.headers.get("User-Agent") or "")[:255],
+        )
+        db.session.add(log)
+        db.session.commit()
+
+        attestation = issue_signature_attestation(
+            organization_id=actor.organization_id,
+            document_id=log.document_id,
+            signature=sp,
+            usage_log=log,
+        )
+        db.session.commit()
+
+        seal_hash, ts_fp = compute_ts_signature_seal(
+            organization_id=actor.organization_id,
+            signature_profile_id=sp.id,
+            owner_user_id=sp.user_id,
+            signature_data=sp.signature_data or "",
+        )
+        sealed_sig_data = embed_ts_forensic_seal(
+            sp.signature_data or "",
+            seal_hash=seal_hash,
+            fingerprint=ts_fp,
+            usage_log_id=log.id,
+        )
+        resp.update({
+            "applied": True,
+            "usage_log_id": log.id,
+            "signature_data": sealed_sig_data,
+            "ts_fingerprint": ts_fp,
+            "ts_seal_hash": seal_hash[:32],
+            **attestation,
+        })
+
+    return jsonify(resp), 201
 
 
 @workspace_assets_views.route("/signatures/register", methods=["POST"])

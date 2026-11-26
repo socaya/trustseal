@@ -76,7 +76,14 @@ def signature_digest(signature_data: str) -> str:
 
 
 def _signature_graphic_present(html: str, signature_data: str) -> bool:
-    """Confirm the attested source graphic is still present in saved markup."""
+    """Confirm the attested source graphic is still present in saved markup.
+
+    Tolerates browser HTML5 DOM serialization differences (attribute reordering,
+    inline style additions, or self-closing ``<path/>`` expansion) while still
+    requiring the exact attested SVG path geometry or text content.
+    """
+    import re as _re
+
     source = signature_data or ""
     if not source:
         return False
@@ -91,7 +98,17 @@ def _signature_graphic_present(html: str, signature_data: str) -> bool:
         encoded = "data:image/svg+xml;base64," + base64.b64encode(
             source.encode("utf-8")
         ).decode("ascii")
-        return (bool(sanitized) and sanitized in html) or encoded in html
+        if (bool(sanitized) and sanitized in html) or encoded in html:
+            return True
+        # Browser DOM round-trip fallback: verify every SVG path `d` geometry
+        # (and/or <text> content) from the attested SVG is still present in `html`.
+        src_paths = _re.findall(r'\bd="([^"]{6,})"', source)
+        if src_paths:
+            return all(p in html for p in src_paths)
+        src_texts = [t.strip() for t in _re.findall(r"<text\b[^>]*>([^<]+)</text>", source, flags=_re.I) if t.strip()]
+        if src_texts:
+            return all(escape(t) in html or t in html for t in src_texts)
+        return False
     return escape(source) in html
 
 
@@ -148,11 +165,21 @@ def validate_document_signatures(*, html: str, organization_id: int,
     """
     allowed_legacy = allowed_legacy or set()
     markers = extract_signature_markers(html)
-    seen: set[tuple[int, int]] = set()
+    seen: dict[tuple[int, int], tuple[str, str]] = {}
     for marker in markers:
         if marker.legacy_key in seen:
+            # Allow multi-page replication of an already-verified signature in the same
+            # document when it carries the exact same digest and HMAC attestation.
+            prev_dig, prev_att = seen[marker.legacy_key]
+            if (
+                prev_dig
+                and prev_att
+                and hmac.compare_digest(marker.digest, prev_dig)
+                and hmac.compare_digest(marker.attestation, prev_att)
+            ):
+                continue
             raise SignatureAttestationError("duplicate_signature_usage")
-        seen.add(marker.legacy_key)
+        seen[marker.legacy_key] = (marker.digest, marker.attestation)
         if not marker.digest or not marker.attestation:
             if marker.legacy_key in allowed_legacy:
                 continue

@@ -169,22 +169,40 @@ def verify_pdf():
 
     evidence_digest = (request.form.get("evidence_sha256") or "").strip().lower()
     if not _CERT_HEX.fullmatch(evidence_digest):
-        return _render_bad_request("Provide the 64-character evidence digest.")
+        return _render_bad_request(
+            "Provide the 64-character evidence digest.",
+            evidence_sha256=evidence_digest,
+        )
 
     pdf_file = request.files.get("pdf")
     if pdf_file is None or not (pdf_file.filename or "").lower().endswith(".pdf"):
-        return _render_bad_request("Attach the PDF you would like to verify.")
+        return _render_bad_request(
+            "Attach the PDF you would like to verify.",
+            evidence_sha256=evidence_digest,
+        )
 
     try:
         data = pdf_file.stream.read(MAX_PDF_BYTES + 1)
     except (OSError, RequestEntityTooLarge):
-        return _render_bad_request("The uploaded file could not be read.")
+        return _render_bad_request(
+            "The uploaded file could not be read.",
+            evidence_sha256=evidence_digest,
+        )
     if not data:
-        return _render_bad_request("The uploaded file is empty.")
+        return _render_bad_request(
+            "The uploaded file is empty.",
+            evidence_sha256=evidence_digest,
+        )
     if len(data) > MAX_PDF_BYTES:
-        return _render_bad_request("The uploaded file exceeds the size limit.")
+        return _render_bad_request(
+            "The uploaded file exceeds the size limit.",
+            evidence_sha256=evidence_digest,
+        )
     if not data.startswith(b"%PDF-"):
-        return _render_bad_request("The uploaded file is not a PDF.")
+        return _render_bad_request(
+            "The uploaded file is not a PDF.",
+            evidence_sha256=evidence_digest,
+        )
 
     document_digest = hashlib.sha256(data).hexdigest()
     try:
@@ -225,7 +243,7 @@ def verify_pdf():
     )
 
 
-def _render_bad_request(message: str):
+def _render_bad_request(message: str, evidence_sha256: str | None = None):
     return (
         render_template(
             _verify_template(),
@@ -234,7 +252,7 @@ def _render_bad_request(message: str):
             verdict_detail=None,
             document_sha256=None,
             certificate_sha256=None,
-            evidence_sha256=None,
+            evidence_sha256=evidence_sha256 or None,
             error=message,
         ),
         400,

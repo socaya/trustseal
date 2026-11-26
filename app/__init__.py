@@ -107,11 +107,15 @@ def create_app(config_class=None):
         can hide dead links (TS-UI-008) and layouts can print the year
         without reaching into global state.
         """
+        from flask_login import current_user
+        from .policies.api_access import get_user_nav_roles
+        nav_roles = get_user_nav_roles(current_user)
         return {
             "url_map_endpoints": {rule.endpoint for rule in app.url_map.iter_rules()},
             "now": datetime.utcnow(),
             "density": "default",
             "unread_notifications": False,
+            **nav_roles,
         }
 
     # --- Request Hooks ---
@@ -395,6 +399,14 @@ def create_app(config_class=None):
     blueprints.append(letterheads_api)
     from .blueprints.estamp.media_letterheads_views import workspace_assets_views
     blueprints.append(workspace_assets_views)
+
+    from .blueprints.contracts import (
+        contract_templates_api,
+        contracts_api,
+        contracts_views,
+        projects_api,
+    )
+    blueprints.extend([contracts_api, projects_api, contract_templates_api, contracts_views])
     from .blueprints.documents.api.document_label_api import (
         document_label_api,
     )

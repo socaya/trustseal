@@ -96,16 +96,28 @@
       <div id="sig-device-bar" class="sig-device-bar">
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="sig-dev-dot" id="sig-dev-dot"></span>
-          <span id="sig-dev-status" style="font-size:12px;color:#1d3648;">Stylus / Pen Pressure Engine Ready (TS High-Quality Vector Smoothing ON)</span>
+          <span id="sig-dev-status" style="font-size:12px;color:#1d3648;">Smooth Calligraphic Pen Engine Ready (Bezier Velocity &amp; Pressure Smoothing ON)</span>
         </div>
-        <div style="display:inline-flex;align-items:center;gap:8px;">
-          <button type="button" class="ts-btn ts-btn--sm" id="sig-connect-hid">Connect Signature Pad (USB/HID)</button>
+        <div style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <div id="sig-ink-swatches" style="display:inline-flex;align-items:center;gap:5px;" role="group" aria-label="Official signing ink color">
+            <button type="button" class="sig-swatch is-active" data-ink="#002769" style="background:#002769;" title="TrustSeal Navy (Official)"></button>
+            <button type="button" class="sig-swatch" data-ink="#0038A8" style="background:#0038A8;" title="Royal Blue Ink (International Official)"></button>
+            <button type="button" class="sig-swatch" data-ink="#0F172A" style="background:#0F172A;" title="Executive Black Ink (Legal Standard)"></button>
+            <button type="button" class="sig-swatch" data-ink="#1B2A4A" style="background:#1B2A4A;" title="Midnight Blue-Black (Fountain Pen)"></button>
+            <button type="button" class="sig-swatch" data-ink="#8B1E24" style="background:#8B1E24;" title="Notary Crimson / Burgundy"></button>
+            <button type="button" class="sig-swatch" data-ink="#065F46" style="background:#065F46;" title="Official Audit Emerald"></button>
+          </div>
           <select id="sig-ink-color" class="st-select" style="height:26px;font-size:11.5px;padding:0 8px;">
             <option value="#002769">TrustSeal Navy</option>
-            <option value="#091e42">Executive Black</option>
-            <option value="#1d3648">Slate Ink</option>
+            <option value="#0038A8">Royal Blue Ink</option>
+            <option value="#0F172A">Executive Black</option>
+            <option value="#1B2A4A">Midnight Blue-Black</option>
+            <option value="#8B1E24">Notary Crimson</option>
+            <option value="#065F46">Official Emerald</option>
           </select>
+          <button type="button" class="ts-btn ts-btn--sm" id="sig-pad-undo" title="Undo last stroke">↶ Undo</button>
           <button type="button" class="ts-btn ts-btn--sm" id="sig-pad-clear">Clear</button>
+          <button type="button" class="ts-btn ts-btn--sm" id="sig-connect-hid">USB/HID Pad</button>
         </div>
       </div>
 
@@ -123,9 +135,26 @@
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
           <input type="text" id="sig-type-input" class="st-select" style="flex:1;min-width:240px;background:#f6f8fb;" placeholder="Type signatory full name for TS High-Quality Calligraphy Engine…">
           <select id="sig-hq-style" class="st-select" style="background:#f6f8fb;">
-            <option value="executive">Executive Fountain Nib</option>
-            <option value="calligraphy">Formal Calligraphy Script</option>
-            <option value="monogram">Clean Legal Initialed</option>
+            <option value="'Mrs Saint Delafield','Snell Roundhand',cursive">Mrs Saint Delafield — Raw Ink Autograph</option>
+            <option value="'Herr Von Muellerhoff','Snell Roundhand',cursive">Herr Von Muellerhoff — Executive Pen Autograph</option>
+            <option value="'Mr De Haviland','Snell Roundhand',cursive">Mr De Haviland — Classic Fountain Autograph</option>
+            <option value="'Mr Dafoe','Brush Script MT',cursive">Mr Dafoe — Fast Ballpoint Signature</option>
+            <option value="'Allison','Segoe Script',cursive">Allison — Modern Fine-Pen Signature</option>
+            <option value="'Kristi','Segoe Script',cursive">Kristi — Rapid Executive Scribble</option>
+            <option value="'La Belle Aurore','Segoe Script',cursive">La Belle Aurore — Fine Nib Personal Hand</option>
+            <option value="'Zeyada','Bradley Hand',cursive">Zeyada — Natural Everyday Pen</option>
+            <option value="'Reenie Beanie','Bradley Hand',cursive">Reenie Beanie — Pure Ballpoint Hand</option>
+            <option value="'Homemade Apple','Bradley Hand',cursive">Homemade Apple — Genuine Cursive Hand</option>
+            <option value="'Cedarville Cursive','Segoe Script',cursive">Cedarville Cursive — True Penmanship Cursive</option>
+            <option value="'Meddon','Snell Roundhand',cursive">Meddon — Archival Dip-Pen Hand</option>
+            <option value="'Qwigley','Snell Roundhand',cursive">Qwigley — Fluid Fountain Signature</option>
+            <option value="'Arizonia','Brush Script MT',cursive">Arizonia — Swift Brush-Pen Autograph</option>
+            <option value="'Birthstone','Snell Roundhand',cursive">Birthstone — Graceful Real Cursive</option>
+            <option value="'WindSong','Snell Roundhand',cursive">WindSong — Expressive Ink Flourish</option>
+            <option value="'Cherish','Segoe Script',cursive">Cherish — Slender Rollerball Hand</option>
+            <option value="'Meow Script','Segoe Script',cursive">Meow Script — Relaxed Personal Cursive</option>
+            <option value="'Monsieur La Doulaise','Snell Roundhand',cursive">Monsieur La Doulaise — Heritage Formal Autograph</option>
+            <option value="'Ruthie','Snell Roundhand',cursive">Ruthie — Classic Fine-Ink Cursive</option>
           </select>
         </div>
         <div id="sig-type-preview" style="min-height:110px;display:flex;align-items:center;justify-content:center;background:#fafbfd;border:1px dashed #cbd5e1;padding:12px;">
@@ -133,12 +162,33 @@
         </div>
       </div>
 
-      <!-- Mode 4: Upload Image -->
+      <!-- Mode 4: Upload Scanned Signature (Auto-Background Removal + Ink Enhancement) -->
       <div id="sig-cap-uploaded" class="sig-cap-box" hidden>
-        <input type="file" id="sig-file-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="margin-bottom:10px;">
-        <div id="sig-upload-preview" style="min-height:100px;display:flex;align-items:center;justify-content:center;background:#fafbfd;border:1px dashed #cbd5e1;padding:12px;color:#7a869a;font-size:12px;">
-          Upload a high-resolution PNG/SVG signature scan.
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+          <input type="file" id="sig-file-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="font-size:12px;">
+          <div style="display:inline-flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:11.5px;color:#1d3648;">
+            <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-weight:600;">
+              <input type="checkbox" id="sig-up-rmbg" checked style="accent-color:#002769;">
+              Auto-remove background
+            </label>
+            <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-weight:600;" title="2x supersampled edge smoothing, despeckle &amp; fountain-pen ink clarity while preserving exact signature structure">
+              <input type="checkbox" id="sig-up-penstyle" checked style="accent-color:#002769;">
+              TSD Pen-Style Smooth Ink
+            </label>
+            <label style="display:inline-flex;align-items:center;gap:5px;white-space:nowrap;">
+              <span>Cleanup</span>
+              <input type="range" id="sig-up-thresh" min="18" max="90" value="48" style="width:84px;accent-color:#002769;">
+            </label>
+            <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;">
+              <input type="checkbox" id="sig-up-recolor" style="accent-color:#002769;">
+              Tone to Official Ink
+            </label>
+          </div>
         </div>
+        <div id="sig-upload-preview" style="min-height:118px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;background:repeating-conic-gradient(#f1f5f9 0% 25%, #ffffff 0% 50%) 50% / 16px 16px;border:1px dashed #cbd5e1;padding:14px;color:#64748b;font-size:12px;">
+          Upload a scanned PNG/JPG/WebP or SVG signature — paper background is automatically removed for a crisp transparent signature.
+        </div>
+        <div id="sig-upload-meta" style="font-size:11px;color:#02982E;font-weight:600;margin-top:6px;min-height:15px;"></div>
       </div>
 
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
@@ -151,64 +201,76 @@
   <!-- ==================== VIEW 1: AUTHORIZED SIGNATORIES VAULT ==================== -->
   <section id="sig-view-registry">
     {% if registered_signatures %}
-    <div class="sig-reg-grid" id="sig-reg-grid">
-      {% for s in registered_signatures %}
-      <article class="sig-card" data-hay="{{ (s.staff_name ~ ' ' ~ s.staff_email ~ ' ' ~ s.name ~ ' ' ~ s.approval_status ~ ' ' ~ s.capture_engine)|lower }}">
-        <!-- No signature pixels are sent to the registry page. -->
-        <div class="sig-card__preview ts-sig-sealed" aria-label="Signature graphic sealed; verification is performed by TrustSeal">
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <rect x="5" y="10" width="14" height="10" rx="1" stroke="currentColor" stroke-width="1.7"/>
-            <path d="M8 10V7a4 4 0 0 1 8 0v3M9 15l2 2 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <strong>SEALED BY TRUSTSEAL</strong>
-          <span>Platform verification only · Graphic preview disabled</span>
-          {% if s.ts_fingerprint %}
-          <code class="ts-sig-fp" style="font-size:10px;letter-spacing:0.04em;color:#002769;background:#eef3fa;padding:2px 6px;border:1px solid #d5e0f0;margin-top:4px;">{{ s.ts_fingerprint }}</code>
-          {% endif %}
-          <span class="ts-sig-sysver-status" data-sysver-status="{{ s.id }}" style="font-size:10.5px;color:#02982E;font-weight:600;margin-top:3px;min-height:14px;"></span>
-        </div>
-
-        <div class="sig-card__meta">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px;">
-            <strong style="font-size:13.5px;color:#091e42;">{{ s.staff_name }}</strong>
-            {% if s.approval_status == 'approved' %}
-              <span class="st-tag st-tag--ok">Approved</span>
-            {% elif s.approval_status == 'revoked' %}
-              <span class="st-tag st-tag--warn">Revoked</span>
-            {% else %}
-              <span class="st-tag">Pending Approval</span>
-            {% endif %}
-          </div>
-          <div style="font-size:12px;color:#42526e;margin-bottom:2px;">{{ s.name }}{% if s.is_default %} · <strong style="color:#002769;">Default</strong>{% endif %}</div>
-          <div style="font-size:11px;color:#7a869a;margin-bottom:10px;">
-            {{ s.staff_email }} · {{ s.capture_engine|replace('_', ' ')|upper }}{% if s.device_name %} ({{ s.device_name }}){% endif %}
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-top:auto;">
-            <button type="button" class="ts-btn ts-btn--sm ts-sig-sysver-btn" data-sysver-id="{{ s.id }}" style="border-color:#002769;color:#002769;font-weight:600;" title="Run TrustSeal server-side cryptographic integrity check">TS System Verify</button>
-            <div style="display:inline-flex;gap:5px;flex-wrap:wrap;">
-              {% if s.approval_status != 'approved' %}
-              <form method="post" action="{{ url_for('workspace_assets_views.approve_staff_signature', sig_id=s.id) }}" style="margin:0;">
-                <button type="submit" class="ts-btn ts-btn--sm" style="background:#02982E;color:#fff;border-color:#02982E;font-weight:600;">Approve</button>
-              </form>
+    <section class="st-panel" style="overflow-x:auto;" id="sig-reg-grid">
+      <table class="st-table">
+        <thead>
+          <tr>
+            <th>Signatory</th>
+            <th>Title / Role</th>
+            <th>Capture Engine &amp; Seal</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in registered_signatures %}
+          <tr class="sig-reg-row" data-hay="{{ (s.staff_name ~ ' ' ~ s.staff_email ~ ' ' ~ s.name ~ ' ' ~ s.approval_status ~ ' ' ~ s.capture_engine ~ ' ' ~ (s.created_at or ''))|lower }}">
+            <td>
+              <div style="font-weight:700;color:#091e42;">{{ s.staff_name }}</div>
+              <div style="font-size:11px;color:#64748b;">{{ s.staff_email }}</div>
+            </td>
+            <td>
+              <div style="font-weight:600;color:#1d3648;">{{ s.name }}</div>
+              {% if s.is_default %}<span style="font-size:10px;font-weight:700;color:#002769;background:#eef3fa;padding:1px 6px;border-radius:3px;">DEFAULT</span>{% endif %}
+            </td>
+            <td>
+              <div style="font-size:11.5px;font-weight:600;color:#334155;">{{ s.capture_engine|replace('_', ' ')|upper }}{% if s.device_name %} · {{ s.device_name }}{% endif %}</div>
+              <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:2px;">
+                <span style="font-size:9.5px;font-weight:700;letter-spacing:0.04em;color:#02982E;background:#e6f6ec;padding:1px 5px;border-radius:3px;">SEALED BY TRUSTSEAL</span>
+                {% if s.ts_fingerprint %}
+                <code class="ts-sig-fp" style="font-size:10px;letter-spacing:0.03em;color:#002769;background:#eef3fa;padding:1px 5px;border:1px solid #d5e0f0;">{{ s.ts_fingerprint }}</code>
+                {% endif %}
+              </div>
+              <div class="ts-sig-sysver-status" data-sysver-status="{{ s.id }}" style="font-size:10.5px;color:#02982E;font-weight:600;margin-top:2px;"></div>
+            </td>
+            <td>
+              {% if s.approval_status == 'approved' %}
+                <span class="st-tag st-tag--ok">Approved</span>
+              {% elif s.approval_status == 'revoked' %}
+                <span class="st-tag st-tag--warn">Revoked</span>
               {% else %}
-              <form method="post" action="{{ url_for('workspace_assets_views.revoke_staff_signature', sig_id=s.id) }}" style="margin:0;">
-                <button type="submit" class="ts-btn ts-btn--sm" style="color:#9b2c2c;">Revoke</button>
-              </form>
+                <span class="st-tag">Pending</span>
               {% endif %}
-              {% if not s.is_default and s.approval_status == 'approved' %}
-              <form method="post" action="{{ url_for('workspace_assets_views.set_default_staff_signature', sig_id=s.id) }}" style="margin:0;">
-                <button type="submit" class="ts-btn ts-btn--sm" style="color:#002769;">Default</button>
-              </form>
-              {% endif %}
-              <form method="post" action="{{ url_for('workspace_assets_views.delete_staff_signature', sig_id=s.id) }}" style="margin:0;" onsubmit="return confirm('Permanently delete this registered signature?');">
-                <button type="submit" class="ts-btn ts-btn--sm" style="color:#7a869a;">✕</button>
-              </form>
-            </div>
-          </div>
-        </div>
-      </article>
-      {% endfor %}
-    </div>
+            </td>
+            <td style="white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:#475569;">{{ s.created_at or '—' }}</td>
+            <td style="text-align:right;white-space:nowrap;">
+              <div style="display:inline-flex;gap:5px;align-items:center;justify-content:flex-end;">
+                <button type="button" class="ts-btn ts-btn--sm ts-sig-sysver-btn" data-sysver-id="{{ s.id }}" style="border-color:#002769;color:#002769;font-weight:600;" title="Run TrustSeal server-side cryptographic integrity check">Verify</button>
+                {% if s.approval_status != 'approved' %}
+                <form method="post" action="{{ url_for('workspace_assets_views.approve_staff_signature', sig_id=s.id) }}" style="margin:0;">
+                  <button type="submit" class="ts-btn ts-btn--sm" style="background:#02982E;color:#fff;border-color:#02982E;font-weight:600;">Approve</button>
+                </form>
+                {% else %}
+                <form method="post" action="{{ url_for('workspace_assets_views.revoke_staff_signature', sig_id=s.id) }}" style="margin:0;">
+                  <button type="submit" class="ts-btn ts-btn--sm" style="color:#9b2c2c;">Revoke</button>
+                </form>
+                {% endif %}
+                {% if not s.is_default and s.approval_status == 'approved' %}
+                <form method="post" action="{{ url_for('workspace_assets_views.set_default_staff_signature', sig_id=s.id) }}" style="margin:0;">
+                  <button type="submit" class="ts-btn ts-btn--sm" style="color:#002769;">Default</button>
+                </form>
+                {% endif %}
+                <form method="post" action="{{ url_for('workspace_assets_views.delete_staff_signature', sig_id=s.id) }}" style="margin:0;" onsubmit="return confirm('Permanently delete this registered signature?');">
+                  <button type="submit" class="ts-btn ts-btn--sm" style="color:#7a869a;">✕</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
     {% else %}
     <section class="st-empty">
       <div class="st-empty__title">No authorized signatories registered yet</div>
@@ -307,6 +369,13 @@
   background: #f6f8fb; border: 1px solid #dfe5ee; padding: 8px 12px; margin-bottom: 8px;
 }
 .sig-dev-dot { width: 8px; height: 8px; border-radius: 50%; background: #02982E; display: inline-block; }
+.sig-swatch {
+  width: 20px; height: 20px; border-radius: 50%; border: 2px solid transparent;
+  cursor: pointer; padding: 0; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.45);
+  transition: transform .12s ease, border-color .12s ease;
+}
+.sig-swatch:hover { transform: scale(1.12); }
+.sig-swatch.is-active { border-color: #0f172a; box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #0f172a; }
 .sig-reg-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px;
 }
@@ -351,7 +420,7 @@
   if (searchEl) {
     searchEl.addEventListener('input', function () {
       var q = (searchEl.value || '').trim().toLowerCase();
-      document.querySelectorAll('#sig-reg-grid .sig-card, #sig-audit-tbody tr').forEach(function (el) {
+      document.querySelectorAll('#sig-reg-grid .sig-reg-row, #sig-audit-tbody tr').forEach(function (el) {
         var hay = el.getAttribute('data-hay') || '';
         el.style.display = (!q || hay.indexOf(q) !== -1) ? '' : 'none';
       });
@@ -374,7 +443,7 @@
       typeHidden.value = (activeMode === 'uploaded') ? 'uploaded' : (activeMode === 'ts_hq_engine' ? 'text' : 'drawn');
       document.querySelectorAll('[data-cap-mode]').forEach(function (x) { x.classList.toggle('is-active', x === b); });
       var isPad = (activeMode === 'stylus_pen' || activeMode === 'device_pad');
-      devBar.hidden = !isPad;
+      devBar.hidden = false;
       document.getElementById('sig-cap-pad').hidden = !isPad;
       document.getElementById('sig-cap-hq').hidden = (activeMode !== 'ts_hq_engine');
       document.getElementById('sig-cap-uploaded').hidden = (activeMode !== 'uploaded');
@@ -399,60 +468,211 @@
     });
   }
 
-  // Pressure-Sensitive Stylus Pen + TS High-Quality Vector Bezier Signature Engine
+  // Smooth Handwritten Calligraphic Stylus/Pen Pressure Engine (Retina + Coalesced + Quadratic Bezier Ribbon)
   var canvas = document.getElementById('sig-pad');
   var ctx = canvas.getContext('2d');
   var inkSel = document.getElementById('sig-ink-color');
   var teleEl = document.getElementById('sig-pen-telemetry');
+  var LOGICAL_W = 760, LOGICAL_H = 190;
+  var DPR = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = LOGICAL_W * DPR;
+  canvas.height = LOGICAL_H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
   var strokes = [];
   var curStroke = null;
+  var lastWidth = 2.4;
 
-  function canvasPt(e) {
+  function currentInk() { return (inkSel && inkSel.value) || '#002769'; }
+
+  function syncInkSwatches(color) {
+    if (inkSel) inkSel.value = color;
+    document.querySelectorAll('#sig-ink-swatches .sig-swatch').forEach(function (b) {
+      b.classList.toggle('is-active', (b.getAttribute('data-ink') || '').toLowerCase() === String(color).toLowerCase());
+    });
+    redrawAllStrokes();
+    if (typeof refreshHq === 'function') refreshHq();
+    if (typeof reprocessUploadedScan === 'function') reprocessUploadedScan();
+  }
+  document.querySelectorAll('#sig-ink-swatches .sig-swatch').forEach(function (b) {
+    b.addEventListener('click', function () { syncInkSwatches(b.getAttribute('data-ink')); });
+  });
+  if (inkSel) {
+    inkSel.addEventListener('change', function () { syncInkSwatches(inkSel.value); });
+  }
+
+  function rawCanvasPt(e) {
     var r = canvas.getBoundingClientRect();
-    var p = (typeof e.pressure === 'number' && e.pressure > 0 && e.pressure <= 1) ? e.pressure : 0.5;
+    var hasHwPressure = (e.pointerType === 'pen' && typeof e.pressure === 'number' && e.pressure > 0 && e.pressure <= 1);
+    var p = hasHwPressure ? e.pressure : 0.5;
     return {
-      x: (e.clientX - r.left) * (canvas.width / r.width),
-      y: (e.clientY - r.top) * (canvas.height / r.height),
+      x: (e.clientX - r.left) * (LOGICAL_W / Math.max(1, r.width)),
+      y: (e.clientY - r.top) * (LOGICAL_H / Math.max(1, r.height)),
       p: p,
+      hasHw: hasHwPressure,
+      t: e.timeStamp || performance.now(),
       pt: e.pointerType || 'mouse',
     };
   }
+
+  function computeStrokeWidth(pt, prev) {
+    var minW = 1.05, maxW = 4.1;
+    var targetW;
+    if (pt.hasHw) {
+      targetW = minW + Math.pow(pt.p, 0.85) * (maxW - minW);
+    } else if (prev) {
+      var dist = Math.hypot(pt.x - prev.x, pt.y - prev.y);
+      var dt = Math.max(4, pt.t - prev.t);
+      var vel = dist / dt; // px per ms
+      // Natural fountain pen physics: slower strokes are fuller, faster sweeps taper smoothly
+      var velNorm = Math.max(0, Math.min(1, vel / 1.85));
+      targetW = maxW - velNorm * (maxW - minW);
+    } else {
+      targetW = 2.4;
+    }
+    // Smooth width transitions (EMA) so stroke thickness never jumps
+    var w = lastWidth * 0.68 + targetW * 0.32;
+    lastWidth = w;
+    return w;
+  }
+
+  // Render a single silky-smooth quadratic Bezier segment with variable width
+  function drawSmoothSegment(p0, p1, p2, ink) {
+    var m0x = (p0.x + p1.x) / 2, m0y = (p0.y + p1.y) / 2;
+    var m1x = (p1.x + p2.x) / 2, m1y = (p1.y + p2.y) / 2;
+    var w0 = (p0.w + p1.w) / 2;
+    var w1 = (p1.w + p2.w) / 2;
+    var approxLen = Math.hypot(p1.x - m0x, p1.y - m0y) + Math.hypot(m1x - p1.x, m1y - p1.y);
+    var steps = Math.max(6, Math.min(28, Math.ceil(approxLen / 1.4)));
+
+    ctx.fillStyle = ink;
+    for (var i = 0; i <= steps; i++) {
+      var t = i / steps;
+      var mt = 1 - t;
+      var x = mt * mt * m0x + 2 * mt * t * p1.x + t * t * m1x;
+      var y = mt * mt * m0y + 2 * mt * t * p1.y + t * t * m1y;
+      var r = (w0 + (w1 - w0) * t) * 0.5;
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(0.45, r), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function redrawAllStrokes() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
+    var ink = currentInk();
+    strokes.forEach(function (st) {
+      if (!st.length) return;
+      if (st.length === 1) {
+        ctx.fillStyle = ink;
+        ctx.beginPath();
+        ctx.arc(st[0].x, st[0].y, (st[0].w || 2.2) * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        return;
+      }
+      if (st.length === 2) {
+        drawSmoothSegment(st[0], st[0], st[1], ink);
+        return;
+      }
+      drawSmoothSegment(st[0], st[0], st[1], ink);
+      for (var i = 2; i < st.length; i++) {
+        drawSmoothSegment(st[i - 2], st[i - 1], st[i], ink);
+      }
+      drawSmoothSegment(st[st.length - 2], st[st.length - 1], st[st.length - 1], ink);
+    });
+  }
+
+  function appendPointerSample(rawPt) {
+    if (!curStroke) return;
+    var prev = curStroke[curStroke.length - 1];
+    var dist = Math.hypot(rawPt.x - prev.x, rawPt.y - prev.y);
+    if (dist < 1.6) return;
+    // Exponential moving average smoothing removes polygonal mouse jitter while preserving fluid curves
+    var smoothX = prev.x * 0.32 + rawPt.x * 0.68;
+    var smoothY = prev.y * 0.32 + rawPt.y * 0.68;
+    var pt = {
+      x: smoothX,
+      y: smoothY,
+      p: rawPt.p,
+      hasHw: rawPt.hasHw,
+      t: rawPt.t,
+      pt: rawPt.pt,
+      w: 2.2,
+    };
+    pt.w = computeStrokeWidth(pt, prev);
+    curStroke.push(pt);
+
+    var len = curStroke.length;
+    var ink = currentInk();
+    if (len === 2) {
+      drawSmoothSegment(curStroke[0], curStroke[0], curStroke[1], ink);
+    } else if (len >= 3) {
+      drawSmoothSegment(curStroke[len - 3], curStroke[len - 2], curStroke[len - 1], ink);
+    }
+  }
+
   canvas.addEventListener('pointerdown', function (e) {
-    var pt = canvasPt(e);
+    e.preventDefault();
+    var pt = rawCanvasPt(e);
+    lastWidth = pt.hasHw ? (1.2 + pt.p * 2.6) : 2.3;
+    pt.w = lastWidth;
     curStroke = [pt];
     strokes.push(curStroke);
     canvas.setPointerCapture(e.pointerId);
+    ctx.fillStyle = currentInk();
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, pt.w * 0.5, 0, Math.PI * 2);
+    ctx.fill();
     if (pt.pt === 'pen') {
       engHidden.value = 'stylus_pen';
       if (!devHidden.value) devHidden.value = 'Stylus Pen (Pressure)';
     }
-    teleEl.textContent = 'Input: ' + pt.pt.toUpperCase() + ' · Pressure: ' + Math.round(pt.p * 100) + '% · TS HQ Vectorizer active';
+    teleEl.textContent = 'Input: ' + pt.pt.toUpperCase() + ' · Pressure: ' + Math.round(pt.p * 100) + '% · Smooth Bezier Ink Engine active';
   });
   canvas.addEventListener('pointermove', function (e) {
     if (!curStroke) return;
-    var pt = canvasPt(e);
-    var prev = curStroke[curStroke.length - 1];
-    curStroke.push(pt);
-    ctx.strokeStyle = inkSel.value || '#002769';
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.lineWidth = Math.max(1.2, Math.min(5.2, 1.4 + pt.p * 3.4));
-    ctx.beginPath();
-    ctx.moveTo(prev.x, prev.y);
-    ctx.lineTo(pt.x, pt.y);
-    ctx.stroke();
-    teleEl.textContent = 'Input: ' + pt.pt.toUpperCase() + ' · Pressure: ' + Math.round(pt.p * 100) + '% · ' + strokes.length + ' stroke(s)';
+    var evs = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : null;
+    if (evs && evs.length) {
+      for (var i = 0; i < evs.length; i++) appendPointerSample(rawCanvasPt(evs[i]));
+    } else {
+      appendPointerSample(rawCanvasPt(e));
+    }
+    var last = curStroke[curStroke.length - 1];
+    teleEl.textContent = 'Input: ' + last.pt.toUpperCase() + ' · Ink Width: ' + last.w.toFixed(1) + 'px · ' + strokes.length + ' stroke(s)';
   });
-  canvas.addEventListener('pointerup', function () { curStroke = null; });
+  function finishStroke() {
+    if (!curStroke) return;
+    if (curStroke.length >= 2) {
+      var n = curStroke.length;
+      drawSmoothSegment(curStroke[n - 2], curStroke[n - 1], curStroke[n - 1], currentInk());
+    }
+    curStroke = null;
+  }
+  canvas.addEventListener('pointerup', finishStroke);
+  canvas.addEventListener('pointercancel', finishStroke);
+
+  var undoBtn = document.getElementById('sig-pad-undo');
+  if (undoBtn) {
+    undoBtn.addEventListener('click', function () {
+      if (!strokes.length) return;
+      strokes.pop();
+      redrawAllStrokes();
+      teleEl.textContent = strokes.length ? (strokes.length + ' stroke(s) remaining') : 'Input: waiting for stylus pen, signature pad, or mouse…';
+    });
+  }
   document.getElementById('sig-pad-clear').addEventListener('click', function () {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
     strokes = [];
     curStroke = null;
     teleEl.textContent = 'Input: waiting for stylus pen, signature pad, or mouse…';
   });
 
+  // Export silky-smooth variable-width calligraphic SVG (midpoint quadratic Bezier segments)
   function strokesToHighQualitySvg() {
     if (!strokes.length) return '';
-    var ink = inkSel.value || '#002769';
+    var ink = currentInk();
     var minX = 9999, minY = 9999, maxX = 0, maxY = 0;
     strokes.forEach(function (st) {
       st.forEach(function (pt) {
@@ -468,37 +688,80 @@
     var paths = strokes.map(function (st) {
       if (st.length < 2) {
         var p0 = st[0];
-        return '<circle cx="' + p0.x.toFixed(1) + '" cy="' + p0.y.toFixed(1) + '" r="1.8" fill="' + ink + '"/>';
+        return '<circle cx="' + p0.x.toFixed(1) + '" cy="' + p0.y.toFixed(1) + '" r="' + ((p0.w || 2.2) * 0.5).toFixed(2) + '" fill="' + ink + '"/>';
       }
-      var d = 'M ' + st[0].x.toFixed(1) + ' ' + st[0].y.toFixed(1);
-      var avgP = 0;
+      // Build smooth variable-width outline ribbon along quadratic Bezier centerline
+      var sampled = [];
       for (var i = 1; i < st.length; i++) {
-        var prev = st[i - 1], cur = st[i];
-        var mx = ((prev.x + cur.x) / 2).toFixed(1);
-        var my = ((prev.y + cur.y) / 2).toFixed(1);
-        d += ' Q ' + prev.x.toFixed(1) + ' ' + prev.y.toFixed(1) + ' ' + mx + ' ' + my;
-        avgP += cur.p;
+        var a = st[Math.max(0, i - 2)];
+        var b = st[i - 1];
+        var c = st[i];
+        var m0x = (a.x + b.x) / 2, m0y = (a.y + b.y) / 2;
+        var m1x = (b.x + c.x) / 2, m1y = (b.y + c.y) / 2;
+        var w0 = ((a.w || 2.2) + (b.w || 2.2)) / 2;
+        var w1 = ((b.w || 2.2) + (c.w || 2.2)) / 2;
+        for (var s = 0; s < 4; s++) {
+          var t = s / 4, mt = 1 - t;
+          sampled.push({
+            x: mt * mt * m0x + 2 * mt * t * b.x + t * t * m1x,
+            y: mt * mt * m0y + 2 * mt * t * b.y + t * t * m1y,
+            r: Math.max(0.5, (w0 + (w1 - w0) * t) * 0.5),
+          });
+        }
       }
-      avgP = avgP / Math.max(1, st.length - 1);
-      var sw = Math.max(1.5, Math.min(4.2, 1.5 + avgP * 2.6)).toFixed(2);
-      return '<path d="' + d + '" fill="none" stroke="' + ink + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>';
+      var lastPt = st[st.length - 1];
+      sampled.push({ x: lastPt.x, y: lastPt.y, r: Math.max(0.5, (lastPt.w || 1.6) * 0.5) });
+      if (sampled.length < 3) {
+        var dSimple = 'M ' + st[0].x.toFixed(1) + ' ' + st[0].y.toFixed(1) + ' L ' + lastPt.x.toFixed(1) + ' ' + lastPt.y.toFixed(1);
+        return '<path d="' + dSimple + '" fill="none" stroke="' + ink + '" stroke-width="' + (lastPt.w || 2.2).toFixed(2) + '" stroke-linecap="round"/>';
+      }
+      var leftPts = [], rightPts = [];
+      for (var k = 0; k < sampled.length; k++) {
+        var prevS = sampled[Math.max(0, k - 1)];
+        var nextS = sampled[Math.min(sampled.length - 1, k + 1)];
+        var dx = nextS.x - prevS.x, dy = nextS.y - prevS.y;
+        var len = Math.hypot(dx, dy) || 1;
+        var nx = -dy / len, ny = dx / len;
+        var rad = sampled[k].r;
+        leftPts.push([sampled[k].x + nx * rad, sampled[k].y + ny * rad]);
+        rightPts.push([sampled[k].x - nx * rad, sampled[k].y - ny * rad]);
+      }
+      var d = 'M ' + leftPts[0][0].toFixed(1) + ' ' + leftPts[0][1].toFixed(1);
+      for (var j = 1; j < leftPts.length; j++) {
+        var lmx = ((leftPts[j - 1][0] + leftPts[j][0]) / 2).toFixed(1);
+        var lmy = ((leftPts[j - 1][1] + leftPts[j][1]) / 2).toFixed(1);
+        d += ' Q ' + leftPts[j - 1][0].toFixed(1) + ' ' + leftPts[j - 1][1].toFixed(1) + ' ' + lmx + ' ' + lmy;
+      }
+      for (var rIdx = rightPts.length - 1; rIdx >= 1; rIdx--) {
+        var rmx = ((rightPts[rIdx][0] + rightPts[rIdx - 1][0]) / 2).toFixed(1);
+        var rmy = ((rightPts[rIdx][1] + rightPts[rIdx - 1][1]) / 2).toFixed(1);
+        d += ' Q ' + rightPts[rIdx][0].toFixed(1) + ' ' + rightPts[rIdx][1].toFixed(1) + ' ' + rmx + ' ' + rmy;
+      }
+      d += ' Z';
+      return '<path d="' + d + '" fill="' + ink + '"/>';
     }).join('');
     return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + vx + ' ' + vy + ' ' + vw + ' ' + vh + '" width="240" height="80" data-ts-hq-sig="1">' + paths + '</svg>';
   }
 
-  // TS High-Quality Vector Calligraphy Generator
+  // Load 18 professional handwritten & calligraphic signature fonts
+  if (!document.getElementById('ts-sig-fonts-link')) {
+    var fl = document.createElement('link');
+    fl.id = 'ts-sig-fonts-link';
+    fl.rel = 'stylesheet';
+    fl.href = 'https://fonts.googleapis.com/css2?family=Allison&family=Arizonia&family=Birthstone&family=Cedarville+Cursive&family=Cherish&family=Herr+Von+Muellerhoff&family=Homemade+Apple&family=Kristi&family=La+Belle+Aurore&family=Meddon&family=Meow+Script&family=Monsieur+La+Doulaise&family=Mr+Dafoe&family=Mr+De+Haviland&family=Mrs+Saint+Delafield&family=Qwigley&family=Reenie+Beanie&family=Ruthie&family=WindSong:wght@400;500&family=Zeyada&display=swap';
+    document.head.appendChild(fl);
+  }
+
+  // TS High-Quality Vector Calligraphy Generator (18 Handwritten Fonts)
   var hqSvg = '';
   function buildHqSvg(txt, style) {
     var safe = String(txt || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     var ink = inkSel.value || '#002769';
-    var fam = style === 'calligraphy'
-      ? "'Snell Roundhand', 'Brush Script MT', 'Apple Chancery', cursive"
-      : (style === 'monogram' ? "Georgia, 'Times New Roman', serif" : "'Zapfino', 'Segoe Script', Georgia, italic, serif");
-    var flourish = style === 'monogram'
-      ? '<line x1="36" y1="74" x2="324" y2="74" stroke="' + ink + '" stroke-width="1.3" opacity="0.7"/>'
-      : '<path d="M36 74 Q 140 60 220 72 T 326 66" fill="none" stroke="' + ink + '" stroke-width="1.5" stroke-linecap="round" opacity="0.72"/>';
+    var fam = (style && style.indexOf("'") !== -1) ? style : "'Great Vibes', 'Snell Roundhand', cursive";
+    var isSerif = fam.indexOf('Playfair') !== -1;
+    var flourish = '<path d="M36 74 Q 140 60 220 72 T 326 66" fill="none" stroke="' + ink + '" stroke-width="1.5" stroke-linecap="round" opacity="0.72"/>';
     return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 94" width="260" height="68" data-ts-hq-sig="1">' +
-      '<text x="180" y="58" text-anchor="middle" font-family="' + fam + '" font-style="italic" font-size="34" fill="' + ink + '">' + safe + '</text>' +
+      '<text x="180" y="58" text-anchor="middle" font-family="' + fam + '" font-style="' + (isSerif ? 'italic' : 'normal') + '" font-size="36" fill="' + ink + '">' + safe + '</text>' +
       flourish + '</svg>';
   }
   function refreshHq() {
@@ -510,15 +773,238 @@
   document.getElementById('sig-type-input').addEventListener('input', refreshHq);
   document.getElementById('sig-hq-style').addEventListener('change', refreshHq);
 
-  // Upload
+  // Upload Scanned Signature — Automatic Background Removal, Anti-Aliased Ink Extraction & Auto-Crop
   var uploadedUri = '';
+  var _rawUploadedImg = null;
+  var _rawUploadedIsSvg = false;
+  var _rawUploadedSvgData = '';
+
+  function _hexToRgb(hex) {
+    var h = String(hex || '#002769').replace('#', '').trim();
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    var n = parseInt(h, 16);
+    if (isNaN(n)) return [0, 39, 105];
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+
+  function processScannedSignatureImage(img) {
+    var rmBg = !!(document.getElementById('sig-up-rmbg') && document.getElementById('sig-up-rmbg').checked);
+    var penStyle = !!(document.getElementById('sig-up-penstyle') && document.getElementById('sig-up-penstyle').checked);
+    var sensitivity = parseInt((document.getElementById('sig-up-thresh') || {}).value || '48', 10) || 48;
+    var recolor = !!(document.getElementById('sig-up-recolor') && document.getElementById('sig-up-recolor').checked);
+
+    // Maintain ultra-crisp high resolution (supersample small scans up to 2x, cap at 1600px)
+    var srcW = img.naturalWidth || img.width || 600;
+    var srcH = img.naturalHeight || img.height || 240;
+    var targetMax = penStyle ? 1600 : 1200;
+    var scale = penStyle
+      ? Math.min(2.0, targetMax / Math.max(srcW, srcH))
+      : Math.min(1.0, targetMax / Math.max(srcW, srcH));
+    var w = Math.max(1, Math.round(srcW * scale));
+    var h = Math.max(1, Math.round(srcH * scale));
+
+    var c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    var cx = c.getContext('2d', { willReadFrequently: true });
+    cx.imageSmoothingEnabled = true;
+    cx.imageSmoothingQuality = 'high';
+    cx.drawImage(img, 0, 0, w, h);
+
+    if (!rmBg) {
+      return { dataUrl: c.toDataURL('image/png'), w: w, h: h, bgRemoved: false, penStyle: false };
+    }
+
+    var imgData = cx.getImageData(0, 0, w, h);
+    var d = imgData.data;
+
+    // 1. Sample perimeter pixels to estimate exact paper background color (white, cream, gray, shadow)
+    var bgSumR = 0, bgSumG = 0, bgSumB = 0, bgSamples = 0;
+    var stepX = Math.max(1, Math.floor(w / 40));
+    var stepY = Math.max(1, Math.floor(h / 24));
+    function samplePx(px, py) {
+      var idx = (py * w + px) * 4;
+      if (d[idx + 3] < 200) return; // ignore already transparent borders
+      bgSumR += d[idx]; bgSumG += d[idx + 1]; bgSumB += d[idx + 2]; bgSamples++;
+    }
+    for (var x = 0; x < w; x += stepX) { samplePx(x, 0); samplePx(x, Math.min(h - 1, 2)); samplePx(x, h - 1); samplePx(x, Math.max(0, h - 3)); }
+    for (var y = 0; y < h; y += stepY) { samplePx(0, y); samplePx(Math.min(w - 1, 2), y); samplePx(w - 1, y); samplePx(Math.max(0, w - 3), y); }
+    var bgR = bgSamples ? (bgSumR / bgSamples) : 255;
+    var bgG = bgSamples ? (bgSumG / bgSamples) : 255;
+    var bgB = bgSamples ? (bgSumB / bgSamples) : 255;
+    var bgLum = 0.299 * bgR + 0.587 * bgG + 0.114 * bgB;
+
+    // Smoothstep thresholds derived from user cleanup slider (higher sensitivity = removes more paper noise)
+    var lowT = Math.max(12, sensitivity * 0.55);
+    var highT = Math.max(lowT + 26, sensitivity * 1.45);
+    var inkRgb = _hexToRgb(currentInk());
+
+    var minX = w, minY = h, maxX = 0, maxY = 0, inkCount = 0;
+
+    for (var py = 0; py < h; py++) {
+      for (var px = 0; px < w; px++) {
+        var i = (py * w + px) * 4;
+        var aOrig = d[i + 3];
+        if (aOrig < 10) { d[i + 3] = 0; continue; }
+
+        var r = d[i], g = d[i + 1], b = d[i + 2];
+        var lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        // Perceptual distance from paper background (both luminance drop & color chroma difference)
+        var lumDiff = Math.max(0, bgLum - lum);
+        var colorDist = Math.sqrt((r - bgR) * (r - bgR) * 0.30 + (g - bgG) * (g - bgG) * 0.59 + (b - bgB) * (b - bgB) * 0.11);
+        var strength = Math.max(lumDiff * 1.15, colorDist * 0.95);
+
+        if (strength <= lowT) {
+          d[i + 3] = 0;
+        } else {
+          // Smooth anti-aliased alpha ramp (eliminates jagged paper halo)
+          var t = Math.min(1, (strength - lowT) / (highT - lowT));
+          var smoothA = t * t * (3 - 2 * t);
+          var outA = Math.round(Math.min(255, aOrig * smoothA));
+          d[i + 3] = outA;
+
+          if (outA > 18) {
+            if (recolor) {
+              d[i] = inkRgb[0];
+              d[i + 1] = inkRgb[1];
+              d[i + 2] = inkRgb[2];
+            } else {
+              // Subtle ink contrast boost so scanned strokes look crisp & rich without white halo bleed
+              var boost = 0.84;
+              d[i] = Math.max(0, Math.min(255, Math.round(r * boost)));
+              d[i + 1] = Math.max(0, Math.min(255, Math.round(g * boost)));
+              d[i + 2] = Math.max(0, Math.min(255, Math.round(b * boost)));
+            }
+            if (px < minX) minX = px;
+            if (py < minY) minY = py;
+            if (px > maxX) maxX = px;
+            if (py > maxY) maxY = py;
+            inkCount++;
+          }
+        }
+      }
+    }
+    // 1b. TSD Pen-Style Smooth Ink Enhancement (despeckle + Gaussian edge smoothing + crisp anti-aliased pen contrast)
+    // Preserves 100% of original handwriting structure while eliminating jagged edges and faint paper fuzz.
+    if (penStyle && inkCount > 25) {
+      var origA = new Uint8Array(w * h);
+      for (var k = 0; k < w * h; k++) origA[k] = d[k * 4 + 3];
+      var smoothA = new Uint8Array(w * h);
+      for (var sy = 1; sy < h - 1; sy++) {
+        var rowOff = sy * w;
+        for (var sx = 1; sx < w - 1; sx++) {
+          var idx0 = rowOff + sx;
+          // 3x3 Gaussian kernel (1,2,1 / 2,4,2 / 1,2,1) / 16
+          var sum =
+            origA[idx0 - w - 1] + 2 * origA[idx0 - w] + origA[idx0 - w + 1] +
+            2 * origA[idx0 - 1] + 4 * origA[idx0] + 2 * origA[idx0 + 1] +
+            origA[idx0 + w - 1] + 2 * origA[idx0 + w] + origA[idx0 + w + 1];
+          var avg = sum / 16;
+          // Despeckle isolated 1-2px scanner dust; sharpen true pen stroke boundaries with smoothstep S-curve
+          if (avg < 24) {
+            smoothA[idx0] = 0;
+          } else {
+            var u = Math.max(0, Math.min(1, (avg - 24) / 145));
+            var crisp = u * u * (3 - 2 * u);
+            smoothA[idx0] = Math.round(crisp * 255);
+          }
+        }
+      }
+      // Re-apply refined alpha and rich fountain-pen ink core
+      minX = w; minY = h; maxX = 0; maxY = 0; inkCount = 0;
+      for (var ry = 0; ry < h; ry++) {
+        for (var rx = 0; rx < w; rx++) {
+          var pIdx = ry * w + rx;
+          var pi = pIdx * 4;
+          var na = smoothA[pIdx];
+          d[pi + 3] = na;
+          if (na > 18) {
+            if (recolor) {
+              d[pi] = inkRgb[0]; d[pi + 1] = inkRgb[1]; d[pi + 2] = inkRgb[2];
+            } else {
+              // Deepen ink core slightly for authentic fountain-pen sheen while keeping exact hue
+              var coreBoost = 0.78 + (1 - na / 255) * 0.14;
+              d[pi] = Math.max(0, Math.min(255, Math.round(d[pi] * coreBoost)));
+              d[pi + 1] = Math.max(0, Math.min(255, Math.round(d[pi + 1] * coreBoost)));
+              d[pi + 2] = Math.max(0, Math.min(255, Math.round(d[pi + 2] * coreBoost)));
+            }
+            if (rx < minX) minX = rx;
+            if (ry < minY) minY = ry;
+            if (rx > maxX) maxX = rx;
+            if (ry > maxY) maxY = ry;
+            inkCount++;
+          }
+        }
+      }
+    }
+    cx.putImageData(imgData, 0, 0);
+
+    // 2. Auto-crop tight around the extracted signature with crisp 16px padding
+    if (inkCount > 25 && maxX > minX && maxY > minY) {
+      var pad = 16;
+      var cropX = Math.max(0, minX - pad);
+      var cropY = Math.max(0, minY - pad);
+      var cropW = Math.min(w - cropX, (maxX - minX) + pad * 2);
+      var cropH = Math.min(h - cropY, (maxY - minY) + pad * 2);
+      var outC = document.createElement('canvas');
+      outC.width = cropW;
+      outC.height = cropH;
+      var outCtx = outC.getContext('2d');
+      outCtx.imageSmoothingEnabled = true;
+      outCtx.imageSmoothingQuality = 'high';
+      outCtx.drawImage(c, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+      return { dataUrl: outC.toDataURL('image/png'), w: cropW, h: cropH, bgRemoved: true, penStyle: penStyle };
+    }
+    return { dataUrl: c.toDataURL('image/png'), w: w, h: h, bgRemoved: true, penStyle: penStyle };
+  }
+
+  function reprocessUploadedScan() {
+    var prevEl = document.getElementById('sig-upload-preview');
+    var metaEl = document.getElementById('sig-upload-meta');
+    if (_rawUploadedIsSvg && _rawUploadedSvgData) {
+      uploadedUri = _rawUploadedSvgData;
+      if (prevEl) prevEl.innerHTML = '<img src="' + uploadedUri + '" style="max-height:92px;max-width:100%;object-fit:contain;">';
+      if (metaEl) metaEl.textContent = '✓ Transparent Vector SVG ready';
+      return;
+    }
+    if (!_rawUploadedImg) return;
+    var res = processScannedSignatureImage(_rawUploadedImg);
+    uploadedUri = res.dataUrl;
+    if (prevEl) prevEl.innerHTML = '<img src="' + uploadedUri + '" alt="Processed transparent signature" style="max-height:92px;max-width:100%;object-fit:contain;">';
+    if (metaEl) {
+      metaEl.textContent = res.bgRemoved
+        ? ('✓ ' + (res.penStyle ? 'TSD Pen-Style Smooth Ink + ' : '') + 'Background removed & cropped (' + res.w + ' × ' + res.h + ' px high-DPI transparent PNG)')
+        : ('Original image (' + res.w + ' × ' + res.h + ' px)');
+    }
+  }
+
+  ['sig-up-rmbg', 'sig-up-penstyle', 'sig-up-thresh', 'sig-up-recolor'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', reprocessUploadedScan);
+    if (el) el.addEventListener('change', reprocessUploadedScan);
+  });
+
   document.getElementById('sig-file-input').addEventListener('change', function (e) {
     var f = e.target.files && e.target.files[0];
     if (!f) return;
+    var isSvg = (f.type === 'image/svg+xml' || /\.svg$/i.test(f.name || ''));
     var reader = new FileReader();
     reader.onload = function () {
-      uploadedUri = reader.result;
-      document.getElementById('sig-upload-preview').innerHTML = '<img src="' + uploadedUri + '" style="max-height:84px;max-width:100%;">';
+      if (isSvg) {
+        _rawUploadedIsSvg = true;
+        _rawUploadedSvgData = reader.result;
+        _rawUploadedImg = null;
+        reprocessUploadedScan();
+        return;
+      }
+      _rawUploadedIsSvg = false;
+      _rawUploadedSvgData = '';
+      var img = new Image();
+      img.onload = function () {
+        _rawUploadedImg = img;
+        reprocessUploadedScan();
+      };
+      img.src = reader.result;
     };
     reader.readAsDataURL(f);
   });

@@ -1,0 +1,330 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'projects' %}
+
+{% block title %}Project Portfolio · TRUSTSEAL{% endblock %}
+{% block page_title %}Project Portfolio{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Master governance portfolio — each Project owns its Contracts (MSA, SOW, Vendor, NDA, Employment), rolling up budgets, deliverables, and probation cohorts.
+  </p>
+{% endblock %}
+{% block page_actions %}
+  <a class="ts-btn ts-btn--secondary" href="{{ url_for('workspace_assets_views.templates_hub_page') }}">TS Template Gallery</a>
+  <a class="ts-btn ts-btn--secondary" href="{{ url_for('workspace_assets_views.signed_contracts_page') }}">All Contracts</a>
+  <button type="button" class="ts-btn ts-btn--primary" id="prj-open-new">+ New Project</button>
+{% endblock %}
+
+{% block content %}
+<div class="st-flat">
+  {% include "stamps/_flat_ui.html" %}
+
+  {# ======================= PORTFOLIO EXECUTIVE KPI STRIP (5 CARDS) ======================= #}
+  <section class="st-metrics" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));" aria-label="Project portfolio KPIs">
+    <div class="st-metric">
+      <span class="st-metric__label">Active Projects</span>
+      <span class="st-metric__value">{{ projects|length }}</span>
+      <span class="st-metric__sub">Each project governs 1–N TSD contracts</span>
+    </div>
+    <div class="st-metric">
+      <span class="st-metric__label">Governed TSD Contracts</span>
+      <span class="st-metric__value">{{ projects|sum(attribute='contracts_total') }}</span>
+      <span class="st-metric__sub">{{ projects|sum(attribute='contracts_signed') }} signed · {{ projects|sum(attribute='contracts_draft') }} draft · {{ projects|sum(attribute='contracts_suspended') }} suspended</span>
+    </div>
+    <div class="st-metric">
+      <span class="st-metric__label">Portfolio Deliverables</span>
+      <span class="st-metric__value" style="color:#17633a;">{{ portfolio.deliverables_pct if portfolio is defined else 0 }}%</span>
+      <span class="st-metric__sub">{{ portfolio.deliverables_accepted if portfolio is defined else 0 }} / {{ portfolio.deliverables_total if portfolio is defined else 0 }} milestones accepted</span>
+    </div>
+    <div class="st-metric">
+      <span class="st-metric__label">Tasks &amp; Risks (RAID)</span>
+      <span class="st-metric__value" style="color:#002769;">{{ portfolio.open_tasks if portfolio is defined else 0 }}</span>
+      <span class="st-metric__sub">open task(s) · {{ portfolio.open_risks if portfolio is defined else 0 }} open risk(s)</span>
+    </div>
+    <div class="st-metric">
+      <span class="st-metric__label">Portfolio Budget</span>
+      <span class="st-metric__value">{{ ('USD {:,.0f}'.format(portfolio.total_budget)) if (portfolio is defined and portfolio.total_budget) else '—' }}</span>
+      <span class="st-metric__sub">Committed: USD {{ '{:,.0f}'.format(portfolio.total_committed or 0) if portfolio is defined else '0' }} · {{ portfolio.probations_active if portfolio is defined else 0 }} probation(s)</span>
+    </div>
+  </section>
+
+  {# ======================= FILTER & VIEW BAR ======================= #}
+  <section class="st-panel" style="padding:10px 14px;margin-bottom:14px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;">
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1 1 320px;">
+      <input type="search" id="prj-search" class="ts-input" style="min-height:32px;font-size:12.5px;max-width:260px;" placeholder="Search code, project, client…">
+      <select id="prj-cat-filter" class="st-select" style="height:32px;font-size:12px;padding:4px 8px;">
+        <option value="ALL">All categories</option>
+        {% for key, lbl in categories %}
+        <option value="{{ key }}">{{ lbl }}</option>
+        {% endfor %}
+      </select>
+      <select id="prj-status-filter" class="st-select" style="height:32px;font-size:12px;padding:4px 8px;">
+        <option value="ALL">All statuses</option>
+        <option value="active">Active</option>
+        <option value="on_hold">On Hold</option>
+        <option value="completed">Completed</option>
+        <option value="archived">Archived</option>
+      </select>
+      <select id="prj-health-filter" class="st-select" style="height:32px;font-size:12px;padding:4px 8px;">
+        <option value="ALL">All health</option>
+        <option value="on_track">On Track</option>
+        <option value="at_risk">At Risk</option>
+        <option value="critical">Critical</option>
+      </select>
+    </div>
+    <div style="display:inline-flex;gap:4px;">
+      <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-pview="table" id="prj-v-table">☰ Table</button>
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pview="cards" id="prj-v-cards">▦ Portfolio Cards</button>
+      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pview="kanban" id="prj-v-kanban">▤ Status Board</button>
+    </div>
+  </section>
+
+  {# ======================= VIEW 1: PORTFOLIO TABLE ======================= #}
+  <section class="st-panel" id="prj-table-wrap" style="overflow-x:auto;">
+    <table class="st-table">
+      <thead>
+        <tr>
+          <th style="width:115px;">Code</th>
+          <th>Project Name &amp; Sponsor</th>
+          <th>Category</th>
+          <th>Status</th>
+          <th>Health</th>
+          <th>TSD Contracts</th>
+          <th>Tasks &amp; Risks</th>
+          <th>Deliverables</th>
+          <th>Budget</th>
+          <th style="width:150px;text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="prj-tbody">
+        {% for p in projects %}
+        {% set h = p.health if p.health is defined else {'rag': 'on_track', 'label': 'On Track', 'score': 100} %}
+        <tr data-prj-item="1" data-cat="{{ p.category }}" data-status="{{ p.status }}" data-health="{{ h.rag }}" data-hay="{{ (p.project_code ~ ' ' ~ p.name ~ ' ' ~ (p.client_name or ''))|lower }}">
+          <td style="font-family:var(--ts-font-mono);font-size:12px;color:var(--ts-brand-primary);font-weight:600;">
+            <a href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}" style="color:inherit;text-decoration:none;">{{ p.project_code }}</a>
+          </td>
+          <td>
+            <div style="font-weight:600;">
+              <a href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}" style="color:var(--ts-text-primary);text-decoration:none;">{{ p.name }}</a>
+              {% if p.is_default %}<span class="st-tag" style="margin-left:6px;font-size:10.5px;">Default</span>{% endif %}
+            </div>
+            {% if p.client_name %}<div style="font-size:11.5px;color:var(--ts-text-subtle);">{{ p.client_name }}</div>{% endif %}
+          </td>
+          <td style="color:var(--ts-text-secondary);">{{ p.category|replace('_', ' ')|title }}</td>
+          <td><span class="st-tag {% if p.status == 'active' %}st-tag--ok{% elif p.status == 'on_hold' %}st-tag--warn{% else %}st-tag--info{% endif %}">{{ p.status|replace('_', ' ')|title }}</span></td>
+          <td>
+            <span class="st-tag {% if h.rag == 'on_track' %}st-tag--ok{% elif h.rag == 'at_risk' %}st-tag--warn{% else %}st-tag--bad{% endif %}">{{ h.label }} · {{ h.score }}</span>
+          </td>
+          <td style="font-variant-numeric:tabular-nums;">
+            <strong>{{ p.contracts_total }}</strong>
+            <span style="color:var(--ts-text-subtle);font-size:11px;">({{ p.contracts_signed }} signed · {{ p.contracts_draft }} draft)</span>
+          </td>
+          <td style="font-size:11.5px;color:var(--ts-text-secondary);font-variant-numeric:tabular-nums;">
+            <strong>{{ p.tasks_done }}/{{ p.tasks_total }}</strong> tasks{% if p.open_risks %} · <strong style="color:#b91c1c;">{{ p.open_risks }} risk(s)</strong>{% endif %}
+          </td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:68px;height:6px;background:#eef2f7;"><div style="width:{{ p.deliverables_pct }}%;height:100%;background:#02982e;"></div></div>
+              <span style="font-size:11.5px;color:var(--ts-text-secondary);">{{ p.deliverables_pct }}%</span>
+            </div>
+          </td>
+          <td style="color:var(--ts-text-secondary);font-variant-numeric:tabular-nums;">
+            {{ (p.currency ~ ' ' ~ ('{:,.0f}'.format(p.budget_amount))) if p.budget_amount else '—' }}
+          </td>
+          <td style="text-align:right;white-space:nowrap;">
+            <a class="ts-btn ts-btn--secondary ts-btn--sm" href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}">Dossier →</a>
+            <a class="ts-btn ts-btn--ghost ts-btn--sm" href="{{ url_for('workspace_assets_views.signed_contracts_page') }}?project={{ p.id }}">Contracts</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  {# ======================= VIEW 2: PORTFOLIO CARDS GRID ======================= #}
+  <section id="prj-cards-wrap" hidden style="display:none;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;">
+    {% for p in projects %}
+    {% set h = p.health if p.health is defined else {'rag': 'on_track', 'label': 'On Track', 'score': 100} %}
+    <article class="st-panel" data-prj-item="1" data-cat="{{ p.category }}" data-status="{{ p.status }}" data-health="{{ h.rag }}" data-hay="{{ (p.project_code ~ ' ' ~ p.name ~ ' ' ~ (p.client_name or ''))|lower }}" style="padding:16px;display:flex;flex-direction:column;justify-content:space-between;gap:12px;">
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="font-family:var(--ts-font-mono);font-size:11.5px;font-weight:700;color:#002769;">{{ p.project_code }}</span>
+          <span class="st-tag {% if h.rag == 'on_track' %}st-tag--ok{% elif h.rag == 'at_risk' %}st-tag--warn{% else %}st-tag--bad{% endif %}">{{ h.label }} · {{ h.score }}</span>
+        </div>
+        <h3 style="margin:0;font-size:15px;font-weight:700;color:#1d3648;">
+          <a href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}" style="color:inherit;text-decoration:none;">{{ p.name }}</a>
+        </h3>
+        <div style="font-size:12px;color:#5a6676;margin-top:3px;">{{ p.category|replace('_', ' ')|title }}{% if p.client_name %} · {{ p.client_name }}{% endif %}</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid #ebeef2;font-size:11.5px;">
+          <div><div style="color:#718494;">Contracts</div><strong>{{ p.contracts_total }}</strong></div>
+          <div><div style="color:#718494;">Tasks</div><strong>{{ p.tasks_done }}/{{ p.tasks_total }}</strong></div>
+          <div><div style="color:#718494;">Risks</div><strong style="color:{{ '#b91c1c' if p.open_risks else '#17633a' }};">{{ p.open_risks }}</strong></div>
+          <div><div style="color:#718494;">Deliverables</div><strong>{{ p.deliverables_pct }}%</strong></div>
+        </div>
+        <div style="margin-top:10px;height:6px;background:#eef2f7;">
+          <div style="width:{{ p.deliverables_pct }}%;height:100%;background:#02982e;"></div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:10px;border-top:1px solid #ebeef2;">
+        <span style="font-size:11.5px;color:#5a6676;">{{ p.key_terms_total }} key terms · {{ p.status|replace('_', ' ')|title }}</span>
+        <a class="ts-btn ts-btn--primary ts-btn--sm" href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}">Open Dossier →</a>
+      </div>
+    </article>
+    {% endfor %}
+  </section>
+
+  {# ======================= VIEW 3: STATUS KANBAN BOARD ======================= #}
+  <section id="prj-kanban-wrap" hidden style="display:none;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:start;">
+    {% for col_st, col_lbl in [('active', 'Active'), ('on_hold', 'On Hold'), ('completed', 'Completed'), ('archived', 'Archived')] %}
+    <div class="st-panel" style="padding:12px;background:#f8fafc;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #e2e8f0;">
+        <strong style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#334155;">{{ col_lbl }}</strong>
+        <span class="st-tag">{{ projects|selectattr('status', 'equalto', col_st)|list|length }}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        {% for p in projects if p.status == col_st %}
+        {% set h = p.health if p.health is defined else {'rag': 'on_track', 'label': 'On Track', 'score': 100} %}
+        <a href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}" data-prj-item="1" data-cat="{{ p.category }}" data-status="{{ p.status }}" data-health="{{ h.rag }}" data-hay="{{ (p.project_code ~ ' ' ~ p.name ~ ' ' ~ (p.client_name or ''))|lower }}" style="display:block;padding:12px;background:#ffffff;border:1px solid #d5dce6;text-decoration:none;color:inherit;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:4px;">
+            <span style="font-family:var(--ts-font-mono);font-size:11px;font-weight:700;color:#002769;">{{ p.project_code }}</span>
+            <span class="st-tag {% if h.rag == 'on_track' %}st-tag--ok{% elif h.rag == 'at_risk' %}st-tag--warn{% else %}st-tag--bad{% endif %}" style="font-size:10px;">{{ h.label }}</span>
+          </div>
+          <div style="font-weight:700;font-size:13px;color:#0f172a;margin-bottom:4px;">{{ p.name }}</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:8px;">{{ p.contracts_total }} contract(s) · {{ p.tasks_done }}/{{ p.tasks_total }} tasks · {{ p.open_risks }} risk(s)</div>
+          <div style="height:5px;background:#eef2f7;"><div style="width:{{ p.deliverables_pct }}%;height:100%;background:#02982e;"></div></div>
+        </a>
+        {% else %}
+        <div style="padding:16px 8px;text-align:center;font-size:11.5px;color:#94a3b8;border:1px dashed #cbd5e1;">No {{ col_lbl|lower }} projects</div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+</div>
+
+<!-- Create Project Modal -->
+<div id="prj-modal" class="ts-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="prj-modal-title" style="z-index:9500;">
+  <div class="ts-modal" style="max-width:540px;">
+    <h2 id="prj-modal-title" class="ts-modal__title">Create New Project</h2>
+    <div class="ts-stack">
+      <div class="ts-form-row ts-form-row--split">
+        <div class="ts-field">
+          <label class="ts-field__label" for="prj-name">Project Name</label>
+          <input type="text" id="prj-name" class="ts-input" placeholder="Core Banking Modernization">
+        </div>
+        <div class="ts-field">
+          <label class="ts-field__label" for="prj-code">Project Code (optional)</label>
+          <input type="text" id="prj-code" class="ts-input ts-input--mono" placeholder="PRJ-2026-002">
+        </div>
+      </div>
+      <div class="ts-form-row ts-form-row--split">
+        <div class="ts-field">
+          <label class="ts-field__label" for="prj-cat">Category</label>
+          <select id="prj-cat" class="ts-select">
+            {% for key, lbl in categories %}
+            <option value="{{ key }}">{{ lbl }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="ts-field">
+          <label class="ts-field__label" for="prj-client">Client / Sponsor</label>
+          <input type="text" id="prj-client" class="ts-input" placeholder="Acme Holdings Ltd">
+        </div>
+      </div>
+      <div class="ts-form-row ts-form-row--split">
+        <div class="ts-field">
+          <label class="ts-field__label" for="prj-budget">Budget Amount</label>
+          <input type="number" id="prj-budget" class="ts-input" placeholder="250000">
+        </div>
+        <div class="ts-field">
+          <label class="ts-field__label" for="prj-curr">Currency</label>
+          <select id="prj-curr" class="ts-select">
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
+            <option value="KES">KES</option>
+            <option value="ZAR">ZAR</option>
+          </select>
+        </div>
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="prj-desc">Description</label>
+        <input type="text" id="prj-desc" class="ts-input" placeholder="Scope, objectives, or department">
+      </div>
+    </div>
+    <div class="ts-modal__actions">
+      <button type="button" class="ts-btn ts-btn--secondary" id="prj-cancel">Cancel</button>
+      <button type="button" class="ts-btn ts-btn--primary" id="prj-save">Create Project</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var modal = document.getElementById('prj-modal');
+  document.getElementById('prj-open-new').addEventListener('click', function () {
+    modal.hidden = false;
+    document.getElementById('prj-name').focus();
+  });
+  document.getElementById('prj-cancel').addEventListener('click', function () { modal.hidden = true; });
+  modal.addEventListener('click', function (e) { if (e.target === modal) modal.hidden = true; });
+  document.getElementById('prj-save').addEventListener('click', function () {
+    var name = document.getElementById('prj-name').value.trim();
+    if (!name) return;
+    fetch('/api/projects', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify({
+        name: name,
+        project_code: document.getElementById('prj-code').value.trim(),
+        category: document.getElementById('prj-cat').value,
+        client_name: document.getElementById('prj-client').value.trim(),
+        budget_amount: document.getElementById('prj-budget').value || null,
+        currency: document.getElementById('prj-curr').value,
+        description: document.getElementById('prj-desc').value.trim(),
+      }),
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.ok) window.location.reload();
+    });
+  });
+
+  function applyPortfolioFilter() {
+    var q = (document.getElementById('prj-search').value || '').trim().toLowerCase();
+    var cat = document.getElementById('prj-cat-filter').value;
+    var st = document.getElementById('prj-status-filter').value;
+    var hl = (document.getElementById('prj-health-filter') || {}).value || 'ALL';
+    document.querySelectorAll('[data-prj-item]').forEach(function (el) {
+      var ok = (cat === 'ALL' || el.dataset.cat === cat)
+        && (st === 'ALL' || el.dataset.status === st)
+        && (hl === 'ALL' || el.dataset.health === hl)
+        && (!q || (el.dataset.hay || '').indexOf(q) !== -1);
+      el.hidden = !ok;
+    });
+  }
+  ['prj-search', 'prj-cat-filter', 'prj-status-filter', 'prj-health-filter'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener(id === 'prj-search' ? 'input' : 'change', applyPortfolioFilter);
+  });
+
+  var tblWrap = document.getElementById('prj-table-wrap');
+  var cardsWrap = document.getElementById('prj-cards-wrap');
+  var kanbanWrap = document.getElementById('prj-kanban-wrap');
+  document.querySelectorAll('[data-pview]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var mode = btn.dataset.pview;
+      tblWrap.hidden = (mode !== 'table');
+      cardsWrap.hidden = (mode !== 'cards');
+      cardsWrap.style.display = (mode === 'cards') ? 'grid' : 'none';
+      if (kanbanWrap) {
+        kanbanWrap.hidden = (mode !== 'kanban');
+        kanbanWrap.style.display = (mode === 'kanban') ? 'grid' : 'none';
+      }
+      ['table', 'cards', 'kanban'].forEach(function (m) {
+        var b = document.getElementById('prj-v-' + m);
+        if (b) b.className = 'ts-btn ts-btn--sm ' + (m === mode ? 'ts-btn--primary' : 'ts-btn--secondary');
+      });
+    });
+  });
+})();
+</script>
+{% endblock %}

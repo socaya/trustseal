@@ -3,7 +3,11 @@
 
 {% block title %}Retention #{{ retention.id }} · TRUSTSEAL{% endblock %}
 {% block page_title %}Retention #{{ retention.id }}{% endblock %}
-{% block page_description %}{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    {{ retention.artifact_type|replace('_',' ')|capitalize }} #{{ retention.artifact_id }} — Preservation dossier and cryptographic evidence chain.
+  </p>
+{% endblock %}
 {% block page_actions %}
   <a class="ts-btn ts-btn--secondary" href="{{ url_for('evidence_views.list_retentions') }}">
     ← Back to retentions
@@ -13,20 +17,21 @@
 {% block breadcrumbs %}
   {% set trail = [
     {'label': 'Workspace', 'url': url_for('system.main_views.home')},
-    {'label': 'Evidence & audit', 'url': url_for('evidence_views.list_retentions')},
+    {'label': 'Evidence & retention', 'url': url_for('evidence_views.list_retentions')},
     {'label': 'Retention #' ~ retention.id}
   ] %}
   {% include 'components_ds/breadcrumbs.html' %}
 {% endblock %}
 
 {% macro ts_table_section(title, empty_message, rows, columns) %}
-<section class="ts-panel" style="margin-top: var(--ts-space-4); padding: 0;">
-  <header style="padding: var(--ts-space-3) var(--ts-space-4); border-bottom: 1px solid var(--ts-border); background: var(--ts-surface-alt);">
-    <h2 style="margin: 0; font-size: var(--ts-fs-subsection); font-weight: var(--ts-fw-semibold);">{{ title }}</h2>
+<section class="st-panel" style="margin-top: var(--ts-space-4);">
+  <header class="st-panel__head">
+    <h2 class="st-panel__title">{{ title }}</h2>
+    <span class="st-tag">{{ rows|length }} record{% if rows|length != 1 %}s{% endif %}</span>
   </header>
   {% if rows %}
     <div class="ts-table-scroll">
-      <table class="ts-table">
+      <table class="st-table">
         <thead>
           <tr>{% for col in columns %}<th scope="col">{{ col }}</th>{% endfor %}</tr>
         </thead>
@@ -36,212 +41,277 @@
       </table>
     </div>
   {% else %}
-    <div class="ts-empty" style="padding: var(--ts-space-5) 0;">
-      <p class="ts-empty__hint">{{ empty_message }}</p>
+    <div style="padding: 24px 18px; color: var(--ts-text-muted); font-size: 13px;">
+      {{ empty_message }}
     </div>
   {% endif %}
 </section>
 {% endmacro %}
 
 {% block content %}
+<div class="st-flat">
+  {% include "stamps/_flat_ui.html" %}
 
-<!-- Canonical digest ---------------------------------------- -->
-<section class="ts-panel">
-  <h2 class="ts-panel__title">Canonical digest</h2>
-  <dl class="ts-evidence">
-    <div class="ts-evidence__row">
-      <dt class="ts-evidence__label">Artifact SHA-256</dt>
-      <dd class="ts-evidence__value">
-        {% with value=retention.artifact_sha256, label_hidden='Copy artifact digest' %}
-          {% include 'components_ds/copy_value.html' %}
-        {% endwith %}
-      </dd>
-      <span class="ts-evidence__state"><span class="ts-status ts-status--neutral">Captured</span></span>
-    </div>
-    <div class="ts-evidence__row">
-      <dt class="ts-evidence__label">Recorded</dt>
-      <dd class="ts-evidence__value">
-        {{ retention.created_at.isoformat(sep=' ') if retention.created_at else '—' }} UTC
-      </dd>
-      <span class="ts-evidence__state"></span>
-    </div>
-    <div class="ts-evidence__row">
-      <dt class="ts-evidence__label">Retain until</dt>
-      <dd class="ts-evidence__value">
-        {% if retention.retain_until %}
-          {{ retention.retain_until.strftime('%Y-%m-%d') }}
+  <!-- Summary KPI strip -->
+  <section class="st-metrics" aria-label="Dossier overview">
+    <div class="st-metric">
+      <span class="st-metric__label">Chain Integrity</span>
+      <span class="st-metric__value" style="font-size: 16px; margin-top: 4px;">
+        {% if integrity.status == 'chain_ok' %}
+          <span class="st-tag st-tag--ok">Chain consistent</span>
+        {% elif integrity.status == 'chain_break' %}
+          <span class="st-tag st-tag--bad">Chain break at #{{ integrity.break_at }}</span>
         {% else %}
-          Indefinite
-        {% endif %}
-      </dd>
-      <span class="ts-evidence__state">
-        {% if retention.retain_until and retention.retain_until < now %}
-          <span class="ts-status ts-status--warning">Retention due</span>
-        {% else %}
-          <span class="ts-status ts-status--success">Preserved</span>
+          <span class="st-tag">No checkpoints</span>
         {% endif %}
       </span>
+      <span class="st-metric__sub">{{ checkpoints|length }} checkpoint{% if checkpoints|length != 1 %}s{% endif %}</span>
     </div>
-  </dl>
-</section>
+    <div class="st-metric">
+      <span class="st-metric__label">Legal Holds</span>
+      <span class="st-metric__value">{{ holds|length }}</span>
+      <span class="st-metric__sub">{% if active_hold is defined and active_hold %}Active hold placed{% else %}No active hold{% endif %}</span>
+    </div>
+    <div class="st-metric">
+      <span class="st-metric__label">RFC 3161 Timestamps</span>
+      <span class="st-metric__value">{{ timestamps|length }}</span>
+      <span class="st-metric__sub">{{ ocsp_rows|length }} OCSP · {{ crl_rows|length }} CRL</span>
+    </div>
+    <div class="st-metric">
+      <span class="st-metric__label">Validation Packages</span>
+      <span class="st-metric__value">{{ dossiers|length + dss_rows|length }}</span>
+      <span class="st-metric__sub">{{ dossiers|length }} dossiers · {{ dss_rows|length }} DSS PDFs</span>
+    </div>
+  </section>
 
-<!-- Legal holds --------------------------------------------- -->
-{% call ts_table_section('Legal holds', 'No legal holds recorded.', holds, ['#', 'Reason', 'Requested at', 'Released at']) %}
-  {% for h in holds %}
-  <tr>
-    <td data-label="#">{{ h.id }}</td>
-    <td data-label="Reason">{{ h.reason }}</td>
-    <td data-label="Requested">{{ h.requested_at.isoformat(sep=' ') if h.requested_at else '—' }}</td>
-    <td data-label="Released">
-      {% if h.released_at %}
-        {{ h.released_at.isoformat(sep=' ') }}
+  <!-- Canonical digest ---------------------------------------- -->
+  <section class="st-panel">
+    <div class="st-panel__head">
+      <h2 class="st-panel__title">Canonical digest</h2>
+      {% if retention.retain_until and retention.retain_until < now %}
+        <span class="ts-status ts-status--warning">Retention due</span>
       {% else %}
-        <span class="ts-status ts-status--pending">Active</span>
+        <span class="ts-status ts-status--success">Preserved</span>
       {% endif %}
-    </td>
-  </tr>
-  {% endfor %}
-{% endcall %}
-
-<!-- Checkpoints --------------------------------------------- -->
-<section class="ts-panel" style="margin-top: var(--ts-space-4); padding: 0;">
-  <header style="padding: var(--ts-space-3) var(--ts-space-4); border-bottom: 1px solid var(--ts-border); background: var(--ts-surface-alt); display: flex; align-items: center; justify-content: space-between; gap: var(--ts-space-3);">
-    <h2 style="margin: 0; font-size: var(--ts-fs-subsection); font-weight: var(--ts-fw-semibold);">Checkpoints (chained integrity)</h2>
-    {% if integrity.status == 'chain_ok' %}
-      <span class="ts-status ts-status--success">Chain consistent · {{ checkpoints|length }} checkpoint{% if checkpoints|length != 1 %}s{% endif %}</span>
-    {% elif integrity.status == 'chain_break' %}
-      <span class="ts-status ts-status--danger">Chain break at #{{ integrity.break_at }}</span>
-    {% else %}
-      <span class="ts-status ts-status--neutral">No checkpoints issued</span>
-    {% endif %}
-  </header>
-  {% if checkpoints %}
-  <div class="ts-table-scroll">
-    <table class="ts-table">
-      <thead>
-        <tr><th>#</th><th>Operator</th><th>Algorithm</th><th>Key</th><th>Issued</th></tr>
-      </thead>
-      <tbody>
-        {% for c in checkpoints %}
-        <tr>
-          <td data-label="#">{{ c.id }}</td>
-          <td data-label="Operator">{{ c.operator_id }}</td>
-          <td data-label="Algorithm">{{ c.algorithm }}</td>
-          <td data-label="Key">
-            {% with value=c.key_id, label_hidden='Copy key id' %}
+    </div>
+    <div style="padding: 4px 18px;">
+      <dl class="ts-evidence">
+        <div class="ts-evidence__row">
+          <dt class="ts-evidence__label">Artifact SHA-256</dt>
+          <dd class="ts-evidence__value">
+            {% with value=retention.artifact_sha256, label_hidden='Copy artifact digest' %}
               {% include 'components_ds/copy_value.html' %}
             {% endwith %}
-          </td>
-          <td data-label="Issued">{{ c.created_at.isoformat(sep=' ') if c.created_at else '—' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="ts-empty" style="padding: var(--ts-space-5) 0;">
-    <p class="ts-empty__hint">No checkpoints have been issued yet.</p>
-  </div>
-  {% endif %}
-</section>
+          </dd>
+          <span class="ts-evidence__state"><span class="ts-status ts-status--neutral">Captured</span></span>
+        </div>
+        <div class="ts-evidence__row">
+          <dt class="ts-evidence__label">Recorded</dt>
+          <dd class="ts-evidence__value">
+            {{ retention.created_at.isoformat(sep=' ') if retention.created_at else '—' }} UTC
+          </dd>
+          <span class="ts-evidence__state"></span>
+        </div>
+        <div class="ts-evidence__row">
+          <dt class="ts-evidence__label">Retain until</dt>
+          <dd class="ts-evidence__value">
+            {% if retention.retain_until %}
+              {{ retention.retain_until.strftime('%Y-%m-%d') }}
+            {% else %}
+              Indefinite
+            {% endif %}
+          </dd>
+          <span class="ts-evidence__state">
+            {% if retention.retain_until and retention.retain_until < now %}
+              <span class="ts-status ts-status--warning">Retention due</span>
+            {% else %}
+              <span class="ts-status ts-status--success">Preserved</span>
+            {% endif %}
+          </span>
+        </div>
+      </dl>
+    </div>
+  </section>
 
-<!-- Timestamps ---------------------------------------------- -->
-{% call ts_table_section('Timestamps (RFC 3161)', 'No timestamps issued.', timestamps, ['#', 'TSA cert', 'Token', 'Gen time']) %}
-  {% for t in timestamps %}
-  <tr>
-    <td data-label="#">{{ t.id }}</td>
-    <td data-label="TSA cert">
-      {% with value=t.tsa_certificate_sha256, label_hidden='Copy TSA cert digest' %}
-        {% include 'components_ds/copy_value.html' %}
-      {% endwith %}
-    </td>
-    <td data-label="Token">
-      {% with value=t.token_sha256, label_hidden='Copy token digest' %}
-        {% include 'components_ds/copy_value.html' %}
-      {% endwith %}
-    </td>
-    <td data-label="Gen time">{{ t.gen_time.isoformat(sep=' ') if t.gen_time else '—' }}</td>
-  </tr>
-  {% endfor %}
-{% endcall %}
+  <!-- Legal holds --------------------------------------------- -->
+  {% call ts_table_section('Legal holds', 'No legal holds recorded.', holds, ['#', 'Reason', 'Requested at', 'Released at']) %}
+    {% for h in holds %}
+    <tr>
+      <td data-label="#">{{ h.id }}</td>
+      <td data-label="Reason">{{ h.reason }}</td>
+      <td data-label="Requested">{{ h.requested_at.isoformat(sep=' ') if h.requested_at else '—' }}</td>
+      <td data-label="Released">
+        {% if h.released_at %}
+          {{ h.released_at.isoformat(sep=' ') }}
+        {% else %}
+          <span class="ts-status ts-status--pending">Active</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  {% endcall %}
 
-<!-- OCSP ---------------------------------------------------- -->
-{% call ts_table_section('OCSP responses', 'No OCSP responses captured.', ocsp_rows, ['#', 'Timestamp', 'Subject cert', 'Status']) %}
-  {% for o in ocsp_rows %}
-  <tr>
-    <td data-label="#">{{ o.id }}</td>
-    <td data-label="Timestamp">{{ o.timestamp_id }}</td>
-    <td data-label="Subject cert">
-      {% with value=o.subject_certificate_sha256, label_hidden='Copy subject cert digest' %}
-        {% include 'components_ds/copy_value.html' %}
-      {% endwith %}
-    </td>
-    <td data-label="Status">
-      {% if o.cert_status == 'good' %}
-        <span class="ts-status ts-status--success">Good</span>
-      {% elif o.cert_status == 'revoked' %}
-        <span class="ts-status ts-status--danger">Revoked</span>
-      {% elif o.cert_status == 'unknown' %}
-        <span class="ts-status ts-status--warning">Unknown</span>
+  <!-- Checkpoints --------------------------------------------- -->
+  <section class="st-panel" style="margin-top: var(--ts-space-4);">
+    <header class="st-panel__head">
+      <h2 class="st-panel__title">Checkpoints (chained integrity)</h2>
+      {% if integrity.status == 'chain_ok' %}
+        <span class="ts-status ts-status--success">Chain consistent · {{ checkpoints|length }} checkpoint{% if checkpoints|length != 1 %}s{% endif %}</span>
+      {% elif integrity.status == 'chain_break' %}
+        <span class="ts-status ts-status--danger">Chain break at #{{ integrity.break_at }}</span>
       {% else %}
-        <span class="ts-status ts-status--neutral">{{ o.cert_status }}</span>
+        <span class="ts-status ts-status--neutral">No checkpoints issued</span>
       {% endif %}
-    </td>
-  </tr>
-  {% endfor %}
-{% endcall %}
+    </header>
+    {% if checkpoints %}
+    <div class="ts-table-scroll">
+      <table class="st-table">
+        <thead>
+          <tr><th>#</th><th>Operator</th><th>Algorithm</th><th>Key</th><th>Issued</th></tr>
+        </thead>
+        <tbody>
+          {% for c in checkpoints %}
+          <tr>
+            <td data-label="#">{{ c.id }}</td>
+            <td data-label="Operator">{{ c.operator_id }}</td>
+            <td data-label="Algorithm">{{ c.algorithm }}</td>
+            <td data-label="Key">
+              {% with value=c.key_id, label_hidden='Copy key id' %}
+                {% include 'components_ds/copy_value.html' %}
+              {% endwith %}
+            </td>
+            <td data-label="Issued">{{ c.created_at.isoformat(sep=' ') if c.created_at else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding: 24px 18px; color: var(--ts-text-muted); font-size: 13px;">
+      No checkpoints have been issued yet.
+    </div>
+    {% endif %}
+  </section>
 
-<!-- CRL ----------------------------------------------------- -->
-{% call ts_table_section('CRL evidence', 'No CRL evidence captured.', crl_rows, ['#', 'Timestamp', 'Subject cert', 'Captured']) %}
-  {% for c in crl_rows %}
-  <tr>
-    <td data-label="#">{{ c.id }}</td>
-    <td data-label="Timestamp">{{ c.timestamp_id }}</td>
-    <td data-label="Subject cert">
-      {% with value=c.subject_certificate_sha256, label_hidden='Copy subject cert digest' %}
-        {% include 'components_ds/copy_value.html' %}
-      {% endwith %}
-    </td>
-    <td data-label="Captured">{{ c.created_at.isoformat(sep=' ') if c.created_at else '—' }}</td>
-  </tr>
-  {% endfor %}
-{% endcall %}
+  <!-- Timestamps ---------------------------------------------- -->
+  {% call ts_table_section('Timestamps (RFC 3161)', 'No timestamps issued.', timestamps, ['#', 'TSA cert', 'Token', 'Gen time']) %}
+    {% for t in timestamps %}
+    <tr>
+      <td data-label="#">{{ t.id }}</td>
+      <td data-label="TSA cert">
+        {% with value=t.tsa_certificate_sha256, label_hidden='Copy TSA cert digest' %}
+          {% include 'components_ds/copy_value.html' %}
+        {% endwith %}
+      </td>
+      <td data-label="Token">
+        {% with value=t.token_sha256, label_hidden='Copy token digest' %}
+          {% include 'components_ds/copy_value.html' %}
+        {% endwith %}
+      </td>
+      <td data-label="Gen time">{{ t.gen_time.isoformat(sep=' ') if t.gen_time else '—' }}</td>
+    </tr>
+    {% endfor %}
+  {% endcall %}
 
-<!-- Dossiers ------------------------------------------------ -->
-{% call ts_table_section('Validation dossiers', 'No dossiers assembled.', dossiers, ['#', 'Timestamp', 'Manifest', 'Operator', 'Issued']) %}
-  {% for d in dossiers %}
-  <tr>
-    <td data-label="#">{{ d.id }}</td>
-    <td data-label="Timestamp">{{ d.timestamp_id }}</td>
-    <td data-label="Manifest">
-      {% with value=d.manifest_sha256, label_hidden='Copy manifest digest' %}
-        {% include 'components_ds/copy_value.html' %}
-      {% endwith %}
-    </td>
-    <td data-label="Operator">{{ d.operator_id }}</td>
-    <td data-label="Issued">{{ d.created_at.isoformat(sep=' ') if d.created_at else '—' }}</td>
-  </tr>
-  {% endfor %}
-{% endcall %}
+  <!-- OCSP ---------------------------------------------------- -->
+  {% call ts_table_section('OCSP responses', 'No OCSP responses captured.', ocsp_rows, ['#', 'Timestamp', 'Subject cert', 'Status']) %}
+    {% for o in ocsp_rows %}
+    <tr>
+      <td data-label="#">{{ o.id }}</td>
+      <td data-label="Timestamp">{{ o.timestamp_id }}</td>
+      <td data-label="Subject cert">
+        {% with value=o.subject_certificate_sha256, label_hidden='Copy subject cert digest' %}
+          {% include 'components_ds/copy_value.html' %}
+        {% endwith %}
+      </td>
+      <td data-label="Status">
+        {% if o.cert_status == 'good' %}
+          <span class="ts-status ts-status--success">Good</span>
+        {% elif o.cert_status == 'revoked' %}
+          <span class="ts-status ts-status--danger">Revoked</span>
+        {% elif o.cert_status == 'unknown' %}
+          <span class="ts-status ts-status--warning">Unknown</span>
+        {% else %}
+          <span class="ts-status ts-status--neutral">{{ o.cert_status }}</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  {% endcall %}
 
-<!-- DSS derivatives ----------------------------------------- -->
-{% call ts_table_section('PDF DSS derivatives', 'No DSS derivatives created.', dss_rows, ['#', 'Source', 'Output', 'Profile']) %}
-  {% for d in dss_rows %}
-  <tr>
-    <td data-label="#">{{ d.id }}</td>
-    <td data-label="Source">
-      {% with value=d.source_sha256, label_hidden='Copy source digest' %}
-        {% include 'components_ds/copy_value.html' %}
-      {% endwith %}
-    </td>
-    <td data-label="Output">
-      {% with value=d.output_sha256, label_hidden='Copy output digest' %}
-        {% include 'components_ds/copy_value.html' %}
-      {% endwith %}
-    </td>
-    <td data-label="Profile">{{ d.profile }}</td>
-  </tr>
-  {% endfor %}
-{% endcall %}
+  <!-- CRL ----------------------------------------------------- -->
+  {% call ts_table_section('CRL evidence', 'No CRL evidence captured.', crl_rows, ['#', 'Timestamp', 'Subject cert', 'Captured']) %}
+    {% for c in crl_rows %}
+    <tr>
+      <td data-label="#">{{ c.id }}</td>
+      <td data-label="Timestamp">{{ c.timestamp_id }}</td>
+      <td data-label="Subject cert">
+        {% with value=c.subject_certificate_sha256, label_hidden='Copy subject cert digest' %}
+          {% include 'components_ds/copy_value.html' %}
+        {% endwith %}
+      </td>
+      <td data-label="Captured">{{ c.created_at.isoformat(sep=' ') if c.created_at else '—' }}</td>
+    </tr>
+    {% endfor %}
+  {% endcall %}
 
+  <!-- Dossiers ------------------------------------------------ -->
+  {% call ts_table_section('Validation dossiers', 'No dossiers assembled.', dossiers, ['#', 'Timestamp', 'Manifest', 'Operator', 'Issued']) %}
+    {% for d in dossiers %}
+    <tr>
+      <td data-label="#">{{ d.id }}</td>
+      <td data-label="Timestamp">{{ d.timestamp_id }}</td>
+      <td data-label="Manifest">
+        {% with value=d.manifest_sha256, label_hidden='Copy manifest digest' %}
+          {% include 'components_ds/copy_value.html' %}
+        {% endwith %}
+      </td>
+      <td data-label="Operator">{{ d.operator_id }}</td>
+      <td data-label="Issued">{{ d.created_at.isoformat(sep=' ') if d.created_at else '—' }}</td>
+    </tr>
+    {% endfor %}
+  {% endcall %}
+
+  <!-- DSS derivatives ----------------------------------------- -->
+  {% call ts_table_section('PDF DSS derivatives', 'No DSS derivatives created.', dss_rows, ['#', 'Source', 'Output', 'Profile']) %}
+    {% for d in dss_rows %}
+    <tr>
+      <td data-label="#">{{ d.id }}</td>
+      <td data-label="Source">
+        {% with value=d.source_sha256, label_hidden='Copy source digest' %}
+          {% include 'components_ds/copy_value.html' %}
+        {% endwith %}
+      </td>
+      <td data-label="Output">
+        {% with value=d.output_sha256, label_hidden='Copy output digest' %}
+          {% include 'components_ds/copy_value.html' %}
+        {% endwith %}
+      </td>
+      <td data-label="Profile">{{ d.profile }}</td>
+    </tr>
+    {% endfor %}
+  {% endcall %}
+</div>
+
+<script>
+(function () {
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-ts-copy-trigger]');
+    if (!btn) return;
+    var wrap = btn.closest('[data-ts-copy]');
+    var textEl = wrap && wrap.querySelector('.ts-copy-value__text');
+    var val = textEl ? (textEl.getAttribute('title') || textEl.textContent || '').trim() : '';
+    if (!val || !navigator.clipboard) return;
+    navigator.clipboard.writeText(val).then(function () {
+      var region = document.getElementById('ts-toasts');
+      if (!region) return;
+      var el = document.createElement('div');
+      el.className = 'ts-toast ts-toast--success';
+      el.textContent = 'Copied to clipboard';
+      region.appendChild(el);
+      setTimeout(function () { el.remove(); }, 2200);
+    });
+  });
+})();
+</script>
 {% endblock %}

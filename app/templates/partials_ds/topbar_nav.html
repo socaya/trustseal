@@ -1,0 +1,131 @@
+{#
+  TRUSTSEAL Executive Topbar Navigation (Role-Gated, Zero Sidebar Scroll).
+  All items check `url_map_endpoints` so dead links never render (TS-UI-008).
+#}
+{% set top_groups = [
+  {
+    "id": "workspace",
+    "label": "Workspace",
+    "tier": "all",
+    "keys": ["overview", "documents", "signed-contracts", "projects"],
+    "items": [
+      {"endpoint": "system.main_views.home",                      "label": "Overview",       "desc": "Workspace KPIs & recent activity",   "key": "overview"},
+      {"endpoint": "tsd_views.library",                           "label": "Documents",      "desc": "Live TSD records & drafts",          "key": "documents"},
+      {"endpoint": "workspace_assets_views.signed_contracts_page","label": "Contracts",      "desc": "Active & executed agreements",       "key": "signed-contracts"},
+      {"endpoint": "contracts_views.projects_page",               "label": "Projects",       "desc": "Matters, deals & deliverables",      "key": "projects"}
+    ]
+  },
+  {
+    "id": "assets",
+    "label": "Brand & Assets",
+    "tier": "all",
+    "keys": ["stamps", "letterheads", "signatures", "media"],
+    "items": [
+      {"endpoint": "tsd_stamps_views.library",                    "label": "Stamps",         "desc": "Sealed corporate & dated stamps",    "key": "stamps"},
+      {"endpoint": "workspace_assets_views.letterheads_page",     "label": "Letterheads",    "desc": "Official organization stationery",   "key": "letterheads"},
+      {"endpoint": "workspace_assets_views.signatures_hub_page",  "label": "Signatures",     "desc": "OTP-protected signatory vault",      "key": "signatures"},
+      {"endpoint": "workspace_assets_views.media_page",           "label": "Media Library",  "desc": "Logos, seals & image assets",        "key": "media"}
+    ]
+  },
+  {
+    "id": "templates",
+    "label": "Templates",
+    "tier": "all",
+    "direct_endpoint": "workspace_assets_views.templates_hub_page",
+    "keys": ["templates"],
+    "items": []
+  },
+  {
+    "id": "trust",
+    "label": "Trust & Directory",
+    "tier": "all",
+    "keys": ["contacts", "clients", "verify", "stamp-verify"],
+    "items": [
+      {"endpoint": "document_party_views.view_document_parties",  "label": "Contacts & Parties", "desc": "Signatories & counterparties",   "key": "contacts"},
+      {"endpoint": "organizations_bp.view_clients",               "label": "Clients",            "desc": "Client accounts & profiles",     "key": "clients"},
+      {"endpoint": "verify_views.verify_form",                    "label": "Verify Document",    "desc": "Cryptographic PDF authenticity", "key": "verify"},
+      {"endpoint": "tsd_stamps_views.verify_page",                "label": "Stamp Forensics",    "desc": "Inspect covert stamp receipts",  "key": "stamp-verify"}
+    ]
+  },
+  {
+    "id": "org_admin",
+    "label": "Org Admin",
+    "tier": "org_admin",
+    "keys": ["users", "roles", "audit", "evidence", "integrations", "billing", "settings"],
+    "items": [
+      {"endpoint": "admin_users_views.index",                     "label": "Users & Access",        "desc": "Team members & invitations",     "key": "users"},
+      {"endpoint": "system.view_roles",                           "label": "Roles & Permissions",   "desc": "Tenant RBAC role policies",      "key": "roles"},
+      {"endpoint": "audit_security_views.index",                  "label": "Audit & Security",      "desc": "Immutable activity & alerts",    "key": "audit"},
+      {"endpoint": "evidence_views.list_retentions",              "label": "Evidence & Retention",  "desc": "7-year vault & legal holds",     "key": "evidence"},
+      {"endpoint": "integrations_views.index",                    "label": "Integrations & API",    "desc": "Webhooks, SCIM, SAML & keys",    "key": "integrations"},
+      {"endpoint": "billing_views.index",                         "label": "Subscription & Billing","desc": "Plan, usage & invoices",         "key": "billing"},
+      {"endpoint": "system.system_settings_view",                 "label": "Organization Settings", "desc": "Tenant profile & defaults",      "key": "settings"}
+    ]
+  },
+  {
+    "id": "platform",
+    "label": "Platform",
+    "badge": "ADMIN",
+    "tier": "platform_admin",
+    "keys": ["organizations", "permissions", "notifications", "slo", "gallery"],
+    "items": [
+      {"endpoint": "organizations_bp.view_organizations",         "label": "Organizations & Tenants","desc": "Manage all subscriber orgs",    "key": "organizations"},
+      {"endpoint": "system.view_permissions",                     "label": "Global Permissions",     "desc": "Platform-wide RBAC catalog",    "key": "permissions"},
+      {"endpoint": "operator_notifications_views.list_notifications","label": "Platform Alerts",     "desc": "System & security notices",     "key": "notifications"},
+      {"endpoint": "slo_api.slo_status",                          "label": "System Health & SLO",    "desc": "Service availability metrics",  "key": "slo"},
+      {"endpoint": "design_gallery_bp.gallery",                   "label": "UI Component Gallery",   "desc": "Design system primitives",      "key": "gallery"}
+    ]
+  }
+] %}
+
+<nav class="ts-topnav" aria-label="Primary navigation">
+  {% for grp in top_groups %}
+    {% set tier = grp.get('tier', 'all') %}
+    {% set allowed = (tier == 'all') or (tier == 'org_admin' and (nav_is_org_admin or nav_is_platform_admin)) or (tier == 'platform_admin' and nav_is_platform_admin) %}
+    {% if allowed %}
+      {% set is_active = active_nav_item in grp['keys'] %}
+      {% if grp.get('direct_endpoint') %}
+        {% if grp['direct_endpoint'] in url_map_endpoints %}
+        <a class="ts-topnav__link{% if is_active %} is-active{% endif %}"
+           href="{{ url_for(grp['direct_endpoint']) }}"
+           {% if is_active %}aria-current="page"{% endif %}>
+          {{ grp.label }}
+        </a>
+        {% endif %}
+      {% else %}
+        {% set vis = namespace(count=0) %}
+        {% for it in grp['items'] %}
+          {% if it.endpoint in url_map_endpoints %}{% set vis.count = vis.count + 1 %}{% endif %}
+        {% endfor %}
+        {% if vis.count > 0 %}
+        <div class="ts-topnav__drop{% if tier == 'platform_admin' %} ts-topnav__drop--platform{% endif %}" data-topnav-drop="{{ grp.id }}" data-open="false">
+          <button type="button"
+                  class="ts-topnav__trigger{% if is_active %} is-active{% endif %}"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  data-topnav-trigger="{{ grp.id }}">
+            <span>{{ grp.label }}</span>
+            {% if grp.get('badge') %}<span class="ts-topnav__plat-badge">{{ grp.badge }}</span>{% endif %}
+            <svg class="ts-topnav__chev" width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <div class="ts-topnav__menu{% if vis.count >= 6 %} ts-topnav__menu--wide{% endif %}" role="menu">
+            {% for it in grp['items'] %}
+              {% if it.endpoint in url_map_endpoints %}
+              <a class="ts-topnav__item{% if active_nav_item == it.key %} is-active{% endif %}"
+                 role="menuitem"
+                 href="{{ url_for(it.endpoint) }}"
+                 {% if active_nav_item == it.key %}aria-current="page"{% endif %}>
+                <span class="ts-topnav__item-title">{{ it.label }}</span>
+                <span class="ts-topnav__item-desc">{{ it.desc }}</span>
+              </a>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+</nav>

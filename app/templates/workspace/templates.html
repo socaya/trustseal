@@ -2,201 +2,326 @@
 {% set active_nav_item = 'templates' %}
 
 {% block title %}Templates · TRUSTSEAL{% endblock %}
-{% block page_title %}Templates{% endblock %}
+{% block page_title %}Template Gallery{% endblock %}
 {% block page_description %}{% endblock %}
 {% block page_actions %}
-  <a class="ts-btn" href="/letterheads">Letterheads Designer</a>
-  <a class="ts-btn" href="{{ url_for('tsd_stamps_views.templates_page') }}">Stamp Studio Templates</a>
-  <button type="button" class="ts-btn ts-btn--primary" id="dt-toggle-new">New custom template</button>
+  <a class="ts-btn" href="/letterheads">Letterhead Studio</a>
+  <a class="ts-btn" href="{{ url_for('tsd_stamps_views.templates_page') }}">Stamp Studio</a>
+  <button type="button" class="ts-btn ts-btn--primary" id="dt-toggle-new">+ New Custom Template</button>
 {% endblock %}
 
 {% block content %}
-{% set total_all = (tsd_templates|length) + (templates|length) + (saved_letterheads|length) + (letterhead_presets|length) + (stamp_templates|length) %}
+{% set total_bib = bib_total if bib_total is defined else 0 %}
+{% set total_ctr = ctr_total if ctr_total is defined else 0 %}
 {% set total_docs = (tsd_templates|length) + (templates|length) %}
 {% set total_lh = (saved_letterheads|length) + (letterhead_presets|length) %}
-{% set total_stamps = stamp_templates|length %}
+{% set total_stamps = stamp_total if stamp_total is defined else (stamp_templates|length) %}
 
-<div class="st-flat">
+<div class="tpl-gallery">
   {% include "stamps/_flat_ui.html" %}
 
-  <section class="st-panel" id="dt-new-panel" hidden style="margin-bottom:18px;padding:16px 18px;">
-    <form method="post" action="{{ url_for('workspace_assets_views.templates_hub_page') }}" style="display:flex;flex-direction:column;gap:10px;">
-      <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:10px;">
-        <input type="text" name="name" required class="st-select" style="width:100%;background:#f6f8fb;" placeholder="Template name (e.g. NDA / Employment Contract)">
-        <input type="text" name="description" class="st-select" style="width:100%;background:#f6f8fb;" placeholder="Short description…">
+  {# ── Collapsible New Custom Template Drawer ── #}
+  <section class="tpl-drawer" id="dt-new-panel" hidden>
+    <div class="tpl-drawer__head">
+      <h3>Create Organization Template</h3>
+      <button type="button" class="tpl-icon-btn" id="dt-cancel-new" aria-label="Close">✕</button>
+    </div>
+    <form method="post" action="{{ url_for('workspace_assets_views.templates_hub_page') }}" class="tpl-drawer__form">
+      <div class="tpl-drawer__row">
+        <input type="text" name="name" required class="tpl-input" placeholder="Template name (e.g. Executive NDA / Employment Offer)">
+        <input type="text" name="description" class="tpl-input" placeholder="Brief summary for your team…">
       </div>
-      <textarea name="content" rows="4" style="width:100%;box-sizing:border-box;padding:10px;border:0;background:#f6f8fb;font-size:13px;color:#091e42;outline:none;" placeholder="Starter document body HTML or text…"></textarea>
-      <div style="display:flex;gap:8px;">
-        <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Save template</button>
-        <button type="button" class="ts-btn ts-btn--sm" id="dt-cancel-new">Cancel</button>
+      <textarea name="content" rows="4" class="tpl-textarea" placeholder="Starter document HTML or plain text…"></textarea>
+      <div class="tpl-drawer__actions">
+        <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Save Template</button>
       </div>
     </form>
   </section>
 
-  <section class="tpl-hub-bar">
-    <div class="tpl-tabs" role="tablist" aria-label="Template category">
-      <button type="button" class="tpl-tab is-active" data-tpl-tab="all">All Templates <span class="tpl-tab__n">{{ total_all }}</span></button>
-      <button type="button" class="tpl-tab" data-tpl-tab="tsd">TSD Documents <span class="tpl-tab__n">{{ total_docs }}</span></button>
-      <button type="button" class="tpl-tab" data-tpl-tab="letterhead">Letterheads <span class="tpl-tab__n">{{ total_lh }}</span></button>
-      <button type="button" class="tpl-tab" data-tpl-tab="stamp">Stamps <span class="tpl-tab__n">{{ total_stamps }}</span></button>
+  {# ── Clean Unified Navigation & Filter Bar ── #}
+  <header class="tpl-toolbar">
+    <nav class="tpl-tabs" role="tablist" aria-label="Template libraries">
+      <button type="button" class="tpl-tab is-active" data-tpl-tab="bib" role="tab" aria-selected="true">
+        Company Documents <span class="tpl-tab__count">{{ total_bib }}</span>
+      </button>
+      <button type="button" class="tpl-tab" data-tpl-tab="contracts" role="tab" aria-selected="false">
+        Contracts <span class="tpl-tab__count">{{ total_ctr }}</span>
+      </button>
+      <button type="button" class="tpl-tab" data-tpl-tab="tsd" role="tab" aria-selected="false">
+        Quick-Start TSD <span class="tpl-tab__count">{{ total_docs }}</span>
+      </button>
+      <button type="button" class="tpl-tab" data-tpl-tab="letterhead" role="tab" aria-selected="false">
+        Letterheads <span class="tpl-tab__count">{{ total_lh }}</span>
+      </button>
+      <button type="button" class="tpl-tab" data-tpl-tab="stamp" role="tab" aria-selected="false">
+        Stamps <span class="tpl-tab__count">{{ total_stamps }}</span>
+      </button>
+    </nav>
+
+    <div class="tpl-controls">
+      <div class="tpl-search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+          <path d="m20 20-3.2-3.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <input type="search" id="dt-search" placeholder="Search 3,300+ templates, policies, contracts &amp; stamps…">
+        <button type="button" id="dt-search-clear" class="tpl-search__clear" hidden aria-label="Clear search">✕</button>
+      </div>
+
+      <select id="bib-dept-filter" class="tpl-select" aria-label="Filter department">
+        <option value="ALL">All Categories ({{ total_bib }})</option>
+        {% for c in (bib_categories if bib_categories is defined else []) %}
+        <option value="{{ c.category }}">{{ c.category }} ({{ c.count }})</option>
+        {% endfor %}
+      </select>
+
+      <select id="ctr-cat-filter" class="tpl-select" aria-label="Filter practice area" hidden>
+        <option value="ALL">All Practice Areas ({{ total_ctr }})</option>
+        {% for c in (ctr_categories if ctr_categories is defined else []) %}
+        <option value="{{ c.category }}">{{ c.category }} ({{ c.count }})</option>
+        {% endfor %}
+      </select>
+
+      <select id="st-cat-filter" class="tpl-select" aria-label="Filter stamp category" hidden>
+        <option value="ALL">All Stamp Categories ({{ total_stamps }})</option>
+        {% for c in (stamp_categories if stamp_categories is defined else []) %}
+        <option value="{{ c.category }}">{{ c.category }} ({{ c.count }})</option>
+        {% endfor %}
+      </select>
+
+      <select id="st-style-filter" class="tpl-select" aria-label="Filter stamp style" hidden>
+        <option value="ALL">All Styles &amp; Shapes</option>
+        {% for s in (stamp_styles if stamp_styles is defined else []) %}
+        <option value="{{ s.style }}">{{ s.label }} ({{ s.count }})</option>
+        {% endfor %}
+      </select>
+
+      <div class="tpl-view-switch" role="group" aria-label="View layout">
+        <button type="button" class="tpl-view-btn is-active" data-view-mode="grid" title="Page thumbnail grid">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+        </button>
+        <button type="button" class="tpl-view-btn" data-view-mode="list" title="Previewable list view">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2.4" rx="0.8"/><rect x="1" y="6.8" width="14" height="2.4" rx="0.8"/><rect x="1" y="11.6" width="14" height="2.4" rx="0.8"/></svg>
+        </button>
+      </div>
     </div>
-    <div class="st-search" style="min-width:260px;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
-        <path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-      <input type="search" id="dt-search" placeholder="Search all document, letterhead & stamp templates…">
+
+    {# ── Modern Quick-Filter Pill Rail & Active Filter Chips ── #}
+    <div class="tpl-filter-rail" id="tpl-chip-rail" aria-label="Quick category filters"></div>
+    <div class="tpl-active-bar" id="tpl-active-filters" hidden></div>
+  </header>
+
+  {# ==================== 1. COMPANY DOCUMENTS (1,080+) ==================== #}
+  <section class="tpl-pane" data-tpl-section="bib">
+    <div class="tpl-pane__meta">
+      <span class="tpl-pane__summary" id="bib-count-badge">Showing {{ total_bib }} company documents</span>
+      <span class="tpl-pane__hint">Click any document's 1st page to inspect full contents before editing</span>
     </div>
+    <div id="bib-grid" class="tpl-grid"></div>
+    <footer class="tpl-pager">
+      <span id="bib-page-info">Page 1</span>
+      <div class="tpl-pager__btns">
+        <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="bib-prev">← Previous</button>
+        <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="bib-next">Next →</button>
+      </div>
+    </footer>
   </section>
 
-  {# ==================== 1. TSD DOCUMENT TEMPLATES ==================== #}
-  <section class="tpl-section" data-tpl-section="tsd">
-    <header class="tpl-section__head">
-      <div>
-        <h2 class="tpl-section__title">TSD Document Templates</h2>
-        <p class="tpl-section__sub">Ready-to-edit agreements, corporate resolutions, letters, memos, and your organization's custom templates.</p>
+  {# ==================== 2. CONTRACTS LIBRARY (1,050+) ==================== #}
+  <section class="tpl-pane" data-tpl-section="contracts" hidden>
+    <div class="tpl-pane__meta">
+      <span class="tpl-pane__summary" id="ctr-count-badge">Showing {{ total_ctr }} full-length 14-article contracts</span>
+      <span class="tpl-pane__hint">Includes automated Key Terms, Probation &amp; Deliverables schedules</span>
+    </div>
+    <div id="ctr-grid" class="tpl-grid"></div>
+    <footer class="tpl-pager">
+      <span id="ctr-page-info">Page 1</span>
+      <div class="tpl-pager__btns">
+        <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="ctr-prev">← Previous</button>
+        <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="ctr-next">Next →</button>
       </div>
-      <span class="tpl-section__badge">{{ total_docs }} available</span>
-    </header>
+    </footer>
+  </section>
 
-    <div class="tpl-card-grid">
+  {# ==================== 3. QUICK-START TSD & CUSTOM TEMPLATES ==================== #}
+  <section class="tpl-pane" data-tpl-section="tsd" hidden>
+    <div class="tpl-pane__meta">
+      <span class="tpl-pane__summary">{{ total_docs }} built-in &amp; organization templates</span>
+      <span class="tpl-pane__hint">Ready-to-edit TSD documents with live 1st-page previews</span>
+    </div>
+
+    <div class="tpl-grid" id="tsd-grid">
       {% for bt in tsd_templates %}
-      <article class="tpl-card" data-tpl-item="tsd" data-hay="{{ (bt.name ~ ' ' ~ bt.category ~ ' ' ~ bt.description)|lower }}">
-        <div class="tpl-card__top">
-          <span class="tpl-card__kicker">{{ bt.category }}</span>
-          <span class="st-tag st-tag--ok">Built-in TSD</span>
+      {% set raw_bt_html = bt.get('body_html', '') if bt is mapping else (bt.body_html if bt.body_html is defined else '') %}
+      {% set bt_html = raw_bt_html if (raw_bt_html and raw_bt_html|length > 20) else ('<div style="text-align:center;padding:120px 30px;color:#64748b;font-family:Inter,sans-serif;"><div style="font-size:36px;margin-bottom:16px;color:#cbd5e1;">+</div><div style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:8px;">Blank Document</div><div style="font-size:13px;line-height:1.6;">Clean A4 sheet with standard 1-inch margins, ready for your own formatting, headings, letterheads, stamps, and signatures.</div></div>') %}
+      <article class="tpl-doc-card" data-tpl-item="tsd" data-hay="{{ (bt.name ~ ' ' ~ bt.category ~ ' ' ~ bt.description)|lower }}">
+        <div class="tpl-doc-card__stage" data-preview-trigger="tsd" data-title="{{ bt.name }}" data-cat="{{ bt.category }}" data-sub="Quick-Start TSD" data-action-url="{{ url_for('workspace_assets_views.use_builtin_tsd_template', slug=bt.slug) }}" data-action-type="post" data-action-label="Use in TSD Editor →">
+          <div class="tpl-a4-mini">
+            <div class="tpl-a4-mini__page">
+              <div style="margin:-46px -52px 24px;padding:0;">
+                <div style="height:8px;background:linear-gradient(90deg,#002769 72%,#02982e 72%);"></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 52px 10px;border-bottom:1.5px solid #002769;background:#fafbfd;font-family:Inter,sans-serif;">
+                  <span style="font-size:10px;font-weight:800;letter-spacing:0.1em;color:#002769;">{{ bt.category|upper }}</span>
+                  <span style="font-size:9.5px;font-weight:600;color:#64748b;">QUICK-START TSD</span>
+                </div>
+              </div>
+              {{ bt_html|safe }}
+            </div>
+          </div>
+          <div class="tpl-doc-card__overlay">
+            <span class="tpl-overlay-pill">Preview 1st Page</span>
+          </div>
+          <template class="tpl-full-html">{{ bt_html|safe }}</template>
         </div>
-        <h3 class="tpl-card__title">{{ bt.name }}</h3>
-        <p class="tpl-card__desc">{{ bt.description }}</p>
-        <div class="tpl-card__foot">
-          <form method="post" action="{{ url_for('workspace_assets_views.use_builtin_tsd_template', slug=bt.slug) }}" style="margin:0;">
-            <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Use in TSD Editor →</button>
-          </form>
+        <div class="tpl-doc-card__body">
+          <div class="tpl-doc-card__info">
+            <div class="tpl-doc-card__kicker">{{ bt.category }}</div>
+            <h3 class="tpl-doc-card__title" title="{{ bt.name }}">{{ bt.name }}</h3>
+            <p class="tpl-doc-card__desc">{{ bt.description }}</p>
+          </div>
+          <div class="tpl-doc-card__actions">
+            <button type="button" class="tpl-link-btn" data-open-preview>Preview</button>
+            <form method="post" action="{{ url_for('workspace_assets_views.use_builtin_tsd_template', slug=bt.slug) }}" style="margin:0;">
+              <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Use →</button>
+            </form>
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+
+      {% for t in templates %}
+      {% set st = (t.state or 'draft')|lower %}
+      {% set c_html = t.content or ('<h1>' ~ t.name ~ '</h1><p>' ~ (t.description or 'Organization custom document template.') ~ '</p>') %}
+      <article class="tpl-doc-card" data-tpl-item="tsd" data-id="{{ t.id }}" data-hay="{{ (t.name ~ ' ' ~ (t.description or '') ~ ' ' ~ st)|lower }}">
+        <div class="tpl-doc-card__stage" data-preview-trigger="custom" data-title="{{ t.name }}" data-cat="Organization Custom" data-sub="{{ st|capitalize }} · {{ creators.get(t.created_by, 'System') }}" data-action-url="{{ url_for('workspace_assets_views.use_template_create_tsd', tpl_id=t.id) }}" data-action-type="post" data-action-label="Use in TSD Editor →">
+          <div class="tpl-a4-mini">
+            <div class="tpl-a4-mini__page">{{ c_html|safe }}</div>
+          </div>
+          <div class="tpl-doc-card__overlay">
+            <span class="tpl-overlay-pill">Preview 1st Page</span>
+          </div>
+          <template class="tpl-full-html">{{ c_html|safe }}</template>
+        </div>
+        <div class="tpl-doc-card__body">
+          <div class="tpl-doc-card__kicker">Custom · {{ st|capitalize }}</div>
+          <h3 class="tpl-doc-card__title" title="{{ t.name }}">{{ t.name }}</h3>
+          <p class="tpl-doc-card__desc">{{ t.description or ('Created by ' ~ creators.get(t.created_by, 'System')) }}</p>
+          <div class="tpl-doc-card__actions">
+            <button type="button" class="tpl-link-btn" data-open-preview>Preview</button>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <form method="post" action="{{ url_for('workspace_assets_views.use_template_create_tsd', tpl_id=t.id) }}" style="margin:0;">
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Use →</button>
+              </form>
+              <button type="button" class="dt-dots" data-dt-dots="{{ t.id }}" data-dt-name="{{ t.name }}" title="More actions">⋮</button>
+            </div>
+          </div>
         </div>
       </article>
       {% endfor %}
     </div>
-
-    {% if templates %}
-    <div style="margin-top:16px;">
-      <h3 class="tpl-subhead">Organization Custom Templates ({{ templates|length }})</h3>
-      <div class="st-panel" style="overflow-x:auto;">
-        <table class="st-table">
-          <thead>
-            <tr>
-              <th>Template Name</th>
-              <th>Description</th>
-              <th>Creator</th>
-              <th>State</th>
-              <th>Created</th>
-              <th style="text-align:right;width:160px;">Action</th>
-            </tr>
-          </thead>
-          <tbody id="dt-tbody">
-            {% for t in templates %}
-            {% set st = (t.state or 'draft')|lower %}
-            <tr data-id="{{ t.id }}" data-tpl-item="tsd" data-hay="{{ (t.name ~ ' ' ~ (t.description or '') ~ ' ' ~ st)|lower }}">
-              <td style="font-weight:600;">{{ t.name }}</td>
-              <td style="color:#42526e;">{{ t.description or '—' }}</td>
-              <td style="color:#42526e;">{{ creators.get(t.created_by, 'System') }}</td>
-              <td>
-                <span class="st-tag {% if st == 'published' %}st-tag--ok{% elif st == 'archived' %}st-tag--warn{% endif %}">{{ st|capitalize }}</span>
-              </td>
-              <td style="color:#7a869a;">{{ t.created_at.strftime('%Y-%m-%d') if t.created_at else '—' }}</td>
-              <td style="text-align:right;">
-                <form method="post" action="{{ url_for('workspace_assets_views.use_template_create_tsd', tpl_id=t.id) }}" style="display:inline;">
-                  <button type="submit" class="ts-btn ts-btn--sm" style="color:#002769;font-weight:600;">Use →</button>
-                </form>
-                <button type="button" class="dt-dots" data-dt-dots="{{ t.id }}" data-dt-name="{{ t.name }}" title="Actions">⋮</button>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-    {% endif %}
   </section>
 
-  {# ==================== 2. LETTERHEAD TEMPLATES ==================== #}
-  <section class="tpl-section" data-tpl-section="letterhead">
-    <header class="tpl-section__head">
-      <div>
-        <h2 class="tpl-section__title">Letterhead Templates</h2>
-        <p class="tpl-section__sub">Saved organization letterheads and built-in executive stationery designs ready for TSD documents and PDF export.</p>
-      </div>
-      <span class="tpl-section__badge">{{ total_lh }} available</span>
-    </header>
+  {# ==================== 4. LETTERHEAD TEMPLATES (Paginated A4 Stationery Previews) ==================== #}
+  <section class="tpl-pane" data-tpl-section="letterhead" hidden>
+    <div class="tpl-pane__meta">
+      <span class="tpl-pane__summary" id="lh-count-badge">{{ total_lh }} official letterhead designs</span>
+      <span class="tpl-pane__hint">Full A4 stationery previews with approved margins and typography</span>
+    </div>
 
-    <div class="tpl-card-grid">
+    <div class="tpl-grid" id="lh-grid">
       {% for lh in saved_letterheads %}
       {% set lay = lh.layout or {} %}
-      {% set pcol = lay.get('primary_color', '#002769') %}
-      {% set acol = lay.get('accent_color', '#02982E') %}
-      <article class="tpl-card" data-tpl-item="letterhead" data-hay="{{ (lh.name ~ ' ' ~ (lh.description or '') ~ ' saved letterhead')|lower }}">
-        <div class="tpl-lh-swatch" style="background:linear-gradient(135deg, {{ pcol }} 0%, {{ pcol }} 68%, {{ acol }} 100%);"></div>
-        <div class="tpl-card__top">
-          <span class="tpl-card__kicker">Saved Letterhead</span>
-          {% if lh.is_default %}<span class="st-tag st-tag--ok">Default</span>{% endif %}
+      <article class="tpl-doc-card" data-lh-card data-hay="{{ (lh.name ~ ' ' ~ (lh.description or '') ~ ' saved letterhead')|lower }}">
+        <div class="tpl-doc-card__stage" data-lh-preview data-title="{{ lh.name }}" data-cat="Saved Letterhead" data-sub="{{ 'Default Stationery' if lh.is_default else 'Organization Stationery' }}" data-action-url="/letterheads?id={{ lh.id }}" data-action-type="link" data-action-label="Open in Letterhead Studio →">
+          <div class="tpl-a4-mini tpl-a4-mini--lh" data-lh-layout='{{ lay|tojson|e }}' data-lh-name="{{ lh.name }}" data-lh-cat="Saved Letterhead"></div>
+          <div class="tpl-doc-card__overlay"><span class="tpl-overlay-pill">Preview Stationery</span></div>
         </div>
-        <h3 class="tpl-card__title">{{ lh.name }}</h3>
-        <p class="tpl-card__desc">{{ lh.description or 'Organization letterhead configured in Letterheads Studio.' }}</p>
-        <div class="tpl-card__foot">
-          <a class="ts-btn ts-btn--primary ts-btn--sm" href="/letterheads?id={{ lh.id }}">Open in Designer →</a>
-          <a class="ts-btn ts-btn--sm" href="/api/letterheads/{{ lh.id }}/preview.pdf" target="_blank" rel="noopener">PDF</a>
+        <div class="tpl-doc-card__body">
+          <div class="tpl-doc-card__info">
+            <div class="tpl-doc-card__kicker">Saved{% if lh.is_default %} · Default{% endif %}</div>
+            <h3 class="tpl-doc-card__title" title="{{ lh.name }}">{{ lh.name }}</h3>
+            <p class="tpl-doc-card__desc">{{ lh.description or 'Organization letterhead configured in Letterhead Studio.' }}</p>
+          </div>
+          <div class="tpl-doc-card__actions">
+            <a class="tpl-link-btn" href="/api/letterheads/{{ lh.id }}/preview.pdf" target="_blank" rel="noopener">PDF</a>
+            <a class="ts-btn ts-btn--primary ts-btn--sm" href="/letterheads?id={{ lh.id }}">Open →</a>
+          </div>
         </div>
       </article>
       {% endfor %}
 
       {% for lp in letterhead_presets %}
       {% set lay = lp.get('layout') or {} %}
-      {% set pcol = lay.get('primary_color', '#002769') %}
-      {% set acol = lay.get('accent_color', '#02982E') %}
-      <article class="tpl-card" data-tpl-item="letterhead" data-hay="{{ (lp.get('label', '') ~ ' ' ~ lp.get('category', '') ~ ' ' ~ lp.get('description', '') ~ ' letterhead')|lower }}">
-        <div class="tpl-lh-swatch" style="background:linear-gradient(135deg, {{ pcol }} 0%, {{ pcol }} 68%, {{ acol }} 100%);"></div>
-        <div class="tpl-card__top">
-          <span class="tpl-card__kicker">{{ lp.get('category', 'Letterhead') }}</span>
-          <span class="st-tag">Preset</span>
+      <article class="tpl-doc-card" data-lh-card data-hay="{{ (lp.get('label', '') ~ ' ' ~ lp.get('category', '') ~ ' ' ~ lp.get('description', '') ~ ' letterhead')|lower }}">
+        <div class="tpl-doc-card__stage" data-lh-preview data-title="{{ lp.get('label') }}" data-cat="{{ lp.get('category', 'Letterhead') }}" data-sub="Executive Stationery Preset" data-action-url="/letterheads?preset={{ lp.get('slug') }}" data-action-type="link" data-action-label="Customize in Studio →">
+          <div class="tpl-a4-mini tpl-a4-mini--lh" data-lh-layout='{{ lay|tojson|e }}' data-lh-name="{{ lp.get('label') }}" data-lh-cat="{{ lp.get('category', 'Letterhead') }}"></div>
+          <div class="tpl-doc-card__overlay"><span class="tpl-overlay-pill">Preview Stationery</span></div>
         </div>
-        <h3 class="tpl-card__title">{{ lp.get('label') }}</h3>
-        <p class="tpl-card__desc">{{ lp.get('description', '') }}</p>
-        <div class="tpl-card__foot">
-          <a class="ts-btn ts-btn--sm" style="color:#002769;font-weight:600;" href="/letterheads?preset={{ lp.get('slug') }}">Customize in Designer →</a>
+        <div class="tpl-doc-card__body">
+          <div class="tpl-doc-card__info">
+            <div class="tpl-doc-card__kicker">{{ lp.get('category', 'Letterhead') }}</div>
+            <h3 class="tpl-doc-card__title" title="{{ lp.get('label') }}">{{ lp.get('label') }}</h3>
+            <p class="tpl-doc-card__desc">{{ lp.get('description', '') }}</p>
+          </div>
+          <div class="tpl-doc-card__actions">
+            <button type="button" class="tpl-link-btn" data-open-preview>Preview</button>
+            <a class="ts-btn ts-btn--primary ts-btn--sm" href="/letterheads?preset={{ lp.get('slug') }}">Customize →</a>
+          </div>
         </div>
       </article>
       {% endfor %}
     </div>
+
+    <footer class="tpl-pager">
+      <span id="lh-page-info">Page 1</span>
+      <div class="tpl-pager__btns">
+        <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="lh-prev">← Previous</button>
+        <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="lh-next">Next →</button>
+      </div>
+    </footer>
   </section>
 
-  {# ==================== 3. STAMP TEMPLATES ==================== #}
-  <section class="tpl-section" data-tpl-section="stamp">
-    <header class="tpl-section__head">
-      <div>
-        <h2 class="tpl-section__title">Official Stamp Templates</h2>
-        <p class="tpl-section__sub">Corporate seals, dated registry stamps, branded logo stamps, rubber approvals, and legal stamps.</p>
-      </div>
-      <span class="tpl-section__badge">{{ total_stamps }} available</span>
-    </header>
-
-    <div class="tpl-stamp-grid">
-      {% for st in stamp_templates %}
-      <article class="tpl-stamp-card" data-tpl-item="stamp" data-hay="{{ (st.name ~ ' ' ~ st.category ~ ' ' ~ st.kind ~ ' ' ~ st.description)|lower }}">
-        <div class="tpl-stamp-card__preview">{{ st.svg|safe }}</div>
-        <div class="tpl-stamp-card__meta">
-          <div class="tpl-card__top" style="margin-bottom:4px;">
-            <span class="tpl-card__kicker">{{ st.category }}</span>
-            <span class="st-tag">{{ st.kind|replace('_', ' ') }}</span>
-          </div>
-          <h3 class="tpl-card__title" style="font-size:13.5px;">{{ st.name }}</h3>
-          <p class="tpl-card__desc" style="font-size:11.5px;margin-bottom:10px;">{{ st.description }}</p>
-          <a class="ts-btn ts-btn--sm" style="color:#002769;font-weight:600;" href="/stamps/studio?template={{ st.slug }}">Open in Stamp Studio →</a>
-        </div>
-      </article>
-      {% endfor %}
+  {# ==================== 5. STAMP TEMPLATES (1,000+ Vector SVG Previews, Paginated) ==================== #}
+  <section class="tpl-pane" data-tpl-section="stamp" hidden>
+    <div class="tpl-pane__meta">
+      <span class="tpl-pane__summary" id="st-count-badge">{{ total_stamps }} official seal &amp; stamp templates</span>
+      <span class="tpl-pane__hint">Filter by category or shape (Circular, Starburst, Oval, Dated, Shield, Square, Rubber) · Click any stamp to preview or customize</span>
     </div>
+
+    <div class="tpl-grid" id="st-grid"></div>
+
+    <footer class="tpl-pager">
+      <span id="st-page-info">Page 1</span>
+      <div class="tpl-pager__btns">
+        <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="st-prev">← Previous</button>
+        <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" id="st-next">Next →</button>
+      </div>
+    </footer>
   </section>
 </div>
 
+{# ── Full-Page Document Preview Modal ── #}
+<div id="tpl-preview-modal" class="tpl-modal" hidden role="dialog" aria-modal="true" aria-labelledby="tpl-pm-title">
+  <div class="tpl-modal__backdrop" data-close-modal></div>
+  <div class="tpl-modal__shell">
+    <header class="tpl-modal__head">
+      <div class="tpl-modal__titles">
+        <span class="tpl-modal__kicker" id="tpl-pm-kicker">Document Preview</span>
+        <h2 class="tpl-modal__title" id="tpl-pm-title">Template Title</h2>
+      </div>
+      <div class="tpl-modal__actions">
+        <span class="tpl-modal__sub" id="tpl-pm-sub"></span>
+        <div id="tpl-pm-cta"></div>
+        <button type="button" class="tpl-icon-btn" data-close-modal aria-label="Close preview">✕</button>
+      </div>
+    </header>
+    <div class="tpl-modal__canvas">
+      <div class="tpl-modal__sheet" id="tpl-pm-sheet"></div>
+    </div>
+  </div>
+</div>
+
+{# ── Custom Template Context Menu ── #}
 <div id="dt-ctx" class="dt-ctx" hidden role="menu">
   <form id="dt-f-pub" method="post" style="margin:0;"><input type="hidden" name="state" value="published"><button type="submit" class="dt-ctx__item">Mark Published</button></form>
   <form id="dt-f-drf" method="post" style="margin:0;"><input type="hidden" name="state" value="draft"><button type="submit" class="dt-ctx__item">Revert to Draft</button></form>
@@ -206,123 +331,1384 @@
 </div>
 
 <style>
-.tpl-hub-bar {
-  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
-  margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #dfe5ee;
+.tpl-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
-.tpl-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ── Drawer ── */
+.tpl-drawer {
+  background: #ffffff;
+  border: 1px solid #dfe5ee;
+  border-radius: 10px;
+  padding: 18px 20px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+}
+.tpl-drawer[hidden] { display: none; }
+.tpl-drawer__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.tpl-drawer__head h3 { margin: 0; font-size: 14.5px; font-weight: 700; color: #0f172a; }
+.tpl-drawer__form { display: flex; flex-direction: column; gap: 10px; }
+.tpl-drawer__row { display: grid; grid-template-columns: 1fr 1.3fr; gap: 10px; }
+.tpl-input, .tpl-textarea, .tpl-select {
+  border: 1px solid #d5dce6;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 13px;
+  padding: 8px 11px;
+  outline: none;
+  font-family: inherit;
+}
+.tpl-input:focus, .tpl-textarea:focus, .tpl-select:focus { border-color: #002769; box-shadow: 0 0 0 2px rgba(0, 39, 105, 0.08); }
+.tpl-drawer__actions { display: flex; justify-content: flex-end; }
+
+/* ── Unified Toolbar ── */
+.tpl-toolbar {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tpl-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #eef2f7;
+  padding-bottom: 10px;
+}
 .tpl-tab {
-  border: 1px solid #d5dce6; background: #fff; color: #1d3648;
-  padding: 7px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 7px; border-radius: 0;
+  border: 0;
+  background: transparent;
+  color: #475569;
+  padding: 7px 13px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: background .15s, color .15s;
 }
-.tpl-tab:hover { background: #f3f6fb; border-color: #002769; }
-.tpl-tab.is-active { background: #002769; border-color: #002769; color: #fff; }
-.tpl-tab__n { font-size: 11px; opacity: 0.85; font-weight: 500; }
+.tpl-tab:hover { background: #f1f5f9; color: #0f172a; }
+.tpl-tab.is-active { background: #002769; color: #ffffff; }
+.tpl-tab__count {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: rgba(15, 23, 42, 0.07);
+  color: inherit;
+}
+.tpl-tab.is-active .tpl-tab__count { background: rgba(255, 255, 255, 0.18); }
 
-.tpl-section { margin-bottom: 28px; }
-.tpl-section__head {
-  display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
+.tpl-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.tpl-search {
+  flex: 1 1 260px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #d5dce6;
+  border-radius: 7px;
+  padding: 0 11px;
+  height: 36px;
+  color: #64748b;
+}
+.tpl-search:focus-within { border-color: #002769; background: #ffffff; }
+.tpl-search input {
+  border: 0;
+  background: transparent;
+  width: 100%;
+  font-size: 13px;
+  color: #0f172a;
+  outline: none;
+}
+.tpl-select { height: 36px; padding: 0 10px; max-width: 280px; }
+.tpl-select[hidden] { display: none; }
+
+.tpl-view-switch {
+  display: inline-flex;
+  border: 1px solid #d5dce6;
+  border-radius: 7px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+.tpl-view-btn {
+  border: 0;
+  background: transparent;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  cursor: pointer;
+}
+.tpl-view-btn.is-active { background: #ffffff; color: #002769; box-shadow: inset 0 0 0 1px #cbd5e1; }
+
+/* ── Pane Meta ── */
+.tpl-pane[hidden] { display: none; }
+.tpl-pane__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 14px;
+  padding: 0 2px;
+  flex-wrap: wrap;
 }
-.tpl-section__title { margin: 0; font-size: 16px; font-weight: 700; color: #091e42; }
-.tpl-section__sub { margin: 3px 0 0; font-size: 12.5px; color: #5a6676; }
-.tpl-section__badge { font-size: 11.5px; font-weight: 600; color: #002769; background: #edf2fa; padding: 3px 9px; }
-.tpl-subhead { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: #1d3648; text-transform: uppercase; letter-spacing: 0.04em; }
+.tpl-pane__summary { font-size: 13px; font-weight: 600; color: #1e293b; }
+.tpl-pane__hint { font-size: 12px; color: #64748b; }
 
-.tpl-card-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px;
+/* ── Spacious 4-Column A4 Preview Grid ── */
+.tpl-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
 }
-.tpl-card {
-  background: #fff; border: 1px solid #dfe5ee; padding: 14px 16px;
-  display: flex; flex-direction: column; position: relative;
-}
-.tpl-card:hover { border-color: #002769; }
-.tpl-lh-swatch { height: 6px; margin: -14px -16px 12px; }
-.tpl-card__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-.tpl-card__kicker { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #5a6676; }
-.tpl-card__title { margin: 0 0 6px; font-size: 14.5px; font-weight: 700; color: #091e42; }
-.tpl-card__desc { margin: 0 0 14px; font-size: 12.5px; color: #42526e; line-height: 1.45; flex: 1; }
-.tpl-card__foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 1240px) { .tpl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 860px)  { .tpl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 540px)  { .tpl-grid { grid-template-columns: 1fr; } }
 
-.tpl-stamp-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(235px, 1fr)); gap: 14px;
+/* ── Document Card with Live 1st-Page A4 Preview ── */
+.tpl-doc-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
 }
-.tpl-stamp-card {
-  background: #fff; border: 1px solid #dfe5ee; padding: 14px;
-  display: flex; flex-direction: column;
+.tpl-doc-card[hidden] { display: none !important; }
+.tpl-doc-card:hover {
+  border-color: #002769;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+  transform: translateY(-2px);
 }
-.tpl-stamp-card:hover { border-color: #002769; }
-.tpl-stamp-card__preview {
-  height: 130px; display: flex; align-items: center; justify-content: center;
-  background: #fafbfd; border: 1px solid #eef2f7; margin-bottom: 12px; padding: 8px; overflow: hidden;
-}
-.tpl-stamp-card__preview svg { max-width: 100%; max-height: 112px; width: auto; height: auto; }
-.tpl-stamp-card__meta { display: flex; flex-direction: column; flex: 1; }
 
+.tpl-doc-card__stage {
+  position: relative;
+  background: linear-gradient(180deg, #f1f5f9 0%, #e8eef5 100%);
+  padding: 16px 16px 0;
+  height: 248px;
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  border-bottom: 1px solid #e2e8f0;
+}
+.tpl-doc-card__stage--stamp {
+  align-items: center;
+  padding: 18px;
+  height: 196px;
+  background: #f8fafc;
+}
+.tpl-stamp-svg { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.tpl-stamp-svg svg { max-width: 155px; max-height: 155px; width: auto; height: auto; }
+
+/* Realistic Scaled A4 1st-Page Paper Sheet */
+.tpl-a4-mini {
+  width: 182px;
+  height: 248px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.11);
+  border-bottom: 0;
+  border-radius: 3px 3px 0 0;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+.tpl-a4-mini::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 36px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.96));
+  pointer-events: none;
+}
+.tpl-a4-mini__page {
+  width: 720px;
+  padding: 46px 52px;
+  transform: scale(0.2528);
+  transform-origin: top left;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  color: #1e293b;
+  font-size: 13.5px;
+  line-height: 1.55;
+  pointer-events: none;
+  user-select: none;
+}
+.tpl-a4-mini__page h1 {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 21px;
+  font-weight: 800;
+  color: #002769;
+  margin: 0 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #002769;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+}
+.tpl-a4-mini__page h2 {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 16px 0 6px;
+}
+.tpl-a4-mini__page h3 { font-size: 13px; font-weight: 700; margin: 12px 0 4px; color: #334155; }
+.tpl-a4-mini__page p { margin: 0 0 8px; }
+.tpl-a4-mini__page blockquote {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border-left: 3.5px solid #002769;
+  font-family: 'Inter', sans-serif;
+  font-size: 11.5px;
+  color: #334155;
+}
+.tpl-a4-mini__page blockquote p { margin: 2px 0; }
+.tpl-a4-mini__page ul, .tpl-a4-mini__page ol { margin: 4px 0 10px; padding-left: 20px; }
+.tpl-a4-mini__page li { margin-bottom: 4px; }
+.tpl-a4-mini__page table { width: 100%; border-collapse: collapse; font-size: 11px; margin: 8px 0; }
+.tpl-a4-mini__page td, .tpl-a4-mini__page th { border: 1px solid #cbd5e1; padding: 4px 6px; }
+.tpl-ph {
+  display: inline-block;
+  background: #edf2fa;
+  color: #002769;
+  border-radius: 3px;
+  padding: 0 4px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.88em;
+  font-weight: 600;
+}
+
+/* Miniature Letterhead A4 Preview */
+.tpl-a4-mini--lh::after { display: none; }
+.tpl-lh-page {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 14px 10px;
+  box-sizing: border-box;
+}
+.tpl-lh-page__head { padding-bottom: 7px; margin-bottom: 10px; }
+.tpl-lh-page__brand { font-size: 9.5px; font-weight: 800; letter-spacing: 0.02em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tpl-lh-page__tag { font-size: 6px; font-weight: 700; letter-spacing: 0.08em; margin-top: 2px; }
+.tpl-lh-page__body { flex: 1; display: flex; flex-direction: column; gap: 5px; padding-top: 4px; }
+.tpl-lh-line { height: 4px; background: #cbd5e1; border-radius: 2px; width: 100%; }
+.tpl-lh-line--title { height: 6px; width: 62%; margin: 4px 0 2px; }
+.tpl-lh-line--med { width: 78%; }
+.tpl-lh-line--short { width: 38%; }
+.tpl-lh-gap { height: 6px; }
+.tpl-lh-page__foot {
+  padding-top: 5px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 5.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  opacity: 0.85;
+}
+
+/* Hover Overlay */
+.tpl-doc-card__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.24);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+.tpl-doc-card__stage:hover .tpl-doc-card__overlay { opacity: 1; }
+.tpl-overlay-pill {
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 99px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.22);
+}
+
+/* Minimal, Uncrowded Card Footer */
+.tpl-doc-card__body {
+  padding: 13px 15px 14px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.tpl-doc-card__kicker {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tpl-doc-card__title {
+  margin: 0 0 6px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tpl-doc-card__desc {
+  display: none;
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  color: #475569;
+  line-height: 1.45;
+}
+.tpl-doc-card__actions {
+  margin-top: auto;
+  padding-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tpl-link-btn {
+  border: 0;
+  background: transparent;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 2px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.tpl-link-btn:hover { color: #002769; }
+.tpl-stamp-kind { font-size: 11px; color: #64748b; text-transform: capitalize; }
+
+/* ── Previewable List View Mode (with Large, Crisp 1st-Page A4 Preview!) ── */
+.tpl-gallery.is-list-view .tpl-grid {
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+.tpl-gallery.is-list-view .tpl-doc-card {
+  flex-direction: row;
+  align-items: stretch;
+}
+.tpl-gallery.is-list-view .tpl-doc-card__stage {
+  width: 192px;
+  min-width: 192px;
+  height: 214px;
+  padding: 12px 14px 0;
+  border-bottom: 0;
+  border-right: 1px solid #e2e8f0;
+}
+.tpl-gallery.is-list-view .tpl-a4-mini {
+  width: 154px;
+  height: 202px;
+}
+.tpl-gallery.is-list-view .tpl-a4-mini__page {
+  transform: scale(0.2138);
+}
+.tpl-gallery.is-list-view .tpl-lh-real-sheet {
+  transform: scale(0.194);
+}
+.tpl-lh-real-sheet {
+  width: 794px;
+  height: 1123px;
+  transform: scale(0.2292);
+  transform-origin: top left;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  pointer-events: none;
+  user-select: none;
+}
+.tpl-gallery.is-list-view .tpl-doc-card__body {
+  flex-direction: row;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 20px;
+}
+.tpl-gallery.is-list-view .tpl-doc-card__info { flex: 1; min-width: 0; }
+.tpl-gallery.is-list-view .tpl-doc-card__desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+.tpl-gallery.is-list-view .tpl-doc-card__actions {
+  margin-top: 0;
+  padding-top: 0;
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+/* ── Pager ── */
+.tpl-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+  font-size: 12.5px;
+  color: #64748b;
+}
+.tpl-pager__btns { display: flex; gap: 8px; }
+
+/* ── Full-Page Document Preview Modal ── */
+.tpl-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.tpl-modal[hidden] { display: none; }
+.tpl-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(2px);
+}
+.tpl-modal__shell {
+  position: relative;
+  z-index: 1;
+  width: min(920px, 100%);
+  height: min(88vh, 860px);
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.28);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.tpl-modal__head {
+  padding: 14px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #ffffff;
+}
+.tpl-modal__titles { min-width: 0; }
+.tpl-modal__kicker {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+.tpl-modal__title {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tpl-modal__actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.tpl-modal__sub { font-size: 12px; color: #64748b; }
+.tpl-icon-btn {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.tpl-icon-btn:hover { background: #eef2f7; color: #0f172a; }
+.tpl-modal__canvas {
+  flex: 1;
+  overflow-y: auto;
+  background: #edf1f6;
+  padding: 28px 24px 40px;
+  display: flex;
+  justify-content: center;
+}
+.tpl-modal__sheet {
+  width: min(740px, 100%);
+  min-height: 920px;
+  height: max-content;
+  background: #ffffff;
+  border: 1px solid #d5dce6;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.09);
+  padding: 54px 62px;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  color: #1e293b;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.tpl-modal__sheet h1 {
+  font-family: 'Inter', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  color: #002769;
+  margin: 0 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #002769;
+}
+.tpl-modal__sheet h2 {
+  font-family: 'Inter', sans-serif;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 20px 0 8px;
+}
+.tpl-modal__sheet blockquote {
+  margin: 0 0 18px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-left: 4px solid #002769;
+  font-family: 'Inter', sans-serif;
+  font-size: 12.5px;
+}
+.tpl-modal__sheet blockquote p { margin: 3px 0; }
+.tpl-modal__sheet p { margin: 0 0 10px; }
+
+/* ── Context Menu ── */
 .dt-dots {
-  border: 0; background: transparent; width: 26px; height: 26px;
-  color: #7a869a; cursor: pointer; font-size: 15px; vertical-align: middle;
+  border: 0; background: transparent; width: 28px; height: 28px; border-radius: 5px;
+  color: #64748b; cursor: pointer; font-size: 15px;
 }
-.dt-dots:hover { background: rgba(15, 23, 42, 0.06); color: #091e42; }
+.dt-dots:hover { background: #f1f5f9; color: #0f172a; }
 .dt-ctx {
   position: fixed; z-index: 9500; min-width: 164px;
-  background: #ffffff; border: 1px solid #d5dce6;
-  box-shadow: 0 6px 18px rgba(16, 24, 40, 0.10);
+  background: #ffffff; border: 1px solid #d5dce6; border-radius: 7px;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
   padding: 4px 0; display: flex; flex-direction: column;
 }
 .dt-ctx[hidden] { display: none; }
 .dt-ctx__item {
   width: 100%; border: 0; background: transparent; padding: 8px 14px; text-align: left;
-  font-size: 12.5px; color: #091e42; cursor: pointer;
+  font-size: 12.5px; color: #0f172a; cursor: pointer;
 }
-.dt-ctx__item:hover { background: #f1f4f8; }
-.dt-ctx__item--danger { color: #9b2c2c; }
-.dt-ctx__item--danger:hover { background: #fff0f0; }
-.dt-ctx__sep { height: 1px; background: #ebeef2; margin: 4px 0; }
+.dt-ctx__item:hover { background: #f1f5f9; }
+.dt-ctx__item--danger { color: #b91c1c; }
+.dt-ctx__item--danger:hover { background: #fef2f2; }
+.dt-ctx__sep { height: 1px; background: #eef2f7; margin: 4px 0; }
+
+.tpl-empty {
+  grid-column: 1 / -1;
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 44px 20px;
+  text-align: center;
+  color: #64748b;
+  font-size: 13.5px;
+}
+
+/* ── Modern Multi-Facet Filter Bar, Chip Rail & Active Filter Pills ── */
+.tpl-search { position: relative; }
+.tpl-search__clear {
+  border: 0; background: #e2e8f0; color: #334155; width: 20px; height: 20px;
+  border-radius: 50%; font-size: 10px; cursor: pointer; display: inline-flex;
+  align-items: center; justify-content: center; flex-shrink: 0;
+}
+.tpl-search__clear[hidden] { display: none; }
+.tpl-search__clear:hover { background: #cbd5e1; color: #0f172a; }
+.tpl-filter-rail {
+  display: flex; align-items: center; gap: 7px; overflow-x: auto;
+  padding: 10px 2px 2px; margin-top: 8px; border-top: 1px solid #eef2f7;
+  scrollbar-width: thin;
+}
+.tpl-filter-rail:empty { display: none; }
+.tpl-chip {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 999px; border: 1px solid #d5dce6;
+  background: #ffffff; color: #334155; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all 0.14s ease; white-space: nowrap;
+}
+.tpl-chip:hover { border-color: #002769; color: #002769; background: #f8fafc; }
+.tpl-chip.is-active {
+  background: #002769; border-color: #002769; color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 39, 105, 0.22);
+}
+.tpl-chip__cnt {
+  font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08); color: inherit;
+}
+.tpl-chip.is-active .tpl-chip__cnt { background: rgba(255, 255, 255, 0.2); }
+.tpl-active-bar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 8px 12px; margin-top: 8px; border-radius: 8px;
+  background: #f1f5f9; border: 1px solid #e2e8f0; font-size: 12px;
+}
+.tpl-active-bar[hidden] { display: none; }
+.tpl-active-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px; background: #ffffff;
+  border: 1px solid #cbd5e1; color: #0f172a; font-weight: 600; font-size: 11.5px;
+}
+.tpl-active-pill button {
+  border: 0; background: transparent; color: #64748b; cursor: pointer;
+  font-size: 11px; padding: 0 2px; line-height: 1;
+}
+.tpl-active-pill button:hover { color: #b91c1c; }
+.tpl-clear-all {
+  margin-left: auto; border: 0; background: transparent; color: #002769;
+  font-size: 12px; font-weight: 700; cursor: pointer; text-decoration: underline;
+}
+.tpl-stamp-meta-row {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px;
+}
+.tpl-stamp-size {
+  font-size: 10.5px; font-weight: 700; color: #475569; background: #f1f5f9;
+  padding: 2px 7px; border-radius: 4px; border: 1px solid #e2e8f0;
+}
 </style>
 
 <script>
 (function () {
+  var gallery = document.querySelector('.tpl-gallery');
   var panel = document.getElementById('dt-new-panel');
   var togBtn = document.getElementById('dt-toggle-new');
   var canBtn = document.getElementById('dt-cancel-new');
   if (togBtn && panel) togBtn.addEventListener('click', function () { panel.hidden = !panel.hidden; });
   if (canBtn && panel) canBtn.addEventListener('click', function () { panel.hidden = true; });
 
-  var activeTab = 'all';
+  var activeTab = 'bib';
   var searchEl = document.getElementById('dt-search');
+  var searchClear = document.getElementById('dt-search-clear');
+  var bibDept = document.getElementById('bib-dept-filter');
+  var ctrCat = document.getElementById('ctr-cat-filter');
+  var stCat = document.getElementById('st-cat-filter');
+  var stStyle = document.getElementById('st-style-filter');
+  var chipRail = document.getElementById('tpl-chip-rail');
+  var activeBar = document.getElementById('tpl-active-filters');
   var sections = document.querySelectorAll('[data-tpl-section]');
   var tabs = document.querySelectorAll('[data-tpl-tab]');
+  var viewBtns = document.querySelectorAll('[data-view-mode]');
 
-  function applyFilter() {
-    var q = (searchEl && searchEl.value || '').trim().toLowerCase();
-    sections.forEach(function (sec) {
-      var kind = sec.getAttribute('data-tpl-section');
-      var tabMatch = (activeTab === 'all' || activeTab === kind);
-      var anyVisible = false;
-      sec.querySelectorAll('[data-tpl-item]').forEach(function (item) {
-        var hay = item.getAttribute('data-hay') || '';
-        var show = tabMatch && (!q || hay.indexOf(q) !== -1);
-        item.style.display = show ? '' : 'none';
-        if (show) anyVisible = true;
-      });
-      sec.style.display = (tabMatch && (anyVisible || !q)) ? '' : 'none';
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // Category-aware institutional document masthead so every template displays an authentic executive look
+  function docPaletteFor(cat, name) {
+    var s = ((cat || '') + ' ' + (name || '')).toLowerCase();
+    if (s.indexOf('ursb') !== -1 || s.indexOf('obrs') !== -1 || s.indexOf('uganda') !== -1) return { a: '#8b1e24', b: '#d97706', tag: 'URSB · UGANDA OBRS' };
+    if (s.indexOf('sacco') !== -1) return { a: '#065f46', b: '#10b981', tag: 'SACCO POLICY & MANUAL' };
+    if (s.indexOf('corporate policies') !== -1) return { a: '#1e3a5f', b: '#0284c7', tag: 'CORPORATE POLICY' };
+    if (s.indexOf('organization-type policies') !== -1) return { a: '#4c1d95', b: '#7c3aed', tag: 'ORG GOVERNANCE POLICY' };
+    if (s.indexOf('sector & industry policies') !== -1) return { a: '#0f4c5c', b: '#059669', tag: 'SECTOR COMPLIANCE POLICY' };
+    if (s.indexOf('vitalwills') !== -1 || s.indexOf('will') !== -1 || s.indexOf('estate') !== -1) return { a: '#6b1d2f', b: '#b45309', tag: 'VITALWILLS FIDUCIARY' };
+    if (s.indexOf('vitalreturns') !== -1 || s.indexOf('tax') !== -1 || s.indexOf('audit') !== -1) return { a: '#0f5132', b: '#02982e', tag: 'VITALRETURNS ADVISORY' };
+    if (s.indexOf('vitalworks') !== -1) return { a: '#002769', b: '#02982e', tag: 'VITALWORKS ENTERPRISE' };
+    if (s.indexOf('finance') !== -1 || s.indexOf('credit') !== -1 || s.indexOf('billing') !== -1) return { a: '#065f46', b: '#0d9488', tag: 'FINANCE & GOVERNANCE' };
+    if (s.indexOf('human resources') !== -1 || s.indexOf('employment') !== -1 || s.indexOf('hr') !== -1) return { a: '#3730a3', b: '#2563eb', tag: 'PEOPLE & HR' };
+    if (s.indexOf('security') !== -1 || s.indexOf('it') !== -1 || s.indexOf('technology') !== -1) return { a: '#0f172a', b: '#0284c7', tag: 'IT & COMPLIANCE' };
+    return { a: '#002769', b: '#02982e', tag: (cat || 'OFFICIAL DOCUMENT').toUpperCase().slice(0, 28) };
+  }
+  function wrapDocPreviewLook(html, cat, edition, name) {
+    var pal = docPaletteFor(cat, name);
+    var mast = '<div style="margin:-46px -52px 24px;padding:0;">' +
+      '<div style="height:8px;background:linear-gradient(90deg,' + pal.a + ' 72%,' + pal.b + ' 72%);"></div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 52px 10px;border-bottom:1.5px solid ' + pal.a + ';background:#fafbfd;font-family:Inter,sans-serif;">' +
+        '<span style="font-size:10px;font-weight:800;letter-spacing:0.1em;color:' + pal.a + ';">' + esc(pal.tag) + '</span>' +
+        '<span style="font-size:9.5px;font-weight:600;color:#64748b;">' + esc(edition || 'OFFICIAL TEMPLATE') + '</span>' +
+      '</div></div>';
+    return mast + html;
+  }
+
+  // Turn {{placeholder}} tokens into clean subtle chips in 1st-page previews
+  function beautifyPreviewHtml(html) {
+    return String(html || '').replace(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g, function (_m, key) {
+      var label = key.replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+      return '<span class="tpl-ph">' + esc(label) + '</span>';
     });
   }
 
-  tabs.forEach(function (btn) {
+  // View mode switch (Grid vs Previewable List)
+  viewBtns.forEach(function (btn) {
     btn.addEventListener('click', function () {
-      activeTab = btn.getAttribute('data-tpl-tab') || 'all';
-      tabs.forEach(function (b) { b.classList.toggle('is-active', b === btn); });
-      applyFilter();
+      var mode = btn.getAttribute('data-view-mode');
+      viewBtns.forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+      if (gallery) gallery.classList.toggle('is-list-view', mode === 'list');
     });
   });
-  if (searchEl) searchEl.addEventListener('input', applyFilter);
 
+  function renderFilterRail() {
+    if (!chipRail) return;
+    var chips = [];
+    if (activeTab === 'bib' && bibDept) {
+      var cur = bibDept.value || 'ALL';
+      var featured = [
+        'ALL',
+        'SACCO Policies & Operations Manuals',
+        'Corporate Policies & Guidelines',
+        'Organization-Type Policies & Guidelines',
+        'Sector & Industry Policies & Guidelines',
+        'URSB & Uganda Companies Act (OBRS)',
+        'Board & Corporate Governance',
+        'Human Resources & People Ops',
+        'Finance, Accounting & Credit',
+      ];
+      featured.forEach(function (val) {
+        var opt = Array.prototype.find.call(bibDept.options, function (o) { return o.value === val; });
+        if (!opt) return;
+        var label = val === 'ALL' ? 'All Documents' : val.replace(' & Operations Manuals', '').replace(' Policies & Guidelines', ' Policies');
+        var m = opt.textContent.match(/\((\d+)\)\s*$/);
+        chips.push({ kind: 'bib', value: val, label: label, count: m ? m[1] : '', active: cur === val });
+      });
+    } else if (activeTab === 'contracts' && ctrCat) {
+      var curC = ctrCat.value || 'ALL';
+      Array.prototype.slice.call(ctrCat.options, 0, 9).forEach(function (opt) {
+        var label = opt.value === 'ALL' ? 'All Contracts' : opt.value;
+        var m = opt.textContent.match(/\((\d+)\)\s*$/);
+        chips.push({ kind: 'ctr', value: opt.value, label: label, count: m ? m[1] : '', active: curC === opt.value });
+      });
+    } else if (activeTab === 'stamp' && stStyle) {
+      var curS = stStyle.value || 'ALL';
+      Array.prototype.slice.call(stStyle.options).forEach(function (opt) {
+        var label = opt.value === 'ALL' ? 'All 10 Styles' : opt.textContent.replace(/\s*\(\d+\)\s*$/, '');
+        var m = opt.textContent.match(/\((\d+)\)\s*$/);
+        chips.push({ kind: 'st-style', value: opt.value, label: label, count: m ? m[1] : '', active: curS === opt.value });
+      });
+    }
+    chipRail.innerHTML = chips.map(function (c) {
+      return '<button type="button" class="tpl-chip' + (c.active ? ' is-active' : '') + '" data-chip-kind="' + esc(c.kind) + '" data-chip-val="' + esc(c.value) + '">' +
+        '<span>' + esc(c.label) + '</span>' + (c.count ? '<span class="tpl-chip__cnt">' + esc(c.count) + '</span>' : '') +
+      '</button>';
+    }).join('');
+  }
+
+  function renderActiveFilters() {
+    if (!activeBar) return;
+    var pills = [];
+    var q = (searchEl && searchEl.value || '').trim();
+    if (searchClear) searchClear.hidden = !q;
+    if (q) pills.push({ label: 'Search: "' + q + '"', key: 'q' });
+    if (activeTab === 'bib' && bibDept && bibDept.value !== 'ALL') {
+      pills.push({ label: 'Category: ' + bibDept.value, key: 'bib' });
+    }
+    if (activeTab === 'contracts' && ctrCat && ctrCat.value !== 'ALL') {
+      pills.push({ label: 'Practice Area: ' + ctrCat.value, key: 'ctr' });
+    }
+    if (activeTab === 'stamp') {
+      if (stCat && stCat.value !== 'ALL') pills.push({ label: 'Category: ' + stCat.value, key: 'st-cat' });
+      if (stStyle && stStyle.value !== 'ALL') {
+        var sOpt = stStyle.options[stStyle.selectedIndex];
+        pills.push({ label: 'Style: ' + (sOpt ? sOpt.textContent.replace(/\s*\(\d+\)\s*$/, '') : stStyle.value), key: 'st-style' });
+      }
+    }
+    if (!pills.length) { activeBar.hidden = true; activeBar.innerHTML = ''; return; }
+    activeBar.hidden = false;
+    activeBar.innerHTML = '<span style="color:#64748b;font-weight:600;">Active filters:</span>' +
+      pills.map(function (p) {
+        return '<span class="tpl-active-pill">' + esc(p.label) + '<button type="button" data-clear-pill="' + esc(p.key) + '" aria-label="Remove filter">✕</button></span>';
+      }).join('') +
+      '<button type="button" class="tpl-clear-all" id="tpl-reset-filters">Reset all filters</button>';
+  }
+
+  if (chipRail) {
+    chipRail.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-chip-kind]');
+      if (!btn) return;
+      var k = btn.getAttribute('data-chip-kind');
+      var v = btn.getAttribute('data-chip-val');
+      if (k === 'bib' && bibDept) { bibDept.value = v; loadBib(1); }
+      else if (k === 'ctr' && ctrCat) { ctrCat.value = v; loadCtr(1); }
+      else if (k === 'st-style' && stStyle) { stStyle.value = v; loadStamps(1); }
+      renderFilterRail();
+      renderActiveFilters();
+    });
+  }
+  if (activeBar) {
+    activeBar.addEventListener('click', function (e) {
+      var rem = e.target.closest('[data-clear-pill]');
+      var resetAll = e.target.closest('#tpl-reset-filters');
+      if (resetAll) {
+        if (searchEl) searchEl.value = '';
+        if (bibDept) bibDept.value = 'ALL';
+        if (ctrCat) ctrCat.value = 'ALL';
+        if (stCat) stCat.value = 'ALL';
+        if (stStyle) stStyle.value = 'ALL';
+      } else if (rem) {
+        var k = rem.getAttribute('data-clear-pill');
+        if (k === 'q' && searchEl) searchEl.value = '';
+        if (k === 'bib' && bibDept) bibDept.value = 'ALL';
+        if (k === 'ctr' && ctrCat) ctrCat.value = 'ALL';
+        if (k === 'st-cat' && stCat) stCat.value = 'ALL';
+        if (k === 'st-style' && stStyle) stStyle.value = 'ALL';
+      } else return;
+      renderFilterRail();
+      renderActiveFilters();
+      loadBib(1); loadCtr(1); filterStaticTsd(); renderLhPage(1); loadStamps(1);
+    });
+  }
+  if (searchClear) {
+    searchClear.addEventListener('click', function () {
+      if (searchEl) searchEl.value = '';
+      renderActiveFilters();
+      loadBib(1); loadCtr(1); filterStaticTsd(); renderLhPage(1); loadStamps(1);
+      if (searchEl) searchEl.focus();
+    });
+  }
+
+  // Tab switching (single focused pane at a time — never crowded)
+  function switchTab(tabKey) {
+    activeTab = tabKey || 'bib';
+    tabs.forEach(function (b) {
+      var on = b.getAttribute('data-tpl-tab') === activeTab;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    sections.forEach(function (sec) {
+      sec.hidden = (sec.getAttribute('data-tpl-section') !== activeTab);
+    });
+    if (bibDept) bibDept.hidden = (activeTab !== 'bib');
+    if (ctrCat) ctrCat.hidden = (activeTab !== 'contracts');
+    if (stCat) stCat.hidden = (activeTab !== 'stamp');
+    if (stStyle) stStyle.hidden = (activeTab !== 'stamp');
+    renderFilterRail();
+    renderActiveFilters();
+    if (activeTab === 'tsd') filterStaticTsd();
+    if (activeTab === 'letterhead') renderLhPage(1);
+    if (activeTab === 'stamp') loadStamps(1);
+  }
+  tabs.forEach(function (btn) {
+    btn.addEventListener('click', function () { switchTab(btn.getAttribute('data-tpl-tab')); });
+  });
+
+  // ── Full-Page Document Preview Modal ──
+  var modal = document.getElementById('tpl-preview-modal');
+  var pmKicker = document.getElementById('tpl-pm-kicker');
+  var pmTitle = document.getElementById('tpl-pm-title');
+  var pmSub = document.getElementById('tpl-pm-sub');
+  var pmCta = document.getElementById('tpl-pm-cta');
+  var pmSheet = document.getElementById('tpl-pm-sheet');
+
+  function openPreviewModal(opts) {
+    if (!modal) return;
+    pmKicker.textContent = opts.category || 'Document Preview';
+    pmTitle.textContent = opts.title || 'Template';
+    pmSub.textContent = opts.sub || '';
+    pmSheet.innerHTML = opts.html || '<p>No preview available.</p>';
+    pmCta.innerHTML = '';
+    if (opts.actionType === 'post') {
+      pmCta.innerHTML = '<form method="post" action="' + esc(opts.actionUrl) + '" style="margin:0;">' +
+        '<button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">' + esc(opts.actionLabel || 'Use Template →') + '</button></form>';
+    } else if (opts.actionType === 'contract') {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ts-btn ts-btn--primary ts-btn--sm';
+      b.textContent = opts.actionLabel || 'Create Contract →';
+      b.addEventListener('click', function () { instantiateContract(opts.slug, b); });
+      pmCta.appendChild(b);
+    } else if (opts.actionType === 'link') {
+      pmCta.innerHTML = '<a class="ts-btn ts-btn--primary ts-btn--sm" href="' + esc(opts.actionUrl) + '">' + esc(opts.actionLabel || 'Open →') + '</a>';
+    }
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+  function closePreviewModal() {
+    if (!modal) return;
+    modal.hidden = true;
+    document.body.style.overflow = '';
+  }
+  if (modal) {
+    modal.querySelectorAll('[data-close-modal]').forEach(function (el) { el.addEventListener('click', closePreviewModal); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.hidden) closePreviewModal(); });
+  }
+
+  // ── 1. Company Documents (1,080+, 8 per page with real 1st-page A4 previews) ──
+  var bibPage = 1, bibTotalPages = 1, bibCache = {}, bibTimer = null;
+  function loadBib(page) {
+    bibPage = page || 1;
+    var q = (searchEl && searchEl.value || '').trim();
+    var dept = (bibDept && bibDept.value) || 'ALL';
+    fetch('/api/tsd/templates/catalog?q=' + encodeURIComponent(q) + '&category=' + encodeURIComponent(dept) + '&page=' + bibPage + '&per_page=8', {
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'fetch' },
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.ok) return;
+        bibPage = d.page || 1;
+        bibTotalPages = d.total_pages || 1;
+        var bBadge = document.getElementById('bib-count-badge');
+        if (bBadge) bBadge.textContent = 'Showing ' + d.total + ' of ' + d.catalog_total + ' company documents';
+        var pInfo = document.getElementById('bib-page-info');
+        if (pInfo) pInfo.textContent = 'Page ' + bibPage + ' of ' + bibTotalPages + ' · ' + d.total + ' documents';
+        var prevB = document.getElementById('bib-prev');
+        var nextB = document.getElementById('bib-next');
+        if (prevB) prevB.disabled = (bibPage <= 1);
+        if (nextB) nextB.disabled = (bibPage >= bibTotalPages);
+
+        var grid = document.getElementById('bib-grid');
+        if (!grid) return;
+        bibCache = {};
+        var items = d.items || [];
+        grid.innerHTML = items.length
+          ? items.map(function (it) {
+              var pretty = beautifyPreviewHtml(it.preview_html || ('<h1>' + esc(it.name) + '</h1><p>' + esc(it.description) + '</p>'));
+              var styled = wrapDocPreviewLook(pretty, it.category, it.edition, it.name);
+              bibCache[it.slug] = { item: it, html: pretty };
+              return '<article class="tpl-doc-card" data-bib-slug="' + esc(it.slug) + '">' +
+                '<div class="tpl-doc-card__stage" data-bib-preview="' + esc(it.slug) + '">' +
+                  '<div class="tpl-a4-mini"><div class="tpl-a4-mini__page">' + styled + '</div></div>' +
+                  '<div class="tpl-doc-card__overlay"><span class="tpl-overlay-pill">Preview 1st Page</span></div>' +
+                '</div>' +
+                '<div class="tpl-doc-card__body">' +
+                  '<div class="tpl-doc-card__info">' +
+                    '<div class="tpl-doc-card__kicker">' + esc(it.category) + ' · ' + esc(it.edition) + '</div>' +
+                    '<h3 class="tpl-doc-card__title" title="' + esc(it.name) + '">' + esc(it.name) + '</h3>' +
+                    '<p class="tpl-doc-card__desc">' + esc(it.description) + '</p>' +
+                  '</div>' +
+                  '<div class="tpl-doc-card__actions">' +
+                    '<button type="button" class="tpl-link-btn" data-bib-preview="' + esc(it.slug) + '">Preview</button>' +
+                    '<form method="post" action="/templates/tsd/' + encodeURIComponent(it.slug) + '/use" style="margin:0;">' +
+                      '<button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Use →</button>' +
+                    '</form>' +
+                  '</div>' +
+                '</div>' +
+              '</article>';
+            }).join('')
+          : '<div class="tpl-empty">No company documents match your search.</div>';
+      })
+      .catch(function () {});
+  }
+  var bibGrid = document.getElementById('bib-grid');
+  if (bibGrid) {
+    bibGrid.addEventListener('click', function (e) {
+      var trig = e.target.closest('[data-bib-preview]');
+      if (!trig) return;
+      var entry = bibCache[trig.getAttribute('data-bib-preview')];
+      if (!entry) return;
+      openPreviewModal({
+        title: entry.item.name,
+        category: entry.item.category,
+        sub: entry.item.edition,
+        html: entry.html,
+        actionType: 'post',
+        actionUrl: '/templates/tsd/' + encodeURIComponent(entry.item.slug) + '/use',
+        actionLabel: 'Use in TSD Editor →',
+      });
+    });
+  }
+  if (bibDept) bibDept.addEventListener('change', function () { loadBib(1); });
+  var bibPrev = document.getElementById('bib-prev');
+  var bibNext = document.getElementById('bib-next');
+  if (bibPrev) bibPrev.addEventListener('click', function () { if (bibPage > 1) loadBib(bibPage - 1); });
+  if (bibNext) bibNext.addEventListener('click', function () { if (bibPage < bibTotalPages) loadBib(bibPage + 1); });
+
+  // ── 2. Contracts Library (1,050+, 8 per page with real 1st-page A4 previews) ──
+  var ctrPage = 1, ctrTotalPages = 1, ctrCache = {}, ctrTimer = null;
+  function instantiateContract(slug, btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
+    fetch('/api/contract-templates/catalog/' + encodeURIComponent(slug) + '/instantiate', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify({}),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d && d.url) window.location.href = d.url; })
+      .catch(function () { if (btn) { btn.disabled = false; btn.textContent = 'Create Contract →'; } });
+  }
+  function loadCtr(page) {
+    ctrPage = page || 1;
+    var q = (searchEl && searchEl.value || '').trim();
+    var cat = (ctrCat && ctrCat.value) || 'ALL';
+    fetch('/api/contract-templates/catalog?q=' + encodeURIComponent(q) + '&category=' + encodeURIComponent(cat) + '&page=' + ctrPage + '&per_page=8', {
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'fetch' },
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.ok) return;
+        ctrPage = d.page || 1;
+        ctrTotalPages = d.total_pages || 1;
+        var cBadge = document.getElementById('ctr-count-badge');
+        if (cBadge) cBadge.textContent = 'Showing ' + d.total + ' of ' + d.catalog_total + ' full-length contracts';
+        var pInfo = document.getElementById('ctr-page-info');
+        if (pInfo) pInfo.textContent = 'Page ' + ctrPage + ' of ' + ctrTotalPages + ' · ' + d.total + ' contracts';
+        var prevC = document.getElementById('ctr-prev');
+        var nextC = document.getElementById('ctr-next');
+        if (prevC) prevC.disabled = (ctrPage <= 1);
+        if (nextC) nextC.disabled = (ctrPage >= ctrTotalPages);
+
+        var grid = document.getElementById('ctr-grid');
+        if (!grid) return;
+        ctrCache = {};
+        var items = d.items || [];
+        grid.innerHTML = items.length
+          ? items.map(function (it) {
+              var pretty = beautifyPreviewHtml(it.preview_html || ('<h1>' + esc(it.name) + '</h1><p>' + esc(it.description) + '</p>'));
+              var styled = wrapDocPreviewLook(pretty, it.category, (it.edition || '16 Articles & 3 Schedules') + ' · Legal Contract', it.name);
+              ctrCache[it.catalog_slug] = { item: it, html: pretty };
+              return '<article class="tpl-doc-card">' +
+                '<div class="tpl-doc-card__stage" data-ctr-preview="' + esc(it.catalog_slug) + '">' +
+                  '<div class="tpl-a4-mini"><div class="tpl-a4-mini__page">' + styled + '</div></div>' +
+                  '<div class="tpl-doc-card__overlay"><span class="tpl-overlay-pill">Preview 1st Page</span></div>' +
+                '</div>' +
+                '<div class="tpl-doc-card__body">' +
+                  '<div class="tpl-doc-card__info">' +
+                    '<div class="tpl-doc-card__kicker">' + esc(it.category) + ' · 16 Articles &amp; Schedules A–C</div>' +
+                    '<h3 class="tpl-doc-card__title" title="' + esc(it.name) + '">' + esc(it.name) + '</h3>' +
+                    '<p class="tpl-doc-card__desc">' + esc(it.description) + '</p>' +
+                  '</div>' +
+                  '<div class="tpl-doc-card__actions">' +
+                    '<button type="button" class="tpl-link-btn" data-ctr-preview="' + esc(it.catalog_slug) + '">Preview</button>' +
+                    '<button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-ctr-instantiate="' + esc(it.catalog_slug) + '">Use →</button>' +
+                  '</div>' +
+                '</div>' +
+              '</article>';
+            }).join('')
+          : '<div class="tpl-empty">No contract templates match your search.</div>';
+      })
+      .catch(function () {});
+  }
+  var ctrGrid = document.getElementById('ctr-grid');
+  if (ctrGrid) {
+    ctrGrid.addEventListener('click', function (e) {
+      var instBtn = e.target.closest('[data-ctr-instantiate]');
+      if (instBtn) { instantiateContract(instBtn.dataset.ctrInstantiate, instBtn); return; }
+      var prevTrig = e.target.closest('[data-ctr-preview]');
+      if (!prevTrig) return;
+      var entry = ctrCache[prevTrig.getAttribute('data-ctr-preview')];
+      if (!entry) return;
+      openPreviewModal({
+        title: entry.item.name,
+        category: entry.item.category,
+        sub: entry.item.edition + ' · 16 Articles & Schedules A–C',
+        html: entry.html,
+        actionType: 'contract',
+        slug: entry.item.catalog_slug,
+        actionLabel: 'Create Contract →',
+      });
+    });
+  }
+  if (ctrCat) ctrCat.addEventListener('change', function () { loadCtr(1); });
+  var ctrPrev = document.getElementById('ctr-prev');
+  var ctrNext = document.getElementById('ctr-next');
+  if (ctrPrev) ctrPrev.addEventListener('click', function () { if (ctrPage > 1) loadCtr(ctrPage - 1); });
+  if (ctrNext) ctrNext.addEventListener('click', function () { if (ctrPage < ctrTotalPages) loadCtr(ctrPage + 1); });
+
+  // ── 3. Quick-Start TSD & Custom Templates Preview + Search ──
+  var tsdGrid = document.getElementById('tsd-grid');
+  function filterStaticTsd() {
+    if (!tsdGrid) return;
+    var q = (searchEl && searchEl.value || '').trim().toLowerCase();
+    tsdGrid.querySelectorAll('[data-tpl-item="tsd"]').forEach(function (card) {
+      var hay = card.getAttribute('data-hay') || '';
+      card.style.display = (!q || hay.indexOf(q) !== -1) ? '' : 'none';
+    });
+  }
+  if (tsdGrid) {
+    tsdGrid.addEventListener('click', function (e) {
+      var card = e.target.closest('.tpl-doc-card');
+      if (!card) return;
+      if (e.target.closest('[data-preview-trigger]') || e.target.closest('[data-open-preview]')) {
+        var stg = card.querySelector('[data-preview-trigger]');
+        var tplEl = card.querySelector('.tpl-full-html');
+        if (!stg) return;
+        openPreviewModal({
+          title: stg.getAttribute('data-title'),
+          category: stg.getAttribute('data-cat'),
+          sub: stg.getAttribute('data-sub'),
+          html: beautifyPreviewHtml(tplEl ? tplEl.innerHTML : ''),
+          actionType: stg.getAttribute('data-action-type'),
+          actionUrl: stg.getAttribute('data-action-url'),
+          actionLabel: stg.getAttribute('data-action-label'),
+        });
+      }
+    });
+  }
+
+  // ── 4. Client-Side Pagination for Letterheads (12 per page) + ACTUAL Full-Fidelity A4 Stationery Renderer ──
+  function renderRealLetterheadA4Html(name, cat, lay) {
+    lay = lay || {};
+    var accent = lay.accent_color || lay.primary_color || '#002769';
+    var brand2 = lay.brand_secondary || '#02982e';
+    var sec = lay.secondary_color || '#334155';
+    var pbg = lay.paper_bg || '#ffffff';
+    var topBar = parseInt(lay.top_bar_px != null ? lay.top_bar_px : '6', 10) || 0;
+    var leftBar = parseInt(lay.left_bar_px || '0', 10) || 0;
+    var align = String(lay.header_align || 'split').toLowerCase();
+    var hdrBg = String(lay.header_bg || 'none').toLowerCase();
+    var isDark = (align === 'banner' || hdrBg === 'solid' || hdrBg === 'gradient' || hdrBg === 'angled');
+    var inkPrim = isDark ? '#ffffff' : accent;
+    var inkSec = isDark ? 'rgba(255,255,255,0.88)' : sec;
+    var orgName = lay.org_name || name || 'Official Stationery';
+    var tagline = lay.tagline || (cat ? (cat + ' · Official Stationery') : 'Official Corporate Stationery');
+    var contacts = [lay.address, lay.phone, lay.email, lay.website].filter(Boolean);
+    var fontCss = lay.font_style === 'serif' || lay.font_style === 'legal' || lay.font_style === 'garamond'
+      ? "Georgia,'Times New Roman',serif"
+      : (lay.font_style === 'mono' ? "Menlo,Consolas,monospace" : "Inter,-apple-system,Arial,sans-serif");
+
+    var hBgCss = '';
+    if (hdrBg === 'solid' || (align === 'banner' && hdrBg === 'none')) hBgCss = 'background:' + accent + ';border-bottom:4px solid ' + brand2 + ';';
+    else if (hdrBg === 'gradient') hBgCss = 'background:linear-gradient(125deg,' + accent + ' 0%,' + accent + ' 60%,' + brand2 + ' 135%);border-bottom:4px solid ' + brand2 + ';';
+    else if (hdrBg === 'angled') hBgCss = 'background:linear-gradient(112deg,' + accent + ' 0%,' + accent + ' 68%,' + brand2 + ' 68.2%,' + brand2 + ' 100%);';
+    else if (hdrBg === 'tint') hBgCss = 'background:linear-gradient(90deg,' + accent + '14,' + brand2 + '14);';
+    else if (hdrBg === 'neutral') hBgCss = 'background:#f6f8fb;';
+    else if (hdrBg === 'framed') hBgCss = 'background:#f8fafc;border-left:6px solid ' + accent + ';';
+
+    var logoHtml = lay.logo_data_uri
+      ? '<img src="' + lay.logo_data_uri + '" alt="" style="height:64px;max-width:180px;object-fit:contain;display:block;flex:0 0 auto;">'
+      : '<div style="width:54px;height:54px;border-radius:8px;background:' + (isDark ? 'rgba(255,255,255,0.16)' : accent) + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;flex:0 0 auto;">' + esc(String(orgName).slice(0, 2).toUpperCase()) + '</div>';
+
+    var hdrInner = '';
+    if (align === 'center') {
+      hdrInner = '<div style="text-align:center;padding:34px 56px 22px;' + hBgCss + '">' +
+        '<div style="display:flex;justify-content:center;margin-bottom:12px;">' + logoHtml + '</div>' +
+        '<div style="font-size:24px;font-weight:800;color:' + inkPrim + ';letter-spacing:0.03em;">' + esc(orgName) + '</div>' +
+        '<div style="font-size:12px;font-weight:600;color:' + (isDark ? brand2 : inkSec) + ';text-transform:uppercase;letter-spacing:0.08em;margin-top:4px;">' + esc(tagline) + '</div>' +
+        (contacts.length ? '<div style="font-size:11px;color:' + inkSec + ';margin-top:8px;">' + esc(contacts.slice(0, 3).join(' · ')) + '</div>' : '') +
+      '</div>';
+    } else {
+      hdrInner = '<div style="display:flex;align-items:center;justify-content:space-between;gap:24px;padding:32px 56px 22px;' + hBgCss + '">' +
+        '<div style="display:flex;align-items:center;gap:16px;min-width:0;">' + logoHtml +
+          '<div><div style="font-size:22px;font-weight:800;color:' + inkPrim + ';line-height:1.15;">' + esc(orgName) + '</div>' +
+          '<div style="font-size:11.5px;font-weight:600;color:' + (isDark ? '#e2e8f0' : brand2) + ';text-transform:uppercase;letter-spacing:0.07em;margin-top:4px;">' + esc(tagline) + '</div></div>' +
+        '</div>' +
+        '<div style="text-align:right;font-size:11px;color:' + inkSec + ';line-height:1.55;flex-shrink:0;">' +
+          contacts.slice(0, 3).map(function (c) { return '<div>' + esc(c) + '</div>'; }).join('') +
+        '</div>' +
+      '</div>';
+    }
+
+    var divCss = lay.divider_style === 'double'
+      ? ('border-bottom:4px double ' + accent + ';')
+      : (lay.divider_style === 'dual'
+        ? ('height:4px;background:linear-gradient(90deg,' + accent + ' 70%,' + brand2 + ' 70%);')
+        : ('height:2.5px;background:' + accent + ';'));
+    var dividerHtml = (!isDark && lay.show_divider !== false) ? ('<div style="margin:0 56px;' + divCss + '"></div>') : '';
+
+    var refBarHtml = lay.show_ref_bar !== false
+      ? '<div style="display:flex;justify-content:space-between;padding:14px 56px;font-size:12px;color:#475569;border-bottom:1px solid #e2e8f0;margin-bottom:24px;">' +
+          '<span><strong>Our Ref:</strong> TS/2026/0142</span><span><strong>Date:</strong> 26 November 2026</span></div>'
+      : '<div style="height:26px;"></div>';
+
+    var borderCss = lay.page_border === 'double'
+      ? ('outline:6px double ' + accent + ';outline-offset:-18px;')
+      : (lay.page_border === 'thin' ? 'outline:1.5px solid rgba(15,23,42,0.18);outline-offset:-18px;' : '');
+    var lBarCss = leftBar > 0 ? ('border-left:' + Math.max(8, leftBar * 2) + 'px solid ' + accent + ';') : '';
+    var topBarHtml = (topBar > 0 && !isDark)
+      ? '<div style="height:' + Math.max(6, topBar) + 'px;width:100%;background:linear-gradient(90deg,' + accent + ' 72%,' + brand2 + ' 72%);"></div>'
+      : '';
+
+    var bodyHtml = '<div style="padding:0 56px;font-size:14.5px;line-height:1.75;color:#1e293b;">' +
+      '<div style="font-weight:700;font-size:16px;color:' + accent + ';margin-bottom:16px;text-transform:uppercase;letter-spacing:0.03em;">RE: OFFICIAL EXECUTIVE CORRESPONDENCE &amp; GOVERNANCE NOTICE</div>' +
+      '<p style="margin:0 0 14px;">Dear Valued Partner,</p>' +
+      '<p style="margin:0 0 14px;">We are pleased to issue this official notice on ' + esc(orgName) + ' corporate stationery. All terms, schedules, and executive resolutions executed under this letterhead carry institutional authorization and cryptographic verification through TrustSeal.</p>' +
+      '<p style="margin:0 0 14px;">Please review the attached deliverables schedule and confirm your authorized countersignature at your earliest convenience. Approved margins, brand identity, and vector typography are preserved identically across print and PDF export.</p>' +
+      '<p style="margin:26px 0 6px;">Yours faithfully,</p>' +
+      '<div style="font-family:Georgia,serif;font-style:italic;font-size:24px;color:' + accent + ';margin:8px 0 4px;">Authorized Signatory</div>' +
+      '<div style="font-weight:700;font-size:13px;color:#0f172a;">Office of the Managing Director</div>' +
+      '<div style="font-size:12px;color:#64748b;">' + esc(orgName) + '</div>' +
+    '</div>';
+
+    var footerHtml = '<div style="position:absolute;left:0;right:0;bottom:0;border-top:2px solid ' + brand2 + ';padding:16px 56px;display:flex;justify-content:space-between;font-size:11px;color:#475569;background:' + pbg + ';">' +
+      '<span>' + esc(lay.footer_text || (orgName + ' · Official Corporate Stationery')) + '</span>' +
+      '<span style="font-weight:700;color:' + accent + ';">Page 1 of 1</span>' +
+    '</div>';
+
+    return '<div class="tpl-lh-real-sheet" style="background:' + pbg + ';font-family:' + fontCss + ';' + lBarCss + borderCss + '">' +
+      topBarHtml + hdrInner + dividerHtml + refBarHtml + bodyHtml + footerHtml +
+    '</div>';
+  }
+
+  var lhCards = Array.prototype.slice.call(document.querySelectorAll('[data-lh-card]'));
+  var lhPage = 1, lhPerPage = 12;
+  function hydrateVisibleLhCard(card) {
+    var box = card.querySelector('.tpl-a4-mini--lh');
+    if (!box || box.getAttribute('data-lh-rendered') === '1') return;
+    box.setAttribute('data-lh-rendered', '1');
+    var lay = {};
+    try { lay = JSON.parse(box.getAttribute('data-lh-layout') || '{}'); } catch (_e) {}
+    box.innerHTML = renderRealLetterheadA4Html(box.getAttribute('data-lh-name'), box.getAttribute('data-lh-cat'), lay);
+  }
+  function renderLhPage(page) {
+    var q = (searchEl && searchEl.value || '').trim().toLowerCase();
+    var matched = lhCards.filter(function (c) { return !q || (c.getAttribute('data-hay') || '').indexOf(q) !== -1; });
+    var totalPages = Math.max(1, Math.ceil(matched.length / lhPerPage));
+    lhPage = Math.max(1, Math.min(totalPages, page || 1));
+    var start = (lhPage - 1) * lhPerPage;
+    var end = start + lhPerPage;
+    lhCards.forEach(function (c) { c.hidden = true; c.style.display = 'none'; });
+    matched.slice(start, end).forEach(function (c) {
+      c.hidden = false;
+      c.style.display = '';
+      hydrateVisibleLhCard(c);
+    });
+    var info = document.getElementById('lh-page-info');
+    if (info) info.textContent = 'Page ' + lhPage + ' of ' + totalPages + ' · ' + matched.length + ' letterheads';
+    var badge = document.getElementById('lh-count-badge');
+    if (badge) badge.textContent = matched.length + ' official letterhead designs';
+    var pBtn = document.getElementById('lh-prev');
+    var nBtn = document.getElementById('lh-next');
+    if (pBtn) pBtn.disabled = (lhPage <= 1);
+    if (nBtn) nBtn.disabled = (lhPage >= totalPages);
+  }
+  var lhPrev = document.getElementById('lh-prev');
+  var lhNext = document.getElementById('lh-next');
+  if (lhPrev) lhPrev.addEventListener('click', function () { renderLhPage(lhPage - 1); });
+  if (lhNext) lhNext.addEventListener('click', function () { renderLhPage(lhPage + 1); });
+  var lhGrid = document.getElementById('lh-grid');
+  if (lhGrid) {
+    lhGrid.addEventListener('click', function (e) {
+      var card = e.target.closest('.tpl-doc-card');
+      if (!card) return;
+      if (e.target.closest('[data-lh-preview]') || e.target.closest('[data-open-preview]')) {
+        var stg = card.querySelector('[data-lh-preview]');
+        var box = card.querySelector('.tpl-a4-mini--lh');
+        if (!stg || !box) return;
+        var lay = {};
+        try { lay = JSON.parse(box.getAttribute('data-lh-layout') || '{}'); } catch (_e) {}
+        var fullSheetHtml = renderRealLetterheadA4Html(stg.getAttribute('data-title'), stg.getAttribute('data-cat'), lay)
+          .replace('class="tpl-lh-real-sheet"', 'style="width:794px;height:1123px;transform:scale(0.76);transform-origin:top left;position:relative;overflow:hidden;box-sizing:border-box;"');
+        openPreviewModal({
+          title: stg.getAttribute('data-title'),
+          category: stg.getAttribute('data-cat'),
+          sub: stg.getAttribute('data-sub'),
+          html: '<div style="width:604px;height:854px;margin:0 auto;overflow:hidden;box-shadow:0 10px 30px rgba(15,23,42,.12);border:1px solid #d5dce6;">' + fullSheetHtml + '</div>',
+          actionType: 'link',
+          actionUrl: stg.getAttribute('data-action-url'),
+          actionLabel: stg.getAttribute('data-action-label'),
+        });
+      }
+    });
+  }
+
+  // ── 5. Server-Side Paginated 1,000+ Stamp Templates Catalog (16 per page) ──
+  var stPage = 1, stTotalPages = 1, stCache = {};
+  function loadStamps(page) {
+    stPage = page || 1;
+    var q = (searchEl && searchEl.value || '').trim();
+    var cat = (stCat && stCat.value) || 'ALL';
+    var sty = (stStyle && stStyle.value) || 'ALL';
+    fetch('/api/tsd-stamps/templates/catalog?q=' + encodeURIComponent(q) + '&category=' + encodeURIComponent(cat) + '&style=' + encodeURIComponent(sty) + '&page=' + stPage + '&per_page=16', {
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'fetch' },
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !Array.isArray(d.items)) return;
+        stPage = d.page || 1;
+        stTotalPages = d.total_pages || 1;
+        var badge = document.getElementById('st-count-badge');
+        if (badge) badge.textContent = 'Showing ' + d.total + ' of ' + d.catalog_total + ' official seal & stamp templates';
+        var info = document.getElementById('st-page-info');
+        if (info) info.textContent = 'Page ' + stPage + ' of ' + stTotalPages + ' · ' + d.total + ' stamps';
+        var pBtn = document.getElementById('st-prev');
+        var nBtn = document.getElementById('st-next');
+        if (pBtn) pBtn.disabled = (stPage <= 1);
+        if (nBtn) nBtn.disabled = (stPage >= stTotalPages);
+
+        var grid = document.getElementById('st-grid');
+        if (!grid) return;
+        stCache = {};
+        grid.innerHTML = d.items.length
+          ? d.items.map(function (st) {
+              stCache[st.slug] = st;
+              var sizeTag = st.size_mm ? '<span class="tpl-stamp-size">' + esc(st.size_mm) + '</span>' : '';
+              return '<article class="tpl-doc-card tpl-doc-card--stamp" data-st-slug="' + esc(st.slug) + '">' +
+                '<div class="tpl-doc-card__stage tpl-doc-card__stage--stamp" data-st-preview="' + esc(st.slug) + '">' +
+                  '<div class="tpl-stamp-svg">' + (st.svg || '') + '</div>' +
+                  '<div class="tpl-doc-card__overlay"><span class="tpl-overlay-pill">Preview Stamp</span></div>' +
+                '</div>' +
+                '<div class="tpl-doc-card__body">' +
+                  '<div class="tpl-doc-card__info">' +
+                    '<div class="tpl-doc-card__kicker">' + esc(st.category) + '</div>' +
+                    '<h3 class="tpl-doc-card__title" title="' + esc(st.name) + '">' + esc(st.name) + '</h3>' +
+                    '<div class="tpl-stamp-meta-row">' + sizeTag + '<span class="tpl-stamp-kind">' + esc(String(st.kind || '').replace(/_/g, ' ')) + '</span></div>' +
+                    '<p class="tpl-doc-card__desc">' + esc(st.description) + '</p>' +
+                  '</div>' +
+                  '<div class="tpl-doc-card__actions">' +
+                    '<button type="button" class="tpl-link-btn" data-st-preview="' + esc(st.slug) + '">Preview</button>' +
+                    '<a class="ts-btn ts-btn--primary ts-btn--sm" href="/stamps/studio?template=' + encodeURIComponent(st.slug) + '">Customize →</a>' +
+                  '</div>' +
+                '</div>' +
+              '</article>';
+            }).join('')
+          : '<div class="tpl-empty">No stamp templates match your current filter. Try resetting filters or searching another keyword.</div>';
+      })
+      .catch(function () {});
+  }
+  var stGrid = document.getElementById('st-grid');
+  if (stGrid) {
+    stGrid.addEventListener('click', function (e) {
+      var trig = e.target.closest('[data-st-preview]');
+      if (!trig) return;
+      var st = stCache[trig.getAttribute('data-st-preview')];
+      if (!st) return;
+      openPreviewModal({
+        title: st.name,
+        category: st.category,
+        sub: (st.style_label || st.kind) + (st.size_mm ? (' · ' + st.size_mm) : ''),
+        html: '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center;">' +
+          '<div style="transform:scale(1.65);margin:36px 0 48px;">' + (st.svg || '') + '</div>' +
+          '<p style="max-width:440px;color:#475569;font-size:13px;">' + esc(st.description) + '</p>' +
+        '</div>',
+        actionType: 'link',
+        actionUrl: '/stamps/studio?template=' + encodeURIComponent(st.slug),
+        actionLabel: 'Customize in Stamp Studio →',
+      });
+    });
+  }
+  if (stCat) stCat.addEventListener('change', function () { renderActiveFilters(); loadStamps(1); });
+  if (stStyle) stStyle.addEventListener('change', function () { renderFilterRail(); renderActiveFilters(); loadStamps(1); });
+  if (bibDept) bibDept.addEventListener('change', function () { renderFilterRail(); renderActiveFilters(); });
+  if (ctrCat) ctrCat.addEventListener('change', function () { renderFilterRail(); renderActiveFilters(); });
+  var stPrev = document.getElementById('st-prev');
+  var stNext = document.getElementById('st-next');
+  if (stPrev) stPrev.addEventListener('click', function () { if (stPage > 1) loadStamps(stPage - 1); });
+  if (stNext) stNext.addEventListener('click', function () { if (stPage < stTotalPages) loadStamps(stPage + 1); });
+
+  // Unified search debounce
+  if (searchEl) {
+    searchEl.addEventListener('input', function () {
+      clearTimeout(bibTimer);
+      clearTimeout(ctrTimer);
+      renderActiveFilters();
+      bibTimer = setTimeout(function () {
+        loadBib(1);
+        loadCtr(1);
+        filterStaticTsd();
+        renderLhPage(1);
+        loadStamps(1);
+      }, 180);
+    });
+  }
+
+  // Custom Template Context Menu
   var ctx = document.getElementById('dt-ctx');
-  var tbody = document.getElementById('dt-tbody');
-  if (ctx && tbody) {
+  if (ctx) {
     function openCtx(id, x, y) {
       document.getElementById('dt-f-pub').action = '/templates/' + id + '/status';
       document.getElementById('dt-f-drf').action = '/templates/' + id + '/status';
@@ -339,15 +1725,17 @@
         openCtx(btn.getAttribute('data-dt-dots'), r.right - 164, r.bottom + 4);
       });
     });
-    tbody.querySelectorAll('tr').forEach(function (tr) {
-      tr.addEventListener('contextmenu', function (e) {
-        e.preventDefault();
-        openCtx(tr.dataset.id, e.clientX, e.clientY);
-      });
-    });
     document.addEventListener('click', function (e) { if (!ctx.hidden && !ctx.contains(e.target)) ctx.hidden = true; });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') ctx.hidden = true; });
   }
+
+  // Initial load
+  renderFilterRail();
+  renderActiveFilters();
+  loadBib(1);
+  loadCtr(1);
+  renderLhPage(1);
+  loadStamps(1);
 })();
 </script>
 {% endblock %}

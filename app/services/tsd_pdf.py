@@ -34,6 +34,10 @@ def _build_wrapper_css(
     page_size: str = "a4",
     orientation: str = "portrait",
     margin_mm: int = 22,
+    margin_top_mm: Optional[int] = None,
+    margin_bottom_mm: Optional[int] = None,
+    extra_css: str = "",
+    include_default_footer: bool = True,
 ) -> str:
     sz_key = (page_size or "a4").strip().lower()
     css_size = _PAGE_SIZE_CSS.get(sz_key, "A4")
@@ -48,15 +52,22 @@ def _build_wrapper_css(
     else:
         size_decl = css_size
     m = max(10, min(40, int(margin_mm or 22)))
-    return f"""
-@page {{
-  size: {size_decl};
-  margin: {m}mm {m}mm {m + 4}mm {m}mm;
+    m_top = max(10, min(110, int(margin_top_mm))) if margin_top_mm is not None else m
+    m_bot = max(10, min(70, int(margin_bottom_mm))) if margin_bottom_mm is not None else (m + 4)
+    footer_frame_css = (
+        f"""
   @frame footer_frame {{
     -pdf-frame-content: footer_content;
     left: {m}mm; right: {m}mm;
     bottom: 8mm; height: 8mm;
-  }}
+  }}"""
+        if include_default_footer
+        else ""
+    )
+    return f"""
+@page {{
+  size: {size_decl};
+  margin: {m_top}mm {m}mm {m_bot}mm {m}mm;{footer_frame_css}
 }}
 body {{ font-family: Helvetica, Arial, sans-serif; font-size: 10.5pt; line-height: 1.5; color: #121a26; }}
 h1 {{ font-size: 19pt; font-weight: bold; margin: 16pt 0 9pt; color: #121a26; }}
@@ -70,6 +81,7 @@ a {{ color: #0f3b82; text-decoration: underline; }}
 img {{ max-width: 100%; }}
 .tsd-footer {{ font-size: 7.5pt; color: #5a6676; text-align: center; }}
 .tsd-footer strong {{ color: #0f3b82; }}
+{extra_css}
 """
 
 
@@ -109,11 +121,26 @@ def render_html_to_pdf(
     page_size: Optional[str] = None,
     orientation: Optional[str] = None,
     margin_mm: Optional[int] = None,
+    margin_top_mm: Optional[int] = None,
+    margin_bottom_mm: Optional[int] = None,
+    extra_css: str = "",
+    include_default_footer: bool = True,
 ) -> bytes:
     """Render decrypted HTML to PDF bytes, optionally encrypted."""
     from xhtml2pdf import pisa
+    from app.services.placeholder_engine import build_placeholder_context, resolve_placeholders_for_export
 
-    det_ps, det_ori, det_mg = _detect_html_page_meta(html or "")
+    resolved_html = resolve_placeholders_for_export(
+        html or "<p></p>",
+        build_placeholder_context(
+            extra={
+                "document_ref": f"TSD-{int(document_id):05d}" if document_id else "",
+                "document_title": title or "",
+            }
+        ),
+    )
+
+    det_ps, det_ori, det_mg = _detect_html_page_meta(resolved_html)
     eff_size = page_size or det_ps or "a4"
     eff_orient = orientation or det_ori or "portrait"
     eff_margin = margin_mm if margin_mm is not None else (det_mg if det_mg is not None else 22)
@@ -123,13 +150,22 @@ def render_html_to_pdf(
         page_size=eff_size,
         orientation=eff_orient,
         margin_mm=eff_margin,
+        margin_top_mm=margin_top_mm,
+        margin_bottom_mm=margin_bottom_mm,
+        extra_css=extra_css,
+        include_default_footer=include_default_footer,
+    )
+    footer_html = (
+        _footer_block(document_id=document_id, version=version, tenant_id=tenant_id, exported_at=exported_at)
+        if include_default_footer
+        else ""
     )
     doc_html = (
         f'<html><head>'
         f'<title>{html_std.escape(title)}</title>'
         f'<style>{wrapper_css}</style></head>'
-        f'<body>{html or "<p></p>"}'
-        f'{_footer_block(document_id=document_id, version=version, tenant_id=tenant_id, exported_at=exported_at)}'
+        f'<body>{resolved_html or "<p></p>"}'
+        f'{footer_html}'
         f'</body></html>'
     )
 

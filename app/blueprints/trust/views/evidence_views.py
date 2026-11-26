@@ -80,11 +80,26 @@ def list_retentions():
             .all()
         ):
             active_holds.setdefault(h.retention_id, h)
+    now = datetime.utcnow()
+    hold_count = len(active_holds)
+    due_count = sum(
+        1
+        for r in rows
+        if r.id not in active_holds and r.retain_until and r.retain_until < now
+    )
+    preserved_count = len(rows) - hold_count - due_count
+    summary = {
+        "total": len(rows),
+        "preserved": preserved_count,
+        "holds": hold_count,
+        "due": due_count,
+    }
     return render_template(
         "trust/evidence_list.html",
         retentions=rows,
         active_holds=active_holds,
-        now=datetime.utcnow(),
+        summary=summary,
+        now=now,
     )
 
 
@@ -217,10 +232,12 @@ def show_retention(retention_id: int):
     # immediately rather than discovering it only via the API.
     integrity = _check_checkpoint_chain(checkpoints)
 
+    active_hold = next((h for h in holds if h.released_at is None), None)
     return render_template(
         "trust/evidence_show.html",
         retention=retention,
         holds=holds,
+        active_hold=active_hold,
         checkpoints=checkpoints,
         timestamps=timestamps,
         ocsp_rows=ocsp_rows,
@@ -228,6 +245,7 @@ def show_retention(retention_id: int):
         dossiers=dossiers,
         dss_rows=dss_rows,
         integrity=integrity,
+        now=datetime.utcnow(),
     )
 
 

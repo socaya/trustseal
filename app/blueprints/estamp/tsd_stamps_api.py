@@ -286,6 +286,29 @@ def list_templates():
     return jsonify({"templates": tsd_stamp_templates.list_templates()})
 
 
+@tsd_stamps_api.route("/templates/catalog", methods=["GET"])
+@login_required
+def search_templates_catalog():
+    _actor()
+    q = (request.args.get("q") or "").strip()
+    category = (request.args.get("category") or "").strip()
+    style = (request.args.get("style") or "").strip()
+    kind = (request.args.get("kind") or "").strip()
+    try:
+        page = int(request.args.get("page") or 1)
+    except ValueError:
+        page = 1
+    try:
+        per_page = int(request.args.get("per_page") or 24)
+    except ValueError:
+        per_page = 24
+    return jsonify(
+        tsd_stamp_templates.search_templates(
+            q=q, category=category, style=style, kind=kind, page=page, per_page=per_page
+        )
+    )
+
+
 @tsd_stamps_api.route("/from-template/<string:slug>", methods=["POST"])
 @login_required
 def create_from_template(slug: str):

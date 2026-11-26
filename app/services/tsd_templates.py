@@ -410,19 +410,39 @@ _TEMPLATES: list[TsdTemplate] = [
 ]
 
 
-def list_templates() -> list[dict]:
-    """Return all templates as dicts (without body) for library listing."""
-    return [
-        {
+def list_templates(*, include_body: bool = False) -> list[dict]:
+    """Return all templates as dicts for library listing (optionally with body_html)."""
+    out = []
+    for t in _TEMPLATES:
+        d = {
             "slug": t.slug, "name": t.name, "description": t.description,
             "category": t.category, "title": t.title, "tags": t.tags,
         }
-        for t in _TEMPLATES
-    ]
+        if include_body:
+            d["body_html"] = t.body_html
+        out.append(d)
+    return out
 
 
 def get_template(slug: str) -> TsdTemplate | None:
     for t in _TEMPLATES:
         if t.slug == slug:
             return t
+    if slug:
+        from app.services.business_docs_catalog import (
+            get_business_doc_by_slug,
+            render_business_doc_html,
+        )
+
+        item = get_business_doc_by_slug().get(slug)
+        if item is not None:
+            return TsdTemplate(
+                slug=item["slug"],
+                name=item["name"],
+                description=item["description"],
+                category=item["category"],
+                title=item.get("title") or item["name"],
+                tags=item["tags"],
+                body_html=render_business_doc_html(item),
+            )
     return None

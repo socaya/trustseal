@@ -3,33 +3,74 @@
 
 {% block title %}Audit &amp; Security · TRUSTSEAL{% endblock %}
 {% block page_title %}Audit &amp; Security{% endblock %}
-{% block page_description %}{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Tamper-evident chained-hash security audit log and webhook delivery outbox.
+  </p>
+{% endblock %}
 {% block page_actions %}
-  <button type="button" class="ts-btn" id="aud-export-csv">Export CSV</button>
+  <button type="button" class="ts-btn ts-btn--secondary" id="aud-export-csv">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 4v11m0 0-4-4m4 4 4-4M4 19h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Export CSV
+  </button>
 {% endblock %}
 
 {% block content %}
 <div class="st-flat">
   {% include "stamps/_flat_ui.html" %}
 
-  <nav class="st-subnav" aria-label="Audit sections">
-    <button type="button" class="st-subnav__link is-active aud-tab" data-tab="events">
+  {% set s = summary if summary is defined else {'shown': events|length, 'success': events|length, 'denied_or_error': 0, 'chained': events|length, 'outbox_total': outbox|length, 'outbox_pending': 0, 'outbox_dead': 0} %}
+  <section class="st-metrics" aria-label="Audit summary">
+    <div class="st-metric">
+      <span class="st-metric__label">Security Events</span>
+      <span class="st-metric__value">{{ s.shown }}</span>
+      <span class="st-metric__sub">Showing up to {{ limit }} latest</span>
+    </div>
+    <div class="st-metric">
+      <span class="st-metric__label">Successful</span>
+      <span class="st-metric__value" style="color: #17633a;">{{ s.success }}</span>
+      <span class="st-metric__sub">{{ s.chained }} hash-chained</span>
+    </div>
+    <div class="st-metric">
+      <span class="st-metric__label">Denied / Errors</span>
+      <span class="st-metric__value" {% if s.denied_or_error %}style="color: #9b2c2c;"{% endif %}>{{ s.denied_or_error }}</span>
+      <span class="st-metric__sub">In current view</span>
+    </div>
+    <div class="st-metric">
+      <span class="st-metric__label">Webhook Outbox</span>
+      <span class="st-metric__value">{{ s.outbox_total }}</span>
+      <span class="st-metric__sub">
+        {% if s.outbox_dead %}
+          <span style="color: #9b2c2c; font-weight: 600;">{{ s.outbox_dead }} dead</span> · {{ s.outbox_pending }} queued
+        {% elif s.outbox_pending %}
+          {{ s.outbox_pending }} pending delivery
+        {% else %}
+          All deliveries clear
+        {% endif %}
+      </span>
+    </div>
+  </section>
+
+  <nav class="st-subnav" aria-label="Audit sections" role="tablist">
+    <button type="button" class="st-subnav__link is-active aud-tab" data-tab="events" role="tab" aria-selected="true">
       Security Events ({{ events|length }})
     </button>
-    <button type="button" class="st-subnav__link aud-tab" data-tab="outbox">
+    <button type="button" class="st-subnav__link aud-tab" data-tab="outbox" role="tab" aria-selected="false">
       Webhook Outbox ({{ outbox|length }})
     </button>
   </nav>
 
   <!-- TAB 1: Security Events -->
-  <div id="aud-panel-events">
+  <div id="aud-panel-events" role="tabpanel">
     <form method="get" class="st-toolbar">
       <div class="st-search">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
           <path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </svg>
-        <input id="action" name="action" type="search" value="{{ action_filter }}" placeholder="Filter action (e.g. tsd.create, document.sign)…">
+        <input id="action" name="action" type="search" aria-label="Filter by action" value="{{ action_filter }}" placeholder="Filter action (e.g. tsd.create, document.sign)…">
       </div>
       <div class="st-toolbar__right">
         <select id="outcome" name="outcome" class="st-select" aria-label="Outcome">
@@ -45,7 +86,7 @@
         </select>
         <button type="submit" class="ts-btn ts-btn--primary">Apply</button>
         {% if action_filter or outcome_filter %}
-        <a href="{{ url_for('audit_security_views.index') }}" class="ts-btn">Reset</a>
+        <a href="{{ url_for('audit_security_views.index') }}" class="ts-btn ts-btn--secondary">Reset</a>
         {% endif %}
       </div>
     </form>
@@ -55,7 +96,7 @@
       <table class="st-table" id="aud-events-table">
         <thead>
           <tr>
-            <th style="width:56px;">#</th>
+            <th style="width:60px;">#</th>
             <th>When (UTC)</th>
             <th>Actor</th>
             <th>Action</th>
@@ -69,24 +110,37 @@
           {% for e in events %}
             {% set actor = actors.get(e.actor_id) %}
             {% set actor_label = ((actor.first_name ~ ' ' ~ actor.last_name)|trim or actor.username) if actor else (('User #' ~ e.actor_id) if e.actor_id else 'system') %}
-          <tr data-action="{{ e.action }}"
+            {% set outcome_lc = (e.outcome or '')|lower %}
+            {% set is_receipt = outcome_lc.startswith('receipt:') %}
+            {% set res_label = e.resource_type ~ ((' #' ~ e.resource_id) if e.resource_id is not none else '') %}
+            {% set when_label = e.created_at.strftime('%Y-%m-%d %H:%M:%S') if e.created_at else '—' %}
+          <tr class="aud-row"
+              data-id="{{ e.id }}"
+              data-when="{{ when_label }}"
+              data-actor="{{ actor_label }}"
+              data-action="{{ e.action }}"
+              data-resource="{{ res_label }}"
+              data-outcome="{{ e.outcome or '' }}"
               data-corr="{{ e.correlation_id or '' }}"
-              data-hash="{{ e.event_hash or '' }}">
-            <td style="font-family:var(--ts-font-mono);color:#64748b;">{{ e.id }}</td>
-            <td style="color:#42526e;">{{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') if e.created_at else '—' }}</td>
+              data-hash="{{ e.event_hash or '' }}"
+              data-prev-hash="{{ e.prev_event_hash or '' }}">
+            <td style="font-family:var(--ts-font-mono);color:var(--ts-text-subtle);">{{ e.id }}</td>
+            <td style="color:var(--ts-text-secondary);">{{ when_label }}</td>
             <td style="font-weight:600;">{{ actor_label }}</td>
-            <td style="font-family:var(--ts-font-mono);font-size:12px;color:#1e4b9e;">{{ e.action }}</td>
-            <td style="color:#42526e;">{{ e.resource_type }}{% if e.resource_id is not none %} #{{ e.resource_id }}{% endif %}</td>
+            <td style="font-family:var(--ts-font-mono);font-size:12px;color:var(--ts-brand-primary);">{{ e.action }}</td>
+            <td style="color:var(--ts-text-secondary);">{{ res_label }}</td>
             <td>
-              {% if e.outcome == 'success' %}
+              {% if outcome_lc == 'success' %}
                 <span class="st-tag st-tag--ok">Success</span>
-              {% elif e.outcome in ('denied', 'forbidden') %}
+              {% elif is_receipt %}
+                <span class="st-tag st-tag--ok" title="Issued receipt #{{ e.outcome.split(':', 1)[1] }}">Success · #{{ e.outcome.split(':', 1)[1] }}</span>
+              {% elif outcome_lc in ('denied', 'forbidden') %}
                 <span class="st-tag st-tag--warn">{{ e.outcome|title }}</span>
               {% else %}
                 <span class="st-tag st-tag--bad">{{ e.outcome|title }}</span>
               {% endif %}
             </td>
-            <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#64748b;" title="{{ e.event_hash or e.correlation_id }}">
+            <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:var(--ts-text-subtle);" title="{{ e.event_hash or e.correlation_id }}">
               {{ (e.event_hash or e.correlation_id or '—')[:16] }}{% if e.event_hash or e.correlation_id %}…{% endif %}
             </td>
             <td style="text-align:right;">
@@ -99,19 +153,32 @@
     </section>
     {% else %}
     <section class="st-empty">
+      <div class="st-empty__icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M4 4h16v6H4zM4 14h16v6H4zM8 7h2M8 17h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
       <div class="st-empty__title">No security events match this filter</div>
+      <p class="st-empty__desc">
+        Try clearing the action or outcome filters to view all recorded security events in this workspace.
+      </p>
+      {% if action_filter or outcome_filter %}
+      <div class="st-empty__actions">
+        <a href="{{ url_for('audit_security_views.index') }}" class="ts-btn ts-btn--secondary">Reset filters</a>
+      </div>
+      {% endif %}
     </section>
     {% endif %}
   </div>
 
   <!-- TAB 2: Webhook Outbox -->
-  <div id="aud-panel-outbox" hidden>
+  <div id="aud-panel-outbox" role="tabpanel" hidden>
     {% if outbox %}
     <section class="st-panel" style="overflow-x:auto;">
       <table class="st-table">
         <thead>
           <tr>
-            <th style="width:56px;">#</th>
+            <th style="width:60px;">#</th>
             <th>Event Type</th>
             <th>Aggregate</th>
             <th>State</th>
@@ -123,9 +190,9 @@
         <tbody>
           {% for o in outbox %}
           <tr>
-            <td style="font-family:var(--ts-font-mono);color:#64748b;">{{ o.id }}</td>
+            <td style="font-family:var(--ts-font-mono);color:var(--ts-text-subtle);">{{ o.id }}</td>
             <td style="font-family:var(--ts-font-mono);font-size:12px;">{{ o.event_type }}</td>
-            <td style="color:#42526e;">{{ o.aggregate_type }} #{{ o.aggregate_id }}</td>
+            <td style="color:var(--ts-text-secondary);">{{ o.aggregate_type }} #{{ o.aggregate_id }}</td>
             <td>
               {% if o.state == 'completed' %}
                 <span class="st-tag st-tag--ok">Completed</span>
@@ -137,8 +204,8 @@
                 <span class="st-tag st-tag--bad">{{ o.state|title }}</span>
               {% endif %}
             </td>
-            <td style="color:#42526e;">{{ o.attempts }}</td>
-            <td style="color:#64748b;">{{ o.next_attempt_at.strftime('%Y-%m-%d %H:%M') if o.next_attempt_at else '—' }}</td>
+            <td style="color:var(--ts-text-secondary);">{{ o.attempts }}</td>
+            <td style="color:var(--ts-text-subtle);">{{ o.next_attempt_at.strftime('%Y-%m-%d %H:%M') if o.next_attempt_at else '—' }}</td>
             <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#9b2c2c;" title="{{ o.last_error or '' }}">{{ o.last_error or '—' }}</td>
           </tr>
           {% endfor %}
@@ -147,44 +214,157 @@
     </section>
     {% else %}
     <section class="st-empty">
+      <div class="st-empty__icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <circle cx="7" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="17" cy="17" r="3" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M9 7h8M7 9v8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
       <div class="st-empty__title">Webhook outbox is empty</div>
+      <p class="st-empty__desc">
+        Outbound webhook deliveries appear here when workspace events trigger configured webhook endpoints.
+      </p>
     </section>
     {% endif %}
   </div>
 </div>
 
+<!-- Row context menu -->
 <div id="aud-ctx" class="aud-ctx" hidden role="menu">
+  <button type="button" class="aud-ctx__item" data-act="inspect">Inspect Event Details</button>
   <button type="button" class="aud-ctx__item" data-act="filter">Filter by this action</button>
+  <div class="aud-ctx__sep"></div>
   <button type="button" class="aud-ctx__item" data-act="hash">Copy Event Hash</button>
   <button type="button" class="aud-ctx__item" data-act="corr">Copy Correlation ID</button>
 </div>
 
+<!-- Event Detail Modal -->
+<div id="aud-detail-overlay" class="ts-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="aud-detail-title">
+  <div class="ts-modal aud-detail-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;">
+      <h2 id="aud-detail-title" class="ts-modal__title" style="margin:0;">Security Event</h2>
+      <button type="button" class="ts-inspector__close" id="aud-detail-close" aria-label="Close event details">✕</button>
+    </div>
+    <dl class="aud-dl" id="aud-detail-body"></dl>
+    <div class="ts-modal__actions">
+      <button type="button" class="ts-btn ts-btn--secondary" id="aud-detail-copy-hash">Copy Event Hash</button>
+      <button type="button" class="ts-btn ts-btn--primary" id="aud-detail-done">Close</button>
+    </div>
+  </div>
+</div>
+
 <style>
-  .aud-tab { border: 0; background: transparent; cursor: pointer; }
-  .aud-more { border: 0; background: transparent; color: #64748b; width: 28px; height: 28px; cursor: pointer; font-size: 15px; }
-  .aud-more:hover { background: #eef2f7; color: #091e42; }
+  .aud-tab {
+    border-top: 0;
+    border-left: 0;
+    border-right: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+  .aud-row { cursor: pointer; }
+  .aud-more {
+    border: 0;
+    background: transparent;
+    color: var(--ts-text-subtle, #718494);
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    font-size: 15px;
+  }
+  .aud-more:hover {
+    background: var(--ts-surface-hover, #eef2f7);
+    color: var(--ts-text, #1d3648);
+  }
   .aud-ctx {
-    position: fixed; z-index: 1200; min-width: 185px;
-    background: #ffffff; box-shadow: 0 8px 24px rgba(9, 30, 66, 0.14);
+    position: fixed;
+    z-index: 1200;
+    min-width: 195px;
+    background: var(--ts-surface, #ffffff);
+    border: 1px solid var(--ts-border, #ebeef2);
+    box-shadow: var(--ts-shadow-overlay, 0 10px 28px rgba(16, 24, 40, 0.12));
     padding: 4px 0;
   }
   .aud-ctx__item {
-    display: block; width: 100%; text-align: left; border: 0;
-    background: transparent; padding: 8px 14px; font-size: 12.5px;
-    color: #091e42; cursor: pointer;
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: 0;
+    background: transparent;
+    padding: 8px 14px;
+    font-size: 12.5px;
+    color: var(--ts-text, #1d3648);
+    cursor: pointer;
   }
-  .aud-ctx__item:hover { background: #f1f5f9; color: #1e4b9e; }
+  .aud-ctx__item:hover {
+    background: var(--ts-surface-alt, #f9fafc);
+    color: var(--ts-brand-primary, #002769);
+  }
+  .aud-ctx__sep {
+    height: 1px;
+    background: var(--ts-border, #ebeef2);
+    margin: 4px 0;
+  }
+  .aud-detail-modal { max-width: 580px; }
+  .aud-dl {
+    margin: 0;
+    display: grid;
+    grid-template-columns: 130px minmax(0, 1fr);
+    gap: 10px 14px;
+    font-size: 12.5px;
+    border-top: 1px solid var(--ts-border, #ebeef2);
+    padding-top: 14px;
+  }
+  .aud-dl dt {
+    color: var(--ts-text-subtle, #718494);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    padding-top: 2px;
+  }
+  .aud-dl dd {
+    margin: 0;
+    color: var(--ts-text, #1d3648);
+    word-break: break-all;
+  }
+  .aud-dl code {
+    font-family: var(--ts-font-mono);
+    font-size: 11.5px;
+    background: var(--ts-surface-alt, #f9fafc);
+    padding: 2px 6px;
+    border: 1px solid var(--ts-border, #ebeef2);
+    display: inline-block;
+  }
 </style>
 
 <script>
 (function () {
+  function showToast(msg, tone) {
+    var region = document.getElementById('ts-toasts');
+    if (!region) return;
+    var el = document.createElement('div');
+    el.className = 'ts-toast ts-toast--' + (tone || 'info');
+    el.textContent = msg;
+    region.appendChild(el);
+    setTimeout(function () { el.remove(); }, 2600);
+  }
+
+  function escH(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
   var tabs = document.querySelectorAll('.aud-tab');
   var pEvents = document.getElementById('aud-panel-events');
   var pOutbox = document.getElementById('aud-panel-outbox');
   tabs.forEach(function (t) {
     t.addEventListener('click', function () {
-      tabs.forEach(function (x) { x.classList.remove('is-active'); });
+      tabs.forEach(function (x) {
+        x.classList.remove('is-active');
+        x.setAttribute('aria-selected', 'false');
+      });
       t.classList.add('is-active');
+      t.setAttribute('aria-selected', 'true');
       var k = t.dataset.tab;
       pEvents.hidden = (k !== 'events');
       pOutbox.hidden = (k !== 'outbox');
@@ -195,14 +375,17 @@
   if (exportBtn) {
     exportBtn.addEventListener('click', function () {
       var tbl = document.getElementById('aud-events-table');
-      if (!tbl) return;
-      var lines = ['id,when_utc,actor,action,resource,outcome,event_hash'];
+      if (!tbl) {
+        showToast('No security events to export', 'warning');
+        return;
+      }
+      var lines = ['id,when_utc,actor,action,resource,outcome,event_hash,correlation_id'];
       tbl.querySelectorAll('tbody tr').forEach(function (tr) {
-        var cells = Array.from(tr.querySelectorAll('td')).slice(0, 6).map(function (td) {
-          return '"' + (td.textContent || '').trim().replace(/"/g, '""') + '"';
-        });
-        cells.push('"' + (tr.dataset.hash || '').replace(/"/g, '""') + '"');
-        lines.push(cells.join(','));
+        var vals = [
+          tr.dataset.id, tr.dataset.when, tr.dataset.actor, tr.dataset.action,
+          tr.dataset.resource, tr.dataset.outcome, tr.dataset.hash, tr.dataset.corr
+        ].map(function (v) { return '"' + String(v || '').replace(/"/g, '""') + '"'; });
+        lines.push(vals.join(','));
       });
       var blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
       var url = URL.createObjectURL(blob);
@@ -210,27 +393,95 @@
       a.href = url; a.download = 'trustseal-audit-events.csv';
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
+      showToast('Exported ' + (lines.length - 1) + ' audit events to CSV', 'success');
     });
   }
 
   var tbody = document.getElementById('aud-tbody');
   var menu = document.getElementById('aud-ctx');
+  var detailOverlay = document.getElementById('aud-detail-overlay');
+  var detailTitle = document.getElementById('aud-detail-title');
+  var detailBody = document.getElementById('aud-detail-body');
+  var detailClose = document.getElementById('aud-detail-close');
+  var detailDone = document.getElementById('aud-detail-done');
+  var detailCopyHash = document.getElementById('aud-detail-copy-hash');
   var activeRow = null;
+  var inspectedHash = '';
+
   function hide() { if (menu) menu.hidden = true; activeRow = null; }
+  function closeDetail() { if (detailOverlay) detailOverlay.hidden = true; }
+
+  function formatOutcomeBadge(raw) {
+    var val = String(raw || '').trim();
+    var lc = val.toLowerCase();
+    if (lc === 'success') {
+      return '<span class="st-tag st-tag--ok">Success</span>';
+    }
+    if (lc.indexOf('receipt:') === 0) {
+      return '<span class="st-tag st-tag--ok">Success · Receipt #' + escH(val.slice(8)) + '</span>';
+    }
+    if (lc === 'denied' || lc === 'forbidden') {
+      return '<span class="st-tag st-tag--warn">' + escH(val.charAt(0).toUpperCase() + val.slice(1)) + '</span>';
+    }
+    return '<span class="st-tag st-tag--bad">' + escH(val ? (val.charAt(0).toUpperCase() + val.slice(1)) : '—') + '</span>';
+  }
+
+  function openDetail(row) {
+    if (!row || !detailOverlay) return;
+    inspectedHash = row.dataset.hash || '';
+    detailTitle.textContent = 'Security Event #' + (row.dataset.id || '');
+    detailBody.innerHTML =
+      '<dt>Timestamp</dt><dd>' + escH(row.dataset.when) + ' UTC</dd>' +
+      '<dt>Actor</dt><dd><strong>' + escH(row.dataset.actor) + '</strong></dd>' +
+      '<dt>Action</dt><dd><code>' + escH(row.dataset.action) + '</code></dd>' +
+      '<dt>Resource</dt><dd>' + escH(row.dataset.resource) + '</dd>' +
+      '<dt>Outcome</dt><dd>' + formatOutcomeBadge(row.dataset.outcome) + '</dd>' +
+      '<dt>Event Hash</dt><dd><code>' + escH(row.dataset.hash || '—') + '</code></dd>' +
+      (row.dataset.prevHash ? '<dt>Previous Hash</dt><dd><code>' + escH(row.dataset.prevHash) + '</code></dd>' : '') +
+      '<dt>Correlation ID</dt><dd><code>' + escH(row.dataset.corr || '—') + '</code></dd>';
+    if (detailCopyHash) detailCopyHash.disabled = !inspectedHash;
+    detailOverlay.hidden = false;
+  }
+
   function openMenu(row, x, y) {
     activeRow = row;
     menu.hidden = false;
-    var mw = menu.offsetWidth || 185, mh = menu.offsetHeight || 110;
+    var mw = menu.offsetWidth || 195, mh = menu.offsetHeight || 150;
     menu.style.left = Math.min(x, window.innerWidth - mw - 8) + 'px';
     menu.style.top = Math.min(y, window.innerHeight - mh - 8) + 'px';
   }
+
+  if (detailClose) detailClose.addEventListener('click', closeDetail);
+  if (detailDone) detailDone.addEventListener('click', closeDetail);
+  if (detailOverlay) {
+    detailOverlay.addEventListener('click', function (e) {
+      if (e.target === detailOverlay) closeDetail();
+    });
+  }
+  if (detailCopyHash) {
+    detailCopyHash.addEventListener('click', function () {
+      if (inspectedHash && navigator.clipboard) {
+        navigator.clipboard.writeText(inspectedHash).then(function () {
+          showToast('Copied event hash to clipboard', 'success');
+        });
+      }
+    });
+  }
+
   if (tbody && menu) {
     tbody.addEventListener('click', function (e) {
       var btn = e.target.closest('.aud-more');
-      if (!btn) return;
-      e.stopPropagation();
-      var r = btn.getBoundingClientRect();
-      openMenu(btn.closest('tr'), r.right - 185, r.bottom + 4);
+      if (btn) {
+        e.stopPropagation();
+        var r = btn.getBoundingClientRect();
+        openMenu(btn.closest('tr'), r.right - 195, r.bottom + 4);
+        return;
+      }
+      var tr = e.target.closest('tr.aud-row');
+      if (tr) {
+        hide();
+        openDetail(tr);
+      }
     });
     tbody.addEventListener('contextmenu', function (e) {
       var tr = e.target.closest('tr');
@@ -242,18 +493,27 @@
       var item = e.target.closest('[data-act]');
       if (!item || !activeRow) return;
       var act = item.dataset.act;
-      if (act === 'filter') {
-        var inp = document.getElementById('action');
-        if (inp) { inp.value = activeRow.dataset.action || ''; inp.form.submit(); }
-      } else if (act === 'hash' && navigator.clipboard) {
-        navigator.clipboard.writeText(activeRow.dataset.hash || '');
-      } else if (act === 'corr' && navigator.clipboard) {
-        navigator.clipboard.writeText(activeRow.dataset.corr || '');
-      }
+      var row = activeRow;
       hide();
+      if (act === 'inspect') {
+        openDetail(row);
+      } else if (act === 'filter') {
+        var inp = document.getElementById('action');
+        if (inp) { inp.value = row.dataset.action || ''; inp.form.submit(); }
+      } else if (act === 'hash' && navigator.clipboard) {
+        navigator.clipboard.writeText(row.dataset.hash || '').then(function () {
+          showToast('Copied event hash to clipboard', 'success');
+        });
+      } else if (act === 'corr' && navigator.clipboard) {
+        navigator.clipboard.writeText(row.dataset.corr || '').then(function () {
+          showToast('Copied correlation ID to clipboard', 'success');
+        });
+      }
     });
     document.addEventListener('click', hide);
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { hide(); closeDetail(); }
+    });
   }
 })();
 </script>

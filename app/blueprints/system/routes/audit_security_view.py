@@ -77,12 +77,36 @@ def index():
         .all()
     }
 
+    success_count = sum(
+        1
+        for e in events
+        if (e.outcome or "").lower() == "success"
+        or (e.outcome or "").lower().startswith("receipt:")
+    )
+    denied_count = sum(
+        1 for e in events if (e.outcome or "").lower() in ("denied", "forbidden")
+    )
+    error_count = len(events) - success_count - denied_count
+    chained_count = sum(1 for e in events if e.event_hash)
+    outbox_pending = counts_by_state.get("pending", 0) + counts_by_state.get("processing", 0)
+    outbox_dead = counts_by_state.get("dead", 0)
+    summary = {
+        "shown": len(events),
+        "success": success_count,
+        "denied_or_error": denied_count + error_count,
+        "chained": chained_count,
+        "outbox_total": sum(counts_by_state.values()),
+        "outbox_pending": outbox_pending,
+        "outbox_dead": outbox_dead,
+    }
+
     return render_template(
         "admin/audit_security.html",
         events=events,
         actors=actors,
         outbox=outbox,
         counts_by_state=counts_by_state,
+        summary=summary,
         limit=limit,
         action_filter=action_filter,
         outcome_filter=outcome_filter,

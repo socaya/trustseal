@@ -649,6 +649,22 @@ def list_templates():
     return jsonify(tsd_templates.list_templates())
 
 
+@tsd_api.route("/templates/catalog", methods=["GET"])
+@login_required
+def search_business_templates_catalog():
+    """Search & paginate the 1,080+ Business-in-a-Box Company Document Templates."""
+    _actor()
+    from app.services.business_docs_catalog import search_business_docs_catalog
+
+    res = search_business_docs_catalog(
+        q=request.args.get("q") or "",
+        category=request.args.get("category") or "",
+        page=int(request.args.get("page") or 1),
+        per_page=int(request.args.get("per_page") or 24),
+    )
+    return jsonify({"ok": True, **res})
+
+
 @tsd_api.route("/from-template/<slug>", methods=["POST"])
 @login_required
 def create_from_template(slug: str):
@@ -691,7 +707,7 @@ def create_from_template(slug: str):
     db.session.add(row)
     db.session.flush()
     _emit(actor_id=actor.id, organization_id=actor.organization_id,
-          action="tsd.from_template", resource_id=row.id, outcome=tpl.slug)
+          action="tsd.from_template", resource_id=row.id, outcome=(tpl.slug or "ok")[:24])
     db.session.commit()
     record_tsd_operation("from_template")
     record_tsd_plaintext(len(plaintext))

@@ -1,5 +1,5 @@
 {#
-  Authenticated verifier wrapper — unified borderless Verification Hub
+  Authenticated verifier wrapper — unified Verification Hub
   connecting Document/PDF verification and Covert Stamp Forensics.
 #}
 {% extends "layouts/app.html" %}
@@ -7,15 +7,20 @@
 
 {% block title %}Verification · TRUSTSEAL{% endblock %}
 {% block page_title %}Verification{% endblock %}
-{% block page_description %}{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Independently verify platform-sealed PDFs against their cryptographic evidence digest.
+  </p>
+{% endblock %}
 
 {% block content %}
 <div class="st-flat">
   {% include "stamps/_flat_ui.html" %}
 
   <nav class="st-subnav" aria-label="Verification modes">
-    <a href="{{ url_for('verify_views.verify_app') if 'verify_views.verify_app' in url_map_endpoints else request.path }}"
-       class="st-subnav__link is-active">
+    <a href="{{ url_for('verify_views.verify_form') }}"
+       class="st-subnav__link is-active"
+       aria-current="page">
       Document &amp; PDF Verification
     </a>
     {% if 'tsd_stamps_views.verify_page' in url_map_endpoints %}

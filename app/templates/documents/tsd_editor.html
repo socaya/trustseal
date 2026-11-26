@@ -114,6 +114,7 @@
             <button type="button" id="tsd-pf-delete" class="tsd-pf-del" title="Delete page footer" aria-label="Delete page footer">✕</button>
           </span>
         </div>
+        <div id="tsd-floating-marks" class="ts-marks-overlay" contenteditable="false"></div>
       </div>
     </div>
     <div id="tsd-obj-floatbar" class="tsd-obj-floatbar" hidden role="toolbar" aria-label="Selected object actions">
@@ -280,6 +281,23 @@
           <label style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:#1d3648;white-space:nowrap;" title="Stamp date (today or backdate only — future dates are not allowed)">
             <span>Stamp Date</span>
             <input type="date" id="tsd-stamp-date" style="border:1px solid #d0d7e2;padding:3px 6px;font-size:11.5px;color:#091e42;background:#fff;">
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:#1d3648;white-space:nowrap;">
+            <span>Placement</span>
+            <select id="tsd-stamp-placement" style="border:1px solid #d0d7e2;padding:3px 6px;font-size:11.5px;color:#091e42;background:#fff;">
+              <option value="current">Current page (draggable &amp; rotatable)</option>
+              <option value="all_br">All pages — Bottom Right</option>
+              <option value="all_bl">All pages — Bottom Left</option>
+              <option value="all_tr">All pages — Top Right</option>
+            </select>
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:#1d3648;white-space:nowrap;">
+            <span>Angle</span>
+            <select id="tsd-stamp-angle" style="border:1px solid #d0d7e2;padding:3px 6px;font-size:11.5px;color:#091e42;background:#fff;">
+              <option value="-12">-12° (Official tilt)</option>
+              <option value="0">0° (Straight)</option>
+              <option value="12">+12° (Right tilt)</option>
+            </select>
           </label>
           <label style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:#1d3648;white-space:nowrap;cursor:pointer;">
             <input type="checkbox" id="tsd-stamp-randomize" style="accent-color:#002769;"> Randomize impression
@@ -451,9 +469,13 @@
   --ed-active: var(--ts-brand-primary-soft);
   --ed-pagew: 794px;
   --ed-pageh: 1123px;
-  --ed-margx: 76px;
-  --ed-margy: 94px;
-  --ed-rulerH: 19px;
+  --ed-margx: 96px;
+  --ed-margy: 96px;
+  --ed-margl: 96px;
+  --ed-margr: 96px;
+  --ed-margt: 96px;
+  --ed-margb: 96px;
+  --ed-rulerH: 20px;
   --ed-visualzoom: 1;
   display: flex; flex-direction: column;
   width: 100%; max-width: 100%; min-width: 0;
@@ -652,33 +674,47 @@
   background: #fff;
   border: 1px solid var(--ed-line);
   border-bottom: 0;
+  user-select: none;
+  touch-action: none;
 }
-.ts-ed__hruler svg { display: block; width: 100%; height: calc(var(--ed-rulerH) - 1px); }
+.ts-ed__hruler svg { display: block; width: 100%; height: calc(var(--ed-rulerH) - 1px); overflow: visible; }
 .ts-ed__vruler {
   position: absolute;
-  left: 9px; top: var(--ed-rulerH);
+  left: 8px; top: var(--ed-rulerH);
   width: var(--ed-rulerH);
   height: var(--ed-pageh);
-  background: #fff;
-  border: 1px solid var(--ed-line);
-  border-right: 0;
+  background: transparent;
+  user-select: none;
+  touch-action: none;
+  z-index: 4;
 }
-.ts-ed__vruler svg { width: calc(var(--ed-rulerH) - 1px); height: 100%; }
+.ts-ed__vruler svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.tsd-ruler-guide {
+  position: absolute; pointer-events: none; z-index: 50;
+  background: rgba(0, 39, 105, 0.55);
+}
+.tsd-ruler-tip {
+  position: fixed; z-index: 9600; pointer-events: none;
+  background: #0f213d; color: #ffffff; font-size: 10.5px; font-weight: 600;
+  padding: 3px 7px; letter-spacing: 0.02em; white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+}
 
 .ts-ed__page {
   background: #fff;
-  box-shadow: 0 2px 9px rgba(20,35,50,.08);
+  box-shadow: 0 1px 4px rgba(15,23,42,.10), 0 4px 14px rgba(15,23,42,.06);
   width: var(--ed-pagew);
   min-height: var(--ed-pageh);
   margin-left: 28px;
   position: relative;
   overflow: hidden;
-  border: 1px solid #d2d9e1;
+  border: 1px solid #d5dce6;
 }
 .ts-ed__printable {
   position: relative;
-  z-index: 1;
-  padding: var(--ed-margy) var(--ed-margx) calc(var(--ed-margy) + 28px);
+  z-index: 3;
+  background: transparent;
+  padding: var(--ed-margt, var(--ed-margy)) var(--ed-margr, var(--ed-margx)) calc(var(--ed-margb, var(--ed-margy)) + 28px) var(--ed-margl, var(--ed-margx));
   box-sizing: border-box;
   outline: 1px dashed transparent;
   transition: outline .15s;
@@ -775,14 +811,27 @@
   position: absolute; inset: 0; pointer-events: none; z-index: 3;
 }
 .tsd-page-break-band {
-  position: absolute; left: -1px; right: -1px; height: 28px;
-  background: var(--ed-bg, #eef2f6);
-  border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1;
-  box-shadow: inset 0 4px 7px -5px rgba(15,23,42,0.18), inset 0 -4px 7px -5px rgba(15,23,42,0.12);
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 18px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em;
-  color: #64748b; text-transform: uppercase; box-sizing: border-box;
+  position: absolute; left: -2px; right: -2px; height: 22px;
+  background: var(--ed-bg, #edf1f6);
+  border-top: 1px solid #cfd8e3; border-bottom: 1px solid #cfd8e3;
+  box-shadow: inset 0 6px 8px -6px rgba(15,23,42,0.16), inset 0 -5px 7px -6px rgba(15,23,42,0.12);
+  box-sizing: border-box;
 }
+.tsd-sheet-footer-stamp {
+  position: absolute; left: var(--ed-margl, 96px); right: var(--ed-margr, 96px);
+  height: 20px; border-top: 1px solid #eceff3; padding-top: 4px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 9.5px; color: #8a97a3; box-sizing: border-box;
+  background: transparent;
+}
+#tsd-printable, #tsd-printable .ProseMirror {
+  max-width: 100%; box-sizing: border-box;
+  overflow-wrap: break-word; word-wrap: break-word;
+}
+#tsd-printable img, #tsd-printable table, #tsd-printable pre, #tsd-printable blockquote {
+  max-width: 100%; box-sizing: border-box;
+}
+#tsd-printable pre { white-space: pre-wrap; }
 @media print {
   .tsd-page-breaks-layer { display: none !important; }
 }
@@ -1386,6 +1435,8 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
 .tsd-verify-empty { padding: 20px; text-align: center; color: #5a6676; font-size: 12px; }
 </style>
 
+<script src="/static/js/floating_marks.js"></script>
+<script src="/static/js/interactive_fields.js"></script>
 <script>
 (function () {
   var NS = 'http://www.w3.org/2000/svg';
@@ -1398,6 +1449,43 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
   var saveStateEl = document.getElementById('tsd-save-state');
   var wordCountEl = document.getElementById('tsd-wordcount');
   var page        = document.getElementById('tsd-page');
+  var floatingOverlay = document.getElementById('tsd-floating-marks');
+  var _tsdFmCtrl = (window.TSFloatingMarks && floatingOverlay) ? window.TSFloatingMarks.attach(floatingOverlay, {
+    getHostRect: function () { return page.getBoundingClientRect(); },
+    getHostUnzoomed: function () { return { w: page.offsetWidth || 794, h: page.offsetHeight || 1123 }; },
+    getPageMetrics: function () {
+      var meta = window._tsdPageMeta || { pageH: 1123, gap: 22, pageCount: 1 };
+      var ws = document.querySelector('.ts-ed__workspace') || document.querySelector('.ts-ed__stage');
+      return {
+        pageW: page.offsetWidth || 794,
+        pageH: meta.pageH || 1123,
+        gap: meta.gap || 22,
+        pageCount: Math.max(1, meta.pageCount || 1),
+        scrollTop: ws ? ws.scrollTop : 0,
+      };
+    },
+    onChange: function () { if (typeof scheduleSave === 'function') scheduleSave(); },
+    onToast: function (m) { if (typeof showToast === 'function') showToast(m); },
+    onSignStamp: function (markEl) {
+      var target = (markEl && markEl.querySelector('.tsd-stamp-mark')) || markEl;
+      if (typeof _openSignInsertedStampDrawer === 'function') _openSignInsertedStampDrawer(target);
+    },
+  }) : null;
+  function _hydrateFloatingMarksFromRoot(rootEl) {
+    if (!rootEl || !floatingOverlay || !_tsdFmCtrl) return;
+    var found = [];
+    rootEl.querySelectorAll('.tsd-persisted-marks, [data-tsd-marks]').forEach(function (box) {
+      Array.prototype.slice.call(box.children).forEach(function (ch) { found.push(ch); });
+      box.remove();
+    });
+    rootEl.querySelectorAll('.tsd-floating-mark').forEach(function (el) {
+      if (found.indexOf(el) === -1) found.push(el);
+    });
+    found.forEach(function (el) {
+      floatingOverlay.appendChild(el);
+    });
+    if (found.length) _tsdFmCtrl.upgradeExisting();
+  }
   var printable   = document.getElementById('tsd-printable');
   var editorWrap  = document.getElementById('tsd-editorwrap');
   var hruler      = document.getElementById('tsd-hruler');
@@ -1414,8 +1502,12 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
 
   var pageSize    = 'a4';
   var pageOrient  = 'portrait';
-  var pageMargin  = 2;      // cm, each side
-  var pageMarginY = 2.5;    // cm, top/bottom
+  var pageMargin  = 2.54;   // cm, Standard 1 inch (Google Docs / MS Word Normal)
+  var pageMarginY = 2.54;   // cm, Standard 1 inch top/bottom
+  var pageMarginL = 2.54;
+  var pageMarginR = 2.54;
+  var pageMarginT = 2.54;
+  var pageMarginB = 2.54;
   var unit        = 'cm';
   var zoom        = 1;
 
@@ -1449,7 +1541,15 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
       el.removeAttribute('data-tsd-auto-page-offset');
       el.removeAttribute('data-tsd-auto-page-original-style');
     });
-    return clone.innerHTML || '';
+    clone.querySelectorAll('.tsd-persisted-marks, [data-tsd-marks]').forEach(function (m) { m.remove(); });
+    var outHtml = clone.innerHTML || '';
+    if (_tsdFmCtrl) {
+      var marksHtml = _tsdFmCtrl.cleanForPersist();
+      if (marksHtml) {
+        outHtml += '<div class="tsd-persisted-marks" data-tsd-marks="1" contenteditable="false">' + marksHtml + '</div>';
+      }
+    }
+    return outHtml;
   }
 
   // ===================================================================== RIBBON
@@ -1775,11 +1875,15 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
     ], function (v) { pageOrient = v; applyPageSize(); }, 'ts-ed__combo--sm');
 
     var margins = makeCombo([
-      { value: '1.2', label: 'Narrow (12 mm)',   selected: pageMargin <= 1.3 },
-      { value: '2',   label: 'Normal (20 mm)',   selected: pageMargin > 1.3 && pageMargin <= 2.2 },
-      { value: '2.5', label: 'Moderate (25 mm)', selected: pageMargin > 2.2 && pageMargin <= 3.0 },
-      { value: '3.2', label: 'Wide (32 mm)',     selected: pageMargin > 3.0 },
-    ], function (v) { pageMargin = parseFloat(v); pageMarginY = pageMargin; applyMargins(); });
+      { value: '1.27', label: 'Narrow (0.5 in / 12.7 mm)', selected: pageMargin <= 1.5 },
+      { value: '2.54', label: 'Normal (1.0 in / 25.4 mm)', selected: pageMargin > 1.5 && pageMargin <= 2.8 },
+      { value: '3.18', label: 'Wide (1.25 in / 31.8 mm)',  selected: pageMargin > 2.8 },
+    ], function (v) {
+      var mv = parseFloat(v);
+      pageMargin = mv; pageMarginY = mv;
+      pageMarginL = mv; pageMarginR = mv; pageMarginT = mv; pageMarginB = mv;
+      applyMargins();
+    });
 
     return [
       makeGroup('Page setup', [sizeCombo, orient, margins]),
@@ -1919,11 +2023,20 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
 
     document.getElementById('tsd-ssd-close').addEventListener('click', function () { drawer.remove(); });
 
-    // Load Registered Signatures (OTP-verified)
-    fetch('/api/signatures/registered', { credentials: 'same-origin' })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(function (d) {
+    // Resilient JSON fetch helper with automatic retry on transient connection hiccups
+    function _loadRegSigs() {
+      var box = document.getElementById('tsd-ssd-registered');
+      if (box) box.innerHTML = '<div style="padding:12px;color:#5a6676;font-size:12px;">Loading approved signatures…</div>';
+      (function attempt(n) {
+        return fetch('/api/signatures/registered', { credentials: 'same-origin' })
+          .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+          .catch(function (err) {
+            if (n > 0) return new Promise(function (res) { setTimeout(res, 450 * (3 - n)); }).then(function () { return attempt(n - 1); });
+            throw err;
+          });
+      })(2).then(function (d) {
         var box = document.getElementById('tsd-ssd-registered');
+        if (!box) return;
         var sigs = (d && d.signatures) || [];
         if (!sigs.length) {
           box.innerHTML = '<div style="padding:14px;border:1px dashed #cbd5e1;text-align:center;">No approved signatures registered yet. Register one under <a href="/signatures" target="_blank">Brand &amp; Assets → Signatures</a>.</div>';
@@ -1966,8 +2079,17 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
         });
       }).catch(function (e) {
         var box = document.getElementById('tsd-ssd-registered');
-        if (box) box.textContent = 'Could not load signatures: ' + e.message;
+        if (box) {
+          box.innerHTML = '<div style="padding:12px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
+            '<span>Could not load signatures (' + String(e && e.message || 'network error').replace(/</g, '&lt;') + ').</span>' +
+            '<button type="button" id="tsd-ssd-retry" style="padding:4px 10px;border:1px solid #991b1b;background:#fff;color:#991b1b;font-weight:600;cursor:pointer;">Retry</button>' +
+          '</div>';
+          var rb = document.getElementById('tsd-ssd-retry');
+          if (rb) rb.addEventListener('click', _loadRegSigs);
+        }
       });
+    }
+    _loadRegSigs();
   }
 
   if (document.getElementById('tsd-obj-sign')) {
@@ -2078,6 +2200,7 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
 
   function _tsdFindSelectableObj(target) {
     if (!target || !target.closest) return null;
+    if (target.closest('.tsd-floating-mark') || target.closest('.ts-fm-bar')) return null;
     var grp = target.closest('.tsd-obj-group');
     if (grp && page.contains(grp)) return grp;
     var obj = target.closest('.tsd-stamp-mark, img, table, figure, .tsd-sig-block, blockquote');
@@ -2318,53 +2441,549 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
     drawer.style.cssText = 'position:fixed;top:38px;right:0;bottom:24px;width:380px;max-width:94vw;z-index:8450;background:#ffffff;box-shadow:-6px 0 24px rgba(9,30,66,0.14);display:flex;flex-direction:column;';
     drawer.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #e2e8f0;">' +
-        '<strong style="font-size:13px;color:#091e42;">Authorized Staff Signatures</strong>' +
+        '<strong style="font-size:13px;color:#091e42;">Signatures &amp; Handwritten Initials</strong>' +
         '<div style="display:flex;gap:10px;align-items:center;">' +
           '<a href="/signatures" target="_blank" style="font-size:11.5px;color:#002769;text-decoration:none;font-weight:600;">Register ↗</a>' +
           '<button type="button" id="tsd-sig-close" style="border:0;background:transparent;font-size:16px;cursor:pointer;color:#64748b;padding:2px 6px;">✕</button>' +
         '</div>' +
       '</div>' +
-      '<div style="padding:10px 14px;background:#f6f8fb;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
-        '<span style="font-size:11.5px;color:#42526e;">Click a registered signature to apply it to this document.</span>' +
-        '<button type="button" id="tsd-sig-blank" style="border:1px solid #cbd5e1;background:#fff;padding:4px 8px;font-size:11px;font-weight:600;color:#1d3648;cursor:pointer;white-space:nowrap;">+ Blank line</button>' +
+      '<div style="display:flex;border-bottom:1px solid #e2e8f0;background:#f8fafc;">' +
+        '<button type="button" id="tsd-sig-tab-reg" style="flex:1;padding:9px 8px;border:0;border-bottom:2px solid #002769;background:#fff;font-size:11.5px;font-weight:700;color:#002769;cursor:pointer;">Signatures</button>' +
+        '<button type="button" id="tsd-sig-tab-init" style="flex:1;padding:9px 8px;border:0;border-bottom:2px solid transparent;background:transparent;font-size:11.5px;font-weight:600;color:#64748b;cursor:pointer;">Initials</button>' +
+        '<button type="button" id="tsd-sig-tab-studio" style="flex:1.2;padding:9px 8px;border:0;border-bottom:2px solid transparent;background:transparent;font-size:11.5px;font-weight:700;color:#02982E;cursor:pointer;">+ Signature Studio</button>' +
       '</div>' +
-      '<div id="tsd-sig-list" style="padding:14px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:10px;font-size:12.5px;color:#5a6676;">Loading registered signatures…</div>';
+      '<div style="padding:8px 14px;background:#f6f8fb;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
+        '<label style="font-size:11.5px;color:#1d3648;font-weight:600;">Placement</label>' +
+        '<select id="tsd-sig-placement" style="flex:1;border:1px solid #cbd5e1;padding:4px 7px;font-size:11.5px;color:#091e42;background:#fff;">' +
+          '<option value="current">Current page (draggable &amp; rotatable)</option>' +
+          '<option value="all_br">All pages — Bottom Right</option>' +
+          '<option value="all_bl">All pages — Bottom Left</option>' +
+          '<option value="all_tr">All pages — Top Right</option>' +
+        '</select>' +
+      '</div>' +
+      '<div id="tsd-sig-pane-reg" style="display:flex;flex-direction:column;flex:1;min-height:0;">' +
+        '<div style="padding:8px 14px;border-bottom:1px solid #eef2f7;display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
+          '<span style="font-size:11px;color:#5a6676;">Apply verified staff signature or blank line.</span>' +
+          '<button type="button" id="tsd-sig-blank" style="border:1px solid #cbd5e1;background:#fff;padding:4px 8px;font-size:11px;font-weight:600;color:#1d3648;cursor:pointer;white-space:nowrap;">+ Blank line</button>' +
+        '</div>' +
+        '<div id="tsd-sig-list" style="padding:14px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:10px;font-size:12.5px;color:#5a6676;">Loading registered signatures…</div>' +
+      '</div>' +
+      '<div id="tsd-sig-pane-init" hidden style="padding:14px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:10px;font-size:12px;color:#1d3648;">' +
+        '<div>' +
+          '<label style="display:block;font-weight:600;margin-bottom:4px;">Your Initials (e.g. S.O. or J.D.)</label>' +
+          '<input type="text" id="tsd-init-text" value="S.O." maxlength="10" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #cbd5e1;font-size:13px;font-weight:600;color:#091e42;">' +
+        '</div>' +
+        '<div>' +
+          '<label style="display:block;font-weight:600;margin-bottom:5px;">Handwritten Font (20 Authentic Pen Styles)</label>' +
+          '<div id="tsd-init-fonts" style="max-height:152px;overflow-y:auto;padding:2px;"></div>' +
+        '</div>' +
+        '<div>' +
+          '<label style="display:block;font-weight:600;margin-bottom:5px;">Accent Style</label>' +
+          '<div id="tsd-init-styles" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;"></div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:6px 8px;background:#f8fafc;border:1px solid #e2e8f0;">' +
+          '<div style="display:flex;align-items:center;gap:5px;">' +
+            '<span style="font-weight:600;">Ink:</span>' +
+            '<button type="button" data-init-ink="#002769" style="width:18px;height:18px;border-radius:50%;background:#002769;border:2px solid #0f172a;cursor:pointer;" title="TrustSeal Navy"></button>' +
+            '<button type="button" data-init-ink="#1d4ed8" style="width:18px;height:18px;border-radius:50%;background:#1d4ed8;border:2px solid transparent;cursor:pointer;" title="Royal Blue"></button>' +
+            '<button type="button" data-init-ink="#111827" style="width:18px;height:18px;border-radius:50%;background:#111827;border:2px solid transparent;cursor:pointer;" title="Fountain Black"></button>' +
+            '<button type="button" data-init-ink="#1e3a5f" style="width:18px;height:18px;border-radius:50%;background:#1e3a5f;border:2px solid transparent;cursor:pointer;" title="Archival Blue-Black"></button>' +
+            '<button type="button" data-init-ink="#7f1d1d" style="width:18px;height:18px;border-radius:50%;background:#7f1d1d;border:2px solid transparent;cursor:pointer;" title="Executive Burgundy"></button>' +
+            '<button type="button" data-init-ink="#065f46" style="width:18px;height:18px;border-radius:50%;background:#065f46;border:2px solid transparent;cursor:pointer;" title="Emerald Seal"></button>' +
+          '</div>' +
+          '<label style="display:inline-flex;align-items:center;gap:4px;">Slant <input type="range" id="tsd-init-slant" min="-12" max="4" value="-5" style="width:52px;accent-color:#002769;"></label>' +
+          '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="tsd-init-date" checked style="accent-color:#002769;"> Date</label>' +
+        '</div>' +
+        '<div style="border:1px solid #d5dce6;background:#fafbfd;padding:12px;text-align:center;min-height:70px;display:flex;align-items:center;justify-content:center;" id="tsd-init-live"></div>' +
+        '<div style="display:flex;gap:8px;">' +
+          '<button type="button" id="tsd-init-apply" style="flex:1;padding:8px 12px;background:#002769;color:#fff;border:0;font-size:12px;font-weight:700;cursor:pointer;">Apply Initials</button>' +
+          '<button type="button" id="tsd-init-apply-all" style="padding:8px 10px;background:#02982E;color:#fff;border:0;font-size:12px;font-weight:700;cursor:pointer;" title="Apply handwritten initials to bottom-right of every page">All Pages</button>' +
+        '</div>' +
+      '</div>' +
+      '<div id="tsd-sig-pane-studio" hidden style="padding:12px 14px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:10px;font-size:12px;color:#1d3648;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;padding-bottom:6px;border-bottom:1px solid #eef2f7;">' +
+          '<div><strong style="font-size:12.5px;color:#091e42;">Register Authorized Signatory Signature</strong>' +
+          '<div style="font-size:10.5px;color:#64748b;">Capture via Stylus Pen, USB/HID Pad, TS Vector Engine, or Scan.</div></div>' +
+          '<div id="tsd-st-counts" style="font-size:10.5px;color:#002769;font-weight:700;"></div>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
+          '<div style="grid-column:1 / -1;"><label style="display:block;font-size:11px;font-weight:600;margin-bottom:3px;">Authorized Signatory (Staff Member)</label>' +
+          '<select id="tsd-st-user" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;font-size:12px;background:#fff;"></select></div>' +
+          '<div><label style="display:block;font-size:11px;font-weight:600;margin-bottom:3px;">Official Title / Role Label</label>' +
+          '<input type="text" id="tsd-st-name" value="Official Signature" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #cbd5e1;font-size:12px;"></div>' +
+          '<div><label style="display:block;font-size:11px;font-weight:600;margin-bottom:3px;">Initials (optional)</label>' +
+          '<input type="text" id="tsd-st-initials" placeholder="e.g. J.D." maxlength="12" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #cbd5e1;font-size:12px;"></div>' +
+        '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:10px;font-size:11px;">' +
+          '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="tsd-st-default" checked style="accent-color:#002769;"> Set as default</label>' +
+          '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-weight:600;color:#02982E;"><input type="checkbox" id="tsd-st-approve" checked style="accent-color:#02982E;"> Owner-approve immediately</label>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;" id="tsd-st-modes">' +
+          '<button type="button" data-st-mode="stylus_pen" style="padding:6px 6px;border:1.5px solid #002769;background:#edf2fa;color:#002769;font-size:11px;font-weight:700;cursor:pointer;">Stylus Pen / Pressure Pad</button>' +
+          '<button type="button" data-st-mode="device_pad" style="padding:6px 6px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:11px;font-weight:600;cursor:pointer;">Connected Device (USB/HID)</button>' +
+          '<button type="button" data-st-mode="ts_hq_engine" style="padding:6px 6px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:11px;font-weight:600;cursor:pointer;">TS High-Quality Vector</button>' +
+          '<button type="button" data-st-mode="uploaded" style="padding:6px 6px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:11px;font-weight:600;cursor:pointer;">Upload Scanned Signature</button>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:6px 8px;background:#f8fafc;border:1px solid #e2e8f0;">' +
+          '<div style="display:flex;align-items:center;gap:5px;" id="tsd-st-inks">' +
+            '<span style="font-size:10.5px;font-weight:700;color:#475569;">Ink:</span>' +
+            '<button type="button" data-st-ink="#002769" title="TrustSeal Navy" style="width:18px;height:18px;border-radius:50%;background:#002769;border:2px solid #0f172a;cursor:pointer;"></button>' +
+            '<button type="button" data-st-ink="#1d4ed8" title="Classic Royal Blue" style="width:18px;height:18px;border-radius:50%;background:#1d4ed8;border:2px solid transparent;cursor:pointer;"></button>' +
+            '<button type="button" data-st-ink="#111827" title="Fountain Ink Black" style="width:18px;height:18px;border-radius:50%;background:#111827;border:2px solid transparent;cursor:pointer;"></button>' +
+            '<button type="button" data-st-ink="#1e3a5f" title="Archival Blue-Black" style="width:18px;height:18px;border-radius:50%;background:#1e3a5f;border:2px solid transparent;cursor:pointer;"></button>' +
+            '<button type="button" data-st-ink="#7f1d1d" title="Executive Burgundy" style="width:18px;height:18px;border-radius:50%;background:#7f1d1d;border:2px solid transparent;cursor:pointer;"></button>' +
+            '<button type="button" data-st-ink="#065f46" title="Emerald Seal" style="width:18px;height:18px;border-radius:50%;background:#065f46;border:2px solid transparent;cursor:pointer;"></button>' +
+          '</div>' +
+          '<div style="display:flex;gap:5px;">' +
+            '<button type="button" id="tsd-st-undo" style="padding:3px 7px;border:1px solid #cbd5e1;background:#fff;font-size:10.5px;font-weight:600;cursor:pointer;">↶ Undo</button>' +
+            '<button type="button" id="tsd-st-clear" style="padding:3px 7px;border:1px solid #cbd5e1;background:#fff;font-size:10.5px;font-weight:600;cursor:pointer;">Clear</button>' +
+          '</div>' +
+        '</div>' +
+        '<div id="tsd-st-box-pad">' +
+          '<div style="font-size:10.5px;color:#02982E;font-weight:600;margin-bottom:4px;">Smooth Calligraphic Pen Engine Ready (Bezier Velocity &amp; Pressure Smoothing ON)</div>' +
+          '<canvas id="tsd-st-pad" width="420" height="150" style="width:100%;height:150px;background:#fafbfd;border:1px dashed #94a3b8;cursor:crosshair;display:block;touch-action:none;"></canvas>' +
+          '<div id="tsd-st-tele" style="font-size:10px;color:#64748b;margin-top:4px;">Input: waiting for stylus pen, signature pad, or mouse… · Auto-vectorized (SVG Bezier)</div>' +
+        '</div>' +
+        '<div id="tsd-st-box-hq" hidden style="display:flex;flex-direction:column;gap:8px;">' +
+          '<input type="text" id="tsd-st-hq-name" placeholder="Type full signatory name…" style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #cbd5e1;font-size:12.5px;">' +
+          '<select id="tsd-st-hq-style" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;font-size:12px;background:#fff;">' +
+            '<option value="Great Vibes">Executive Calligraphic (Great Vibes)</option>' +
+            '<option value="Brush Script MT">Fountain Pen Script</option>' +
+            '<option value="Georgia">Classic Legal Italic</option>' +
+            '<option value="Palatino">Formal Notary Script</option>' +
+          '</select>' +
+          '<div id="tsd-st-hq-prev" style="min-height:86px;border:1px solid #d5dce6;background:#fafbfd;display:flex;align-items:center;justify-content:center;padding:10px;"></div>' +
+        '</div>' +
+        '<div id="tsd-st-box-up" hidden style="display:flex;flex-direction:column;gap:8px;">' +
+          '<input type="file" id="tsd-st-file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="font-size:11.5px;">' +
+          '<div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;">' +
+            '<label style="display:inline-flex;align-items:center;gap:4px;"><input type="checkbox" id="tsd-st-rmbg" checked style="accent-color:#002769;"> Auto-remove BG</label>' +
+            '<label style="display:inline-flex;align-items:center;gap:4px;"><input type="checkbox" id="tsd-st-pen" checked style="accent-color:#002769;"> TSD Pen Smooth Ink</label>' +
+            '<label style="display:inline-flex;align-items:center;gap:4px;"><input type="checkbox" id="tsd-st-recolor" style="accent-color:#002769;"> Tone Ink</label>' +
+          '</div>' +
+          '<div id="tsd-st-up-prev" style="min-height:92px;border:1px dashed #cbd5e1;background:repeating-conic-gradient(#f1f5f9 0% 25%,#fff 0% 50%) 50%/14px 14px;display:flex;align-items:center;justify-content:center;padding:10px;font-size:11px;color:#64748b;">Upload scanned PNG/JPG/WebP or SVG signature…</div>' +
+        '</div>' +
+        '<div id="tsd-st-err" hidden style="color:#991b1b;background:#fef2f2;border:1px solid #fecaca;padding:6px 8px;font-size:11px;"></div>' +
+        '<div style="display:flex;gap:8px;margin-top:2px;">' +
+          '<button type="button" id="tsd-st-reg-apply" style="flex:1.4;padding:8px 10px;background:#002769;color:#fff;border:0;font-size:12px;font-weight:700;cursor:pointer;">Register &amp; Sign Now →</button>' +
+          '<button type="button" id="tsd-st-reg-only" style="flex:1;padding:8px 10px;background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1;font-size:11.5px;font-weight:700;cursor:pointer;">Save to Vault</button>' +
+        '</div>' +
+      '</div>';
     document.body.appendChild(drawer);
 
-    function placeSigNode(htmlStr) {
+    var sigPlacementSel = document.getElementById('tsd-sig-placement');
+    function placeSigNode(htmlStr, kindOverride, placementOverride) {
+      var chosenPlacement = placementOverride || (sigPlacementSel && sigPlacementSel.value) || 'current';
       drawer.remove();
+      if (_tsdFmCtrl) {
+        var created = _tsdFmCtrl.placeMark(htmlStr, {
+          kind: kindOverride || 'signature',
+          placement: chosenPlacement,
+          angle: 0,
+          width: kindOverride === 'initials' ? 112 : 228,
+        });
+        if (created && created.length && typeof showToast === 'function') {
+          showToast(created.length > 1
+            ? ('Applied across all ' + created.length + ' pages (drag or rotate any mark)')
+            : 'Placed on current page — drag anywhere or rotate via top handle');
+        }
+        scheduleSave();
+        setTimeout(save, 0);
+        return;
+      }
       var tmp = document.createElement('div');
       tmp.innerHTML = htmlStr;
       var node = tmp.firstElementChild;
       if (!node || !editor) return;
-      editor.focus();
-      var placed = false;
-      var marksLayer = document.getElementById('tsd-marks-layer');
-      if (window._pmView && marksLayer) {
-        marksLayer.appendChild(node);
-        placed = true;
-      }
-      if (!placed && savedRange && editor.contains(savedRange.startContainer)) {
-        try {
-          var s = window.getSelection();
-          s.removeAllRanges();
-          s.addRange(savedRange);
-          var r = savedRange.cloneRange();
-          r.collapse(false);
-          r.insertNode(node);
-          placed = true;
-        } catch (_e) { placed = false; }
-      }
-      if (!placed) {
-        var p = document.createElement('p');
-        p.style.margin = '12pt 0';
-        p.appendChild(node);
-        editor.appendChild(p);
-      }
-      try { node.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) {}
+      editor.appendChild(node);
       scheduleSave();
       setTimeout(save, 0);
     }
+
+    // Wire Signatures / Initials / + Signature Studio tabs
+    var tabReg = document.getElementById('tsd-sig-tab-reg');
+    var tabInit = document.getElementById('tsd-sig-tab-init');
+    var tabStudio = document.getElementById('tsd-sig-tab-studio');
+    var paneReg = document.getElementById('tsd-sig-pane-reg');
+    var paneInit = document.getElementById('tsd-sig-pane-init');
+    var paneStudio = document.getElementById('tsd-sig-pane-studio');
+    function showSigTab(which) {
+      paneReg.hidden = (which !== 'reg');
+      paneInit.hidden = (which !== 'init');
+      if (paneStudio) paneStudio.hidden = (which !== 'studio');
+      drawer.style.width = (which === 'studio') ? '468px' : '380px';
+      [
+        [tabReg, which === 'reg', '#002769'],
+        [tabInit, which === 'init', '#002769'],
+        [tabStudio, which === 'studio', '#02982E'],
+      ].forEach(function (pair) {
+        var el = pair[0], on = pair[1], col = pair[2];
+        if (!el) return;
+        el.style.borderBottomColor = on ? col : 'transparent';
+        el.style.background = on ? '#fff' : 'transparent';
+        el.style.color = on ? col : (el === tabStudio ? '#02982E' : '#64748b');
+      });
+    }
+    if (tabReg) tabReg.addEventListener('click', function () { showSigTab('reg'); });
+    if (tabInit) tabInit.addEventListener('click', function () { showSigTab('init'); });
+    if (tabStudio) tabStudio.addEventListener('click', function () { showSigTab('studio'); });
+
+    // ── Embedded Signature Studio Engine (Stylus/Pad + USB/HID + TS Vector + Scan Smooth Ink) ──
+    (function initEmbeddedStudio() {
+      if (!paneStudio) return;
+      var stMode = 'stylus_pen';
+      var stInk = '#002769';
+      var stStrokes = [], stCur = null, stLastW = 2.2;
+      var stHqSvg = '', stUpUri = '', stRawImg = null;
+      var stPad = document.getElementById('tsd-st-pad');
+      var stCtx = stPad ? stPad.getContext('2d') : null;
+      var DPR = Math.min(3, window.devicePixelRatio || 2);
+      var LW = 420, LH = 150;
+      if (stPad && stCtx) {
+        stPad.width = LW * DPR; stPad.height = LH * DPR;
+        stCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        stCtx.lineCap = 'round'; stCtx.lineJoin = 'round';
+      }
+      var stTele = document.getElementById('tsd-st-tele');
+      var stUserSel = document.getElementById('tsd-st-user');
+      var stCounts = document.getElementById('tsd-st-counts');
+      var stErr = document.getElementById('tsd-st-err');
+
+      fetch('/api/signatures/studio-meta', { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (m) {
+          if (!m || !m.ok) return;
+          if (stCounts && m.counts) {
+            stCounts.textContent = 'Signatories: ' + m.counts.signatories + ' · Audits: ' + m.counts.usage_logs;
+          }
+          if (stUserSel && Array.isArray(m.staff)) {
+            stUserSel.innerHTML = m.staff.map(function (u) {
+              return '<option value="' + u.id + '"' + (u.is_me ? ' selected' : '') + '>' +
+                String(u.name || u.email).replace(/</g, '&lt;') + (u.is_me ? ' (Me)' : '') + '</option>';
+            }).join('');
+            var me = m.staff.find(function (u) { return u.is_me; });
+            var hqInp = document.getElementById('tsd-st-hq-name');
+            if (me && hqInp && !hqInp.value) { hqInp.value = me.name; renderHq(); }
+          }
+        }).catch(function () {});
+
+      function ptFrom(e) {
+        var r = stPad.getBoundingClientRect();
+        var p = (e.pointerType === 'pen' && e.pressure > 0 && e.pressure < 1) ? e.pressure : 0.5;
+        return { x: (e.clientX - r.left) * (LW / r.width), y: (e.clientY - r.top) * (LH / r.height), p: p, t: e.timeStamp || Date.now(), pt: e.pointerType || 'mouse', w: 2.2 };
+      }
+      function drawSeg(p0, p1, p2) {
+        if (!stCtx) return;
+        var m0x = (p0.x + p1.x) / 2, m0y = (p0.y + p1.y) / 2;
+        var m1x = (p1.x + p2.x) / 2, m1y = (p1.y + p2.y) / 2;
+        stCtx.strokeStyle = stInk;
+        stCtx.lineWidth = ((p0.w || 2.2) + (p2.w || 2.2)) * 0.5;
+        stCtx.beginPath(); stCtx.moveTo(m0x, m0y); stCtx.quadraticCurveTo(p1.x, p1.y, m1x, m1y); stCtx.stroke();
+      }
+      function redrawPad() {
+        if (!stCtx) return;
+        stCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        stCtx.clearRect(0, 0, LW, LH);
+        stStrokes.forEach(function (st) {
+          if (!st.length) return;
+          if (st.length === 1) { stCtx.fillStyle = stInk; stCtx.beginPath(); stCtx.arc(st[0].x, st[0].y, 1.2, 0, Math.PI * 2); stCtx.fill(); return; }
+          drawSeg(st[0], st[0], st[1]);
+          for (var i = 2; i < st.length; i++) drawSeg(st[i - 2], st[i - 1], st[i]);
+          drawSeg(st[st.length - 2], st[st.length - 1], st[st.length - 1]);
+        });
+      }
+      function exportPadSvg() {
+        if (!stStrokes.length) return '';
+        var minX = 9999, minY = 9999, maxX = 0, maxY = 0;
+        stStrokes.forEach(function (st) { st.forEach(function (pt) { if (pt.x < minX) minX = pt.x; if (pt.y < minY) minY = pt.y; if (pt.x > maxX) maxX = pt.x; if (pt.y > maxY) maxY = pt.y; }); });
+        var pad = 12, vx = Math.max(0, Math.floor(minX - pad)), vy = Math.max(0, Math.floor(minY - pad));
+        var vw = Math.max(80, Math.ceil(maxX - minX + pad * 2)), vh = Math.max(40, Math.ceil(maxY - minY + pad * 2));
+        var paths = stStrokes.map(function (st) {
+          if (st.length < 2) return '<circle cx="' + st[0].x.toFixed(1) + '" cy="' + st[0].y.toFixed(1) + '" r="1.4" fill="' + stInk + '"/>';
+          var d = 'M ' + st[0].x.toFixed(1) + ' ' + st[0].y.toFixed(1);
+          for (var i = 1; i < st.length - 1; i++) {
+            var mx = ((st[i].x + st[i + 1].x) / 2).toFixed(1), my = ((st[i].y + st[i + 1].y) / 2).toFixed(1);
+            d += ' Q ' + st[i].x.toFixed(1) + ' ' + st[i].y.toFixed(1) + ' ' + mx + ' ' + my;
+          }
+          var lp = st[st.length - 1];
+          d += ' L ' + lp.x.toFixed(1) + ' ' + lp.y.toFixed(1);
+          return '<path d="' + d + '" fill="none" stroke="' + stInk + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>';
+        }).join('');
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + vx + ' ' + vy + ' ' + vw + ' ' + vh + '" width="' + vw + '" height="' + vh + '">' + paths + '</svg>';
+      }
+      if (stPad) {
+        stPad.addEventListener('pointerdown', function (e) {
+          e.preventDefault();
+          var p = ptFrom(e); stLastW = 2.3; p.w = stLastW;
+          stCur = [p]; stStrokes.push(stCur);
+          stPad.setPointerCapture(e.pointerId);
+          stCtx.fillStyle = stInk; stCtx.beginPath(); stCtx.arc(p.x, p.y, 1.2, 0, Math.PI * 2); stCtx.fill();
+          if (stTele) stTele.textContent = 'Input: ' + p.pt.toUpperCase() + ' · Smooth Bezier Ink Engine active';
+        });
+        stPad.addEventListener('pointermove', function (e) {
+          if (!stCur) return;
+          var raw = ptFrom(e), prev = stCur[stCur.length - 1];
+          var dist = Math.hypot(raw.x - prev.x, raw.y - prev.y);
+          if (dist < 1.5) return;
+          var dt = Math.max(4, raw.t - prev.t), vel = dist / dt;
+          var tw = Math.max(1.2, Math.min(3.4, 2.9 - Math.min(1.8, vel) * 0.85));
+          stLastW = stLastW * 0.65 + tw * 0.35;
+          var np = { x: prev.x * 0.3 + raw.x * 0.7, y: prev.y * 0.3 + raw.y * 0.7, p: raw.p, t: raw.t, pt: raw.pt, w: stLastW };
+          stCur.push(np);
+          var n = stCur.length;
+          if (n === 2) drawSeg(stCur[0], stCur[0], stCur[1]);
+          else drawSeg(stCur[n - 3], stCur[n - 2], stCur[n - 1]);
+          if (stTele) stTele.textContent = 'Input: ' + np.pt.toUpperCase() + ' · ' + stStrokes.length + ' stroke(s) · SVG Bezier ready';
+        });
+        function endSt() { stCur = null; }
+        stPad.addEventListener('pointerup', endSt);
+        stPad.addEventListener('pointercancel', endSt);
+      }
+
+      function renderHq() {
+        var nm = ((document.getElementById('tsd-st-hq-name') || {}).value || '').trim();
+        var font = ((document.getElementById('tsd-st-hq-style') || {}).value || 'Great Vibes');
+        var prev = document.getElementById('tsd-st-hq-prev');
+        if (!nm) { stHqSvg = ''; if (prev) prev.innerHTML = '<span style="color:#94a3b8;font-size:11px;">Type a name to generate vector signature…</span>'; return; }
+        var safe = nm.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        stHqSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 100" width="380" height="100">' +
+          '<text x="190" y="64" text-anchor="middle" font-family="' + font + ', Georgia, serif" font-style="italic" font-size="42" fill="' + stInk + '">' + safe + '</text>' +
+          '<path d="M 46 80 Q 190 72 334 78" fill="none" stroke="' + stInk + '" stroke-width="1.3" stroke-linecap="round" opacity="0.55"/>' +
+        '</svg>';
+        if (prev) prev.innerHTML = stHqSvg;
+      }
+      var hqNameEl = document.getElementById('tsd-st-hq-name');
+      var hqStyleEl = document.getElementById('tsd-st-hq-style');
+      if (hqNameEl) hqNameEl.addEventListener('input', renderHq);
+      if (hqStyleEl) hqStyleEl.addEventListener('change', renderHq);
+
+      function processScan() {
+        if (!stRawImg) return;
+        var rmBg = !!(document.getElementById('tsd-st-rmbg') && document.getElementById('tsd-st-rmbg').checked);
+        var pen = !!(document.getElementById('tsd-st-pen') && document.getElementById('tsd-st-pen').checked);
+        var rec = !!(document.getElementById('tsd-st-recolor') && document.getElementById('tsd-st-recolor').checked);
+        var sw = stRawImg.naturalWidth || 600, sh = stRawImg.naturalHeight || 240;
+        var sc = Math.min(pen ? 2.0 : 1.0, 1400 / Math.max(sw, sh));
+        var w = Math.max(1, Math.round(sw * sc)), h = Math.max(1, Math.round(sh * sc));
+        var c = document.createElement('canvas'); c.width = w; c.height = h;
+        var cx = c.getContext('2d', { willReadFrequently: true });
+        cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high';
+        cx.drawImage(stRawImg, 0, 0, w, h);
+        if (rmBg) {
+          var id = cx.getImageData(0, 0, w, h), d = id.data;
+          var bgR = 255, bgG = 255, bgB = 255, nS = 0, sR = 0, sG = 0, sB = 0;
+          for (var x = 0; x < w; x += Math.max(1, Math.floor(w / 24))) { var k0 = x * 4; if (d[k0 + 3] > 200) { sR += d[k0]; sG += d[k0 + 1]; sB += d[k0 + 2]; nS++; } }
+          if (nS) { bgR = sR / nS; bgG = sG / nS; bgB = sB / nS; }
+          var bgL = 0.299 * bgR + 0.587 * bgG + 0.114 * bgB;
+          var hHex = stInk.replace('#', ''), hN = parseInt(hHex, 16);
+          var ir = (hN >> 16) & 255, ig = (hN >> 8) & 255, ib = hN & 255;
+          var minX = w, minY = h, maxX = 0, maxY = 0, cnt = 0;
+          for (var py = 0; py < h; py++) {
+            for (var px = 0; px < w; px++) {
+              var i = (py * w + px) * 4;
+              if (d[i + 3] < 10) { d[i + 3] = 0; continue; }
+              var lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+              var str = Math.max(0, bgL - lum) * 1.15;
+              if (str <= 24) { d[i + 3] = 0; } else {
+                var t = Math.min(1, (str - 24) / 48);
+                var a = Math.round(d[i + 3] * t * t * (3 - 2 * t));
+                d[i + 3] = a;
+                if (a > 18) {
+                  if (rec) { d[i] = ir; d[i + 1] = ig; d[i + 2] = ib; }
+                  else { d[i] = Math.round(d[i] * 0.82); d[i + 1] = Math.round(d[i + 1] * 0.82); d[i + 2] = Math.round(d[i + 2] * 0.82); }
+                  if (px < minX) minX = px; if (py < minY) minY = py; if (px > maxX) maxX = px; if (py > maxY) maxY = py; cnt++;
+                }
+              }
+            }
+          }
+          cx.putImageData(id, 0, 0);
+          if (cnt > 20 && maxX > minX && maxY > minY) {
+            var pad = 12, ox = Math.max(0, minX - pad), oy = Math.max(0, minY - pad);
+            var ow = Math.min(w - ox, maxX - minX + pad * 2), oh = Math.min(h - oy, maxY - minY + pad * 2);
+            var oc = document.createElement('canvas'); oc.width = ow; oc.height = oh;
+            oc.getContext('2d').drawImage(c, ox, oy, ow, oh, 0, 0, ow, oh);
+            stUpUri = oc.toDataURL('image/png');
+          } else { stUpUri = c.toDataURL('image/png'); }
+        } else { stUpUri = c.toDataURL('image/png'); }
+        var upPrev = document.getElementById('tsd-st-up-prev');
+        if (upPrev) upPrev.innerHTML = '<img src="' + stUpUri + '" style="max-height:76px;max-width:100%;object-fit:contain;">';
+      }
+      var stFile = document.getElementById('tsd-st-file');
+      if (stFile) stFile.addEventListener('change', function (e) {
+        var f = e.target.files && e.target.files[0]; if (!f) return;
+        var rd = new FileReader();
+        rd.onload = function () {
+          if (f.type === 'image/svg+xml' || /\.svg$/i.test(f.name || '')) {
+            stUpUri = rd.result; stRawImg = null;
+            var upPrev = document.getElementById('tsd-st-up-prev');
+            if (upPrev) upPrev.innerHTML = '<img src="' + stUpUri + '" style="max-height:76px;max-width:100%;">';
+            return;
+          }
+          var im = new Image(); im.onload = function () { stRawImg = im; processScan(); }; im.src = rd.result;
+        };
+        rd.readAsDataURL(f);
+      });
+      ['tsd-st-rmbg', 'tsd-st-pen', 'tsd-st-recolor'].forEach(function (id) {
+        var el = document.getElementById(id); if (el) el.addEventListener('change', processScan);
+      });
+
+      drawer.querySelectorAll('[data-st-mode]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          stMode = btn.getAttribute('data-st-mode');
+          drawer.querySelectorAll('[data-st-mode]').forEach(function (x) {
+            var on = (x === btn);
+            x.style.border = on ? '1.5px solid #002769' : '1px solid #cbd5e1';
+            x.style.background = on ? '#edf2fa' : '#fff';
+            x.style.color = on ? '#002769' : '#475569';
+          });
+          var isPad = (stMode === 'stylus_pen' || stMode === 'device_pad');
+          document.getElementById('tsd-st-box-pad').hidden = !isPad;
+          document.getElementById('tsd-st-box-hq').hidden = (stMode !== 'ts_hq_engine');
+          document.getElementById('tsd-st-box-up').hidden = (stMode !== 'uploaded');
+        });
+      });
+      drawer.querySelectorAll('[data-st-ink]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          stInk = btn.getAttribute('data-st-ink');
+          drawer.querySelectorAll('[data-st-ink]').forEach(function (x) { x.style.borderColor = (x === btn) ? '#0f172a' : 'transparent'; });
+          redrawPad(); renderHq(); processScan();
+        });
+      });
+      var stUndo = document.getElementById('tsd-st-undo');
+      var stClear = document.getElementById('tsd-st-clear');
+      if (stUndo) stUndo.addEventListener('click', function () { stStrokes.pop(); redrawPad(); });
+      if (stClear) stClear.addEventListener('click', function () { stStrokes = []; redrawPad(); });
+
+      function submitStudio(applyNow, btnEl) {
+        if (stErr) { stErr.hidden = true; stErr.textContent = ''; }
+        var sigData = (stMode === 'ts_hq_engine') ? stHqSvg : (stMode === 'uploaded' ? stUpUri : exportPadSvg());
+        if (!sigData) {
+          if (stErr) { stErr.textContent = 'Please draw, type, or upload your signature first.'; stErr.hidden = false; }
+          return;
+        }
+        var sigType = (stMode === 'uploaded') ? 'uploaded' : (stMode === 'ts_hq_engine' ? 'text' : 'drawn');
+        btnEl.disabled = true;
+        var origTxt = btnEl.textContent;
+        btnEl.textContent = 'Saving…';
+        fetch('/api/signatures/register-json', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+          body: JSON.stringify({
+            user_id: stUserSel ? Number(stUserSel.value) : null,
+            name: (document.getElementById('tsd-st-name') || {}).value || 'Official Signature',
+            initials_data: (document.getElementById('tsd-st-initials') || {}).value || '',
+            signature_type: sigType,
+            capture_engine: stMode,
+            signature_data: sigData,
+            is_default: !!(document.getElementById('tsd-st-default') && document.getElementById('tsd-st-default').checked),
+            approve_now: !!(document.getElementById('tsd-st-approve') && document.getElementById('tsd-st-approve').checked),
+            apply_now: applyNow,
+            document_id: tsdId || null,
+            document_title: (shell && shell.dataset && shell.dataset.tsdTitle) || 'TSD Document',
+          }),
+        }).then(function (r) { return r.json().then(function (j) { if (!r.ok || !j.ok) throw new Error((j && j.error) || ('HTTP ' + r.status)); return j; }); })
+          .then(function (res) {
+            btnEl.disabled = false; btnEl.textContent = origTxt;
+            if (res.applied && res.signature_data) {
+              var g = res.signature_data.indexOf('data:image/') === 0
+                ? '<img src="' + res.signature_data + '" alt="Signature" draggable="false" style="max-height:64px;max-width:220px;display:block;pointer-events:none;user-select:none;">'
+                : '<div style="max-width:220px;line-height:0;pointer-events:none;user-select:none;">' + res.signature_data + '</div>';
+              placeSigNode(
+                '<div class="tsd-sig-block ts-sig-doc-protected" data-tsd-sig-id="' + res.signature_id + '" data-tsd-sig-usage="' + res.usage_log_id + '" data-tsd-sig-digest="' + res.signature_digest + '" data-tsd-sig-attestation="' + res.signature_attestation + '" contenteditable="false" oncontextmenu="return false;" style="display:inline-block;vertical-align:bottom;user-select:none;-webkit-user-select:none;">' +
+                  g + '</div>'
+              );
+              if (typeof showToast === 'function') showToast('Signature registered & applied to document (audit #' + res.usage_log_id + ')');
+            } else {
+              if (typeof showToast === 'function') showToast('Signature saved to Vault (' + res.approval_status + ')');
+              showSigTab('reg');
+              _loadSigDrawer();
+            }
+          }).catch(function (err) {
+            btnEl.disabled = false; btnEl.textContent = origTxt;
+            if (stErr) { stErr.textContent = err.message || 'Could not register signature.'; stErr.hidden = false; }
+          });
+      }
+      var btnApply = document.getElementById('tsd-st-reg-apply');
+      var btnSave = document.getElementById('tsd-st-reg-only');
+      if (btnApply) btnApply.addEventListener('click', function () { submitStudio(true, btnApply); });
+      if (btnSave) btnSave.addEventListener('click', function () { submitStudio(false, btnSave); });
+    })();
+
+    // Wire Handwritten Initials 18 fonts + 4 styles + ink + slant + live preview
+    var initStyle = 'cursive', initFont = 'mrs-saint-delafield', initInk = '#002769';
+    var initInput = document.getElementById('tsd-init-text');
+    var initDateCb = document.getElementById('tsd-init-date');
+    var initSlantInp = document.getElementById('tsd-init-slant');
+    var initFontsBox = document.getElementById('tsd-init-fonts');
+    var initStylesBox = document.getElementById('tsd-init-styles');
+    var initLiveBox = document.getElementById('tsd-init-live');
+    var INIT_STYLES = [
+      { id: 'cursive', label: 'Flowing Cursive' },
+      { id: 'fountain', label: 'Fountain Pen' },
+      { id: 'editorial', label: 'Legal Italic' },
+      { id: 'monogram', label: 'Circle Monogram' },
+    ];
+    function renderInitOptions() {
+      var txt = (initInput && initInput.value.trim()) || 'S.O.';
+      var showD = !!(initDateCb && initDateCb.checked);
+      var slant = initSlantInp ? Number(initSlantInp.value) : -5;
+      if (initFontsBox && window.TSFloatingMarks && window.TSFloatingMarks.renderFontGallery) {
+        window.TSFloatingMarks.renderFontGallery(initFontsBox, { sampleText: txt, activeFontId: initFont, ink: initInk, cols: 2 });
+      }
+      if (initStylesBox && window.TSFloatingMarks) {
+        initStylesBox.innerHTML = INIT_STYLES.map(function (st) {
+          var active = st.id === initStyle;
+          var preview = window.TSFloatingMarks.buildHandwrittenInitialsHtml({ initials: txt, style: st.id, font: initFont, ink: initInk, slant: slant, showDate: false });
+          return '<button type="button" data-init-style="' + st.id + '" style="border:1.5px solid ' + (active ? '#002769' : '#d5dce6') + ';background:' + (active ? '#edf2fa' : '#fff') + ';padding:6px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;">' +
+            '<div style="transform:scale(0.76);transform-origin:center;">' + preview + '</div>' +
+            '<span style="font-size:9.5px;font-weight:700;color:#475569;">' + st.label + '</span>' +
+          '</button>';
+        }).join('');
+      }
+      if (initLiveBox && window.TSFloatingMarks) {
+        initLiveBox.innerHTML = window.TSFloatingMarks.buildHandwrittenInitialsHtml({ initials: txt, style: initStyle, font: initFont, ink: initInk, slant: slant, showDate: showD });
+      }
+    }
+    if (initFontsBox) {
+      initFontsBox.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-ts-font-id]');
+        if (!b) return;
+        initFont = b.getAttribute('data-ts-font-id');
+        renderInitOptions();
+      });
+    }
+    if (initStylesBox) {
+      initStylesBox.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-init-style]');
+        if (!b) return;
+        initStyle = b.getAttribute('data-init-style');
+        renderInitOptions();
+      });
+    }
+    drawer.querySelectorAll('[data-init-ink]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        initInk = b.getAttribute('data-init-ink');
+        drawer.querySelectorAll('[data-init-ink]').forEach(function (x) { x.style.borderColor = (x === b) ? '#0f172a' : 'transparent'; });
+        renderInitOptions();
+      });
+    });
+    if (initInput) initInput.addEventListener('input', renderInitOptions);
+    if (initDateCb) initDateCb.addEventListener('change', renderInitOptions);
+    if (initSlantInp) initSlantInp.addEventListener('input', renderInitOptions);
+    renderInitOptions();
+
+    var applyInitBtn = document.getElementById('tsd-init-apply');
+    var applyInitAllBtn = document.getElementById('tsd-init-apply-all');
+    if (applyInitBtn) applyInitBtn.addEventListener('click', function () {
+      var txt = (initInput && initInput.value.trim()) || 'S.O.';
+      var html = window.TSFloatingMarks.buildHandwrittenInitialsHtml({ initials: txt, style: initStyle, font: initFont, ink: initInk, slant: initSlantInp ? Number(initSlantInp.value) : -5, showDate: !!(initDateCb && initDateCb.checked) });
+      placeSigNode(html, 'initials');
+    });
+    if (applyInitAllBtn) applyInitAllBtn.addEventListener('click', function () {
+      var txt = (initInput && initInput.value.trim()) || 'S.O.';
+      var html = window.TSFloatingMarks.buildHandwrittenInitialsHtml({ initials: txt, style: initStyle, font: initFont, ink: initInk, slant: initSlantInp ? Number(initSlantInp.value) : -5, showDate: !!(initDateCb && initDateCb.checked) });
+      placeSigNode(html, 'initials', 'all_br');
+    });
 
     document.getElementById('tsd-sig-close').addEventListener('click', function () { drawer.remove(); });
     document.getElementById('tsd-sig-blank').addEventListener('click', function () {
@@ -2378,10 +2997,19 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
       );
     });
 
-    fetch('/api/signatures/registered', { credentials: 'same-origin' })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(function (data) {
+    function _loadSigDrawer() {
+      var listEl0 = document.getElementById('tsd-sig-list');
+      if (listEl0) listEl0.innerHTML = '<div style="padding:14px;color:#5a6676;font-size:12px;">Loading approved signatures…</div>';
+      (function attempt(n) {
+        return fetch('/api/signatures/registered', { credentials: 'same-origin' })
+          .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+          .catch(function (err) {
+            if (n > 0) return new Promise(function (res) { setTimeout(res, 450 * (3 - n)); }).then(function () { return attempt(n - 1); });
+            throw err;
+          });
+      })(2).then(function (data) {
         var listEl = document.getElementById('tsd-sig-list');
+        if (!listEl) return;
         var sigs = (data && data.signatures) || [];
         if (!sigs.length) {
           listEl.innerHTML = '<div style="padding:18px;text-align:center;border:1px dashed #cbd5e1;">' +
@@ -2393,24 +3021,43 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
         }
         var today = (typeof _todayIsoLocal === 'function') ? _todayIsoLocal() : new Date().toISOString().slice(0, 10);
         listEl.innerHTML = '';
+        var tblWrap = document.createElement('div');
+        tblWrap.style.cssText = 'border:1px solid #dfe5ee;background:#fff;overflow-x:auto;';
+        var tbl = document.createElement('table');
+        tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:11.5px;';
+        tbl.innerHTML =
+          '<thead><tr style="background:#f6f8fb;border-bottom:1px solid #dfe5ee;text-align:left;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;">' +
+            '<th style="padding:7px 8px;">Signatory &amp; Title</th>' +
+            '<th style="padding:7px 6px;">Created</th>' +
+            '<th style="padding:7px 8px;text-align:right;">Action</th>' +
+          '</tr></thead><tbody></tbody>';
+        var tbody = tbl.querySelector('tbody');
         sigs.forEach(function (sg) {
-          var card = document.createElement('div');
-          card.style.cssText = 'border:1px solid #dfe5ee;background:#fff;padding:11px 12px;display:flex;flex-direction:column;gap:7px;';
-          card.innerHTML =
-            '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">' +
-              '<strong style="font-size:12.5px;color:#091e42;">' + String(sg.staff_name || '').replace(/</g, '&lt;') + '</strong>' +
-              '<span style="font-size:10px;background:#e6f6ec;color:#02982E;padding:1px 6px;font-weight:700;">APPROVED · OTP</span>' +
-            '</div>' +
-            '<div style="font-size:11.5px;color:#42526e;">' + String(sg.name || 'Official Signature').replace(/</g, '&lt;') + '</div>' +
-            '<div style="font-size:10.5px;color:#7a869a;">' + String(sg.capture_engine || 'ts_hq_engine').replace(/_/g, ' ').toUpperCase() + ' · Preview locked until Owner OTP verified</div>' +
-            '<div class="tsd-sig-otp-zone" style="display:flex;flex-direction:column;gap:6px;margin-top:2px;">' +
-              '<button type="button" class="tsd-sig-req-btn" style="padding:6px 10px;background:#002769;color:#fff;border:0;font-size:11.5px;font-weight:600;cursor:pointer;">Request Owner OTP to Sign</button>' +
-            '</div>';
-          var reqBtn = card.querySelector('.tsd-sig-req-btn');
-          var zone = card.querySelector('.tsd-sig-otp-zone');
+          var engLabel = String(sg.capture_engine || 'ts_hq_engine').replace(/_/g, ' ').toUpperCase();
+          var tr = document.createElement('tr');
+          tr.style.cssText = 'border-bottom:1px solid #eef2f7;';
+          tr.innerHTML =
+            '<td style="padding:7px 8px;vertical-align:middle;">' +
+              '<div style="font-weight:700;color:#091e42;">' + String(sg.staff_name || '').replace(/</g, '&lt;') + '</div>' +
+              '<div style="font-size:11px;color:#42526e;">' + String(sg.name || 'Official Signature').replace(/</g, '&lt;') + '</div>' +
+              '<span style="font-size:9.5px;background:#e6f6ec;color:#02982E;padding:1px 5px;font-weight:700;">APPROVED · ' + engLabel + '</span>' +
+            '</td>' +
+            '<td style="padding:7px 6px;vertical-align:middle;white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;color:#64748b;">' + String(sg.created_at || '—').replace(/</g, '&lt;') + '</td>' +
+            '<td style="padding:7px 8px;vertical-align:middle;text-align:right;white-space:nowrap;">' +
+              '<button type="button" class="tsd-sig-req-btn" style="padding:5px 8px;background:#002769;color:#fff;border:0;font-size:11px;font-weight:600;cursor:pointer;">Sign (OTP)</button>' +
+            '</td>';
+          var otpTr = document.createElement('tr');
+          otpTr.hidden = true;
+          otpTr.style.cssText = 'background:#f8fafc;border-bottom:1px solid #dfe5ee;';
+          otpTr.innerHTML = '<td colspan="3" style="padding:8px;"><div class="tsd-sig-otp-zone" style="display:flex;flex-direction:column;gap:6px;"></div></td>';
+          tbody.appendChild(tr);
+          tbody.appendChild(otpTr);
+          var reqBtn = tr.querySelector('.tsd-sig-req-btn');
+          var zone = otpTr.querySelector('.tsd-sig-otp-zone');
           reqBtn.addEventListener('click', function () {
+            otpTr.hidden = false;
             reqBtn.disabled = true;
-            reqBtn.textContent = 'Notifying owner & generating OTP…';
+            reqBtn.textContent = 'OTP…';
             fetch('/api/signatures/' + sg.id + '/request-otp', {
               method: 'POST', credentials: 'same-origin',
               headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
@@ -2446,15 +3093,13 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
                   }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); })
                     .then(function (ver) {
                       var sigGraphic = (ver.signature_data && (ver.signature_data.indexOf('data:image/') === 0 || ver.signature_data.indexOf('/static/') === 0))
-                        ? '<img src="' + ver.signature_data + '" alt="Verified Signature" draggable="false" style="max-height:58px;max-width:220px;display:block;margin-bottom:2pt;pointer-events:none;user-select:none;">'
+                        ? '<img src="' + ver.signature_data + '" alt="Signature" draggable="false" style="max-height:64px;max-width:220px;display:block;pointer-events:none;user-select:none;">'
                         : (ver.signature_data && ver.signature_data.indexOf('<svg') !== -1
-                          ? '<div style="max-width:220px;line-height:0;margin-bottom:2pt;pointer-events:none;user-select:none;">' + ver.signature_data + '</div>'
-                          : '<div style="font-family:Georgia,serif;font-style:italic;font-size:22pt;color:#002769;user-select:none;">' + String(ver.staff_name || '').replace(/</g, '&lt;') + '</div>');
+                          ? '<div style="max-width:220px;line-height:0;pointer-events:none;user-select:none;">' + ver.signature_data + '</div>'
+                          : '<div style="font-family:\'Great Vibes\',\'Brush Script MT\',Georgia,serif;font-style:italic;font-size:26pt;color:#002769;line-height:1.1;user-select:none;">' + String(ver.staff_name || '').replace(/</g, '&lt;') + '</div>');
                       placeSigNode(
-                        '<div class="tsd-sig-block ts-sig-doc-protected" data-tsd-sig-id="' + ver.signature_id + '" data-tsd-sig-usage="' + ver.usage_log_id + '" data-tsd-sig-digest="' + ver.signature_digest + '" data-tsd-sig-attestation="' + ver.signature_attestation + '" contenteditable="false" oncontextmenu="return false;" style="margin:14pt 0 8pt;display:inline-block;vertical-align:bottom;min-width:200pt;user-select:none;-webkit-user-select:none;">' +
+                        '<div class="tsd-sig-block ts-sig-doc-protected" data-tsd-sig-id="' + ver.signature_id + '" data-tsd-sig-usage="' + ver.usage_log_id + '" data-tsd-sig-digest="' + ver.signature_digest + '" data-tsd-sig-attestation="' + ver.signature_attestation + '" contenteditable="false" oncontextmenu="return false;" style="display:inline-block;vertical-align:bottom;user-select:none;-webkit-user-select:none;">' +
                           sigGraphic +
-                          '<div style="border-top:1px solid #1d3648;padding-top:3pt;font-size:9pt;font-weight:700;color:#091e42;">' + String(ver.staff_name || '').replace(/</g, '&lt;') + '</div>' +
-                          '<div style="font-size:8pt;color:#5a6676;">' + String(ver.name || 'Authorized Signatory').replace(/</g, '&lt;') + ' · OTP Verified #' + ver.usage_log_id + ' · ' + today + '</div>' +
                         '</div>'
                       );
                       if (typeof showToast === 'function') showToast('OTP verified & signature applied (audit #' + ver.usage_log_id + ')');
@@ -2466,22 +3111,33 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
                 });
               }).catch(function (err) {
                 reqBtn.disabled = false;
-                reqBtn.textContent = 'Request Owner OTP to Sign';
+                reqBtn.textContent = 'Sign (OTP)';
                 alert(err.message);
               });
           });
-          listEl.appendChild(card);
         });
+        tblWrap.appendChild(tbl);
+        listEl.appendChild(tblWrap);
       })
       .catch(function (e) {
         var listEl = document.getElementById('tsd-sig-list');
-        if (listEl) listEl.textContent = 'Could not load signatures: ' + e.message;
+        if (listEl) {
+          listEl.innerHTML = '<div style="padding:14px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
+            '<span>Could not load signatures (' + String(e && e.message || 'network error').replace(/</g, '&lt;') + ').</span>' +
+            '<button type="button" id="tsd-sig-retry" style="padding:4px 10px;border:1px solid #991b1b;background:#fff;color:#991b1b;font-weight:600;cursor:pointer;">Retry</button>' +
+          '</div>';
+          var rb = document.getElementById('tsd-sig-retry');
+          if (rb) rb.addEventListener('click', _loadSigDrawer);
+        }
       });
+    }
+    _loadSigDrawer();
   }
   function insertFieldVar() {
-    var n = prompt('Variable name', 'client_name'); if (!n) return;
+    var n = prompt('Field name (e.g. client_name, document_ref, effective_date)', 'client_name'); if (!n) return;
     var safe = String(n).replace(/[^\w]/g, '_');
-    insertHTML('<span style="background:#eef3fa;color:#0f3b82;border:1px solid #cfdcef;padding:1px 6px;border-radius:3px;font-family:monospace;font-size:10pt;">{' + '{' + safe + '}' + '}</span>');
+    var label = (window.TSInteractiveFields && window.TSInteractiveFields.humanizeKey(safe)) || safe;
+    insertHTML('<span class="ts-field-chip is-empty" data-field-key="' + safe + '" data-field-label="' + label + '" contenteditable="false">' + label + '</span>&nbsp;');
   }
 
   // ---- Stamp picker (Insert ▸ Stamp) ----
@@ -2773,71 +3429,42 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
     }
   }
 
-  function _insertStampNodeIntoEditor(wrapperHtml) {
+  function _insertStampNodeIntoEditor(wrapperHtml, stampObj) {
+    var placeSel = document.getElementById('tsd-stamp-placement');
+    var angleSel = document.getElementById('tsd-stamp-angle');
+    var chosenPlacement = (placeSel && placeSel.value) || 'current';
+    var chosenAngle = parseFloat((angleSel && angleSel.value) || '-12');
+    if (isNaN(chosenAngle)) chosenAngle = -12;
     closeStampPicker();
+
+    if (_tsdFmCtrl) {
+      var created = _tsdFmCtrl.placeMark(wrapperHtml, {
+        kind: 'stamp',
+        stampObj: stampObj || null,
+        placement: chosenPlacement,
+        angle: chosenAngle,
+      });
+      _savedStampRange = null;
+      if (created && created.length) {
+        created[0].classList.add('tsd-verify-flash');
+        setTimeout(function () { created[0].classList.remove('tsd-verify-flash'); }, 1400);
+        if (typeof showToast === 'function') {
+          showToast(created.length > 1
+            ? ('Stamp affixed across all ' + created.length + ' pages — drag or rotate any stamp')
+            : 'Stamp placed on current page — drag over content or rotate via top knob');
+        }
+      }
+      scheduleSave();
+      setTimeout(save, 0);
+      return;
+    }
+
     var tmp = document.createElement('div');
     tmp.innerHTML = wrapperHtml;
     var node = tmp.firstElementChild;
     if (!node || !editor) return;
-
-    // Guarantee the SVG inside the stamp wrapper has explicit visible dimensions.
-    var svgEl = node.querySelector('svg');
-    if (svgEl) {
-      if (!svgEl.getAttribute('viewBox')) {
-        var wAttr = parseFloat(svgEl.getAttribute('width')) || 160;
-        var hAttr = parseFloat(svgEl.getAttribute('height')) || 160;
-        svgEl.setAttribute('viewBox', '0 0 ' + wAttr + ' ' + hAttr);
-      }
-      svgEl.style.display = 'block';
-      svgEl.style.width = '168px';
-      svgEl.style.maxWidth = '100%';
-      svgEl.style.height = 'auto';
-      svgEl.style.overflow = 'visible';
-    }
-
-    editor.focus();
-    var inserted = false;
-    var marksLayer = document.getElementById('tsd-marks-layer');
-    if (window._pmView && marksLayer) {
-      marksLayer.appendChild(node);
-      inserted = true;
-    }
-    if (!inserted && _savedStampRange && editor.contains(_savedStampRange.startContainer)) {
-      try {
-        var sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(_savedStampRange);
-        var r = _savedStampRange.cloneRange();
-        r.collapse(false);
-        r.insertNode(node);
-        // Move caret right after the inserted stamp
-        var after = document.createRange();
-        after.setStartAfter(node);
-        after.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(after);
-        inserted = true;
-      } catch (_err) {
-        inserted = false;
-      }
-    }
-    if (!inserted) {
-      var p = document.createElement('p');
-      p.style.margin = '12pt 0';
-      p.appendChild(node);
-      var footer = editor.querySelector('.tsd-letterhead-footer');
-      if (footer && footer.parentNode === editor) {
-        editor.insertBefore(p, footer);
-      } else {
-        editor.appendChild(p);
-      }
-    }
+    editor.appendChild(node);
     _savedStampRange = null;
-    try {
-      node.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      node.classList.add('tsd-verify-flash');
-      setTimeout(function () { node.classList.remove('tsd-verify-flash'); }, 1400);
-    } catch (_e) {}
     scheduleSave();
     setTimeout(save, 0);
   }
@@ -2945,20 +3572,20 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
         ' data-tsd-stamp-nonce="' + receipt.nonce + '"' +
         ' data-tsd-stamp-date="' + chosenDate + '"' +
         sigAttrs +
-        ' style="display:inline-block;vertical-align:middle;margin:6pt;width:168px;max-width:220px;"' +
+        ' style="display:inline-block;vertical-align:middle;"' +
         ' contenteditable="false" title="TSD Forensically Sealed Stamp (' + chosenDate + ') · receipt #' + receipt.receipt_id + fpBadge + '">' +
         stamped + '</span>';
-      _insertStampNodeIntoEditor(wrapper);
+      _insertStampNodeIntoEditor(wrapper, stampObj);
       _saveRecent(sid);
       if (typeof showToast === 'function') showToast('Stamp sealed & inserted (' + chosenDate + ')' + (sigUsageId ? ' with verified signature' : '') + ' · receipt #' + receipt.receipt_id + fpBadge);
     }).catch(function (e) {
       var wrapper =
         '<span class="tsd-stamp-mark tsd-stamp-mark--unsigned"' +
         ' data-tsd-stamp-date="' + chosenDate + '"' +
-        ' style="display:inline-block;vertical-align:middle;margin:6pt;width:168px;max-width:220px;"' +
+        ' style="display:inline-block;vertical-align:middle;"' +
         ' contenteditable="false" title="Stamp (' + chosenDate + ') — signing service unavailable">' +
         svgMarkup + '</span>';
-      _insertStampNodeIntoEditor(wrapper);
+      _insertStampNodeIntoEditor(wrapper, stampObj);
       _saveRecent(sid);
       if (typeof showToast === 'function') showToast('Stamp inserted (' + chosenDate + '): ' + e.message);
     });
@@ -3106,15 +3733,30 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
     document.querySelectorAll('#tsd-stamp-overlay [data-stamp-kind]').forEach(function (b) {
       b.classList.toggle('ts-is-active', b.getAttribute('data-stamp-kind') === 'all');
     });
-    document.getElementById('tsd-stamp-grid').innerHTML =
-      '<li class="ts-stamp-picker-empty">Loading…</li>';
-    fetch('/api/tsd-stamps/', { credentials: 'same-origin' })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(function (items) { _stampCache = items; _renderStampPicker(); })
-      .catch(function (e) {
-        document.getElementById('tsd-stamp-grid').innerHTML =
-          '<li class="ts-stamp-picker-empty">Failed to load: ' + e.message + '</li>';
+    function _loadStampsIntoPicker() {
+      var gEl = document.getElementById('tsd-stamp-grid');
+      if (gEl) gEl.innerHTML = '<li class="ts-stamp-picker-empty">Loading stamps…</li>';
+      (function attempt(n) {
+        return fetch('/api/tsd-stamps/', { credentials: 'same-origin' })
+          .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+          .catch(function (err) {
+            if (n > 0) return new Promise(function (res) { setTimeout(res, 450 * (3 - n)); }).then(function () { return attempt(n - 1); });
+            throw err;
+          });
+      })(2).then(function (items) {
+        _stampCache = items;
+        _renderStampPicker();
+      }).catch(function (e) {
+        var grid = document.getElementById('tsd-stamp-grid');
+        if (grid) {
+          grid.innerHTML = '<li class="ts-stamp-picker-empty">Could not load stamps (' + String(e && e.message || 'network error').replace(/</g, '&lt;') + '). ' +
+            '<button type="button" id="tsd-stamp-retry" style="margin-left:8px;padding:3px 10px;border:1px solid #002769;background:#fff;color:#002769;font-weight:600;cursor:pointer;">Retry</button></li>';
+          var rb = document.getElementById('tsd-stamp-retry');
+          if (rb) rb.addEventListener('click', _loadStampsIntoPicker);
+        }
       });
+    }
+    _loadStampsIntoPicker();
     if (search) setTimeout(function () { search.focus(); }, 30);
   }
   function closeStampPicker() {
@@ -3237,15 +3879,18 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
       });
     }
 
-    var TOP_GAP = 14; // crisp executive breathing room below letterhead header/divider
-    var BOT_GAP = 16; // crisp breathing room above letterhead footer rule
-    var finalTop = Math.max(24, Math.ceil(maxHdrBottom) + TOP_GAP);
-    var finalBot = Math.max(24, Math.ceil(maxFtrHeight) + BOT_GAP);
+    var TOP_GAP = 16; // crisp executive breathing room below letterhead header/divider
+    var BOT_GAP = 18; // crisp breathing room above letterhead footer rule
+    var pageH = (typeof _getPageHeightPx === 'function') ? _getPageHeightPx() : 1123;
+    var finalTop = Math.min(Math.round(pageH * 0.30), Math.max(72, Math.ceil(maxHdrBottom) + TOP_GAP));
+    var finalBot = Math.min(Math.round(pageH * 0.20), Math.max(64, Math.ceil(maxFtrHeight) + BOT_GAP));
     printable.style.paddingTop = finalTop + 'px';
     printable.style.paddingBottom = finalBot + 'px';
+    if (typeof _schedulePagination === 'function') _schedulePagination();
   }
 
   function clearLetterheadDesignFromPage() {
+    window._tsdActiveLetterhead = null;
     if (_lhAutogapObserver) { try { _lhAutogapObserver.disconnect(); } catch (_e) {} _lhAutogapObserver = null; }
     var layer = document.getElementById('tsd-lh-design-layer');
     if (layer) layer.innerHTML = '';
@@ -3306,8 +3951,13 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
       if (lay.orientation) { pageOrient = String(lay.orientation).toLowerCase(); }
       if (lay.margin_mm) {
         var cmVal = Math.max(1.0, Math.min(3.5, parseFloat(lay.margin_mm) / 10));
+        var cmValY = lay.margin_y_mm ? Math.max(1.0, Math.min(3.5, parseFloat(lay.margin_y_mm) / 10)) : cmVal;
         pageMargin = cmVal;
-        pageMarginY = cmVal;
+        pageMarginY = cmValY;
+        pageMarginL = cmVal;
+        pageMarginR = cmVal;
+        pageMarginT = cmValY;
+        pageMarginB = cmValY;
       }
       applyPageSize();
       applyMargins();
@@ -3443,10 +4093,13 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
       }
 
       var topStripeHtml = (topBarPx > 0 && !isBleedHdr)
-        ? '<div style="height:' + topBarPx + 'px;width:100%;background:linear-gradient(90deg,' + accent + ' 72%,' + brand2 + ' 72%);margin-bottom:18px;"></div>'
+        ? '<div style="height:' + topBarPx + 'px;width:100%;background:linear-gradient(90deg,' + accent + ' 72%,' + brand2 + ' 72%);margin-bottom:14px;"></div>'
         : '';
-      var hdrTopOffset = (!isBleedHdr && topBarPx === 0) ? ('padding-top:' + padY + 'px;') : '';
-      html += '<header id="tsd-lh-chrome-hdr" role="banner" style="position:absolute;top:0;left:0;right:0;pointer-events:auto;z-index:2;' + hdrTopOffset + '">' + topStripeHtml + hdrInner + divHtml + '</header>';
+      var hdrTopOffset = (!isBleedHdr && topBarPx === 0) ? ('padding-top:' + Math.min(28, padY) + 'px;') : '';
+      var page1HdrHtml = '<header id="tsd-lh-chrome-hdr" role="banner" style="position:absolute;top:0;left:0;right:0;pointer-events:none;z-index:1;' + hdrTopOffset + '">' + topStripeHtml + hdrInner + divHtml + '</header>';
+      var contHdrHtml = '<div style="position:absolute;top:0;left:0;right:0;pointer-events:none;z-index:1;">' +
+        '<div style="height:' + Math.max(3, Math.min(6, topBarPx || 4)) + 'px;width:100%;background:linear-gradient(90deg,' + accent + ' 72%,' + brand2 + ' 72%);"></div>' +
+      '</div>';
 
       // ---- Full Letterhead Footer Chrome (Full-Width Rule + Footer Disclosure + Bottom Stripe) ----
       var showFtr = lay.show_footer !== false;
@@ -3464,29 +4117,52 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
       var ftrRuleHtml = (lay.show_footer_rule !== false && !isDarkFtr)
         ? '<div style="width:100%;border-top:1px solid rgba(15,23,42,0.16);"></div>'
         : '';
-      var ftrBodyHtml = '';
-      if (showFtr) {
-        var fText = _escLh(lay.footer_text || '') || regLine || _escLh(lay.org_name || '');
-        var rBits = [];
-        if (lay.show_page_numbers) rBits.push('Page 1 of 1');
-        if (lay.show_trust_badge !== false) rBits.push('Verified · TrustSeal Document');
-        var fRight = rBits.length ? ('<span style="color:' + fMut + ';white-space:nowrap;">' + rBits.join(' · ') + '</span>') : '';
-        var fRow = (lay.footer_layout === 'centered' || elAlign.footer_content === 'center')
-          ? ('<div style="text-align:center;"><div contenteditable="true" spellcheck="false" title="Document Footer · Click to adjust" style="outline:none;">' + fText + '</div>' + (fRight ? '<div contenteditable="true" spellcheck="false" style="outline:none;margin-top:2px;">' + fRight + '</div>' : '') + '</div>')
-          : ('<div style="display:flex;justify-content:space-between;gap:10px;"><span contenteditable="true" spellcheck="false" title="Document Footer · Click to adjust" style="outline:none;">' + fText + '</span>' + (fRight ? '<span contenteditable="true" spellcheck="false" style="outline:none;">' + fRight + '</span>' : '') + '</div>');
-        ftrBodyHtml = '<div style="font-size:' + (lay.footer_font_pt || 8) + 'pt;color:' + fInk + ';padding:' + fPadY + 'px ' + padX + 'px;' + fBgCss + elStyle('footer_content') + '">' +
-          (lay.directors ? '<div contenteditable="true" spellcheck="false" style="outline:none;color:' + fMut + ';margin-bottom:2px;"><strong>Directors / Officers:</strong> ' + _escLh(lay.directors) + '</div>' : '') +
-          (lay.bank_details ? '<div contenteditable="true" spellcheck="false" style="outline:none;color:' + fMut + ';margin-bottom:2px;"><strong>Banking:</strong> ' + _escLh(lay.bank_details) + '</div>' : '') +
-          fRow + '</div>';
-      }
       var botBarHtml = lay.show_bottom_bar
         ? '<div style="height:' + (parseInt(lay.bottom_bar_px || '5', 10) || 5) + 'px;width:100%;background:linear-gradient(90deg,' + accent + ' 72%,' + brand2 + ' 72%);"></div>'
         : '';
-      if (ftrRuleHtml || ftrBodyHtml || botBarHtml) {
-        html += '<footer id="tsd-lh-chrome-ftr" role="contentinfo" style="position:absolute;bottom:0;left:0;right:0;pointer-events:auto;z-index:2;">' + ftrRuleHtml + ftrBodyHtml + botBarHtml + '</footer>';
+
+      function buildSheetFooterHtml(pageNum, totalPages) {
+        var ftrBodyHtml = '';
+        if (showFtr) {
+          var fText = _escLh(lay.footer_text || '') || regLine || _escLh(lay.org_name || '');
+          var rBits = [];
+          if (lay.show_page_numbers || totalPages > 1) rBits.push('Page ' + pageNum + ' of ' + totalPages);
+          if (lay.show_trust_badge !== false) rBits.push('Verified · TrustSeal Document');
+          var fRight = rBits.length ? ('<span style="color:' + fMut + ';white-space:nowrap;">' + rBits.join(' · ') + '</span>') : '';
+          var fRow = (lay.footer_layout === 'centered' || elAlign.footer_content === 'center')
+            ? ('<div style="text-align:center;"><div>' + fText + '</div>' + (fRight ? '<div style="margin-top:2px;">' + fRight + '</div>' : '') + '</div>')
+            : ('<div style="display:flex;justify-content:space-between;gap:10px;"><span>' + fText + '</span>' + (fRight ? '<span>' + fRight + '</span>' : '') + '</div>');
+          ftrBodyHtml = '<div style="font-size:' + (lay.footer_font_pt || 8) + 'pt;color:' + fInk + ';padding:' + fPadY + 'px ' + padX + 'px;' + fBgCss + elStyle('footer_content') + '">' +
+            (lay.directors ? '<div style="color:' + fMut + ';margin-bottom:2px;"><strong>Directors / Officers:</strong> ' + _escLh(lay.directors) + '</div>' : '') +
+            (lay.bank_details ? '<div style="color:' + fMut + ';margin-bottom:2px;"><strong>Banking:</strong> ' + _escLh(lay.bank_details) + '</div>' : '') +
+            fRow + '</div>';
+        }
+        if (!(ftrRuleHtml || ftrBodyHtml || botBarHtml)) return '';
+        var ftrId = (pageNum === 1) ? ' id="tsd-lh-chrome-ftr"' : '';
+        return '<footer' + ftrId + ' role="contentinfo" style="position:absolute;bottom:0;left:0;right:0;pointer-events:none;z-index:1;">' + ftrRuleHtml + ftrBodyHtml + botBarHtml + '</footer>';
       }
 
-      layer.innerHTML = html;
+      // Render exact-proportion per-sheet letterhead stationery so patterns & rows NEVER stretch across pages
+      var bgHtml = html;
+      window._tsdRenderLhSheets = function () {
+        if (!layer || !page.hasAttribute('data-tsd-lh-applied')) return;
+        var meta = window._tsdPageMeta || { pageH: (typeof _getPageHeightPx === 'function' ? _getPageHeightPx() : 1123), gap: 22, pageCount: 1 };
+        var pH = meta.pageH || 1123;
+        var gap = meta.gap || 22;
+        var count = Math.max(1, meta.pageCount || 1);
+        var out = '';
+        for (var p = 0; p < count; p++) {
+          var topY = p * (pH + gap);
+          out += '<div class="tsd-lh-sheet" data-lh-page="' + (p + 1) + '" style="position:absolute;left:0;right:0;top:' + topY + 'px;height:' + pH + 'px;overflow:hidden;pointer-events:none;z-index:1;background:' + (lay.paper_bg || '#ffffff') + ';">' +
+            bgHtml +
+            (p === 0 ? page1HdrHtml : contHdrHtml) +
+            buildSheetFooterHtml(p + 1, count) +
+          '</div>';
+        }
+        layer.innerHTML = out;
+      };
+      window._tsdActiveLetterhead = lh;
+      window._tsdRenderLhSheets();
 
       // Hide default permanent footer while Letterhead chrome is active so there is no double footer
       var defFooter = document.getElementById('tsd-pagefooter');
@@ -3861,14 +4537,22 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
     drawRulers();
     if (typeof _syncDocumentPagination === 'function') _syncDocumentPagination();
   }
-  function applyMargins() {
-    var px = Math.round(pageMargin * 37.8);     // 1 cm = 37.8 px at 96dpi
-    var py = Math.round(pageMarginY * 37.8);
-    shell.style.setProperty('--ed-margx', px + 'px');
-    shell.style.setProperty('--ed-margy', py + 'px');
+  function applyMargins(skipPaginate) {
+    var pL = Math.round(pageMarginL * 37.8);     // 1 cm = 37.8 px at 96dpi
+    var pR = Math.round(pageMarginR * 37.8);
+    var pT = Math.round(pageMarginT * 37.8);
+    var pB = Math.round(pageMarginB * 37.8);
+    pageMargin  = (pageMarginL + pageMarginR) / 2;
+    pageMarginY = (pageMarginT + pageMarginB) / 2;
+    shell.style.setProperty('--ed-margl', pL + 'px');
+    shell.style.setProperty('--ed-margr', pR + 'px');
+    shell.style.setProperty('--ed-margt', pT + 'px');
+    shell.style.setProperty('--ed-margb', pB + 'px');
+    shell.style.setProperty('--ed-margx', Math.round(pageMargin * 37.8) + 'px');
+    shell.style.setProperty('--ed-margy', Math.round(pageMarginY * 37.8) + 'px');
     updateBadge();
     drawRulers();
-    if (typeof _syncDocumentPagination === 'function') _syncDocumentPagination();
+    if (!skipPaginate && typeof _syncDocumentPagination === 'function') _syncDocumentPagination();
   }
   function updateBadge() {
     var labels = {
@@ -3882,28 +4566,72 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
     var pair = labels[pageSize] || [pageSize.toUpperCase(), pageSize.toUpperCase()];
     var or = pageOrient.charAt(0).toUpperCase() + pageOrient.slice(1);
     var u = unit === 'cm' ? ' cm' : ' in';
-    var m = unit === 'cm' ? pageMargin.toFixed(1).replace(/\.0$/, '') : (pageMargin / 2.54).toFixed(2);
-    badge.textContent = pair[0] + ' · ' + or + ' · Margins: ' + m + u;
+    var fmt = function (cm) {
+      return unit === 'cm' ? cm.toFixed(2).replace(/\.?0+$/, '') : (cm / 2.54).toFixed(2).replace(/\.?0+$/, '');
+    };
+    var uniform = Math.abs(pageMarginL - pageMarginR) < 0.05 && Math.abs(pageMarginL - pageMarginT) < 0.05 && Math.abs(pageMarginT - pageMarginB) < 0.05;
+    var mLabel = uniform
+      ? (fmt(pageMarginL) + u)
+      : ('L ' + fmt(pageMarginL) + ' · R ' + fmt(pageMarginR) + u);
+    badge.textContent = pair[0] + ' · ' + or + ' · Margins: ' + mLabel;
     var sbSize = document.getElementById('tsd-sb-pagesize');
     if (sbSize) sbSize.textContent = pair[1] + (pageOrient === 'landscape' ? ' · Landscape' : '');
   }
 
-  // ===================================================================== RULERS
-  function drawRulers() {
-    hruler.innerHTML = ''; vruler.innerHTML = '';
-    var rect = page.getBoundingClientRect();
-    var w = rect.width, h = rect.height;
-    if (w === 0 || h === 0) return;
-    var mPx = parseFloat(getComputedStyle(shell).getPropertyValue('--ed-margx')) || 76;
-    var myPx = parseFloat(getComputedStyle(shell).getPropertyValue('--ed-margy')) || 94;
+  // ===================================================================== RULERS (Multi-page + Interactive Margin Resize)
+  var _rulerGuideEl = null;
+  var _rulerTipEl = null;
+  var _rulerDragActive = false;
 
+  function _ensureRulerOverlays() {
+    if (!_rulerGuideEl) {
+      _rulerGuideEl = document.createElement('div');
+      _rulerGuideEl.className = 'tsd-ruler-guide';
+      _rulerGuideEl.hidden = true;
+      page.appendChild(_rulerGuideEl);
+    }
+    if (!_rulerTipEl) {
+      _rulerTipEl = document.createElement('div');
+      _rulerTipEl.className = 'tsd-ruler-tip';
+      _rulerTipEl.hidden = true;
+      document.body.appendChild(_rulerTipEl);
+    }
+  }
+
+  function drawRulers() {
+    if (!hruler || !vruler || !page) return;
+    hruler.innerHTML = ''; vruler.innerHTML = '';
+    var w = page.offsetWidth || Math.round(page.getBoundingClientRect().width);
+    var pageH = (typeof _getPageHeightPx === 'function') ? _getPageHeightPx() : (parseFloat(getComputedStyle(page).getPropertyValue('--ed-pageh')) || 1123);
+    if (w <= 0 || pageH <= 0) return;
+
+    var meta = window._tsdPageMeta || { pageH: pageH, gap: 22, pageCount: 1 };
+    var GAP = meta.gap || 22;
+    var pageCount = Math.max(1, meta.pageCount || 1);
+    var totalH = pageCount * pageH + (pageCount - 1) * GAP;
+
+    // Sync ruler container dimensions strictly to unzoomed paper width & full multi-page height
+    hruler.style.width = w + 'px';
+    vruler.style.height = totalH + 'px';
+
+    var csShell = getComputedStyle(shell);
+    var mL = Math.max(16, parseFloat(csShell.getPropertyValue('--ed-margl')) || 96);
+    var mR = Math.max(16, parseFloat(csShell.getPropertyValue('--ed-margr')) || 96);
+    var mT = Math.max(16, parseFloat(csShell.getPropertyValue('--ed-margt')) || 96);
+    var mB = Math.max(16, parseFloat(csShell.getPropertyValue('--ed-margb')) || 96);
+
+    var RH = 20;
     var hs = document.createElementNS(NS, 'svg');
-    hs.setAttribute('viewBox', '0 0 ' + w + ' 18');
+    hs.setAttribute('viewBox', '0 0 ' + w + ' ' + RH);
+    hs.setAttribute('width', String(w));
+    hs.setAttribute('height', String(RH));
     hs.setAttribute('preserveAspectRatio', 'none');
     hruler.appendChild(hs);
 
     var vs = document.createElementNS(NS, 'svg');
-    vs.setAttribute('viewBox', '0 0 18 ' + h);
+    vs.setAttribute('viewBox', '0 0 ' + RH + ' ' + totalH);
+    vs.setAttribute('width', String(RH));
+    vs.setAttribute('height', String(totalH));
     vs.setAttribute('preserveAspectRatio', 'none');
     vruler.appendChild(vs);
 
@@ -3915,41 +4643,180 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
       return n;
     }
 
-    el(hs, 'rect', { x: 0, y: 0, width: mPx, height: 18, fill: '#e4eaf0' });
-    el(hs, 'rect', { x: w - mPx, y: 0, width: mPx, height: 18, fill: '#e4eaf0' });
-    el(vs, 'rect', { x: 0, y: 0, width: 18, height: myPx, fill: '#e4eaf0' });
-    el(vs, 'rect', { x: 0, y: h - myPx, width: 18, height: myPx, fill: '#e4eaf0' });
-
-    var horCountCm  = unit === 'cm' ? (w / 37.8) : (w / 96);
-    var vertCountCm = unit === 'cm' ? (h / 37.8) : (h / 96);
+    var pxPerUnit = unit === 'cm' ? 37.8 : 96;
     var step = unit === 'cm' ? 0.25 : 0.125;
 
-    for (var n = 0; n <= horCountCm + 1e-7; n += step) {
-      var x = (n / horCountCm) * w;
+    // ── Horizontal ruler (obeys current paper width & independent left/right margins) ──
+    el(hs, 'rect', { x: 0, y: 0, width: mL, height: RH, fill: '#e2e8f0' });
+    el(hs, 'rect', { x: w - mR, y: 0, width: mR, height: RH, fill: '#e2e8f0' });
+    el(hs, 'line', { x1: mL, y1: 0, x2: mL, y2: RH, stroke: '#94a3b8', 'stroke-width': 0.8 });
+    el(hs, 'line', { x1: w - mR, y1: 0, x2: w - mR, y2: RH, stroke: '#94a3b8', 'stroke-width': 0.8 });
+
+    var horCount = w / pxPerUnit;
+    for (var n = 0; n <= horCount + 1e-6; n += step) {
+      var x = n * pxPerUnit;
       var major = Math.abs(n - Math.round(n)) < 0.01;
       var half  = Math.abs(n * 2 - Math.round(n * 2)) < 0.01;
       var len = major ? 7 : half ? 5 : 3;
-      el(hs, 'line', { x1: x, y1: 18 - len, x2: x, y2: 18, stroke: major ? '#667889' : '#9daab6', 'stroke-width': major ? 0.9 : 0.6 });
-      if (major && n > 0 && n < horCountCm) {
-        el(hs, 'text', { x: x, y: 7, 'text-anchor': 'middle', 'font-size': 7, fill: '#667889', 'font-family': 'Arial' }, String(Math.round(n)));
+      el(hs, 'line', { x1: x, y1: RH - len, x2: x, y2: RH, stroke: major ? '#64748b' : '#94a3b8', 'stroke-width': major ? 0.9 : 0.6 });
+      if (major && n > 0 && n < horCount - 0.15) {
+        el(hs, 'text', { x: x, y: 8.5, 'text-anchor': 'middle', 'font-size': 7.5, fill: '#475569', 'font-family': 'Inter, Arial, sans-serif' }, String(Math.round(n)));
       }
     }
-    for (var m = 0; m <= vertCountCm + 1e-7; m += step) {
-      var y = (m / vertCountCm) * h;
-      var majorV = Math.abs(m - Math.round(m)) < 0.01;
-      var halfV  = Math.abs(m * 2 - Math.round(m * 2)) < 0.01;
-      var lenV = majorV ? 7 : halfV ? 5 : 3;
-      el(vs, 'line', { x1: 18 - lenV, y1: y, x2: 18, y2: y, stroke: majorV ? '#667889' : '#9daab6', 'stroke-width': majorV ? 0.9 : 0.6 });
-      if (majorV && m > 0 && m < vertCountCm) {
-        el(vs, 'text', { x: 6, y: y + 2, 'text-anchor': 'middle', 'font-size': 7, fill: '#667889', 'font-family': 'Arial' }, String(Math.round(m)));
+    // Draggable Left & Right margin handles (wide invisible hit rect + Google Docs blue markers)
+    var gL = el(hs, 'g', { 'class': 'ts-ed__ruler-handle', 'data-handle': 'left' });
+    el(gL, 'title', {}, 'Drag to resize left margin');
+    el(gL, 'rect', { x: mL - 7, y: 0, width: 14, height: RH, fill: 'transparent' });
+    el(gL, 'rect', { x: mL - 5, y: 1, width: 10, height: 3, rx: 1, fill: '#1a73e8' });
+    el(gL, 'path', { d: 'M ' + (mL - 5) + ' 5 L ' + (mL + 5) + ' 5 L ' + mL + ' 11 Z', fill: '#1a73e8' });
+
+    var gR = el(hs, 'g', { 'class': 'ts-ed__ruler-handle', 'data-handle': 'right' });
+    el(gR, 'title', {}, 'Drag to resize right margin');
+    el(gR, 'rect', { x: (w - mR) - 7, y: 0, width: 14, height: RH, fill: 'transparent' });
+    el(gR, 'path', { d: 'M ' + (w - mR - 5) + ' 5 L ' + (w - mR + 5) + ' 5 L ' + (w - mR) + ' 11 Z', fill: '#1a73e8' });
+
+    // ── Vertical ruler (drawn per page across ALL pages, transparent across 22px breaks) ──
+    var vertCount = pageH / pxPerUnit;
+    for (var pIdx = 0; pIdx < pageCount; pIdx++) {
+      var y0 = pIdx * (pageH + GAP);
+      // Sheet strip background & border
+      el(vs, 'rect', { x: 0, y: y0, width: RH, height: pageH, fill: '#ffffff', stroke: '#cbd5e1', 'stroke-width': 0.8 });
+      // Top & bottom shaded margin bands
+      el(vs, 'rect', { x: 0.5, y: y0 + 0.5, width: RH - 1, height: Math.max(0, mT - 0.5), fill: '#e2e8f0' });
+      el(vs, 'rect', { x: 0.5, y: y0 + pageH - mB, width: RH - 1, height: Math.max(0, mB - 0.5), fill: '#e2e8f0' });
+      el(vs, 'line', { x1: 0, y1: y0 + mT, x2: RH, y2: y0 + mT, stroke: '#94a3b8', 'stroke-width': 0.8 });
+      el(vs, 'line', { x1: 0, y1: y0 + pageH - mB, x2: RH, y2: y0 + pageH - mB, stroke: '#94a3b8', 'stroke-width': 0.8 });
+
+      for (var m = 0; m <= vertCount + 1e-6; m += step) {
+        var y = y0 + m * pxPerUnit;
+        var majorV = Math.abs(m - Math.round(m)) < 0.01;
+        var halfV  = Math.abs(m * 2 - Math.round(m * 2)) < 0.01;
+        var lenV = majorV ? 7 : halfV ? 5 : 3;
+        el(vs, 'line', { x1: RH - lenV, y1: y, x2: RH, y2: y, stroke: majorV ? '#64748b' : '#94a3b8', 'stroke-width': majorV ? 0.9 : 0.6 });
+        if (majorV && m > 0 && m < vertCount - 0.15) {
+          el(vs, 'text', { x: 6.5, y: y + 2.5, 'text-anchor': 'middle', 'font-size': 7.5, fill: '#475569', 'font-family': 'Inter, Arial, sans-serif' }, String(Math.round(m)));
+        }
       }
+
+      // Draggable Top & Bottom margin handles on every page
+      var gT = el(vs, 'g', { 'class': 'ts-ed__ruler-handle', 'data-handle': 'top', 'data-page-idx': String(pIdx) });
+      el(gT, 'title', {}, 'Drag to resize top margin');
+      el(gT, 'rect', { x: 0, y: y0 + mT - 7, width: RH, height: 14, fill: 'transparent' });
+      el(gT, 'path', { d: 'M 1 ' + (y0 + mT - 5) + ' L 1 ' + (y0 + mT + 5) + ' L 8 ' + (y0 + mT) + ' Z', fill: '#1a73e8' });
+
+      var gB = el(vs, 'g', { 'class': 'ts-ed__ruler-handle', 'data-handle': 'bottom', 'data-page-idx': String(pIdx) });
+      el(gB, 'title', {}, 'Drag to resize bottom margin');
+      el(gB, 'rect', { x: 0, y: y0 + pageH - mB - 7, width: RH, height: 14, fill: 'transparent' });
+      el(gB, 'path', { d: 'M 1 ' + (y0 + pageH - mB - 5) + ' L 1 ' + (y0 + pageH - mB + 5) + ' L 8 ' + (y0 + pageH - mB) + ' Z', fill: '#1a73e8' });
     }
-    // Margin markers.
-    el(hs, 'path', { d: 'M ' + (mPx - 5) + ' 0 L ' + (mPx + 5) + ' 0 L ' + mPx + ' 6 Z', fill: 'var(--ed-brand)' });
-    el(hs, 'path', { d: 'M ' + (w - mPx - 5) + ' 0 L ' + (w - mPx + 5) + ' 0 L ' + (w - mPx) + ' 6 Z', fill: 'var(--ed-brand)' });
-    el(vs, 'path', { d: 'M 0 ' + (myPx - 5) + ' L 0 ' + (myPx + 5) + ' L 6 ' + myPx + ' Z', fill: 'var(--ed-brand)' });
-    el(vs, 'path', { d: 'M 0 ' + (h - myPx - 5) + ' L 0 ' + (h - myPx + 5) + ' L 6 ' + (h - myPx) + ' Z', fill: 'var(--ed-brand)' });
   }
+
+  // Interactive manual margin resize via horizontal & vertical ruler handles
+  (function _initRulerDrag() {
+    if (!hruler || !vruler) return;
+    function onPointerDown(e) {
+      var handleEl = e.target && e.target.closest ? e.target.closest('[data-handle]') : null;
+      if (!handleEl) return;
+      e.preventDefault();
+      var which = handleEl.getAttribute('data-handle');
+      var pIdx = parseInt(handleEl.getAttribute('data-page-idx') || '0', 10) || 0;
+      _ensureRulerOverlays();
+      _rulerDragActive = true;
+
+      var pageW = page.offsetWidth || 794;
+      var pageH = (typeof _getPageHeightPx === 'function') ? _getPageHeightPx() : 1123;
+      var meta = window._tsdPageMeta || { pageH: pageH, gap: 22, pageCount: 1 };
+      var GAP = meta.gap || 22;
+      var pageRect = page.getBoundingClientRect();
+      var scaleX = (pageW > 0 && pageRect.width > 0) ? (pageRect.width / pageW) : 1;
+      var scaleY = (page.offsetHeight > 0 && pageRect.height > 0) ? (pageRect.height / page.offsetHeight) : 1;
+      var isHoriz = (which === 'left' || which === 'right');
+
+      _rulerGuideEl.className = 'tsd-ruler-guide tsd-ruler-guide--' + (isHoriz ? 'v' : 'h');
+      _rulerGuideEl.hidden = false;
+      _rulerTipEl.hidden = false;
+
+      function updateFromEvent(ev) {
+        var r = page.getBoundingClientRect();
+        var minCm = 0.8;
+        var valCm = 2.54;
+        var guidePos = 0;
+
+        if (which === 'left') {
+          var localX = (ev.clientX - r.left) / scaleX;
+          var maxLeftPx = Math.max(minCm * 37.8, pageW - (pageMarginR * 37.8) - 160);
+          var clampedX = Math.max(minCm * 37.8, Math.min(maxLeftPx, localX));
+          valCm = Math.round((clampedX / 37.8) * 20) / 20;
+          pageMarginL = valCm;
+          guidePos = Math.round(valCm * 37.8);
+          _rulerGuideEl.style.left = guidePos + 'px';
+          _rulerGuideEl.style.top = '0';
+        } else if (which === 'right') {
+          var localXR = (ev.clientX - r.left) / scaleX;
+          var distFromRight = pageW - localXR;
+          var maxRightPx = Math.max(minCm * 37.8, pageW - (pageMarginL * 37.8) - 160);
+          var clampedR = Math.max(minCm * 37.8, Math.min(maxRightPx, distFromRight));
+          valCm = Math.round((clampedR / 37.8) * 20) / 20;
+          pageMarginR = valCm;
+          guidePos = Math.round(pageW - valCm * 37.8);
+          _rulerGuideEl.style.left = guidePos + 'px';
+          _rulerGuideEl.style.top = '0';
+        } else if (which === 'top') {
+          var y0 = pIdx * (pageH + GAP);
+          var localY = ((ev.clientY - r.top) / scaleY) - y0;
+          var maxTopPx = Math.max(minCm * 37.8, pageH - (pageMarginB * 37.8) - 220);
+          var clampedT = Math.max(minCm * 37.8, Math.min(maxTopPx, localY));
+          valCm = Math.round((clampedT / 37.8) * 20) / 20;
+          pageMarginT = valCm;
+          guidePos = Math.round(y0 + valCm * 37.8);
+          _rulerGuideEl.style.top = guidePos + 'px';
+          _rulerGuideEl.style.left = '0';
+        } else if (which === 'bottom') {
+          var y0B = pIdx * (pageH + GAP);
+          var localYB = ((ev.clientY - r.top) / scaleY) - y0B;
+          var distFromBot = pageH - localYB;
+          var maxBotPx = Math.max(minCm * 37.8, pageH - (pageMarginT * 37.8) - 220);
+          var clampedB = Math.max(minCm * 37.8, Math.min(maxBotPx, distFromBot));
+          valCm = Math.round((clampedB / 37.8) * 20) / 20;
+          pageMarginB = valCm;
+          guidePos = Math.round(y0B + pageH - valCm * 37.8);
+          _rulerGuideEl.style.top = guidePos + 'px';
+          _rulerGuideEl.style.left = '0';
+        }
+
+        var labelVal = unit === 'cm'
+          ? (valCm.toFixed(2).replace(/\.?0+$/, '') + ' cm')
+          : ((valCm / 2.54).toFixed(2).replace(/\.?0+$/, '') + ' in');
+        var sideName = which.charAt(0).toUpperCase() + which.slice(1) + ' margin: ';
+        _rulerTipEl.textContent = sideName + labelVal;
+        _rulerTipEl.style.left = Math.min(window.innerWidth - 150, ev.clientX + 14) + 'px';
+        _rulerTipEl.style.top = Math.max(8, ev.clientY - 28) + 'px';
+
+        applyMargins(true);
+      }
+
+      function onPointerMove(ev) {
+        updateFromEvent(ev);
+      }
+      function onPointerUp() {
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+        document.removeEventListener('pointercancel', onPointerUp);
+        _rulerDragActive = false;
+        if (_rulerGuideEl) _rulerGuideEl.hidden = true;
+        if (_rulerTipEl) _rulerTipEl.hidden = true;
+        applyMargins(false);
+        if (typeof scheduleSave === 'function') scheduleSave();
+      }
+
+      document.addEventListener('pointermove', onPointerMove);
+      document.addEventListener('pointerup', onPointerUp);
+      document.addEventListener('pointercancel', onPointerUp);
+      updateFromEvent(e);
+    }
+    hruler.addEventListener('pointerdown', onPointerDown);
+    vruler.addEventListener('pointerdown', onPointerDown);
+  })();
 
   // ===================================================================== ZOOM
   function setZoom(z) {
@@ -3990,7 +4857,18 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
       .then(function (data) {
         var html = (data.content && data.content.html) || '';
         editor.innerHTML = html;
-        editor._initialHtml = html;   // handed to the PM init as fallback seed
+        _hydrateFloatingMarksFromRoot(editor);
+        if (window.TSInteractiveFields) {
+          window.TSInteractiveFields.hydrate(editor, {
+            document_ref: tsdId ? ('TSD-' + String(tsdId).padStart(5, '0')) : '',
+            document_title: (titleInput && titleInput.value) || '',
+            effective_date: new Date().toISOString().slice(0, 10),
+            date: new Date().toISOString().slice(0, 10),
+          }, {
+            onChange: function () { scheduleSave(); },
+          });
+        }
+        editor._initialHtml = editor.innerHTML;   // handed to the PM init as fallback seed
         _contentReady = true;
         updateWords(); rebuildOutline();
         refreshDynamicStampDates();
@@ -4032,7 +4910,7 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
   var _saveInFlight = false;
   var _saveQueued = false;
   function _doTsdPut(url, method, payload, retried) {
-    return fetch(url, { method: method, credentials: 'same-origin', headers: headers(), body: JSON.stringify(payload), keepalive: true })
+    return fetch(url, { method: method, credentials: 'same-origin', headers: headers(), body: JSON.stringify(payload) })
       .then(function (r) {
         if (r.status === 412 && !retried) {
           return r.json().catch(function () { return {}; }).then(function (body) {
@@ -4762,17 +5640,19 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
   // ===================================================================== PRESENCE
   var presenceEl = document.getElementById('tsd-presence');
   function pingPresence() {
-    if (!tsdId) return;
-    fetch('/api/tsd/' + tsdId + '/presence', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } });
+    if (!tsdId || document.hidden) return;
+    fetch('/api/tsd/' + tsdId + '/presence', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })
+      .catch(function () {});
     fetch('/api/tsd/' + tsdId + '/presence', { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : []; })
       .then(function (viewers) {
-        if (!presenceEl) return;
+        if (!presenceEl || !Array.isArray(viewers)) return;
         presenceEl.innerHTML = viewers.slice(0, 5).map(function (v, i) {
           return '<span class="ts-ed__presence__pill' + (i > 0 ? ' ts-ed__presence__pill--muted' : '') +
                  '" title="' + v.name + ' (' + v.email + ')">' + v.initials + '</span>';
         }).join('');
-      });
+      })
+      .catch(function () {});
   }
   setInterval(pingPresence, 15000);
   setTimeout(pingPresence, 500);
@@ -4963,7 +5843,8 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
     try {
       rtSocket = io('/tsd', {
         path: '/socket.io',
-        transports: ['websocket', 'polling'],
+        transports: ['polling'],
+        upgrade: false,
         withCredentials: true,
       });
     } catch (e) { setRtBadge('off'); return; }
@@ -5181,6 +6062,10 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
     });
     pmView = new EditorView(pmMount, { state: state_ });
     window._pmView = pmView;  // debug handle
+    if (typeof window._tsdSchedulePagination === 'function') {
+      setTimeout(window._tsdSchedulePagination, 60);
+      setTimeout(window._tsdSchedulePagination, 300);
+    }
     window._pmSchema = schema;
 
     // Plug ProseMirror commands into the existing ribbon. The ribbon
@@ -5273,22 +6158,22 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
       var serializer = DOMSerializer.fromSchema(schema);
       tmp.appendChild(serializer.serializeFragment(pmView.state.doc.content));
       var htmlNow = tmp.innerHTML;
-      var savedMarks = [];
-      editor.querySelectorAll('.tsd-stamp-mark, .tsd-sig-block').forEach(function (el) {
-        if (el.closest('.tsd-stamp-mark, .tsd-sig-block') !== el) return;
-        var cl = el.cloneNode(true);
-        cl.classList.remove('tsd-obj-selected', 'tsd-verify-flash');
-        if (cl.hasAttribute('data-tsd-auto-page-offset')) {
-          var origStyle = cl.getAttribute('data-tsd-auto-page-original-style');
-          if (origStyle === null || origStyle === '') cl.removeAttribute('style');
-          else cl.setAttribute('style', origStyle);
-          cl.removeAttribute('data-tsd-auto-page-offset');
-          cl.removeAttribute('data-tsd-auto-page-original-style');
+      var persistedFloating = (_tsdFmCtrl && typeof _tsdFmCtrl.cleanForPersist === 'function')
+        ? _tsdFmCtrl.cleanForPersist()
+        : '';
+      if (persistedFloating) {
+        htmlNow += '<div class="tsd-persisted-marks" data-tsd-marks="1" contenteditable="false">' + persistedFloating + '</div>';
+      } else {
+        var savedMarks = [];
+        editor.querySelectorAll('.tsd-stamp-mark, .tsd-sig-block').forEach(function (el) {
+          if (el.closest('.tsd-stamp-mark, .tsd-sig-block') !== el) return;
+          var cl = el.cloneNode(true);
+          cl.classList.remove('tsd-obj-selected', 'tsd-verify-flash');
+          savedMarks.push(cl.outerHTML);
+        });
+        if (savedMarks.length) {
+          htmlNow += '<div class="tsd-persisted-marks" data-tsd-marks="1" contenteditable="false">' + savedMarks.join('') + '</div>';
         }
-        savedMarks.push(cl.outerHTML);
-      });
-      if (savedMarks.length) {
-        htmlNow += '<div class="tsd-persisted-marks" data-tsd-marks="1" style="margin-top:16pt;display:flex;flex-wrap:wrap;align-items:flex-end;gap:14pt;">' + savedMarks.join('') + '</div>';
       }
       var payload = {
         title: title,
@@ -5400,83 +6285,167 @@ body.ts-sig-blur-lock .ts-sig-doc-protected svg { filter: blur(22px) contrast(0.
       _syncDocumentPagination();
     });
   }
+  var _autoPageStyleEl = document.getElementById('tsd-auto-page-css');
+  if (!_autoPageStyleEl) {
+    _autoPageStyleEl = document.createElement('style');
+    _autoPageStyleEl.id = 'tsd-auto-page-css';
+    document.head.appendChild(_autoPageStyleEl);
+  }
   function _clearAutomaticPageOffsets() {
-    editor.querySelectorAll('[data-tsd-auto-page-offset]').forEach(function (el) {
-      var original = el.getAttribute('data-tsd-auto-page-original-style');
-      if (original === null || original === '') el.removeAttribute('style');
-      else el.setAttribute('style', original);
-      el.removeAttribute('data-tsd-auto-page-offset');
-      el.removeAttribute('data-tsd-auto-page-original-style');
-    });
+    if (_autoPageStyleEl) _autoPageStyleEl.textContent = '';
   }
   function _flowBlocks() {
-    var root = (window._pmView && window._pmView.dom) ? window._pmView.dom : editor;
-    var blocks = Array.prototype.slice.call(root.children || []);
-    var marks = document.getElementById('tsd-marks-layer');
-    if (marks && blocks.indexOf(marks) === -1) blocks.push(marks);
-    return blocks.filter(function (el) {
-      return el && el.nodeType === 1 && el.id !== 'tsd-marks-layer' ? true : !!(el && el.children && el.children.length);
+    var pmDom = (window._pmView && window._pmView.dom)
+      ? window._pmView.dom
+      : (editor && editor.querySelector('.ProseMirror')) || editor;
+    if (!pmDom) return [];
+    var isPm = pmDom.classList && pmDom.classList.contains('ProseMirror');
+    var rootSel = isPm ? '#tsd-printable .ProseMirror' : '#tsd-editor';
+    var out = [];
+    var kids = Array.prototype.slice.call(pmDom.children || []);
+    kids.forEach(function (el, idx) {
+      if (!el || el.nodeType !== 1 || el.id === 'tsd-marks-layer') return;
+      var nth = idx + 1;
+      var tag = (el.tagName || '').toUpperCase();
+      if ((tag === 'UL' || tag === 'OL') && el.children && el.children.length > 1) {
+        Array.prototype.slice.call(el.children).forEach(function (li, liIdx) {
+          if (li && li.nodeType === 1) {
+            out.push({ el: li, sel: rootSel + ' > :nth-child(' + nth + ') > :nth-child(' + (liIdx + 1) + ')' });
+          }
+        });
+      } else {
+        out.push({ el: el, sel: rootSel + ' > :nth-child(' + nth + ')' });
+      }
     });
+    return out;
   }
   function _syncDocumentPagination() {
     var printable = document.getElementById('tsd-printable');
     var brkLayer = document.getElementById('tsd-page-breaks-layer');
     if (!printable || !page || !brkLayer) return;
     var pageH = _getPageHeightPx();
-    var GAP = 28;
-    var marginY = parseFloat(getComputedStyle(shell).getPropertyValue('--ed-margy')) || 94;
-    var footerReserve = document.getElementById('tsd-pagefooter') && !document.getElementById('tsd-pagefooter').hidden ? 46 : 18;
-    var usableBottom = pageH - marginY - footerReserve;
-    var usableHeight = Math.max(120, usableBottom - marginY);
+    var GAP = 22;
+    var csShell = getComputedStyle(shell);
+    var marginTopPx = Math.max(30, parseFloat(csShell.getPropertyValue('--ed-margt')) || 96);
+    var marginBotPx = Math.max(30, parseFloat(csShell.getPropertyValue('--ed-margb')) || 96);
+    var hasCustomLh = page.hasAttribute('data-tsd-lh-applied');
+    var lhPadBot = hasCustomLh ? (parseFloat(printable.style.paddingBottom) || 0) : 0;
+    var footerBandH = Math.max(marginBotPx, lhPadBot, 54);
+    // Strict content-area bottom boundary (with 16px breathing room above footer rule)
+    var usableBottom = pageH - footerBandH - 16;
+    var usableHeight = Math.max(120, usableBottom - marginTopPx);
     var cycle = pageH + GAP;
 
-    // Remove prior runtime-only offsets, then move each complete top-level
-    // block to the next sheet when it no longer fits the current sheet. This
-    // creates real flow space rather than merely painting a separator over
-    // overflowing content. Offsets are deliberately stripped during save.
+    // Reset runtime pagination stylesheet without touching ProseMirror DOM attributes.
     _clearAutomaticPageOffsets();
     var pageRect = page.getBoundingClientRect();
-    _flowBlocks().forEach(function (block) {
+    var scaleY = (page.offsetHeight > 0 && pageRect.height > 0) ? (pageRect.height / page.offsetHeight) : 1;
+    if (!scaleY || scaleY <= 0.1) scaleY = 1;
+
+    var rules = [];
+    var forceNextSheet = false;
+    var curMaxBottom = pageH;
+    _flowBlocks().forEach(function (item) {
+      var block = item.el;
       var rect = block.getBoundingClientRect();
-      var top = rect.top - pageRect.top;
-      var height = rect.height;
+      var top = (rect.top - pageRect.top) / scaleY;
+      var height = rect.height / scaleY;
       var pageIndex = Math.max(0, Math.floor(top / cycle));
+      var localTop = top - (pageIndex * cycle);
       var pageEnd = pageIndex * cycle + usableBottom;
-      if (top + height > pageEnd + 1 && height <= usableHeight) {
-        var nextStart = (pageIndex + 1) * cycle + marginY;
+
+      var isManualBreak = !!(block.style && (block.style.pageBreakAfter === 'always' || block.style.breakAfter === 'page'));
+      var inGapOrTopMargin = (pageIndex > 0 && localTop < marginTopPx - 1);
+      var crossesFooter = (top + height > pageEnd + 0.5 && height <= usableHeight);
+      if (forceNextSheet || crossesFooter || inGapOrTopMargin) {
+        var targetPage = (inGapOrTopMargin && !forceNextSheet && !crossesFooter) ? pageIndex : (pageIndex + 1);
+        var nextStart = targetPage * cycle + marginTopPx;
         var shift = Math.max(0, Math.ceil(nextStart - top));
-        if (shift) {
-          block.setAttribute('data-tsd-auto-page-original-style', block.getAttribute('style') || '');
-          block.setAttribute('data-tsd-auto-page-offset', String(shift));
-          var basePadding = parseFloat(getComputedStyle(block).paddingTop) || 0;
-          block.style.setProperty('padding-top', (basePadding + shift) + 'px', 'important');
+        if (shift > 0) {
+          var baseMarginTop = parseFloat(getComputedStyle(block).marginTop) || 0;
+          var applied = baseMarginTop + shift;
+          var rIdx = rules.length;
+          rules.push(item.sel + ' { margin-top: ' + applied + 'px !important; }');
+          _autoPageStyleEl.textContent = rules.join('\n');
+          // Verify actual post-collapse landing position and compensate any collapsed margin
+          var postRect = block.getBoundingClientRect();
+          var postTop = (postRect.top - pageRect.top) / scaleY;
+          if (postTop < nextStart - 0.5) {
+            applied += Math.ceil(nextStart - postTop);
+            rules[rIdx] = item.sel + ' { margin-top: ' + applied + 'px !important; }';
+            _autoPageStyleEl.textContent = rules.join('\n');
+            postRect = block.getBoundingClientRect();
+            postTop = (postRect.top - pageRect.top) / scaleY;
+          }
+          top = postTop;
+          height = postRect.height / scaleY;
         }
+      }
+      forceNextSheet = isManualBreak;
+      if (top + height + footerBandH > curMaxBottom) {
+        curMaxBottom = top + height + footerBandH;
       }
     });
 
-    var contentH = Math.max(pageH, printable.scrollHeight);
-    var pageCount = Math.max(1, Math.ceil((contentH + GAP) / cycle));
+    var contentH = Math.max(pageH, curMaxBottom);
+    var pageCount = Math.max(1, Math.ceil((contentH - 1) / cycle));
     var totalMinH = pageCount * pageH + (pageCount - 1) * GAP;
     page.style.minHeight = totalMinH + 'px';
+    window._tsdPageMeta = { pageH: pageH, gap: GAP, cycle: cycle, pageCount: pageCount };
 
-    if (pageCount !== _lastPageCount || brkLayer.children.length !== Math.max(0, pageCount - 1)) {
-      _lastPageCount = pageCount;
-      var html = '';
-      for (var k = 1; k < pageCount; k++) {
-        var topPx = k * pageH + (k - 1) * GAP;
-        html += '<div class="tsd-page-break-band" style="top:' + topPx + 'px;">' +
-          '<span>End of Page ' + k + ' of ' + pageCount + '</span>' +
-          '<span>Page ' + (k + 1) + ' of ' + pageCount + ' ↓</span>' +
+    var docTitleShort = (document.getElementById('tsd-title') && document.getElementById('tsd-title').value) || 'TrustSeal Document';
+    var ftrOffset = Math.max(30, Math.min(footerBandH - 10, Math.round(footerBandH * 0.62)));
+    var html = '';
+    for (var k = 1; k <= pageCount; k++) {
+      if (!hasCustomLh && pageCount > 1) {
+        var ftrTop = (k * pageH + (k - 1) * GAP) - ftrOffset;
+        html += '<div class="tsd-sheet-footer-stamp" style="top:' + ftrTop + 'px;">' +
+          '<span>' + String(docTitleShort).replace(/</g, '&lt;').slice(0, 60) + '</span>' +
+          '<span>Page ' + k + ' of ' + pageCount + '</span>' +
         '</div>';
       }
-      brkLayer.innerHTML = html;
-      var sbP = document.getElementById('tsd-sb-pages');
-      if (sbP) sbP.textContent = 'Page 1 of ' + pageCount + (pageCount > 1 ? (' (' + pageCount + ' pages)') : '');
-      var pfR = document.getElementById('tsd-pf-right');
-      if (pfR && /^Page\s+\d+\s+of\s+\d+/i.test((pfR.textContent || '').trim())) {
-        pfR.textContent = 'Page 1 of ' + pageCount;
+      if (k < pageCount) {
+        var topPx = k * pageH + (k - 1) * GAP;
+        // Modern Google Docs clean canvas gap between distinct paper sheets
+        html += '<div class="tsd-page-break-band" style="top:' + topPx + 'px;"></div>';
       }
     }
+    _lastPageCount = pageCount;
+    brkLayer.innerHTML = html;
+
+    var defFooter = document.getElementById('tsd-pagefooter');
+    if (defFooter && !hasCustomLh) {
+      defFooter.hidden = (pageCount > 1);
+    }
+    _updateActivePageIndicator();
+    if (typeof window._tsdRenderLhSheets === 'function' && hasCustomLh) {
+      window._tsdRenderLhSheets();
+    }
+    if (!_rulerDragActive && typeof drawRulers === 'function') {
+      drawRulers();
+    }
+  }
+  window._tsdSchedulePagination = _schedulePagination;
+
+  function _updateActivePageIndicator() {
+    var meta = window._tsdPageMeta || { pageH: 1123, gap: 22, cycle: 1145, pageCount: 1 };
+    var stageEl = document.querySelector('.ts-ed__workspace') || document.querySelector('.ts-ed__stage');
+    var curPage = 1;
+    if (stageEl && meta.pageCount > 1) {
+      var midScroll = stageEl.scrollTop + (stageEl.clientHeight * 0.35);
+      curPage = Math.max(1, Math.min(meta.pageCount, Math.floor(midScroll / meta.cycle) + 1));
+    }
+    var sbP = document.getElementById('tsd-sb-pages');
+    if (sbP) sbP.textContent = 'Page ' + curPage + ' of ' + meta.pageCount + (meta.pageCount > 1 ? (' (' + meta.pageCount + ' pages)') : '');
+    var pfR = document.getElementById('tsd-pf-right');
+    if (pfR && /^Page\s+\d+\s+of\s+\d+/i.test((pfR.textContent || '').trim())) {
+      pfR.textContent = 'Page ' + curPage + ' of ' + meta.pageCount;
+    }
+  }
+
+  var _stageScrollEl = document.querySelector('.ts-ed__workspace') || document.querySelector('.ts-ed__stage');
+  if (_stageScrollEl) {
+    _stageScrollEl.addEventListener('scroll', _updateActivePageIndicator, { passive: true });
   }
   if (editor) {
     editor.addEventListener('input', _schedulePagination);

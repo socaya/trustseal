@@ -125,80 +125,147 @@
 
 {% set nav_sections = [
   {
+    "id": "workspace",
     "label": "Workspace",
+    "tier": "all",
+    "collapsible": False,
     "items": [
-      {"endpoint": "system.main_views.home",                 "label": "Overview",              "icon": "overview",   "key": "overview"},
-      {"endpoint": "tsd_views.library",                      "label": "Documents",             "icon": "documents",  "key": "documents"},
-      {"endpoint": "workspace_assets_views.signed_contracts_page", "label": "Contracts",       "icon": "contract",   "key": "signed-contracts"},
-      {"endpoint": "workspace_assets_views.templates_hub_page",  "label": "Templates",             "icon": "templates",  "key": "templates"}
+      {"endpoint": "system.main_views.home",                     "label": "Overview",              "icon": "overview",   "key": "overview"},
+      {"endpoint": "tsd_views.library",                          "label": "Documents",             "icon": "documents",  "key": "documents"},
+      {"endpoint": "workspace_assets_views.signed_contracts_page","label": "Contracts",            "icon": "contract",   "key": "signed-contracts"},
+      {"endpoint": "contracts_views.projects_page",              "label": "Projects",              "icon": "tasks",      "key": "projects"}
     ]
   },
   {
+    "id": "brand_assets",
     "label": "Brand & Assets",
+    "tier": "all",
+    "collapsible": False,
     "items": [
-      {"endpoint": "tsd_stamps_views.library",               "label": "Stamps",                "icon": "stamp",      "key": "stamps"},
-      {"endpoint": "workspace_assets_views.letterheads_page","label": "Letterheads",           "icon": "letterhead", "key": "letterheads"},
-      {"endpoint": "workspace_assets_views.signatures_hub_page", "label": "Signatures",        "icon": "signature",  "key": "signatures"},
-      {"endpoint": "workspace_assets_views.media_page",      "label": "Media library",         "icon": "media",      "key": "media"}
+      {"endpoint": "tsd_stamps_views.library",                   "label": "Stamps",                "icon": "stamp",      "key": "stamps"},
+      {"endpoint": "workspace_assets_views.letterheads_page",    "label": "Letterheads",           "icon": "letterhead", "key": "letterheads"},
+      {"endpoint": "workspace_assets_views.signatures_hub_page", "label": "Signatures",            "icon": "signature",  "key": "signatures"},
+      {"endpoint": "workspace_assets_views.media_page",          "label": "Media library",         "icon": "media",      "key": "media"}
     ]
   },
   {
-    "label": "Trust & Compliance",
+    "id": "resources_trust",
+    "label": "Resources & Verification",
+    "tier": "all",
+    "collapsible": False,
     "items": [
-      {"endpoint": "verify_views.verify_form",               "label": "Verification",          "icon": "verify",     "key": "verify"},
-      {"endpoint": "tsd_stamps_views.verify_page",           "label": "Stamp forensics",       "icon": "stamp",      "key": "stamp-verify"},
-      {"endpoint": "evidence_views.list_retentions",         "label": "Evidence & retention",  "icon": "evidence",   "key": "evidence"},
-      {"endpoint": "audit_security_views.index",             "label": "Audit & security",      "icon": "audit",      "key": "audit"}
+      {"endpoint": "workspace_assets_views.templates_hub_page",  "label": "TS Template Gallery",   "icon": "templates",  "key": "templates"},
+      {"endpoint": "document_party_views.view_document_parties", "label": "Contacts & parties",    "icon": "contacts",   "key": "contacts"},
+      {"endpoint": "organizations_bp.view_clients",              "label": "Clients",               "icon": "teams",      "key": "clients"},
+      {"endpoint": "verify_views.verify_form",                   "label": "Verification",          "icon": "verify",     "key": "verify"},
+      {"endpoint": "tsd_stamps_views.verify_page",               "label": "Stamp forensics",       "icon": "stamp",      "key": "stamp-verify"}
     ]
   },
   {
-    "label": "Directory",
+    "id": "org_admin",
+    "label": "Organization Admin",
+    "tier": "org_admin",
+    "collapsible": True,
     "items": [
-      {"endpoint": "document_party_views.view_document_parties", "label": "Contacts & parties","icon": "contacts",   "key": "contacts"},
-      {"endpoint": "organizations_bp.view_clients",          "label": "Clients",               "icon": "teams",      "key": "clients"}
+      {"endpoint": "admin_users_views.index",                    "label": "Users & access",        "icon": "users",      "key": "users"},
+      {"endpoint": "system.view_roles",                          "label": "Roles & permissions",   "icon": "settings",   "key": "roles"},
+      {"endpoint": "audit_security_views.index",                 "label": "Audit & security",      "icon": "audit",      "key": "audit"},
+      {"endpoint": "evidence_views.list_retentions",             "label": "Evidence & retention",  "icon": "evidence",   "key": "evidence"},
+      {"endpoint": "integrations_views.index",                   "label": "Integrations & API",    "icon": "integrations","key": "integrations"},
+      {"endpoint": "billing_views.index",                        "label": "Subscription & billing","icon": "billing",    "key": "billing"},
+      {"endpoint": "system.system_settings_view",                "label": "Organization settings", "icon": "settings",   "key": "settings"}
     ]
   },
   {
-    "label": "Administration",
+    "id": "platform_admin",
+    "label": "TS Platform Console",
+    "badge": "PLATFORM",
+    "tier": "platform_admin",
+    "collapsible": True,
     "items": [
-      {"endpoint": "admin_users_views.index",                "label": "Users & access",        "icon": "users",      "key": "users"},
-      {"endpoint": "system.view_roles",                      "label": "Roles & permissions",   "icon": "settings",   "key": "roles"},
-      {"endpoint": "integrations_views.index",               "label": "Integrations & API",    "icon": "integrations","key": "integrations"},
-      {"endpoint": "billing_views.index",                    "label": "Subscriptions & billing","icon": "billing",   "key": "billing"},
-      {"endpoint": "system.system_settings_view",            "label": "Settings",              "icon": "settings",   "key": "settings"}
+      {"endpoint": "organizations_bp.view_organizations",        "label": "Organizations & tenants","icon": "teams",     "key": "organizations"},
+      {"endpoint": "system.view_permissions",                    "label": "Global permissions",    "icon": "settings",   "key": "permissions"},
+      {"endpoint": "operator_notifications_views.list_notifications", "label": "Platform alerts",  "icon": "notifications", "key": "notifications"},
+      {"endpoint": "slo_api.slo_status",                         "label": "System health & SLO",   "icon": "audit",      "key": "slo"},
+      {"endpoint": "design_gallery_bp.gallery",                  "label": "UI Component Gallery",  "icon": "templates",  "key": "gallery"}
     ]
   }
 ] %}
 
 {% for section in nav_sections %}
-  {% set rendered = namespace(count=0) %}
-  <nav class="ts-sidebar__section"{% if section.label %} aria-label="{{ section.label }}"{% endif %}>
-    {% if section.label %}<span class="ts-sidebar__label">{{ section.label }}</span>{% endif %}
+  {% set tier = section.get('tier', 'all') %}
+  {% set allowed = (tier == 'all') or (tier == 'org_admin' and (nav_is_org_admin or nav_is_platform_admin)) or (tier == 'platform_admin' and nav_is_platform_admin) %}
+  {% if allowed %}
+    {% set rendered = namespace(count=0, has_active=False) %}
     {% for item in section['items'] %}
-      {# Only render the row if the backend route exists in this build. #}
-      {% set href = None %}
       {% if item.endpoint in url_map_endpoints %}
-        {% set href = url_for(item.endpoint) %}
-      {% endif %}
-      {% if href %}
         {% set rendered.count = rendered.count + 1 %}
-        <a class="ts-sidebar__item"
-           href="{{ href }}"
-           title="{{ item.label }}"
-           {% if active_nav_item == item.key %}aria-current="page"{% endif %}>
-          {{ icon(item.icon) }}
-          <span class="ts-sidebar__text">{{ item.label }}</span>
-          {% if item.badge %}<span class="ts-sidebar__badge">{{ item.badge }}</span>{% endif %}
-        </a>
+        {% if active_nav_item == item.key %}{% set rendered.has_active = True %}{% endif %}
       {% endif %}
     {% endfor %}
-    {% if rendered.count == 0 %}
-      <span class="ts-sidebar__item" aria-disabled="true" style="color:rgba(203,217,236,0.45);">
-        <span class="ts-sidebar__text">No authorized items</span>
-      </span>
+    {% if rendered.count > 0 %}
+    <nav class="ts-sidebar__section{% if tier == 'platform_admin' %} ts-sidebar__section--platform{% endif %}{% if section.collapsible %} is-collapsible{% endif %}"
+         data-nav-sec="{{ section.id }}"
+         {% if section.collapsible and not rendered.has_active %}data-collapsed-default="1"{% endif %}
+         {% if section.label %} aria-label="{{ section.label }}"{% endif %}>
+      {% if section.label %}
+        {% if section.collapsible %}
+        <button type="button" class="ts-sidebar__label ts-sidebar__label--toggle" data-sec-toggle="{{ section.id }}" aria-expanded="true">
+          <span>{{ section.label }}</span>
+          {% if section.get('badge') %}<span class="ts-sidebar__plat-pill">{{ section.badge }}</span>{% endif %}
+          <svg class="ts-sidebar__chev" width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        {% else %}
+        <span class="ts-sidebar__label">{{ section.label }}</span>
+        {% endif %}
+      {% endif %}
+      <div class="ts-sidebar__group" data-sec-body="{{ section.id }}">
+      {% for item in section['items'] %}
+        {% if item.endpoint in url_map_endpoints %}
+          <a class="ts-sidebar__item"
+             href="{{ url_for(item.endpoint) }}"
+             title="{{ item.label }}"
+             {% if active_nav_item == item.key %}aria-current="page"{% endif %}>
+            {{ icon(item.icon) }}
+            <span class="ts-sidebar__text">{{ item.label }}</span>
+            {% if item.badge %}<span class="ts-sidebar__badge">{{ item.badge }}</span>{% endif %}
+          </a>
+        {% endif %}
+      {% endfor %}
+      </div>
+    </nav>
     {% endif %}
-  </nav>
+  {% endif %}
 {% endfor %}
+
+<script>
+(function () {
+  var keyPrefix = 'ts.nav.sec.';
+  document.querySelectorAll('[data-sec-toggle]').forEach(function (btn) {
+    var secId = btn.getAttribute('data-sec-toggle');
+    var secEl = btn.closest('[data-nav-sec]');
+    var bodyEl = document.querySelector('[data-sec-body="' + secId + '"]');
+    if (!secEl || !bodyEl) return;
+    function setCollapsed(col) {
+      secEl.classList.toggle('is-collapsed', col);
+      bodyEl.hidden = col;
+      btn.setAttribute('aria-expanded', col ? 'false' : 'true');
+    }
+    var saved = null;
+    try { saved = localStorage.getItem(keyPrefix + secId); } catch (_e) {}
+    if (saved === '1' && secEl.getAttribute('data-collapsed-default') === '1') {
+      setCollapsed(true);
+    }
+    btn.addEventListener('click', function () {
+      var next = !secEl.classList.contains('is-collapsed');
+      setCollapsed(next);
+      try { localStorage.setItem(keyPrefix + secId, next ? '1' : '0'); } catch (_e) {}
+    });
+  });
+})();
+</script>
 
 <div class="ts-sidebar__footer">
   <button type="button" class="ts-sidebar__collapse" data-ts-rail-toggle title="Collapse sidebar">

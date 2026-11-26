@@ -392,6 +392,9 @@ _ALLOWED_ATTRS = {
         "data-tsd-sig-digest", "data-tsd-sig-attestation",
         "data-ts-sig-seal", "data-ts-sig-fp",
         "data-tsd-group", "data-align",
+        "data-floating-mark", "data-mark-kind", "data-angle",
+        "data-page-idx", "data-initials-style", "data-mark-width",
+        "data-field-key", "data-field-label",
     ],
     "a": ["href", "title", "rel", "target"],
     "img": ["src", "alt", "width", "height", "draggable"],
@@ -404,10 +407,11 @@ _ALLOWED_STYLES = {
     "margin", "margin-top", "margin-bottom", "margin-left", "margin-right",
     "padding", "padding-top", "padding-bottom", "padding-left", "padding-right",
     "border", "border-left", "border-right", "border-collapse", "border-top",
-    "border-bottom", "letter-spacing", "width", "min-width", "max-width",
+    "border-bottom", "border-radius", "letter-spacing", "width", "min-width", "max-width",
     "height", "max-height", "display", "flex-wrap", "align-items",
     "justify-content", "gap", "vertical-align", "position", "z-index",
-    "overflow", "user-select", "pointer-events", "transform",
+    "left", "top", "right", "bottom", "opacity", "mix-blend-mode", "white-space",
+    "overflow", "user-select", "pointer-events", "transform", "transform-origin",
 }
 _ALLOWED_PROTOCOLS = {"http", "https", "mailto", "data"}
 
@@ -425,10 +429,41 @@ def _sanitize_svg_fragment(svg_raw: str) -> str:
     """Strictly sanitize an inline SVG (stamp or vector signature) while preserving SVG camelCase."""
     import xml.etree.ElementTree as ET
 
+    # Browser HTML5 innerHTML serialization can emit xlink:href without xmlns:xlink,
+    # HTML entities like &nbsp;, bare '&', or nested double-quotes inside font-family=""Arial Black", ...".
+    norm = (svg_raw or "").replace("&nbsp;", "&#160;")
+    norm = re.sub(r"&(?!#?[a-zA-Z0-9]+;)", "&amp;", norm)
+    norm = re.sub(
+        r'font-family="([^"]*""[^"]*"[^"]*)"',
+        lambda m: 'font-family="' + m.group(1).replace('"', "'") + '"',
+        norm,
+    )
+    norm = re.sub(
+        r'font-family=""([^"]+)"([^"]*)"',
+        lambda m: "font-family=\"'" + m.group(1) + "'" + m.group(2).replace('"', "'") + '"',
+        norm,
+    )
+    if "xlink:" in norm and "xmlns:xlink" not in norm:
+        norm = re.sub(
+            r"<svg\b",
+            '<svg xmlns:xlink="http://www.w3.org/1999/xlink"',
+            norm,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+    if "xmlns=" not in norm[:200]:
+        norm = re.sub(
+            r"<svg\b",
+            '<svg xmlns="http://www.w3.org/2000/svg"',
+            norm,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+
     try:
-        root = ET.fromstring(svg_raw)
+        root = ET.fromstring(norm)
     except Exception:
-        return ""
+        return _sanitize_svg_html5_fallback(norm)
 
     def _local(tag: str) -> str:
         return tag.split("}", 1)[1] if "}" in tag else tag
@@ -466,6 +501,100 @@ def _sanitize_svg_fragment(svg_raw: str) -> str:
         return ""
     cleaned_root.set("xmlns", "http://www.w3.org/2000/svg")
     return ET.tostring(cleaned_root, encoding="unicode")
+
+
+_SVG_TAG_CASE = {t.lower(): t for t in _SAFE_SVG_TAGS}
+_SVG_ATTR_CASE = {
+    "viewbox": "viewBox", "preserveaspectratio": "preserveAspectRatio",
+    "startoffset": "startOffset", "stddeviation": "stdDeviation",
+    "basefrequency": "baseFrequency", "numoctaves": "numOctaves",
+    "xchannelselector": "xChannelSelector", "ychannelselector": "yChannelSelector",
+    "gradientunits": "gradientUnits", "gradienttransform": "gradientTransform",
+    "patternunits": "patternUnits", "clippathunits": "clipPathUnits",
+    "maskunits": "maskUnits", "filterunits": "filterUnits",
+    "textlength": "textLength", "lengthadjust": "lengthAdjust",
+    "spreadmethod": "spreadMethod", "xlink:href": "href",
+}
+_SVG_VOID_TAGS = frozenset({
+    "path", "circle", "ellipse", "rect", "polygon", "polyline", "line",
+    "image", "stop", "feTurbulence", "feDisplacementMap", "feColorMatrix",
+    "feComposite", "feGaussianBlur", "feFuncA", "feFuncR", "feFuncG",
+    "feFuncB", "feMergeNode", "feMorphology",
+})
+
+
+def _sanitize_svg_html5_fallback(svg_raw: str) -> str:
+    """Fallback SVG sanitizer using Python's tolerant HTMLParser when browser HTML5
+    serialization produces non-XML-strict attributes (e.g. broken quoted font-family).
+    Enforces the exact same _SAFE_SVG_TAGS and XSS attribute rules.
+    """
+    from html import escape as _hesc
+    from html.parser import HTMLParser
+
+    out: list[str] = []
+    skip_depth = 0
+    seen_svg = False
+
+    class _P(HTMLParser):
+        def handle_starttag(self, tag: str, attrs):
+            nonlocal skip_depth, seen_svg
+            if skip_depth:
+                skip_depth += 1
+                return
+            proper = _SVG_TAG_CASE.get(tag.lower())
+            if not proper:
+                skip_depth = 1
+                return
+            if proper == "svg":
+                seen_svg = True
+            parts = [f"<{proper}"]
+            has_xmlns = False
+            for k, v in attrs:
+                if not k:
+                    continue
+                kl = k.lower().strip()
+                # Drop garbage attributes left by broken HTML5 quotes (e.g. black",)
+                if not re.match(r"^[a-z][a-z0-9_:-]*$", kl):
+                    continue
+                if kl.startswith("on") or kl == "xmlns:xlink":
+                    continue
+                ak = _SVG_ATTR_CASE.get(kl, k)
+                val = "" if v is None else str(v)
+                if ak == "href":
+                    vs = val.strip()
+                    if not (vs.startswith("#") or vs.startswith("data:image/") or vs.startswith("/static/")):
+                        continue
+                if "javascript:" in val.lower():
+                    continue
+                if ak == "xmlns":
+                    has_xmlns = True
+                parts.append(f' {ak}="{_hesc(val, quote=True)}"')
+            if proper == "svg" and not has_xmlns:
+                parts.append(' xmlns="http://www.w3.org/2000/svg"')
+            parts.append(">")
+            out.append("".join(parts))
+
+        def handle_endtag(self, tag: str):
+            nonlocal skip_depth
+            if skip_depth:
+                skip_depth -= 1
+                return
+            proper = _SVG_TAG_CASE.get(tag.lower())
+            if proper:
+                out.append(f"</{proper}>")
+
+        def handle_data(self, data: str):
+            if not skip_depth and data:
+                out.append(_hesc(data, quote=False))
+
+    p = _P(convert_charrefs=True)
+    try:
+        p.feed(svg_raw)
+        p.close()
+    except Exception:
+        return ""
+    res = "".join(out)
+    return res if (seen_svg and "<svg" in res) else ""
 
 
 def sanitize_html(raw: str, *, allow_data_images: bool = True) -> str:

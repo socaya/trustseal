@@ -2972,4 +2972,53 @@ def get_template(slug: str) -> StampTemplate | None:
     for t in _TEMPLATES:
         if t.slug == slug:
             return t
+    from app.services.stamp_templates_1000 import get_1000_stamp_by_slug, render_stamp_item
+
+    raw = get_1000_stamp_by_slug().get(slug)
+    if raw is not None:
+        h = render_stamp_item(raw)
+        return StampTemplate(
+            slug=h["slug"],
+            name=h["name"],
+            category=h["category"],
+            kind=h["kind"],
+            description=h["description"],
+            layout=h["layout"],
+            svg=h["svg"],
+        )
     return None
+
+
+def search_templates(
+    *,
+    q: str = "",
+    category: str = "",
+    style: str = "",
+    kind: str = "",
+    page: int = 1,
+    per_page: int = 24,
+) -> dict:
+    from app.services.stamp_templates_1000 import search_stamp_catalog
+
+    return search_stamp_catalog(
+        builtin_items=list_templates(),
+        q=q,
+        category=category,
+        style=style,
+        kind=kind,
+        page=page,
+        per_page=per_page,
+    )
+
+
+def get_stamp_catalog_summary() -> dict:
+    from app.services.stamp_templates_1000 import get_1000_stamp_catalog, get_stamp_catalog_facets
+
+    builtins = list_templates()
+    facets = get_stamp_catalog_facets(builtins)
+    return {
+        "total": len(builtins) + len(get_1000_stamp_catalog()),
+        "categories": facets["categories"],
+        "styles": facets["styles"],
+        "kinds": facets["kinds"],
+    }

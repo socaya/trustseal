@@ -1,0 +1,214 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'signed-contracts' %}
+
+{% block title %}Contract Templates · TRUSTSEAL{% endblock %}
+{% block page_title %}Contract Templates{% endblock %}
+{% block page_description %}
+  <p class="ts-page-header__description">
+    Governed contract blueprints with pre-configured legal terms, probation schedules, and project deliverables.
+  </p>
+{% endblock %}
+{% block page_actions %}
+  <a class="ts-btn ts-btn--secondary" href="{{ url_for('contracts_views.projects_page') }}">Projects</a>
+  <a class="ts-btn ts-btn--secondary" href="{{ url_for('workspace_assets_views.signed_contracts_page') }}">← Back to contracts</a>
+  <button type="button" class="ts-btn ts-btn--primary" id="tpl-open-new">+ New template</button>
+{% endblock %}
+
+{% block content %}
+<div class="st-flat">
+  {% include "stamps/_flat_ui.html" %}
+
+  <div class="ctpl-grid">
+    {% for t in templates %}
+    <article class="st-panel ctpl-card">
+      <div class="st-panel__head">
+        <span class="st-tag st-tag--info">{{ t.contract_type|replace('_', ' ')|upper }}</span>
+        <span class="st-tag {% if t.state == 'published' %}st-tag--ok{% else %}st-tag--warn{% endif %}">{{ t.state|title }} · v{{ t.version }}</span>
+      </div>
+      <div class="ctpl-card__body">
+        <h2 class="ctpl-card__title">{{ t.name }}</h2>
+        <p class="ctpl-card__desc">{{ t.description or 'Standardized contract blueprint.' }}</p>
+        <div class="ctpl-meta">
+          <span>{{ t.default_key_terms|length }} Key Term{% if t.default_key_terms|length != 1 %}s{% endif %}</span>
+          <span>·</span>
+          <span>{{ t.default_deliverables|length }} Deliverable{% if t.default_deliverables|length != 1 %}s{% endif %}</span>
+        </div>
+      </div>
+      <div class="ctpl-card__foot">
+        {% if t.state == 'published' %}
+        <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-use-tpl="{{ t.id }}" data-tpl-name="{{ t.name }}" data-tpl-type="{{ t.contract_type }}">
+          Use Template →
+        </button>
+        {% else %}
+        <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pub-tpl="{{ t.id }}">
+          Publish Template
+        </button>
+        {% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Instantiate Contract from Template Modal -->
+<div id="inst-modal" class="ts-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="inst-title">
+  <div class="ts-modal" style="max-width:540px;">
+    <h2 id="inst-title" class="ts-modal__title">Create Contract from Template</h2>
+    <p id="inst-sub" style="margin:0 0 14px;font-size:12.5px;color:var(--ts-text-muted);"></p>
+    <div class="ts-stack">
+      <div class="ts-field">
+        <label class="ts-field__label" for="inst-project">Associated Project *</label>
+        <select id="inst-project" class="ts-select">
+          {% for p in projects %}
+          <option value="{{ p.id }}">{{ p.project_code }} · {{ p.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="inst-name">Contract Title</label>
+        <input type="text" id="inst-name" class="ts-input" placeholder="e.g. Phase 1 Delivery SOW — Acme Ltd">
+      </div>
+      <div class="ts-form-row ts-form-row--split">
+        <div class="ts-field">
+          <label class="ts-field__label" for="inst-party">Counterparty / Employee *</label>
+          <input type="text" id="inst-party" class="ts-input" placeholder="Acme Holdings / Jane Doe">
+        </div>
+        <div class="ts-field">
+          <label class="ts-field__label" for="inst-val">Contract Value / Salary</label>
+          <input type="text" id="inst-val" class="ts-input" placeholder="120,000">
+        </div>
+      </div>
+      <div class="ts-form-row ts-form-row--split">
+        <div class="ts-field">
+          <label class="ts-field__label" for="inst-eff">Effective / Start Date</label>
+          <input type="date" id="inst-eff" class="ts-input">
+        </div>
+        <div class="ts-field" id="inst-prob-wrap" hidden>
+          <label class="ts-field__label" for="inst-prob">Probation Duration (Days)</label>
+          <input type="number" id="inst-prob" class="ts-input" value="90" min="14" max="365">
+        </div>
+      </div>
+    </div>
+    <div class="ts-modal__actions">
+      <button type="button" class="ts-btn ts-btn--secondary" id="inst-cancel">Cancel</button>
+      <button type="button" class="ts-btn ts-btn--primary" id="inst-submit">Create &amp; Open Contract →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create New Template Modal -->
+<div id="tpl-modal" class="ts-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="tpl-modal-title">
+  <div class="ts-modal" style="max-width:560px;">
+    <h2 id="tpl-modal-title" class="ts-modal__title">New Contract Template</h2>
+    <div class="ts-stack">
+      <div class="ts-form-row ts-form-row--split">
+        <div class="ts-field">
+          <label class="ts-field__label" for="tpl-name">Template Name *</label>
+          <input type="text" id="tpl-name" class="ts-input" placeholder="e.g. Consultancy Agreement (60-Day Probation)">
+        </div>
+        <div class="ts-field">
+          <label class="ts-field__label" for="tpl-type">Contract Type</label>
+          <select id="tpl-type" class="ts-select">
+            {% for key, lbl in contract_types %}
+            <option value="{{ key }}">{{ lbl }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="tpl-desc">Description</label>
+        <input type="text" id="tpl-desc" class="ts-input" placeholder="Short summary of when to use this template">
+      </div>
+      <div class="ts-field">
+        <label class="ts-field__label" for="tpl-body">Body HTML (supports {% raw %}{{project_name}}, {{counterparty_name}}, {{deal_value}}, {{effective_date}}{% endraw %})</label>
+        <textarea id="tpl-body" class="ts-textarea" rows="5" placeholder="<h1>AGREEMENT</h1><p>Entered into for Project {{project_name}} with {{counterparty_name}}.</p>"></textarea>
+      </div>
+    </div>
+    <div class="ts-modal__actions">
+      <button type="button" class="ts-btn ts-btn--secondary" id="tpl-cancel">Cancel</button>
+      <button type="button" class="ts-btn ts-btn--primary" id="tpl-save">Save Draft Template</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.ctpl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 16px;
+}
+.ctpl-card { display: flex; flex-direction: column; }
+.ctpl-card__body { padding: 16px 18px; flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; }
+.ctpl-card__title { margin: 0; font-size: 14.5px; font-weight: 600; color: var(--ts-text); }
+.ctpl-card__desc { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--ts-text-muted); }
+.ctpl-meta { margin-top: auto; padding-top: 8px; font-size: 11.5px; color: var(--ts-text-subtle); display: flex; gap: 6px; }
+.ctpl-card__foot { padding: 12px 18px; border-top: 1px solid var(--ts-border); background: var(--ts-surface-alt); display: flex; justify-content: flex-end; }
+</style>
+
+<script>
+(function () {
+  var instModal = document.getElementById('inst-modal');
+  var tplModal = document.getElementById('tpl-modal');
+  var activeTplId = null;
+
+  document.querySelectorAll('[data-use-tpl]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activeTplId = btn.dataset.useTpl;
+      document.getElementById('inst-sub').textContent = 'Template: ' + btn.dataset.tplName + ' — auto-seeds Key Terms & Deliverables.';
+      document.getElementById('inst-prob-wrap').hidden = btn.dataset.tplType !== 'employment_probation';
+      instModal.hidden = false;
+      document.getElementById('inst-party').focus();
+    });
+  });
+  document.getElementById('inst-cancel').addEventListener('click', function () { instModal.hidden = true; });
+  document.getElementById('inst-submit').addEventListener('click', function () {
+    if (!activeTplId) return;
+    fetch('/api/contract-templates/' + activeTplId + '/instantiate', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify({
+        project_id: document.getElementById('inst-project').value,
+        title: document.getElementById('inst-name').value.trim(),
+        variables: {
+          counterparty_name: document.getElementById('inst-party').value.trim(),
+          deal_value: document.getElementById('inst-val').value.trim(),
+          effective_date: document.getElementById('inst-eff').value,
+          probation_days: document.getElementById('inst-prob').value || 90,
+        },
+      }),
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.ok && d.url) window.location = d.url;
+    });
+  });
+
+  document.querySelectorAll('[data-pub-tpl]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      fetch('/api/contract-templates/' + btn.dataset.pubTpl + '/publish', {
+        method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' },
+      }).then(function () { window.location.reload(); });
+    });
+  });
+
+  document.getElementById('tpl-open-new').addEventListener('click', function () { tplModal.hidden = false; });
+  document.getElementById('tpl-cancel').addEventListener('click', function () { tplModal.hidden = true; });
+  document.getElementById('tpl-save').addEventListener('click', function () {
+    var name = document.getElementById('tpl-name').value.trim();
+    if (!name) return;
+    fetch('/api/contract-templates', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify({
+        name: name,
+        contract_type: document.getElementById('tpl-type').value,
+        description: document.getElementById('tpl-desc').value.trim(),
+        body_html: document.getElementById('tpl-body').value.trim(),
+      }),
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.ok) window.location.reload();
+    });
+  });
+})();
+</script>
+{% endblock %}
