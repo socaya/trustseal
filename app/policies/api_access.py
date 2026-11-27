@@ -31,12 +31,16 @@ SESSION_AUTH_ALLOWED_PREFIXES = (
     "/api/timesheets",
     "/api/project-templates",
     "/api/contract-templates",
+    "/api/eidas",
+    "/api/esignatures",
 )
 
 PUBLIC_ENDPOINTS = frozenset((
     "/api/auth/login",
     "/api/auth/register",
     "/api/auth/password-reset/request",
+    "/api/eidas/standards",
+    "/api/eidas/certificates/inspect",
 ))
 # Email-verification and password-reset consume routes authenticate
 # the caller by validating a one-shot token inside the handler.
@@ -44,6 +48,10 @@ PUBLIC_PREFIXES = (
     "/api/auth/verify-email/",
     "/api/auth/password-reset/",
     "/api/project-portal/",
+    "/api/esignatures/sign/",
+    "/api/esignatures/verify/",
+    "/api/eidas/eudi-wallet/",
+    "/api/eidas/csc/v2/",
 )
 ADMIN_EXACT = frozenset((
     "/api/roles", "/api/permissions", "/api/settings", "/api/audit-logs",

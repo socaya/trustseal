@@ -1,135 +1,125 @@
 {% extends "layouts/public.html" %}
 
-{% block title %}Trust &amp; security · TRUSTSEAL{% endblock %}
+{% block title %}Trust, Security &amp; eIDAS 2.0 Standards · TRUSTSEAL{% endblock %}
 {% block main_modifier %}ts-public-main--narrow{% endblock %}
 
 {% block content %}
-<header style="margin-bottom: var(--ts-space-5);">
-  <h1 class="ts-page-title">Trust &amp; security</h1>
-  <p class="ts-page-header__description">
-    What TRUSTSEAL cryptographically proves, what it records as workflow
-    evidence and what it deliberately does not claim. This page is the
-    canonical statement of our assurance scope.
+<style>
+  .tr-hero {
+    background: linear-gradient(110deg, #001a4d 0%, #002769 65%, #013688 100%);
+    color: #fff;
+    padding: 32px 34px;
+    border-bottom: 3px solid #02982e;
+    border-radius: 8px;
+    margin-bottom: 28px;
+  }
+  .tr-hero__eyebrow {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #7ee29a; margin-bottom: 6px;
+  }
+  .tr-hero__title { margin: 0 0 8px; font-size: 30px; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
+  .tr-hero__desc { margin: 0; font-size: 15px; line-height: 1.6; color: rgba(255,255,255,0.88); }
+
+  .tr-sec { padding: 24px 0; border-bottom: 1px solid #dbe4f2; }
+  .tr-sec:last-of-type { border-bottom: none; }
+  .tr-sec__title { font-size: 20px; font-weight: 700; color: #002769; margin: 0 0 12px; }
+  .tr-sec__lead { font-size: 14.5px; color: #334155; margin: 0 0 16px; line-height: 1.6; }
+
+  .tr-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .tr-table th {
+    text-align: left; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    color: #475569; padding: 10px 12px; border-bottom: 1.5px solid #002769; background: #f4f7fc;
+  }
+  .tr-table td { padding: 13px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: top; color: #0f172a; line-height: 1.5; }
+  .tr-list { margin: 0; padding-left: 20px; font-size: 14.5px; line-height: 1.65; color: #1e293b; }
+  .tr-list li { margin-bottom: 8px; }
+  .tr-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #02982e; margin-right: 6px; vertical-align: middle; }
+</style>
+
+<header class="tr-hero">
+  <div class="tr-hero__eyebrow">Regulation (EU) 2024/1183 (eIDAS 2.0) · ETSI EN 319 142 · CSC API v2 · EUDI Wallet</div>
+  <h1 class="tr-hero__title">Trust, Security &amp; eIDAS 2.0 Standards</h1>
+  <p class="tr-hero__desc">
+    TRUSTSEAL implements end-to-end electronic signature assurance across Simple (SES), Advanced (AES), and Qualified (QES) tiers, backed by ETSI PAdES long-term archival sealing, RFC 3161 trusted timestamps, Remote QSCD (CSC API v2), and EUDI Wallet identity verification.
   </p>
 </header>
 
-<section class="ts-panel">
-  <h2 class="ts-panel__title">What we prove cryptographically</h2>
-  <ul class="ts-stack ts-stack--tight" style="padding-left: var(--ts-space-5); list-style: disc;">
-    <li>
-      <strong>Platform-sealed PDFs.</strong> Each finalized envelope is
-      sealed with a TRUSTSEAL-controlled PAdES-B-B signature backed by
-      an AWS KMS-held key. An independent verifier can confirm the
-      sealed bytes were signed by our platform certificate and have
-      not been altered since.
-    </li>
-    <li>
-      <strong>RFC 3161 trusted timestamps.</strong> Every seal captures
-      a signed Time-Stamp Authority response bound to the sealed
-      document digest. The TSA response is retained inside the
-      validation dossier.
-    </li>
-    <li>
-      <strong>OCSP + CRL revocation evidence.</strong> At seal time we
-      capture OCSP responses (and CRLs where applicable) for the
-      certificates involved. These responses are stored with the
-      evidence dossier so a later check can see what was true at
-      sealing.
-    </li>
-    <li>
-      <strong>Chained-hash audit log.</strong> Every significant action
-      — envelope prepared, decision recorded, seal written, admin
-      operation — appends a SecurityEvent whose hash is chained from
-      the previous event. Signed anchors pin the chain tip so any
-      retrospective rewrite produces a detectable break.
-    </li>
-    <li>
-      <strong>Ed25519 review receipts.</strong> Each recorded signer
-      decision gets a canonical, Ed25519-signed receipt. Verifiers
-      can replay the receipt against a trusted public key without
-      calling TRUSTSEAL.
-    </li>
-  </ul>
-</section>
-
-<section class="ts-panel" style="margin-top: var(--ts-space-4);">
-  <h2 class="ts-panel__title">What we record as workflow evidence</h2>
-  <ul class="ts-stack ts-stack--tight" style="padding-left: var(--ts-space-5); list-style: disc;">
-    <li>
-      <strong>Signer appearances.</strong> A drawn signature captured
-      during review is stored as a visual representation of consent.
-      It is <em>not</em> a cryptographic signature on the sealed PDF.
-    </li>
-    <li>
-      <strong>Supporting attachments.</strong> Files the signer uploads
-      alongside their decision are hashed and the hashes are included
-      in the signed review receipt, so the receipt attests to the
-      exact bytes.
-    </li>
-    <li>
-      <strong>Organizational stamps.</strong> A visible stamp is a
-      workflow record that an authorized custodian applied a specific
-      design. It is not a cryptographic organizational seal on its
-      own; the authoritative seal is the platform PAdES signature.
-    </li>
-    <li>
-      <strong>Operator activity.</strong> Who prepared, reissued,
-      withdrew, archived, labelled or transferred an envelope — every
-      operation lands in SecurityEvent and the per-envelope timeline.
-    </li>
-  </ul>
-</section>
-
-<section class="ts-panel" style="margin-top: var(--ts-space-4);">
-  <h2 class="ts-panel__title">What TRUSTSEAL does <em>not</em> claim</h2>
-  <div class="ts-inline ts-inline--warning">
-    <div class="ts-inline__body">
-      <p style="margin: 0;">
-        TRUSTSEAL does not represent the current build as legally
-        certified, universally binding, tamper-proof or compliant with
-        a specific jurisdiction. We do not emit "qualified electronic
-        signature" status unless the operator has independently
-        configured a QSCD integration. We do not derive signer
-        identity from a drawn signature. We do not guarantee the
-        truth of the document's underlying claims — verification can
-        only establish properties of the recorded bytes and evidence.
-      </p>
-    </div>
-  </div>
-</section>
-
-<section class="ts-panel" style="margin-top: var(--ts-space-4);">
-  <h2 class="ts-panel__title">How verification runs</h2>
-  <ol class="ts-stack ts-stack--tight" style="padding-left: var(--ts-space-5); list-style: decimal;">
-    <li>You upload the sealed PDF and the evidence digest supplied by the issuer.</li>
-    <li>We hash the uploaded bytes server-side; the file is discarded immediately after hashing.</li>
-    <li>The embedded platform signature is validated against the pinned signing certificate.</li>
-    <li>The response tells you what was checked, what passed, what failed and what we could not check — never conflating the four.</li>
-  </ol>
-  <div class="ts-form-actions" style="justify-content: flex-start;">
-    <a class="ts-btn ts-btn--primary" href="/verify">Open the public verifier</a>
-  </div>
-</section>
-
-<section class="ts-panel" style="margin-top: var(--ts-space-4);">
-  <h2 class="ts-panel__title">Operating assurances</h2>
-  <ul class="ts-stack ts-stack--tight" style="padding-left: var(--ts-space-5); list-style: disc;">
-    <li>PostgreSQL row-level security enforces tenant isolation as defence in depth.</li>
-    <li>Pluggable private-object storage (filesystem or S3/MinIO) keeps retained artifacts off the generic static server.</li>
-    <li>Rate limiting is DB-backed so per-worker ceilings do not multiply across the cluster.</li>
-    <li>Idempotency keys + a transaction outbox ensure replayed webhook deliveries and API retries don't double-write.</li>
-    <li>Reusable OpenTelemetry + Prometheus instrumentation. Every HTTP response carries <code>X-Request-Id</code> and <code>X-Trace-Id</code> for support correlation.</li>
-    <li>No third-party CDN assets are required for the authenticated UI; brand and design tokens are self-hosted.</li>
-  </ul>
-</section>
-
-<section class="ts-panel" style="margin-top: var(--ts-space-4);">
-  <h2 class="ts-panel__title">Reporting a problem</h2>
-  <p style="margin: 0;">
-    Correlation IDs appear on error pages and in every response header.
-    Please include the <code>X-Request-Id</code> when contacting support.
-    Security issues should be reported through the channel established
-    with your TRUSTSEAL administrator.
+<section class="tr-sec">
+  <h2 class="tr-sec__title">Supported eIDAS 2.0 Electronic Signature Levels</h2>
+  <p class="tr-sec__lead">
+    Every document sent through TRUSTSEAL can enforce per-recipient assurance tiers matching EU Regulation 2024/1183 (eIDAS 2.0), Regulation (EU) No 910/2014, ESIGN, and UETA.
   </p>
+  <table class="tr-table">
+    <thead>
+      <tr>
+        <th>Tier</th>
+        <th>Legal Standard</th>
+        <th>Identity &amp; Sole-Control Mechanism</th>
+        <th>Cryptographic Binding</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong><span class="tr-dot"></span>SES</strong><br>Simple Electronic Signature</td>
+        <td>eIDAS 2.0 Art. 3(10) &amp; Art. 25(1); ESIGN / UETA</td>
+        <td>Verified recipient email invite, explicit versioned consent digest, and visual signature capture.</td>
+        <td>SHA-256 document digest, Ed25519 review receipt, hash-chained audit trail, and platform PAdES seal.</td>
+      </tr>
+      <tr>
+        <td><strong><span class="tr-dot"></span>AES</strong><br>Advanced Electronic Signature</td>
+        <td>eIDAS 2.0 Art. 26 (AdES) &amp; ETSI EN 319 142-1</td>
+        <td>Uniquely linked signatory identity with 2-factor sole-control OTP / TOTP / Passkey verification.</td>
+        <td>X.509 / Ed25519 cryptographic binding over document bytes, RFC 3161 TSA timestamp, and PAdES-B-LT DSS validation data.</td>
+      </tr>
+      <tr>
+        <td><strong><span class="tr-dot"></span>QES</strong><br>Qualified Electronic Signature</td>
+        <td>eIDAS 2.0 Art. 3(12), Art. 25(2), Art. 28 &amp; Annex II</td>
+        <td>EU LOTL-listed QTSP Qualified Certificate (ETSI EN 319 412-5 QCStatements) + Remote QSCD (CSC API v2 SCAL2 SAD) or EUDI Wallet (OpenID4VP LoA High PID).</td>
+        <td>Handwritten legal equivalence across EU Member States, sealed under ETSI PAdES-B-LTA with Qualified TSA &amp; long-term archival DocTimeStamp.</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="tr-sec">
+  <h2 class="tr-sec__title">ETSI EN 319 142 PAdES Long-Term Preservation Profiles</h2>
+  <ul class="tr-list">
+    <li><strong>PAdES-B-B (Baseline):</strong> Embedded CMS/PKCS#7 cryptographic signature (`ETSI.CAdES.detached`) over the exact PDF ByteRange backed by HSM / AWS KMS or QTSP signing keys.</li>
+    <li><strong>PAdES-B-T (Trusted Time):</strong> Binds an RFC 3161 Time-Stamp Authority (TSA) token to the signature value for independent cryptographic proof of signing time.</li>
+    <li><strong>PAdES-B-LT (Long-Term Validation):</strong> Embeds the complete certificate chain, OCSP responses, and CRL revocation snapshots inside the PDF `/DSS` and `/VRI` dictionaries for offline verification beyond certificate expiry.</li>
+    <li><strong>PAdES-B-LTA (Long-Term Archival):</strong> Applies periodic `ETSI.RFC3161` Document Time-Stamps sealing both the signature and all DSS validation material for multi-decade archival preservation.</li>
+  </ul>
+</section>
+
+<section class="tr-sec">
+  <h2 class="tr-sec__title">Remote QSCD (CSC API v2.0) &amp; EUDI Wallet Architecture</h2>
+  <ul class="tr-list">
+    <li><strong>Cloud Signature Consortium (CSC) API v2.0:</strong> Standards-compliant credential discovery (`/credentials/list`), SCAL2 Signature Activation Data sole-control authorization (`/credentials/authorize`), and remote HSM hash signing (`/signatures/signHash`).</li>
+    <li><strong>EUDI Wallet ARF (OpenID4VP / OID4VCI):</strong> Generates verifiable `openid4vp://` presentation requests for EU Person Identification Data (PID) at Level of Assurance High and executes Wallet-backed Qualified Electronic Signatures bound to exact document SHA-256 digests.</li>
+    <li><strong>ETSI EN 319 412-5 QCStatements Inspection:</strong> Automated X.509 parser validating `QcCompliance` (`0.4.0.1862.1.1`), `QcSSCD/QSCD` (`0.4.0.1862.1.4`), and `QcType` (`esign` / `eseal`) extensions against EU Trusted Lists (LOTL).</li>
+    <li><strong>Tamper-Evident Audit Chain &amp; Certificate of Completion:</strong> Every workflow action — creation, dispatch, viewing, OTP/EUDI verification, signing, and PAdES sealing — is chained with SHA-256 hashes and exported in a verifiable Certificate of Completion.</li>
+  </ul>
+</section>
+
+<section class="tr-sec">
+  <h2 class="tr-sec__title">Independent Public Verification</h2>
+  <ol class="tr-list">
+    <li>Upload any sealed PDF or enter a TRUSTSEAL Package Reference (`ESIG-...`), Document SHA-256, or Stamp Receipt ID.</li>
+    <li>TRUSTSEAL verifies the exact byte digest, embedded PAdES CMS signature, certificate chain, RFC 3161 TSA token, and OCSP/CRL revocation status.</li>
+    <li>The verifier returns a structured cryptographic report detailing the eIDAS 2.0 level (`SES`/`AES`/`QES`), ETSI PAdES profile, and hash-chain integrity.</li>
+  </ol>
+  <div style="margin-top: 18px; display: flex; gap: 12px; flex-wrap: wrap;">
+    <a class="ts-btn ts-btn--primary" href="/verify">Open Public Verifier</a>
+    <a class="ts-btn ts-btn--secondary" href="/esignatures/send">Open Send for eSignature Studio</a>
+  </div>
+</section>
+
+<section class="tr-sec">
+  <h2 class="tr-sec__title">Platform Operating Assurances</h2>
+  <ul class="tr-list">
+    <li>PostgreSQL Row-Level Security (RLS) enforces strict multi-tenant data isolation at the database layer.</li>
+    <li>Private object storage (S3/MinIO or encrypted filesystem) protects retained artifacts with digest verification.</li>
+    <li>Idempotency keys, transactional outbox delivery, and DB-backed rate limiting safeguard high-volume API and bulk-invite operations.</li>
+    <li>Full OpenTelemetry tracing and Prometheus metrics with `X-Request-Id` and `X-Trace-Id` correlation headers on every response.</li>
+  </ul>
 </section>
 {% endblock %}

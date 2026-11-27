@@ -1,0 +1,18 @@
+name: trustseal_mobile
+description: TRUSTSEAL Native Flutter Mobile App — Home, Projects & My Work, Contracts & eIDAS 2.0 eSignature, Documents & Stamps, and Cryptographic Verification.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

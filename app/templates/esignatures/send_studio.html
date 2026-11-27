@@ -1,0 +1,739 @@
+{% extends "layouts/app.html" %}
+{% block title %}Send for eSignature · eIDAS 2.0 Studio · TRUSTSEAL{% endblock %}
+{% block page_header %}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .ts-page { padding: 0 !important; max-width: none !important; width: 100% !important; }
+  .ts-content { padding: 0 !important; background: #ffffff !important; }
+
+  .es-hero {
+    background: linear-gradient(110deg, #001a4d 0%, #002769 60%, #013688 100%);
+    color: #fff;
+    padding: 26px 36px;
+    border-bottom: 2px solid #02982e;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .es-hero__eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #7ee29a;
+    margin-bottom: 4px;
+  }
+  .es-hero__title {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #fff;
+  }
+  .es-hero__sub {
+    margin: 6px 0 0;
+    font-size: 14px;
+    color: rgba(255,255,255,0.82);
+  }
+  .es-hero__actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .es-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 18px; border-radius: 7px; font-size: 14px; font-weight: 600;
+    cursor: pointer; border: 1px solid transparent; text-decoration: none;
+    transition: background 140ms ease, border-color 140ms ease;
+  }
+  .es-btn--white { background: #fff; color: #002769; }
+  .es-btn--white:hover { background: #eef4ff; }
+  .es-btn--emerald { background: #02982e; color: #fff; }
+  .es-btn--emerald:hover { background: #027f26; }
+  .es-btn--navy { background: #002769; color: #fff; }
+  .es-btn--navy:hover { background: #001d52; }
+  .es-btn--outline { background: transparent; color: #002769; border-color: #cbd5e1; }
+  .es-btn--outline:hover { background: #f4f7fc; border-color: #002769; }
+  .es-btn--ghost-dark { background: transparent; color: #fff; border-color: rgba(255,255,255,0.34); }
+  .es-btn--ghost-dark:hover { background: rgba(255,255,255,0.1); }
+  .es-btn--sm { padding: 6px 12px; font-size: 13px; }
+
+  .es-kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    background: #f4f7fc;
+    border-bottom: 1px solid #dbe4f2;
+  }
+  .es-kpi {
+    padding: 18px 28px;
+    border-right: 1px solid #dbe4f2;
+  }
+  .es-kpi:last-child { border-right: none; }
+  .es-kpi__label { font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+  .es-kpi__val { font-size: 28px; font-weight: 700; color: #002769; line-height: 1.1; }
+  .es-kpi__val--em { color: #028227; }
+  .es-kpi__sub { font-size: 12.5px; color: #64748b; margin-top: 4px; }
+
+  .es-tabs {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    padding: 0 36px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #fff;
+  }
+  .es-tab {
+    background: none; border: none; border-bottom: 2.5px solid transparent;
+    padding: 15px 0; font-size: 14.5px; font-weight: 600; color: #475569;
+    cursor: pointer; margin-bottom: -1px;
+  }
+  .es-tab.is-active { color: #002769; border-bottom-color: #002769; }
+  .es-tab:hover { color: #002769; }
+
+  .es-pane { display: none; padding: 28px 36px 48px; }
+  .es-pane.is-active { display: block; }
+
+  .es-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.9fr);
+    gap: 36px;
+    align-items: start;
+  }
+  .es-section-title {
+    font-size: 16px; font-weight: 700; color: #002769;
+    margin: 0 0 14px; padding-bottom: 8px; border-bottom: 1.5px solid #002769;
+  }
+  .es-section-title--em { border-bottom-color: #02982e; }
+
+  .es-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .es-table th {
+    text-align: left; font-size: 12px; font-weight: 700; letter-spacing: 0.05em;
+    text-transform: uppercase; color: #64748b; padding: 11px 12px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .es-table td {
+    padding: 13px 12px; border-bottom: 1px solid #eef2f7; color: #0f172a; vertical-align: middle;
+  }
+  .es-table tbody tr:hover { background: #f8fafd; }
+
+  .es-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .es-dot--green { background: #02982e; }
+  .es-dot--navy { background: #002769; }
+  .es-dot--amber { background: #d97706; }
+  .es-dot--red { background: #dc2626; }
+  .es-dot--slate { background: #64748b; }
+
+  .es-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 20px;
+  }
+  .es-field { display: flex; flex-direction: column; gap: 6px; }
+  .es-field--full { grid-column: 1 / -1; }
+  .es-label { font-size: 13.5px; font-weight: 600; color: #1e293b; }
+  .es-input, .es-select, .es-textarea {
+    width: 100%; padding: 9px 12px; font-size: 14px; color: #0f172a;
+    border: 1px solid #cbd5e1; border-radius: 6px; background: #fff;
+    font-family: inherit;
+  }
+  .es-input:focus, .es-select:focus, .es-textarea:focus {
+    outline: none; border-color: #002769; box-shadow: 0 0 0 2px rgba(0,39,105,0.1);
+  }
+  .es-row-inline { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  .es-rec-row {
+    display: grid;
+    grid-template-columns: 44px 1.2fr 1.4fr 110px 100px 135px 36px;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #eef2f7;
+  }
+  .es-rail {
+    background: #f8fafd;
+    border-left: 1px solid #e2e8f0;
+    padding: 20px 24px;
+  }
+  .es-std-row {
+    padding: 14px 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .es-std-row:last-child { border-bottom: none; }
+  .es-std-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .es-std-name { font-size: 15px; font-weight: 700; color: #002769; }
+  .es-std-code { font-size: 12.5px; font-weight: 700; color: #028227; font-family: ui-monospace, monospace; }
+  .es-std-desc { font-size: 13.5px; color: #475569; margin: 0; line-height: 1.5; }
+  .es-notice {
+    padding: 12px 16px; border-left: 3px solid #02982e; background: #f4fbf6;
+    font-size: 14px; color: #0f172a; margin-bottom: 18px; display: none;
+  }
+  .es-notice.is-error { border-left-color: #dc2626; background: #fef2f2; color: #991b1b; }
+  .es-notice.is-show { display: block; }
+  .es-link-mono { font-family: ui-monospace, monospace; font-size: 13px; color: #002769; text-decoration: none; font-weight: 600; }
+  .es-link-mono:hover { text-decoration: underline; }
+  @media (max-width: 1080px) {
+    .es-kpi-strip { grid-template-columns: repeat(2, 1fr); }
+    .es-split { grid-template-columns: 1fr; }
+    .es-rec-row { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="es-hero">
+  <div>
+    <div class="es-hero__eyebrow">eIDAS 2.0 · ETSI EN 319 142 PAdES · CSC API v2 · EUDI Wallet</div>
+    <h1 class="es-hero__title">Send Documents for eSignature</h1>
+    <p class="es-hero__sub">Multi-recipient routing, CSV bulk invites, automated reminders, and SES / AES / QES cryptographic sealing.</p>
+  </div>
+  <div class="es-hero__actions">
+    <button type="button" class="es-btn es-btn--white" data-es-jump="compose">+ Send Document</button>
+    <button type="button" class="es-btn es-btn--emerald" data-es-jump="bulk">Bulk Invite (CSV)</button>
+    <a class="es-btn es-btn--ghost-dark" href="/trust">eIDAS 2.0 Trust Standards</a>
+  </div>
+</section>
+
+<section class="es-kpi-strip" aria-label="eSignature summary metrics">
+  <div class="es-kpi">
+    <div class="es-kpi__label">Total Packages</div>
+    <div class="es-kpi__val" id="kpi-total">0</div>
+    <div class="es-kpi__sub">All sent &amp; sealed workflows</div>
+  </div>
+  <div class="es-kpi">
+    <div class="es-kpi__label">Awaiting Signature</div>
+    <div class="es-kpi__val" id="kpi-awaiting">0</div>
+    <div class="es-kpi__sub">Active routing &amp; reminders</div>
+  </div>
+  <div class="es-kpi">
+    <div class="es-kpi__label">Completed &amp; Sealed</div>
+    <div class="es-kpi__val es-kpi__val--em" id="kpi-completed">0</div>
+    <div class="es-kpi__sub">PAdES + RFC 3161 + Audit Trail</div>
+  </div>
+  <div class="es-kpi">
+    <div class="es-kpi__label">Qualified (QES)</div>
+    <div class="es-kpi__val" id="kpi-qes">0</div>
+    <div class="es-kpi__sub">QTSP / Remote QSCD / EUDI Wallet</div>
+  </div>
+  <div class="es-kpi">
+    <div class="es-kpi__label">Bulk Batches</div>
+    <div class="es-kpi__val" id="kpi-bulk">0</div>
+    <div class="es-kpi__sub">CSV mass dispatch campaigns</div>
+  </div>
+</section>
+
+<nav class="es-tabs" role="tablist">
+  <button type="button" class="es-tab is-active" data-es-tab="packages">Packages &amp; Tracking</button>
+  <button type="button" class="es-tab" data-es-tab="compose">Send Document</button>
+  <button type="button" class="es-tab" data-es-tab="bulk">Bulk Invite (CSV)</button>
+  <button type="button" class="es-tab" data-es-tab="standards">eIDAS 2.0 &amp; QTSP Config</button>
+</nav>
+
+<div id="es-notice" class="es-notice" style="margin: 18px 36px 0;"></div>
+
+<!-- TAB 1: PACKAGES & TRACKING -->
+<section class="es-pane is-active" id="pane-packages">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:12px; flex-wrap:wrap;">
+    <div class="es-row-inline">
+      <select id="filter-status" class="es-select" style="width:170px;">
+        <option value="">All statuses</option>
+        <option value="sent">Sent</option>
+        <option value="in_progress">In Progress</option>
+        <option value="completed">Completed</option>
+        <option value="declined">Declined</option>
+        <option value="voided">Voided</option>
+      </select>
+      <select id="filter-level" class="es-select" style="width:170px;">
+        <option value="">All eIDAS levels</option>
+        <option value="SES">SES · Simple</option>
+        <option value="AES">AES · Advanced</option>
+        <option value="QES">QES · Qualified</option>
+      </select>
+    </div>
+    <button type="button" class="es-btn es-btn--outline es-btn--sm" id="btn-refresh-packages">Refresh</button>
+  </div>
+
+  <table class="es-table">
+    <thead>
+      <tr>
+        <th>Package</th>
+        <th>Reference</th>
+        <th>eIDAS / PAdES</th>
+        <th>Routing</th>
+        <th>Progress</th>
+        <th>Status</th>
+        <th>Expires</th>
+        <th style="text-align:right;">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="packages-tbody">
+      <tr><td colspan="8" style="color:#64748b; padding:28px 12px;">Loading signature packages…</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- TAB 2: SEND DOCUMENT -->
+<section class="es-pane" id="pane-compose">
+  <div class="es-split">
+    <form id="compose-form">
+      <h2 class="es-section-title">1. Document, Routing &amp; eIDAS 2.0 Level</h2>
+      <div class="es-form-grid">
+        <div class="es-field">
+          <label class="es-label" for="send-doc-select">Workspace Document (Optional)</label>
+          <select id="send-doc-select" class="es-select">
+            <option value="">Custom title / external document…</option>
+            {% for d in documents %}
+            <option value="{{ d.id }}" data-title="{{ d.title }}">{{ d.title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="es-field">
+          <label class="es-label" for="send-title">Envelope Title *</label>
+          <input id="send-title" class="es-input" required placeholder="e.g. Master Services Agreement — Counterparty">
+        </div>
+        <div class="es-field">
+          <label class="es-label" for="send-mode">Delivery Mode</label>
+          <select id="send-mode" class="es-select">
+            <option value="single">Email Invite (Trackable per recipient)</option>
+            <option value="invite_link">Shareable Signing Link (Kiosk / Self-Service)</option>
+            <option value="in_person">In-Person Signing Session</option>
+          </select>
+        </div>
+        <div class="es-field">
+          <label class="es-label" for="send-routing">Signing Order</label>
+          <select id="send-routing" class="es-select">
+            <option value="sequential">Sequential (Step 1 → Step 2 → Step 3)</option>
+            <option value="parallel">Parallel (All signers simultaneously)</option>
+            <option value="quorum">Quorum (N of M signers required)</option>
+          </select>
+        </div>
+        <div class="es-field">
+          <label class="es-label" for="send-eidas">eIDAS 2.0 Signature Level</label>
+          <select id="send-eidas" class="es-select">
+            <option value="QES">QES — Qualified Electronic Signature (QTSP / QSCD / EUDI Wallet)</option>
+            <option value="AES" selected>AES — Advanced Electronic Signature (Art. 26 + OTP + X.509)</option>
+            <option value="SES">SES — Simple Electronic Signature (Art. 3(10) + Consent)</option>
+          </select>
+        </div>
+        <div class="es-field">
+          <label class="es-label" for="send-pades">ETSI PAdES Preservation Profile</label>
+          <select id="send-pades" class="es-select">
+            <option value="PAdES-B-LTA" selected>PAdES-B-LTA (Long-Term Archival + DocTimeStamp)</option>
+            <option value="PAdES-B-LT">PAdES-B-LT (Long-Term Validation + DSS OCSP/CRL)</option>
+            <option value="PAdES-B-T">PAdES-B-T (RFC 3161 Trusted Timestamp)</option>
+            <option value="PAdES-B-B">PAdES-B-B (Basic Baseline CMS Seal)</option>
+          </select>
+        </div>
+        <div class="es-field">
+          <label class="es-label" for="send-expiry">Expiration (1–180 Days)</label>
+          <input id="send-expiry" type="number" min="1" max="180" value="30" class="es-input">
+        </div>
+        <div class="es-field">
+          <label class="es-label" for="send-reminder-days">Auto-Reminder Interval (Days)</label>
+          <input id="send-reminder-days" type="number" min="1" max="30" value="3" class="es-input">
+        </div>
+        <div class="es-field es-field--full">
+          <label class="es-label" for="send-subject">Email Subject</label>
+          <input id="send-subject" class="es-input" placeholder="Please review and sign this TRUSTSEAL agreement">
+        </div>
+        <div class="es-field es-field--full">
+          <label class="es-label" for="send-message">Personal Message to Recipients</label>
+          <textarea id="send-message" rows="2" class="es-textarea" placeholder="Please review the attached agreement and complete your signature before the deadline."></textarea>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:24px;">
+        <h2 class="es-section-title" style="margin:0; border:none; padding:0;">2. Recipients &amp; Per-Signer Assurance</h2>
+        <button type="button" class="es-btn es-btn--outline es-btn--sm" id="btn-add-recipient">+ Add Recipient</button>
+      </div>
+      <div style="border-top:1.5px solid #002769; margin-top:8px; padding-top:8px;">
+        <div id="recipients-list"></div>
+      </div>
+
+      <div class="es-row-inline" style="margin-top:20px; gap:20px;">
+        <label style="font-size:14px; display:flex; align-items:center; gap:7px;">
+          <input type="checkbox" id="send-allow-decline" checked> Allow recipients to decline
+        </label>
+        <label style="font-size:14px; display:flex; align-items:center; gap:7px;">
+          <input type="checkbox" id="send-allow-reassign" checked> Allow signer reassignment (delegate)
+        </label>
+      </div>
+
+      <div class="es-row-inline" style="margin-top:24px;">
+        <button type="submit" class="es-btn es-btn--navy">Dispatch Signature Package</button>
+      </div>
+    </form>
+
+    <aside class="es-rail">
+      <h3 class="es-section-title es-section-title--em">eIDAS 2.0 Signature Tiers</h3>
+      {% for code, info in eidas_levels.items() %}
+      <div class="es-std-row">
+        <div class="es-std-head">
+          <span class="es-std-name">{{ info.name }}</span>
+          <span class="es-std-code">{{ code }}</span>
+        </div>
+        <p class="es-std-desc">{{ info.legal_basis }}<br>{{ info.sole_control }}</p>
+      </div>
+      {% endfor %}
+    </aside>
+  </div>
+</section>
+
+<!-- TAB 3: BULK INVITE (CSV) -->
+<section class="es-pane" id="pane-bulk">
+  <div class="es-split">
+    <form id="bulk-form">
+      <h2 class="es-section-title">Bulk Invite — Individual Trackable Envelopes via CSV</h2>
+      <p style="font-size:14px; color:#475569; margin:0 0 18px;">
+        Send one agreement or policy acknowledgment to up to 250 recipients at once. Each recipient receives an isolated, trackable invite token and audit trail.
+      </p>
+      <div class="es-form-grid">
+        <div class="es-field">
+          <label class="es-label" for="bulk-title">Template / Document Title *</label>
+          <input id="bulk-title" class="es-input" required placeholder="e.g. 2026 Employee Confidentiality &amp; NDA">
+        </div>
+        <div class="es-field">
+          <label class="es-label" for="bulk-eidas">Default eIDAS Level</label>
+          <select id="bulk-eidas" class="es-select">
+            <option value="SES">SES · Simple</option>
+            <option value="AES" selected>AES · Advanced (OTP + Certificate)</option>
+            <option value="QES">QES · Qualified (QSCD / EUDI Wallet)</option>
+          </select>
+        </div>
+        <div class="es-field es-field--full">
+          <label class="es-label" for="bulk-csv">Recipients CSV (<code>name,email,role,eidas_level</code>)</label>
+          <textarea id="bulk-csv" rows="6" class="es-textarea" required placeholder="name,email,role,eidas_level&#10;Alice Meyer,alice.meyer@acme.eu,signer,QES&#10;David Kato,david.kato@acme.eu,signer,AES"></textarea>
+        </div>
+      </div>
+      <div style="margin-top:20px;">
+        <button type="submit" class="es-btn es-btn--emerald">Dispatch Bulk Invite Batch</button>
+      </div>
+    </form>
+
+    <aside class="es-rail">
+      <h3 class="es-section-title es-section-title--em">Bulk Dispatch Controls</h3>
+      <div class="es-std-row">
+        <div class="es-std-name">Isolated Per-Recipient Links</div>
+        <p class="es-std-desc">Each CSV row generates a dedicated package reference, unique SHA-256 digest binding, and individual Certificate of Completion.</p>
+      </div>
+      <div class="es-std-row">
+        <div class="es-std-name">Automated Follow-Ups</div>
+        <p class="es-std-desc">All dispatched packages inherit expiration limits (up to 180 days) and automated reminder tracking.</p>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<!-- TAB 4: eIDAS 2.0 & QTSP CONFIG -->
+<section class="es-pane" id="pane-standards">
+  <div class="es-split">
+    <div>
+      <h2 class="es-section-title">Configured QTSP &amp; Remote QSCD Providers (EU LOTL / CSC API v2)</h2>
+      <table class="es-table" style="margin-bottom:28px;">
+        <thead>
+          <tr>
+            <th>Provider</th>
+            <th>Type</th>
+            <th>Country</th>
+            <th>Default PAdES</th>
+            <th>LOTL / QSCD</th>
+          </tr>
+        </thead>
+        <tbody id="qtsp-tbody">
+          <tr><td colspan="5" style="color:#64748b;">Loading QTSP configuration…</td></tr>
+        </tbody>
+      </table>
+
+      <h2 class="es-section-title">Register QTSP / EUDI Wallet / CSC v2 Gateway</h2>
+      <form id="qtsp-form" class="es-form-grid">
+        <div class="es-field">
+          <label class="es-label" for="qtsp-name">QTSP Name *</label>
+          <input id="qtsp-name" class="es-input" required placeholder="e.g. TrustTech NL Qualified TSP">
+        </div>
+        <div class="es-field">
+          <label class="es-label" for="qtsp-type">Protocol Type</label>
+          <select id="qtsp-type" class="es-select">
+            <option value="csc_v2">CSC API v2.0 (Remote QSCD)</option>
+            <option value="eudi_wallet">EUDI Wallet ARF (OpenID4VP / QES)</option>
+            <option value="qualified_seal">Qualified Electronic Seal (QSeal)</option>
+          </select>
+        </div>
+        <div class="es-field">
+          <label class="es-label" for="qtsp-country">EU / Jurisdiction Code</label>
+          <input id="qtsp-country" class="es-input" value="NL" maxlength="4">
+        </div>
+        <div class="es-field">
+          <label class="es-label" for="qtsp-pades">Default PAdES Profile</label>
+          <select id="qtsp-pades" class="es-select">
+            <option value="PAdES-B-LTA">PAdES-B-LTA</option>
+            <option value="PAdES-B-LT">PAdES-B-LT</option>
+            <option value="PAdES-B-T">PAdES-B-T</option>
+            <option value="PAdES-B-B">PAdES-B-B</option>
+          </select>
+        </div>
+        <div class="es-field es-field--full">
+          <label class="es-label" for="qtsp-url">CSC v2 / EUDI Verifier Endpoint URL</label>
+          <input id="qtsp-url" class="es-input" placeholder="https://csc.qtsp.example.eu/csc/v2">
+        </div>
+        <div class="es-field es-field--full">
+          <button type="submit" class="es-btn es-btn--navy" style="width:fit-content;">Save QTSP Provider</button>
+        </div>
+      </form>
+    </div>
+
+    <aside class="es-rail">
+      <h3 class="es-section-title es-section-title--em">ETSI EN 319 142 PAdES Profiles</h3>
+      {% for code, p in pades_profiles.items() %}
+      <div class="es-std-row">
+        <div class="es-std-head">
+          <span class="es-std-name">{{ code }}</span>
+          <span class="es-std-code">{{ p.longevity }}</span>
+        </div>
+        <p class="es-std-desc">{{ p.controls | join(' · ') }}</p>
+      </div>
+      {% endfor %}
+    </aside>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_body %}
+<script>
+(function () {
+  const notice = document.getElementById('es-notice');
+  function showNotice(msg, isError) {
+    notice.textContent = msg;
+    notice.className = 'es-notice is-show' + (isError ? ' is-error' : '');
+  }
+
+  function switchTab(name) {
+    document.querySelectorAll('[data-es-tab]').forEach(b => b.classList.toggle('is-active', b.dataset.esTab === name));
+    document.querySelectorAll('.es-pane').forEach(p => p.classList.toggle('is-active', p.id === 'pane-' + name));
+  }
+  document.querySelectorAll('[data-es-tab]').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.esTab)));
+  document.querySelectorAll('[data-es-jump]').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.esJump)));
+
+  const docSelect = document.getElementById('send-doc-select');
+  const titleInput = document.getElementById('send-title');
+  docSelect.addEventListener('change', () => {
+    const opt = docSelect.options[docSelect.selectedIndex];
+    if (opt && opt.dataset.title && !titleInput.value.trim()) {
+      titleInput.value = opt.dataset.title;
+    }
+  });
+
+  // Dynamic recipient rows
+  const recList = document.getElementById('recipients-list');
+  function addRecipientRow(prefill) {
+    const idx = recList.children.length + 1;
+    const row = document.createElement('div');
+    row.className = 'es-rec-row';
+    const defLevel = document.getElementById('send-eidas').value || 'AES';
+    row.innerHTML = `
+      <input type="number" class="es-input rec-order" min="1" value="${prefill?.order || idx}" title="Order">
+      <input type="text" class="es-input rec-name" placeholder="Full Name" value="${prefill?.name || ''}">
+      <input type="email" class="es-input rec-email" placeholder="signer@company.com" value="${prefill?.email || ''}">
+      <select class="es-select rec-role">
+        <option value="signer">Signer</option>
+        <option value="approver">Approver</option>
+        <option value="witness">Witness</option>
+        <option value="cc">CC Viewer</option>
+      </select>
+      <select class="es-select rec-level">
+        <option value="QES" ${defLevel === 'QES' ? 'selected' : ''}>QES</option>
+        <option value="AES" ${defLevel === 'AES' ? 'selected' : ''}>AES</option>
+        <option value="SES" ${defLevel === 'SES' ? 'selected' : ''}>SES</option>
+      </select>
+      <select class="es-select rec-auth">
+        <option value="email_otp">Email OTP</option>
+        <option value="eudi_wallet_pid">EUDI Wallet</option>
+        <option value="passcode">Passcode</option>
+        <option value="none">Standard</option>
+      </select>
+      <button type="button" class="es-btn es-btn--outline es-btn--sm rec-del" title="Remove">&times;</button>
+    `;
+    row.querySelector('.rec-del').addEventListener('click', () => {
+      if (recList.children.length > 1) row.remove();
+    });
+    recList.appendChild(row);
+  }
+  addRecipientRow();
+  document.getElementById('btn-add-recipient').addEventListener('click', () => addRecipientRow());
+
+  function dotClass(status) {
+    if (status === 'completed') return 'es-dot--green';
+    if (status === 'sent' || status === 'in_progress') return 'es-dot--navy';
+    if (status === 'declined' || status === 'voided' || status === 'expired') return 'es-dot--red';
+    return 'es-dot--slate';
+  }
+
+  async function loadPackages() {
+    const st = document.getElementById('filter-status').value;
+    const lv = document.getElementById('filter-level').value;
+    const qs = new URLSearchParams();
+    if (st) qs.set('status', st);
+    if (lv) qs.set('eidas_level', lv);
+    const res = await fetch('/api/esignatures/send?' + qs.toString());
+    if (!res.ok) return;
+    const data = await res.json();
+    const s = data.summary || {};
+    document.getElementById('kpi-total').textContent = s.total ?? 0;
+    document.getElementById('kpi-awaiting').textContent = s.awaiting ?? 0;
+    document.getElementById('kpi-completed').textContent = s.completed ?? 0;
+    document.getElementById('kpi-qes').textContent = s.qes_count ?? 0;
+    document.getElementById('kpi-bulk').textContent = s.bulk_batches ?? 0;
+
+    const tbody = document.getElementById('packages-tbody');
+    const pkgs = data.packages || [];
+    if (!pkgs.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="color:#64748b; padding:28px 12px;">No signature packages yet. Use "Send Document" or "Bulk Invite (CSV)" to dispatch your first eIDAS 2.0 workflow.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = pkgs.map(p => {
+      const nextSigner = (p.recipients || []).find(r => r.status === 'sent' || r.status === 'viewed');
+      const signLink = nextSigner ? nextSigner.sign_url : (p.share_link_url || '');
+      const exp = p.expires_at ? p.expires_at.slice(0, 10) : '—';
+      return `<tr>
+        <td>
+          <div style="font-weight:600; color:#0f172a;">${p.title}</div>
+          <div style="font-size:12.5px; color:#64748b;">${p.send_mode}${p.bulk_batch_id ? ' · ' + p.bulk_batch_id : ''}</div>
+        </td>
+        <td><a class="es-link-mono" href="/esignatures/certificate/${p.package_ref}">${p.package_ref}</a></td>
+        <td><strong>${p.eidas_level}</strong> <span style="color:#64748b;">· ${p.pades_profile}</span></td>
+        <td style="text-transform:capitalize;">${p.routing_mode}</td>
+        <td>${p.signed_count} / ${p.signer_count} signed</td>
+        <td><span class="es-dot ${dotClass(p.status)}"></span><span style="text-transform:capitalize;">${p.status.replace('_',' ')}</span></td>
+        <td style="color:#475569;">${exp}</td>
+        <td style="text-align:right; white-space:nowrap;">
+          ${signLink && p.status !== 'completed' && p.status !== 'voided' ? `<a class="es-btn es-btn--outline es-btn--sm" href="${signLink}" target="_blank">Open Signer Link</a>` : ''}
+          ${p.status === 'sent' || p.status === 'in_progress' ? `<button type="button" class="es-btn es-btn--outline es-btn--sm" data-remind="${p.id}">Remind</button>` : ''}
+          <a class="es-btn es-btn--outline es-btn--sm" href="/esignatures/certificate/${p.package_ref}">Audit Cert</a>
+        </td>
+      </tr>`;
+    }).join('');
+
+    tbody.querySelectorAll('[data-remind]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const r = await fetch(`/api/esignatures/send/${btn.dataset.remind}/remind`, {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'fetch' },
+        });
+        const d = await r.json();
+        if (r.ok) {
+          showNotice(`Reminder #${d.reminders_sent} dispatched to ${d.reminded_count} pending recipient(s).`, false);
+          loadPackages();
+        } else {
+          showNotice(d.error || 'Reminder failed', true);
+        }
+      });
+    });
+  }
+
+  async function loadQtsp() {
+    const res = await fetch('/api/eidas/qtsp');
+    if (!res.ok) return;
+    const data = await res.json();
+    const tbody = document.getElementById('qtsp-tbody');
+    tbody.innerHTML = (data.providers || []).map(p => `<tr>
+      <td><strong>${p.name}</strong><div style="font-size:12.5px; color:#64748b;">${p.lotl_trust_service_id || p.csc_base_url || 'Configured'}</div></td>
+      <td style="font-family:ui-monospace,monospace; font-size:13px;">${p.provider_type}</td>
+      <td>${p.country_code}</td>
+      <td>${p.default_pades_profile}</td>
+      <td><span class="es-dot es-dot--green"></span>LOTL Verified · QSCD Certified</td>
+    </tr>`).join('');
+  }
+
+  document.getElementById('compose-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const recipients = Array.from(recList.querySelectorAll('.es-rec-row')).map(r => ({
+      signing_order: parseInt(r.querySelector('.rec-order').value || '1', 10),
+      name: r.querySelector('.rec-name').value.trim(),
+      email: r.querySelector('.rec-email').value.trim(),
+      role: r.querySelector('.rec-role').value,
+      eidas_level: r.querySelector('.rec-level').value,
+      auth_method: r.querySelector('.rec-auth').value,
+    })).filter(r => r.email);
+
+    const payload = {
+      source_id: docSelect.value ? parseInt(docSelect.value, 10) : null,
+      title: titleInput.value.trim(),
+      send_mode: document.getElementById('send-mode').value,
+      routing_mode: document.getElementById('send-routing').value,
+      eidas_level: document.getElementById('send-eidas').value,
+      pades_profile: document.getElementById('send-pades').value,
+      expires_in_days: parseInt(document.getElementById('send-expiry').value || '30', 10),
+      reminder_every_days: parseInt(document.getElementById('send-reminder-days').value || '3', 10),
+      email_subject: document.getElementById('send-subject').value.trim(),
+      email_message: document.getElementById('send-message').value.trim(),
+      allow_decline: document.getElementById('send-allow-decline').checked,
+      allow_reassign: document.getElementById('send-allow-reassign').checked,
+      recipients,
+    };
+
+    const res = await fetch('/api/esignatures/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showNotice(data.error || 'Could not dispatch signature package', true);
+      return;
+    }
+    showNotice(`Package ${data.package.package_ref} dispatched (${data.package.eidas_level} · ${data.package.pades_profile}).`, false);
+    titleInput.value = '';
+    switchTab('packages');
+    loadPackages();
+  });
+
+  document.getElementById('bulk-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const res = await fetch('/api/esignatures/send/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify({
+        title: document.getElementById('bulk-title').value.trim(),
+        eidas_level: document.getElementById('bulk-eidas').value,
+        csv_text: document.getElementById('bulk-csv').value.trim(),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showNotice(data.error || 'Bulk invite failed', true);
+      return;
+    }
+    showNotice(`Bulk batch ${data.bulk_batch_id} dispatched to ${data.dispatched_count} individual recipient(s).`, false);
+    switchTab('packages');
+    loadPackages();
+  });
+
+  document.getElementById('qtsp-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const res = await fetch('/api/eidas/qtsp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify({
+        name: document.getElementById('qtsp-name').value.trim(),
+        provider_type: document.getElementById('qtsp-type').value,
+        country_code: document.getElementById('qtsp-country').value.trim(),
+        default_pades_profile: document.getElementById('qtsp-pades').value,
+        csc_base_url: document.getElementById('qtsp-url').value.trim(),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showNotice(data.error || 'Could not save QTSP provider', true);
+      return;
+    }
+    showNotice(`QTSP provider "${data.provider.name}" registered and active.`, false);
+    document.getElementById('qtsp-form').reset();
+    loadQtsp();
+  });
+
+  document.getElementById('filter-status').addEventListener('change', loadPackages);
+  document.getElementById('filter-level').addEventListener('change', loadPackages);
+  document.getElementById('btn-refresh-packages').addEventListener('click', loadPackages);
+
+  loadPackages();
+  loadQtsp();
+})();
+</script>
+{% endblock %}

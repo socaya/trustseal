@@ -7,11 +7,12 @@
     "id": "workspace",
     "label": "Workspace",
     "tier": "all",
-    "keys": ["overview", "documents", "signed-contracts"],
+    "keys": ["overview", "documents", "signed-contracts", "send-esign"],
     "items": [
       {"endpoint": "system.main_views.home",                      "label": "Overview",              "desc": "Workspace KPIs & recent activity",       "key": "overview"},
       {"endpoint": "tsd_views.library",                           "label": "Documents",             "desc": "Live TSD records & drafts",              "key": "documents"},
-      {"endpoint": "workspace_assets_views.signed_contracts_page","label": "Contracts",             "desc": "Active & executed agreements",           "key": "signed-contracts"}
+      {"endpoint": "workspace_assets_views.signed_contracts_page","label": "Contracts",             "desc": "Active & executed agreements",           "key": "signed-contracts"},
+      {"endpoint": "send_studio_views.send_studio",               "label": "Send for eSignature",   "desc": "eIDAS 2.0 SES/AES/QES & bulk invites",   "key": "send-esign"}
     ]
   },
   {

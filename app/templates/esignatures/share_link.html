@@ -1,0 +1,23 @@
+{% extends "layouts/signer.html" %}
+{% block title %}Signing Link · {{ package.title }} · TRUSTSEAL{% endblock %}
+
+{% block content %}
+<div style="max-width:560px; margin:24px auto; background:#fff; border:1px solid #dbe4f2; border-radius:8px; overflow:hidden;">
+  <div style="background:#002769; color:#fff; padding:22px 26px; border-bottom:3px solid #02982e;">
+    <div style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#7ee29a;">TRUSTSEAL Shareable Signing Link · {{ package.eidas_level }}</div>
+    <h1 style="margin:6px 0 0; font-size:22px; color:#fff;">{{ package.title }}</h1>
+  </div>
+  <form method="POST" style="padding:24px 26px;">
+    <p style="font-size:14px; color:#475569; margin:0 0 18px;">Enter your full name and email address to open your individual eIDAS 2.0 signing session.</p>
+    <div style="margin-bottom:14px;">
+      <label style="display:block; font-size:13.5px; font-weight:600; margin-bottom:5px;">Full Name *</label>
+      <input name="name" required style="width:100%; padding:9px 12px; font-size:14px; border:1px solid #cbd5e1; border-radius:6px;">
+    </div>
+    <div style="margin-bottom:20px;">
+      <label style="display:block; font-size:13.5px; font-weight:600; margin-bottom:5px;">Work Email *</label>
+      <input name="email" type="email" required style="width:100%; padding:9px 12px; font-size:14px; border:1px solid #cbd5e1; border-radius:6px;">
+    </div>
+    <button type="submit" style="width:100%; padding:11px; background:#002769; color:#fff; border:none; border-radius:6px; font-size:14.5px; font-weight:600; cursor:pointer;">Continue to Sign Document</button>
+  </form>
+</div>
+{% endblock %}

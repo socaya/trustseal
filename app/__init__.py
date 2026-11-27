@@ -153,6 +153,9 @@ def create_app(config_class=None):
             'sign_views.download',
             'sign_views.upload_attachment',
             'sign_views.status',
+            'send_studio_views.sign_package_page',
+            'send_studio_views.share_link_kiosk',
+            'send_studio_views.completion_certificate_page',
             # External TSD share magic-link landing — anonymous by
             # design, authorized by the one-shot token in the URL.
             'tsd_external_views.landing',
@@ -443,6 +446,9 @@ def create_app(config_class=None):
     blueprints.append(evidence_views)
     from .blueprints.envelopes.views.sign_views import sign_views
     blueprints.append(sign_views)
+    from .blueprints.esignatures.eidas_api import eidas_api, send_esign_api
+    from .blueprints.esignatures.send_studio_views import send_studio_views
+    blueprints.extend([eidas_api, send_esign_api, send_studio_views])
 
     for bp in blueprints:
         app.register_blueprint(bp)

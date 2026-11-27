@@ -1,0 +1,109 @@
+{% extends "layouts/public.html" %}
+{% block title %}Certificate of Completion · {{ cert.package_ref }} · TRUSTSEAL{% endblock %}
+
+{% block content %}
+<style>
+  .cc-wrap { max-width: 980px; margin: 0 auto; background: #fff; border: 1px solid #dbe4f2; border-radius: 8px; overflow: hidden; }
+  .cc-head { background: #002769; color: #fff; padding: 26px 32px; border-bottom: 3px solid #02982e; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+  .cc-body { padding: 28px 32px; }
+  .cc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0; margin-bottom: 24px; }
+  .cc-k { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
+  .cc-v { font-size: 14px; font-weight: 600; color: #0f172a; margin-top: 3px; word-break: break-all; }
+  .cc-table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-bottom: 24px; }
+  .cc-table th { text-align: left; font-size: 12px; text-transform: uppercase; color: #64748b; padding: 9px 10px; border-bottom: 1.5px solid #cbd5e1; }
+  .cc-table td { padding: 11px 10px; border-bottom: 1px solid #eef2f7; }
+  @media print { .cc-noprint { display: none !important; } }
+</style>
+
+<div class="cc-wrap">
+  <div class="cc-head">
+    <div>
+      <div style="font-size:12px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#7ee29a;">TRUSTSEAL · eIDAS 2.0 Certificate of Completion</div>
+      <h1 style="margin:6px 0 2px; font-size:24px; color:#fff;">{{ cert.title }}</h1>
+      <div style="font-size:13.5px; color:rgba(255,255,255,0.85);">Reference: <code>{{ cert.package_ref }}</code> · Status: <strong>{{ cert.status|upper }}</strong></div>
+    </div>
+    <div class="cc-noprint" style="display:flex; gap:10px;">
+      <button type="button" onclick="window.print()" style="padding:9px 16px; background:#fff; color:#002769; border:none; border-radius:6px; font-weight:600; cursor:pointer;">Print / Save PDF</button>
+    </div>
+  </div>
+
+  <div class="cc-body">
+    <div class="cc-grid">
+      <div>
+        <div class="cc-k">eIDAS 2.0 Level</div>
+        <div class="cc-v">{{ cert.eidas_standard.name }} ({{ cert.eidas_standard.code }})</div>
+      </div>
+      <div>
+        <div class="cc-k">ETSI PAdES Profile</div>
+        <div class="cc-v">{{ cert.pades_conformance.profile }} · OCSP: {{ cert.pades_conformance.ocsp_status or 'Verified' }}</div>
+      </div>
+      <div>
+        <div class="cc-k">Hash-Chained Audit Trail</div>
+        <div class="cc-v" style="color:#028227;">{{ 'Intact' if cert.audit_chain.intact else 'Broken' }} ({{ cert.audit_chain.event_count }} events)</div>
+      </div>
+      <div>
+        <div class="cc-k">Document SHA-256</div>
+        <div class="cc-v" style="font-family:ui-monospace,monospace; font-size:12px;">{{ cert.document_sha256 }}</div>
+      </div>
+      <div>
+        <div class="cc-k">Sealed PDF / LTA Digest</div>
+        <div class="cc-v" style="font-family:ui-monospace,monospace; font-size:12px;">{{ cert.sealed_pdf_sha256 or 'Pending completion' }}</div>
+      </div>
+      <div>
+        <div class="cc-k">RFC 3161 TSA Token Digest</div>
+        <div class="cc-v" style="font-family:ui-monospace,monospace; font-size:12px;">{{ cert.pades_conformance.tsa_token_digest or 'Issued upon seal' }}</div>
+      </div>
+    </div>
+
+    <h2 style="font-size:16px; color:#002769; margin:0 0 10px;">Signatories &amp; Cryptographic Evidence</h2>
+    <table class="cc-table">
+      <thead>
+        <tr>
+          <th>Recipient</th>
+          <th>Role / Order</th>
+          <th>eIDAS Level</th>
+          <th>Method &amp; Attestation</th>
+          <th>Status / UTC Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in cert.recipients %}
+        <tr>
+          <td><strong>{{ r.name }}</strong><br><span style="color:#64748b;">{{ r.email }}</span></td>
+          <td>{{ r.role|title }} (#{{ r.signing_order }})</td>
+          <td><strong>{{ r.eidas_level }}</strong></td>
+          <td>
+            {{ r.signature_method or '—' }}
+            {% if r.qscd_attestation_id %}<br><code style="font-size:12px;">{{ r.qscd_attestation_id }}</code>{% endif %}
+            {% if r.eudi_pid_loa %}<br><span style="color:#028227;">EUDI PID LoA: {{ r.eudi_pid_loa|upper }}</span>{% endif %}
+          </td>
+          <td>{{ r.status|title }}<br><span style="color:#64748b;">{{ r.signed_at or '—' }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h2 style="font-size:16px; color:#002769; margin:0 0 10px;">Immutable Hash-Chained Audit Log</h2>
+    <table class="cc-table">
+      <thead>
+        <tr>
+          <th>UTC Timestamp</th>
+          <th>Event</th>
+          <th>Actor</th>
+          <th>Chain Hash (SHA-256)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ev in cert.events %}
+        <tr>
+          <td style="white-space:nowrap;">{{ ev.created_at }}</td>
+          <td><strong>{{ ev.event_type }}</strong></td>
+          <td>{{ ev.actor_email or 'System' }}</td>
+          <td style="font-family:ui-monospace,monospace; font-size:12px;">{{ ev.event_hash[:24] }}…</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

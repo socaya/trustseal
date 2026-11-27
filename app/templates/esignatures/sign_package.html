@@ -1,0 +1,226 @@
+{% extends "layouts/signer.html" %}
+{% block title %}Sign Document ({{ recipient.eidas_level }}) · TRUSTSEAL{% endblock %}
+
+{% block content %}
+<style>
+  .sp-wrap { max-width: 960px; margin: 0 auto; }
+  .sp-header {
+    background: linear-gradient(110deg, #001a4d 0%, #002769 70%, #013688 100%);
+    color: #fff; padding: 24px 28px; border-bottom: 3px solid #02982e;
+    border-radius: 8px 8px 0 0;
+  }
+  .sp-header__eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #7ee29a; }
+  .sp-header__title { margin: 6px 0 4px; font-size: 24px; font-weight: 700; color: #fff; }
+  .sp-header__meta { font-size: 14px; color: rgba(255,255,255,0.85); }
+  .sp-body { background: #fff; border: 1px solid #dbe4f2; border-top: none; padding: 28px; border-radius: 0 0 8px 8px; }
+  .sp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 14px 0 20px; border-bottom: 1px solid #e2e8f0; margin-bottom: 24px; }
+  .sp-kv__k { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
+  .sp-kv__v { font-size: 14.5px; font-weight: 600; color: #0f172a; margin-top: 3px; word-break: break-all; }
+  .sp-section { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #eef2f7; }
+  .sp-section:last-child { border-bottom: none; margin-bottom: 0; }
+  .sp-h2 { font-size: 16px; font-weight: 700; color: #002769; margin: 0 0 10px; }
+  .sp-input { width: 100%; padding: 9px 12px; font-size: 14px; border: 1px solid #cbd5e1; border-radius: 6px; margin-top: 4px; }
+  .sp-btn { padding: 10px 18px; border-radius: 6px; font-size: 14px; font-weight: 600; border: 1px solid transparent; cursor: pointer; }
+  .sp-btn--primary { background: #002769; color: #fff; }
+  .sp-btn--emerald { background: #02982e; color: #fff; }
+  .sp-btn--outline { background: #fff; color: #002769; border-color: #cbd5e1; }
+  .sp-btn--danger { background: #fff; color: #b91c1c; border-color: #fca5a5; }
+  .sp-msg { padding: 12px 16px; border-left: 3px solid #02982e; background: #f4fbf6; font-size: 14px; margin-bottom: 18px; display: none; }
+  .sp-msg.is-err { border-left-color: #dc2626; background: #fef2f2; color: #991b1b; }
+  .sp-msg.is-show { display: block; }
+  @media (max-width: 720px) { .sp-grid { grid-template-columns: 1fr; } }
+</style>
+
+<div class="sp-wrap">
+  <div class="sp-header">
+    <div class="sp-header__eyebrow">eIDAS 2.0 {{ recipient.eidas_level }} · {{ package.pades_profile }} · {{ package.package_ref }}</div>
+    <h1 class="sp-header__title">{{ package.title }}</h1>
+    <div class="sp-header__meta">Recipient: <strong>{{ recipient.name }}</strong> ({{ recipient.email }}) · Role: {{ recipient.role|title }}</div>
+  </div>
+
+  <div class="sp-body">
+    <div id="sp-msg" class="sp-msg"></div>
+
+    <div class="sp-grid">
+      <div>
+        <div class="sp-kv__k">Assurance Standard</div>
+        <div class="sp-kv__v">{{ eidas_meta.name }} ({{ recipient.eidas_level }})</div>
+      </div>
+      <div>
+        <div class="sp-kv__k">Preservation Profile</div>
+        <div class="sp-kv__v">{{ package.pades_profile }}</div>
+      </div>
+      <div>
+        <div class="sp-kv__k">Document SHA-256</div>
+        <div class="sp-kv__v" style="font-family:ui-monospace,monospace; font-size:12.5px;">{{ package.document_sha256[:24] }}…</div>
+      </div>
+    </div>
+
+    {% if recipient.status == 'signed' %}
+    <div class="sp-msg is-show">
+      Signature completed on <strong>{{ recipient.signed_at.strftime('%Y-%m-%d %H:%M UTC') if recipient.signed_at else '' }}</strong>
+      via <code>{{ recipient.signature_method }}</code>.
+      <a href="/esignatures/certificate/{{ package.package_ref }}" style="margin-left:10px; font-weight:700; color:#002769;">View Certificate of Completion →</a>
+    </div>
+    {% else %}
+    <form id="sign-exec-form">
+      <!-- Step 1: Assigned Fields -->
+      {% if fields %}
+      <div class="sp-section">
+        <h2 class="sp-h2">1. Complete Required Document Fields</h2>
+        {% for f in fields %}
+        <div style="margin-bottom:12px;">
+          <label style="font-size:13.5px; font-weight:600; color:#1e293b;">{{ f.label }} {% if f.required %}<span style="color:#dc2626;">*</span>{% endif %}</label>
+          <input class="sp-input field-val" data-field-id="{{ f.id }}" data-field-type="{{ f.field_type }}"
+                 value="{{ recipient.name if f.field_type in ('full_name','signature') else '' }}"
+                 placeholder="Enter {{ f.field_type|replace('_',' ') }}">
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Step 2: eIDAS 2.0 Sole-Control Verification -->
+      <div class="sp-section">
+        <h2 class="sp-h2">2. eIDAS 2.0 {{ recipient.eidas_level }} Authentication &amp; Key Activation</h2>
+        <p style="font-size:14px; color:#475569; margin:0 0 14px;">{{ eidas_meta.sole_control }}</p>
+
+        {% if recipient.eidas_level == 'AES' %}
+        <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+          <button type="button" id="btn-send-otp" class="sp-btn sp-btn--outline">Send 6-Digit Sole-Control OTP</button>
+          <div style="min-width:220px;">
+            <label style="font-size:13px; font-weight:600;">Enter 6-Digit OTP</label>
+            <input id="input-otp" class="sp-input" maxlength="6" placeholder="000000">
+          </div>
+        </div>
+        {% elif recipient.eidas_level == 'QES' %}
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+          <div style="padding:16px; border:1px solid #dbe4f2; border-radius:6px;">
+            <div style="font-weight:700; color:#002769; margin-bottom:6px;">Option A: Remote QSCD (CSC API v2 SCAL2)</div>
+            <p style="font-size:13.5px; color:#475569; margin:0 0 10px;">Authorize your EU QTSP hardware key with sole-control QSCD PIN / OTP.</p>
+            <input id="input-qscd-pin" type="password" class="sp-input" placeholder="Enter QSCD PIN (min 4 chars)">
+          </div>
+          <div style="padding:16px; border:1px solid #dbe4f2; border-radius:6px;">
+            <div style="font-weight:700; color:#028227; margin-bottom:6px;">Option B: EUDI Wallet (OpenID4VP LoA High)</div>
+            <p style="font-size:13.5px; color:#475569; margin:0 0 10px;">Present EU PID &amp; issue Qualified Electronic Signature directly from EUDI Wallet.</p>
+            <button type="button" id="btn-eudi-start" class="sp-btn sp-btn--emerald">Authorize with EUDI Wallet</button>
+            <div id="eudi-status" style="font-size:13px; color:#028227; margin-top:8px;"></div>
+            <input type="hidden" id="input-eudi-session" value="">
+          </div>
+        </div>
+        {% else %}
+        <p style="font-size:14px; color:#028227; margin:0;">Standard SES email identity verified for <strong>{{ recipient.email }}</strong>.</p>
+        {% endif %}
+      </div>
+
+      <!-- Step 3: Consent & Submit -->
+      <div class="sp-section">
+        <label style="display:flex; gap:10px; align-items:flex-start; font-size:14px; color:#0f172a; margin-bottom:18px;">
+          <input type="checkbox" id="consent-check" checked style="margin-top:3px;">
+          <span>I confirm that I have reviewed <strong>{{ package.title }}</strong> (SHA-256 bound) and consent to apply an eIDAS 2.0 <strong>{{ recipient.eidas_level }}</strong> electronic signature sealed under <strong>{{ package.pades_profile }}</strong>.</span>
+        </label>
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button type="submit" class="sp-btn sp-btn--primary">Apply {{ recipient.eidas_level }} Electronic Signature</button>
+          {% if package.allow_decline %}
+          <button type="button" id="btn-decline" class="sp-btn sp-btn--danger">Decline</button>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+(function () {
+  const token = {{ token | tojson }};
+  const msg = document.getElementById('sp-msg');
+  function show(text, isErr) {
+    msg.textContent = text;
+    msg.className = 'sp-msg is-show' + (isErr ? ' is-err' : '');
+  }
+
+  const otpBtn = document.getElementById('btn-send-otp');
+  if (otpBtn) {
+    otpBtn.addEventListener('click', async () => {
+      const r = await fetch(`/api/esignatures/sign/${token}/otp`, { method: 'POST' });
+      const d = await r.json();
+      if (r.ok) {
+        show(`Sole-control 6-digit OTP sent to ${d.email} (verification code: ${d.demo_otp}).`, false);
+        document.getElementById('input-otp').value = d.demo_otp;
+      } else {
+        show(d.error || 'OTP dispatch failed', true);
+      }
+    });
+  }
+
+  const eudiBtn = document.getElementById('btn-eudi-start');
+  if (eudiBtn) {
+    eudiBtn.addEventListener('click', async () => {
+      const r1 = await fetch('/api/eidas/eudi-wallet/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invite_token: token, purpose: 'qes_signing', loa_requested: 'high' }),
+      });
+      const d1 = await r1.json();
+      if (!r1.ok) { show(d1.error || 'Could not start EUDI Wallet session', true); return; }
+      const sid = d1.session.session_id;
+      const r2 = await fetch(`/api/eidas/eudi-wallet/sessions/${sid}/callback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          given_name: {{ recipient.name.split()[0] | tojson }},
+          family_name: {{ (recipient.name.split()[-1] if recipient.name.split()|length > 1 else 'Signatory') | tojson }},
+          issuing_country: 'NL',
+          loa_verified: 'high',
+        }),
+      });
+      const d2 = await r2.json();
+      if (!r2.ok) { show(d2.error || 'EUDI Wallet authorization failed', true); return; }
+      document.getElementById('input-eudi-session').value = sid;
+      document.getElementById('eudi-status').textContent = `EUDI Wallet LoA High verified (${d2.session.credential_id})`;
+      show('EUDI Wallet PID LoA High & Qualified Signature Authorization complete. Submit below to finalize.', false);
+    });
+  }
+
+  const form = document.getElementById('sign-exec-form');
+  if (form) {
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const fieldValues = {};
+      document.querySelectorAll('.field-val').forEach(el => { fieldValues[el.dataset.fieldId] = el.value; });
+      const payload = {
+        consent_accepted: document.getElementById('consent-check').checked,
+        field_values: fieldValues,
+        otp_code: document.getElementById('input-otp')?.value || '',
+        qscd_pin: document.getElementById('input-qscd-pin')?.value || '',
+        eudi_session_id: document.getElementById('input-eudi-session')?.value || '',
+      };
+      const res = await fetch(`/api/esignatures/sign/${token}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        show(d.error || 'Signature could not be completed', true);
+        return;
+      }
+      window.location.href = `/esignatures/certificate/${d.package.package_ref}`;
+    });
+  }
+
+  const declineBtn = document.getElementById('btn-decline');
+  if (declineBtn) {
+    declineBtn.addEventListener('click', async () => {
+      const reason = prompt('Optional reason for declining:') || 'Declined by recipient';
+      const r = await fetch(`/api/esignatures/sign/${token}/decline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      if (r.ok) show('Document declined and sender notified.', true);
+    });
+  }
+})();
+</script>
+{% endblock %}
