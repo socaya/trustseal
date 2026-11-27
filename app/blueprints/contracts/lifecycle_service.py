@@ -1201,8 +1201,17 @@ def create_linked_contract(
     relationship_type: str = "amendment",
     title: str = "",
 ) -> tuple[TSDocument, ContractWorkflow]:
-    rel = relationship_type if relationship_type in ("amendment", "addendum", "renewal", "sow") else "amendment"
-    rel_label = rel.upper() if rel == "sow" else rel.capitalize()
+    allowed_rels = {
+        "amendment": "Amendment",
+        "addendum": "Addendum",
+        "nce": "No-Cost Extension (NCE)",
+        "costed_extension": "Costed Extension",
+        "scope_variation": "Scope Variation",
+        "renewal": "Renewal",
+        "sow": "SOW",
+    }
+    rel = relationship_type if relationship_type in allowed_rels else "amendment"
+    rel_label = allowed_rels[rel]
     new_title = (title or f"{rel_label} — {parent_doc.title}")[:255]
 
     parent_env = decrypt_content_envelope(parent_doc.ciphertext, organization_id=parent_doc.organization_id) or {}

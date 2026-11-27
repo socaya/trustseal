@@ -1862,10 +1862,23 @@ def spawn_amendment(doc_id: int):
     new_doc, new_wf = create_linked_contract(
         parent_doc=doc, parent_wf=wf, actor=actor, relationship_type=rel, title=title
     )
+    if wf.project_id and not new_wf.project_id:
+        new_wf.project_id = wf.project_id
+    if data.get("expiration_date"):
+        new_wf.expiration_date = str(data.get("expiration_date")).strip()[:32]
+    if data.get("effective_date"):
+        new_wf.effective_date = str(data.get("effective_date")).strip()[:32]
+    if data.get("deal_value") is not None and str(data.get("deal_value")).strip() != "":
+        new_wf.deal_value = str(data.get("deal_value")).strip()[:64]
+    elif rel == "nce":
+        new_wf.deal_value = "0"
+    db.session.commit()
     return jsonify({
         "ok": True,
         "document_id": new_doc.id,
         "contract_number": new_wf.contract_number,
+        "relationship_type": new_wf.relationship_type,
+        "project_id": new_wf.project_id,
         "url": f"/contracts/{new_doc.id}/workflow",
     })
 

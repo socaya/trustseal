@@ -177,7 +177,7 @@ def projects_page():
 
     # UI-05 & UI-06: Server-side search, multi-facet filtering, deterministic sorting & pagination
     active_section = (request.args.get("section") or "projects").strip().lower()
-    if active_section not in ("home", "projects", "portfolios", "programmes", "intake", "obligations", "spend", "templates"):
+    if active_section not in ("home", "projects", "portfolios", "programmes", "intake", "contracts", "obligations", "spend", "templates"):
         active_section = "projects"
 
     q_str = (request.args.get("q") or "").strip()
@@ -298,6 +298,51 @@ def projects_page():
             "rag": rag,
         })
 
+    # Global Contract Overview: Primary contracts grouped with Addendums / NCEs / Amendments
+    _rel_labels = {
+        "nce": "No-Cost Extension (NCE)",
+        "addendum": "Addendum",
+        "amendment": "Amendment",
+        "costed_extension": "Costed Extension",
+        "scope_variation": "Scope Variation",
+        "renewal": "Renewal",
+        "sow": "SOW",
+    }
+    _children_by_parent: dict[int, list[dict]] = {}
+    _primaries: list[dict] = []
+    for wf in wf_by_id.values():
+        doc_id = wf.document_id
+        c_ref = wf.contract_number or f"CTR-{doc_id:04d}"
+        c_title = doc_titles.get(doc_id) or f"Contract #{doc_id}"
+        prj_info = proj_by_id.get(wf.project_id) if wf.project_id else None
+        rel_k = (wf.relationship_type or "").lower()
+        row = {
+            "workflow_id": wf.id,
+            "document_id": doc_id,
+            "contract_number": c_ref,
+            "title": c_title,
+            "contract_type": (wf.contract_type or "msa").replace("_", " ").upper(),
+            "relationship_type": rel_k,
+            "relationship_label": _rel_labels.get(rel_k, rel_k.replace("_", " ").title() if rel_k else "Primary Contract"),
+            "counterparty": wf.counterparty_name or "—",
+            "deal_value": f"{wf.currency} {wf.deal_value}" if wf.deal_value else "—",
+            "effective_date": wf.effective_date or "—",
+            "expiration_date": wf.expiration_date or "—",
+            "status": wf.canonical_status(),
+            "project_id": wf.project_id,
+            "project_name": prj_info["name"] if prj_info else "Unlinked",
+            "project_code": prj_info["project_code"] if prj_info else "—",
+            "url": f"/contracts/{doc_id}/workflow",
+            "children": [],
+        }
+        if wf.parent_contract_id and wf.parent_contract_id in wf_by_id:
+            _children_by_parent.setdefault(wf.parent_contract_id, []).append(row)
+        else:
+            _primaries.append(row)
+    for pr in _primaries:
+        pr["children"] = _children_by_parent.get(pr["workflow_id"], [])
+    global_contract_overview = _primaries
+
     metrics_counts = {
         "total": len(project_cards),
         "on_track": sum(1 for pc in project_cards if pc["health"]["rag"] == "on_track" and pc["status"] not in ("completed", "archived")),
@@ -356,6 +401,7 @@ def projects_page():
         active_section=active_section,
         global_obligations=global_obligations,
         global_contract_burns=global_contract_burns,
+        global_contract_overview=global_contract_overview,
         metrics_counts=metrics_counts,
         projects=paged_projects,
         all_projects_count=len(project_cards),
@@ -776,6 +822,76 @@ def project_detail_page(project_id: int):
         "avg_burn_pct": round(((tot_c_actual + tot_c_comm) / tot_c_val) * 100.0, 1) if tot_c_val > 0 else 0.0,
     }
 
+    # Contract Overview Hierarchy (Primary Contracts + Linked Addendums / NCEs / Amendments)
+    _p_rel_labels = {
+        "nce": "No-Cost Extension (NCE)",
+        "addendum": "Addendum",
+        "amendment": "Amendment",
+        "costed_extension": "Costed Extension",
+        "scope_variation": "Scope Variation",
+        "renewal": "Renewal",
+        "sow": "SOW",
+    }
+    wf_id_set = {w.id for w in wfs}
+    # Also include any child addendums/NCEs whose parent is in this project even if project_id wasn't set
+    extra_children = (
+        ContractWorkflow.query.filter(
+            ContractWorkflow.organization_id == org_id,
+            ContractWorkflow.parent_contract_id.in_(list(wf_id_set)),
+        ).all()
+        if wf_id_set
+        else []
+    )
+    all_proj_wfs_map = {w.id: w for w in wfs}
+    for cw in extra_children:
+        all_proj_wfs_map.setdefault(cw.id, cw)
+    extra_doc_ids = [cw.document_id for cw in extra_children if cw.document_id not in docs]
+    if extra_doc_ids:
+        for ed in TSDocument.query.filter(TSDocument.id.in_(extra_doc_ids)).all():
+            docs[ed.id] = ed
+
+    _p_children: dict[int, list[dict]] = {}
+    contract_overview_groups: list[dict] = []
+    addendum_cnt = 0
+    nce_cnt = 0
+    for w in all_proj_wfs_map.values():
+        d = docs.get(w.document_id)
+        if not d or d.deleted_at:
+            continue
+        rel_k = (w.relationship_type or "").lower()
+        c_ref = w.contract_number or f"CTR-{d.id:04d}"
+        item = {
+            "workflow_id": w.id,
+            "document_id": d.id,
+            "contract_number": c_ref,
+            "title": d.title,
+            "contract_type": (w.contract_type or "msa").replace("_", " ").upper(),
+            "relationship_type": rel_k,
+            "relationship_label": _p_rel_labels.get(rel_k, rel_k.replace("_", " ").title() if rel_k else "Primary Contract"),
+            "counterparty_name": w.counterparty_name or "—",
+            "deal_value": f"{w.currency} {w.deal_value}" if w.deal_value else "—",
+            "effective_date": w.effective_date or "—",
+            "expiration_date": w.expiration_date or "—",
+            "contract_status": w.canonical_status(),
+            "url": f"/contracts/{d.id}/workflow",
+            "children": [],
+        }
+        if w.parent_contract_id and w.parent_contract_id in all_proj_wfs_map:
+            addendum_cnt += 1
+            if rel_k == "nce":
+                nce_cnt += 1
+            _p_children.setdefault(w.parent_contract_id, []).append(item)
+        else:
+            contract_overview_groups.append(item)
+    for grp in contract_overview_groups:
+        grp["children"] = _p_children.get(grp["workflow_id"], [])
+    contract_overview_summary = {
+        "primary_count": len(contract_overview_groups),
+        "addendum_count": addendum_cnt,
+        "nce_count": nce_cnt,
+        "total_count": len(contract_overview_groups) + addendum_cnt,
+    }
+
     overall_prog = compute_deliverable_progress(all_proj_delivs)
     templates = ensure_default_templates(org_id, actor)
     return render_template(
@@ -785,6 +901,8 @@ def project_detail_page(project_id: int):
         obligation_rows=obligation_rows,
         contract_burn_rows=contract_burn_rows,
         spend_summary=spend_summary,
+        contract_overview_groups=contract_overview_groups,
+        contract_overview_summary=contract_overview_summary,
         contracts=contracts,
         deliverable_rows=deliverable_rows,
         key_term_rows=key_term_rows,

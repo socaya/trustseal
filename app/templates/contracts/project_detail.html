@@ -824,39 +824,95 @@
         </div>
       </section>
 
-      {# ---- 9. TSD CONTRACTS, DELIVERABLES & PROBATION ---- #}
+      {# ---- 9. CONTRACT OVERVIEW, ADDENDUMS / NCEs, OBLIGATIONS & DELIVERABLES ---- #}
       <section class="pms-pane" data-pdpane="contracts" hidden>
         <div class="pms-sec-head">
           <div>
-            <h2 class="pms-sec-title">TSD Contracts, Deliverables &amp; Key Terms</h2>
-            <p class="pms-sec-sub">Governed legal agreements, milestone acceptance rollup, and probation cohorts (PM-10/18)</p>
+            <h2 class="pms-sec-title">Contract Overview — Primary Agreements, Addendums &amp; NCEs</h2>
+            <p class="pms-sec-sub">All related project contracts, No-Cost Extensions (NCEs), amendments, obligations, and milestone deliverables (PM-10/18)</p>
           </div>
-          {% if available_contracts %}
-          <div style="display:flex;gap:6px;align-items:center;">
-            <select id="pd-link-sel" class="st-select" style="height:32px;font-size:12px;min-width:240px;">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            {% if contracts %}
+            <button type="button" class="pms-btn pms-btn--primary pms-btn--sm" data-toggle-drawer="dr-addendum">+ Add Addendum / NCE</button>
+            {% endif %}
+            {% if available_contracts %}
+            <select id="pd-link-sel" class="st-select" style="height:29px;font-size:12px;min-width:220px;">
               {% for ac in available_contracts %}<option value="{{ ac.document_id }}">{{ ac.contract_number }} — {{ ac.title }}</option>{% endfor %}
             </select>
-            <button type="button" id="pd-link-btn" class="ts-btn ts-btn--secondary ts-btn--sm">+ Link Contract</button>
+            <button type="button" id="pd-link-btn" class="pms-btn pms-btn--sm">+ Link Contract</button>
+            {% endif %}
           </div>
-          {% endif %}
         </div>
 
+        {% set cos = contract_overview_summary if contract_overview_summary is defined else {'primary_count':contracts|length,'addendum_count':0,'nce_count':0,'total_count':contracts|length} %}
+        <div class="pms-kpis">
+          <div class="pms-kpi"><span class="pms-kpi__label">Primary Contracts</span><span class="pms-kpi__val">{{ cos.primary_count }}</span></div>
+          <div class="pms-kpi"><span class="pms-kpi__label">Addendums &amp; Amendments</span><span class="pms-kpi__val">{{ cos.addendum_count }}</span></div>
+          <div class="pms-kpi"><span class="pms-kpi__label">No-Cost Extensions (NCE)</span><span class="pms-kpi__val" style="color:#85500c;">{{ cos.nce_count }}</span></div>
+          <div class="pms-kpi"><span class="pms-kpi__label">Total Governed Agreements</span><span class="pms-kpi__val" style="color:#002769;">{{ cos.total_count }}</span></div>
+        </div>
+
+        {% if contracts %}
+        <div class="pms-drawer" id="dr-addendum" hidden>
+          <form id="pd-addendum-form" class="pms-form-grid">
+            <div class="pms-field">
+              <label>Parent Contract</label>
+              <select id="pd-add-parent" class="st-select" required>
+                {% for cg in (contract_overview_groups if contract_overview_groups is defined else []) %}
+                <option value="{{ cg.document_id }}">{{ cg.contract_number }} — {{ cg.title }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="pms-field">
+              <label>Type / Relationship</label>
+              <select id="pd-add-rel" class="st-select">
+                <option value="nce">No-Cost Extension (NCE)</option>
+                <option value="addendum">Addendum</option>
+                <option value="amendment">Amendment</option>
+                <option value="costed_extension">Costed Extension</option>
+                <option value="scope_variation">Scope Variation</option>
+                <option value="renewal">Renewal</option>
+                <option value="sow">SOW</option>
+              </select>
+            </div>
+            <div class="pms-field"><label>Title</label><input type="text" id="pd-add-title" class="ts-input" placeholder="e.g. NCE-1 — 6 Month Extension" required></div>
+            <div class="pms-field"><label>Revised Expiry Date</label><input type="date" id="pd-add-exp" class="ts-input"></div>
+            <div class="pms-field"><label>Value Delta (0 for NCE)</label><input type="number" step="0.01" id="pd-add-val" class="ts-input" placeholder="0.00"></div>
+            <div class="pms-field"><label>&nbsp;</label><button type="submit" class="pms-btn pms-btn--primary pms-btn--sm">Create Linked Record</button></div>
+          </form>
+        </div>
+        {% endif %}
+
         <div class="pms-card">
-          <div class="pms-card__head"><h3 class="pms-card__title">Linked TSD Contracts ({{ contracts|length }})</h3></div>
+          <div class="pms-card__head"><h3 class="pms-card__title">Contract Overview ({{ cos.total_count }})</h3></div>
           <div class="pms-card__table-wrap">
             <table class="st-table">
-              <thead><tr><th>Ref #</th><th>Contract Title</th><th>Type</th><th>Counterparty</th><th>Status</th><th>Deliverables</th><th>Value</th></tr></thead>
+              <thead><tr><th>Ref #</th><th>Contract / Addendum</th><th>Type / Relationship</th><th>Counterparty</th><th>Effective → Expiry</th><th>Status</th><th style="text-align:right;">Value</th></tr></thead>
               <tbody>
-                {% for c in contracts %}
+                {% for cg in (contract_overview_groups if contract_overview_groups is defined else []) %}
                 <tr>
-                  <td style="font-family:var(--ts-font-mono);font-size:12px;color:#002769;font-weight:600;">{{ c.contract_number }}</td>
-                  <td style="font-weight:600;"><a href="{{ c.url }}" style="color:#0f172a;text-decoration:none;">{{ c.title }}</a></td>
-                  <td>{{ c.contract_type|replace('_', ' ')|upper }}</td>
-                  <td>{{ c.counterparty_name }}</td>
-                  <td><span class="st-tag {% if c.contract_status == 'SIGNED' %}st-tag--ok{% elif c.contract_status == 'SUSPENDED' %}st-tag--warn{% elif c.contract_status == 'TERMINATED' %}st-tag--bad{% else %}st-tag--info{% endif %}">{{ c.contract_status }}</span></td>
-                  <td style="font-variant-numeric:tabular-nums;">{{ c.deliverables_pct }}% ({{ c.deliverables_total }})</td>
-                  <td>{{ c.deal_value }}</td>
+                  <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#002769;font-weight:700;">{{ cg.contract_number }}</td>
+                  <td>
+                    <a class="pms-row-name" href="{{ cg.url }}">{{ cg.title }}</a>
+                    {% if cg.children %}<span class="pms-row-meta">{{ cg.children|length }} linked addendum(s) / NCE(s)</span>{% endif %}
+                  </td>
+                  <td><strong>{{ cg.relationship_label }}</strong><span class="pms-row-meta">{{ cg.contract_type }}</span></td>
+                  <td>{{ cg.counterparty_name }}</td>
+                  <td>{{ cg.effective_date }} → {{ cg.expiration_date }}</td>
+                  <td><span class="st-tag {% if cg.contract_status == 'SIGNED' %}st-tag--ok{% elif cg.contract_status == 'SUSPENDED' %}st-tag--warn{% elif cg.contract_status == 'TERMINATED' %}st-tag--bad{% else %}st-tag--info{% endif %}">{{ cg.contract_status }}</span></td>
+                  <td style="text-align:right;font-weight:600;">{{ cg.deal_value }}</td>
                 </tr>
+                {% for ch in cg.children %}
+                <tr>
+                  <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#4c6273;padding-left:26px !important;">↳ {{ ch.contract_number }}</td>
+                  <td style="padding-left:22px !important;"><a class="pms-row-name" style="font-weight:600;" href="{{ ch.url }}">{{ ch.title }}</a></td>
+                  <td><span class="pms-state {% if ch.relationship_type == 'nce' %}pms-state--warn{% else %}pms-state--info{% endif %}">{{ ch.relationship_label }}</span></td>
+                  <td>{{ ch.counterparty_name }}</td>
+                  <td>{{ ch.effective_date }} → {{ ch.expiration_date }}</td>
+                  <td><span class="st-tag {% if ch.contract_status == 'SIGNED' %}st-tag--ok{% elif ch.contract_status == 'SUSPENDED' %}st-tag--warn{% elif ch.contract_status == 'TERMINATED' %}st-tag--bad{% else %}st-tag--info{% endif %}">{{ ch.contract_status }}</span></td>
+                  <td style="text-align:right;font-weight:600;">{{ ch.deal_value }}</td>
+                </tr>
+                {% endfor %}
                 {% else %}
                 <tr><td colspan="7" style="text-align:center;padding:24px;color:#718494;">No contracts linked yet. Projects may operate contract-free or click <strong>+ New Contract</strong> above.</td></tr>
                 {% endfor %}
@@ -1442,6 +1498,28 @@
     });
     if (popEl && popEl.open) popEl.open = false;
     try { window.history.replaceState(null, '', '#' + target); } catch (e) {}
+  }
+
+  // Create Linked Addendum / No-Cost Extension (NCE)
+  var addForm = document.getElementById('pd-addendum-form');
+  if (addForm) {
+    addForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var parentId = document.getElementById('pd-add-parent').value;
+      if (!parentId) return;
+      fetch('/api/contracts/' + parentId + '/amendment', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({
+          relationship_type: document.getElementById('pd-add-rel').value,
+          title: document.getElementById('pd-add-title').value.trim(),
+          expiration_date: document.getElementById('pd-add-exp').value,
+          deal_value: document.getElementById('pd-add-val').value,
+        }),
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d.ok) { window.location.hash = '#contracts'; window.location.reload(); }
+      });
+    });
   }
 
   // Record Contract Spend & Recalculate Burn Rate

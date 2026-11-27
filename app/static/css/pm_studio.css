@@ -923,7 +923,8 @@ div.pms-drawer,
   gap: 8px;
   align-items: end;
 }
-.pms-field { display: flex; flex-direction: column; gap: 3px; }
+.pms-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pms-field select, .pms-field input { max-width: 100%; width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .pms-field label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--pms-muted); }
 
 .pms-board {

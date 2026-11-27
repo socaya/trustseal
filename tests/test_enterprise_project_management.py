@@ -655,24 +655,41 @@ def test_srs_server_side_register_and_obligations(pg_app, pm_env):
     })
     assert r_ob.status_code in (200, 201)
 
-    # Verify /projects/<id> renders PRO Menus + Command Ribbon + lifecycle stepper + Spend & Burn Rate + Obligations Register
+    # Create a No-Cost Extension (NCE) addendum linked to the project contract
+    r_nce = c.post(f"/api/contracts/{doc.id}/amendment", headers=hdrs, json={
+        "relationship_type": "nce",
+        "title": "NCE-1 — 6 Month Schedule Extension",
+        "expiration_date": "2027-06-30",
+    })
+    assert r_nce.status_code == 200
+    assert r_nce.get_json()["relationship_type"] == "nce"
+
+    # Verify /projects/<id> renders PRO Menus + Command Ribbon + lifecycle stepper + Spend & Burn Rate + Contract Overview (NCE) + Obligations Register
     r_det = c.get(f"/projects/{p1}")
     assert r_det.status_code == 200
     assert b"Contract Obligations Register" in r_det.data
     assert b"Submit Q4 Environmental Compliance Certificate" in r_det.data
     assert b"Spend &amp; Burn" in r_det.data
     assert b"Contract Burn Rate Register" in r_det.data
+    assert b"NCE-1" in r_det.data
+    assert b"No-Cost Extension (NCE)" in r_det.data
     assert b"pme-apps-menu" in r_det.data
     assert b"pme-workspaces-menu" in r_det.data
     assert b"pm-ribbon" in r_det.data
     assert b"pme-context" in r_det.data
     assert b"pme-lifecycle" in r_det.data
 
-    # Verify global Contract Spend & Burn Rate view (?section=spend)
+    # Verify global Contract Spend & Burn Rate view (?section=spend) & Contract Overview (?section=contracts)
     r_sp = c.get("/projects?section=spend")
     assert r_sp.status_code == 200
     assert b"Contract Spend &amp; Burn Rate" in r_sp.data
     assert b"Alpha EPC Supply Contract" in r_sp.data
+
+    r_co = c.get("/projects?section=contracts")
+    assert r_co.status_code == 200
+    assert b"Contract Overview" in r_co.data
+    assert b"NCE-1" in r_co.data
+    assert b"No-Cost Extension (NCE)" in r_co.data
 
 
 

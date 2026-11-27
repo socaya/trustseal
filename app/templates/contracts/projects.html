@@ -12,6 +12,7 @@
   'portfolios': ('Portfolios', 'Review strategic investments, ceilings and delivery priorities.'),
   'programmes': ('Programmes', 'Coordinate related projects, shared outcomes and dependencies.'),
   'intake': ('Demand & Intake', 'Assess incoming proposals, score value/urgency and convert approved requests to projects.'),
+  'contracts': ('Contract Overview', 'All project contracts, addendums, amendments and No-Cost Extensions (NCEs).'),
   'obligations': ('Contract obligations', 'Track contractual deadlines, owners and acceptance across linked projects.'),
   'spend': ('Contract Spend & Burn Rate', 'Track contract spend, commitments, remaining ceiling and monthly burn rates.'),
   'templates': ('Administration & Templates', 'Manage reusable project templates, delivery methodologies and governance defaults.')
@@ -26,7 +27,7 @@
 {% include "stamps/_flat_ui.html" %}
 
 {% set pm_ribbon_ctx = 'projects' %}
-{% set pm_ribbon_tab = 'Contracts' if sec in ('obligations','spend') else ('Plan' if sec in ('portfolios','programmes') else ('File' if sec == 'templates' else 'Home')) %}
+{% set pm_ribbon_tab = 'Contracts' if sec in ('contracts','obligations','spend') else ('Plan' if sec in ('portfolios','programmes') else ('File' if sec == 'templates' else 'Home')) %}
 {% set pm_crumb_label = cur_title %}
 
 <div class="pme-shell">
@@ -293,6 +294,68 @@
             <a href="{{ url_for('contracts_views.projects_page', q=flt.q, category=flt.category, status=flt.status, health=flt.health, contracts=flt.contracts, view=flt.view, sort=flt.sort, dir=flt.dir, page=pgr.page+1, per_page=pgr.per_page) }}">Next ›</a>
           {% endif %}
         </nav>
+      </div>
+    </section>
+
+    {# ======================= SECTION: GLOBAL CONTRACT OVERVIEW (PRIMARY CONTRACTS + ADDENDUMS / NCEs) ======================= #}
+    {% elif sec == 'contracts' %}
+    <section class="pms-panel" aria-label="Contract overview register">
+      <div class="pms-panel-header">
+        <h2>Contract Overview — Primary Contracts &amp; Addendums / NCEs ({{ global_contract_overview|length if global_contract_overview is defined else 0 }})</h2>
+      </div>
+      <div class="pms-table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Ref #</th>
+              <th>Contract / Addendum</th>
+              <th>Project</th>
+              <th>Relationship</th>
+              <th>Counterparty</th>
+              <th>Effective → Expiry</th>
+              <th>Status</th>
+              <th style="text-align:right;">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for cg in (global_contract_overview if global_contract_overview is defined else []) %}
+            <tr>
+              <td style="font-family:var(--ts-font-mono);font-size:11.5px;font-weight:700;color:#002769;">{{ cg.contract_number }}</td>
+              <td>
+                <a class="pms-row-name" href="{{ cg.url }}">{{ cg.title }}</a>
+                {% if cg.children %}<span class="pms-row-meta">{{ cg.children|length }} linked addendum(s) / NCE(s)</span>{% endif %}
+              </td>
+              <td>
+                {% if cg.project_id %}
+                  <a class="pms-row-name" href="{{ url_for('contracts_views.project_detail_page', project_id=cg.project_id) }}#contracts">{{ cg.project_name }}</a>
+                  <span class="pms-row-meta">{{ cg.project_code }}</span>
+                {% else %}Unlinked{% endif %}
+              </td>
+              <td><strong>{{ cg.relationship_label }}</strong><span class="pms-row-meta">{{ cg.contract_type }}</span></td>
+              <td>{{ cg.counterparty }}</td>
+              <td>{{ cg.effective_date }} → {{ cg.expiration_date }}</td>
+              <td><span class="pms-state {% if cg.status == 'SIGNED' %}pms-state--good{% elif cg.status in ('SUSPENDED','TERMINATED') %}pms-state--bad{% else %}pms-state--info{% endif %}">{{ cg.status }}</span></td>
+              <td style="text-align:right;font-weight:600;">{{ cg.deal_value }}</td>
+            </tr>
+            {% for ch in cg.children %}
+            <tr>
+              <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#4c6273;padding-left:26px !important;">↳ {{ ch.contract_number }}</td>
+              <td style="padding-left:22px !important;">
+                <a class="pms-row-name" style="font-weight:600;" href="{{ ch.url }}">{{ ch.title }}</a>
+              </td>
+              <td style="color:#4c6273;">{{ cg.project_name }}</td>
+              <td><span class="pms-state {% if ch.relationship_type == 'nce' %}pms-state--warn{% else %}pms-state--info{% endif %}">{{ ch.relationship_label }}</span></td>
+              <td>{{ ch.counterparty }}</td>
+              <td>{{ ch.effective_date }} → {{ ch.expiration_date }}</td>
+              <td><span class="pms-state {% if ch.status == 'SIGNED' %}pms-state--good{% elif ch.status in ('SUSPENDED','TERMINATED') %}pms-state--bad{% else %}pms-state--info{% endif %}">{{ ch.status }}</span></td>
+              <td style="text-align:right;font-weight:600;">{{ ch.deal_value }}</td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr><td colspan="8" style="text-align:center;padding:30px;color:#4c6273;">No project contracts recorded yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </section>
 

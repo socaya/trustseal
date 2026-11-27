@@ -56,6 +56,7 @@
               <h4>Delivery</h4>
               <a href="{{ url_for('contracts_views.my_work_page') }}" {% if _ctx=='my_work' %}aria-current="page"{% endif %}><span>My Work</span></a>
               <a href="{{ url_for('contracts_views.project_detail_page', project_id=_pid) ~ '#resources' if _pid else url_for('contracts_views.projects_page') }}"><span>Resources</span></a>
+              <a href="{{ url_for('contracts_views.projects_page', section='contracts') }}" {% if _ctx=='projects' and active_section=='contracts' %}aria-current="page"{% endif %}><span>Contract Overview</span></a>
               <a href="{{ url_for('contracts_views.projects_page', section='spend') }}" {% if _ctx=='projects' and active_section=='spend' %}aria-current="page"{% endif %}><span>Spend &amp; Burn</span></a>
               <a href="{{ url_for('contracts_views.projects_page', section='obligations') }}" {% if _ctx=='projects' and active_section=='obligations' %}aria-current="page"{% endif %}><span>Obligations</span></a>
               {% if 'tsd_views.library' in url_map_endpoints %}
@@ -349,14 +350,18 @@
             {% if _is_proj %}
             <button type="button" class="pm-ribbon-command" data-pdtab="contracts">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18"/></svg>
-              <span>Agreements</span>
+              <span>Contract Overview</span>
             </button>
             <button type="button" class="pm-ribbon-command" data-pdtab="contracts">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
               <span>Obligations</span>
             </button>
             {% else %}
-            <a class="pm-ribbon-command" href="{{ url_for('contracts_views.projects_page', section='obligations') }}">
+            <a class="pm-ribbon-command {% if _ctx=='projects' and active_section=='contracts' %}is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='contracts') }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18"/></svg>
+              <span>Contract Overview</span>
+            </a>
+            <a class="pm-ribbon-command {% if _ctx=='projects' and active_section=='obligations' %}is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='obligations') }}">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
               <span>Obligations</span>
             </a>
