@@ -98,14 +98,7 @@
         </select>
       </div>
     </div>
-    <div class="pms-filterbar__row">
-      <div class="pms-quick-chips">
-        <button type="button" class="pms-chip is-active" data-qchip="all">All Projects</button>
-        <button type="button" class="pms-chip" data-qchip="attention">Needs Attention</button>
-        <button type="button" class="pms-chip" data-qchip="active">Active Only</button>
-        <button type="button" class="pms-chip" data-qchip="with_contracts">With Contracts</button>
-        <button type="button" class="pms-chip" data-qchip="contract_free">Contract-Free</button>
-      </div>
+    <div class="pms-filterbar__row" style="padding-top:2px;">
       <div class="pms-filterbar__tokens" id="prj-active-tokens">
         <span id="prj-match-count">Showing {{ projects|length }} of {{ projects|length }} projects</span>
       </div>
@@ -486,29 +479,25 @@
     });
     var tokWrap = document.getElementById('prj-active-tokens');
     if (tokWrap) {
+      var parts = [];
+      if (cat !== 'ALL') parts.push('Category: ' + cat.replace(/_/g, ' '));
+      if (st !== 'ALL') parts.push('Status: ' + st.replace(/_/g, ' '));
+      if (hl !== 'ALL') parts.push('Health: ' + hl.replace(/_/g, ' '));
+      if (ct !== 'ALL') parts.push('Contracts: ' + ct);
+      if (q) parts.push('Search: "' + q.replace(/</g, '&lt;') + '"');
       var html = '<span>Showing ' + visibleRows + ' of ' + totalRows + ' projects</span>';
-      if (cat !== 'ALL') html += '<span class="pms-token">Category: ' + cat.replace(/_/g, ' ') + ' <button type="button" data-clr="cat">×</button></span>';
-      if (st !== 'ALL') html += '<span class="pms-token">Status: ' + st.replace(/_/g, ' ') + ' <button type="button" data-clr="st">×</button></span>';
-      if (hl !== 'ALL') html += '<span class="pms-token">Health: ' + hl.replace(/_/g, ' ') + ' <button type="button" data-clr="hl">×</button></span>';
-      if (ct !== 'ALL') html += '<span class="pms-token">Contracts: ' + ct + ' <button type="button" data-clr="ct">×</button></span>';
-      if (q) html += '<span class="pms-token">Search: "' + q.replace(/</g, '&lt;') + '" <button type="button" data-clr="q">×</button></span>';
-      if (cat !== 'ALL' || st !== 'ALL' || hl !== 'ALL' || ct !== 'ALL' || q) {
-        html += '<button type="button" class="ts-btn ts-btn--ghost ts-btn--sm" data-clr="all">Clear all</button>';
+      if (parts.length) {
+        html += '<span style="color:#475569;margin-left:10px;">· Filtered by ' + parts.join(', ') + '</span>';
+        html += '<button type="button" class="ts-btn ts-btn--ghost ts-btn--sm" data-clr="all" style="margin-left:6px;text-decoration:underline;">Reset filters</button>';
       }
       tokWrap.innerHTML = html;
       tokWrap.querySelectorAll('[data-clr]').forEach(function (b) {
         b.addEventListener('click', function () {
-          var k = b.dataset.clr;
-          if (k === 'cat' || k === 'all') document.getElementById('prj-cat-filter').value = 'ALL';
-          if (k === 'st' || k === 'all') document.getElementById('prj-status-filter').value = 'ALL';
-          if (k === 'hl' || k === 'all') document.getElementById('prj-health-filter').value = 'ALL';
-          if (k === 'ct' || k === 'all') document.getElementById('prj-contract-filter').value = 'ALL';
-          if (k === 'q' || k === 'all') document.getElementById('prj-search').value = '';
-          if (k === 'all') {
-            document.querySelectorAll('[data-qchip]').forEach(function (c) {
-              c.classList.toggle('is-active', c.dataset.qchip === 'all');
-            });
-          }
+          document.getElementById('prj-cat-filter').value = 'ALL';
+          document.getElementById('prj-status-filter').value = 'ALL';
+          document.getElementById('prj-health-filter').value = 'ALL';
+          document.getElementById('prj-contract-filter').value = 'ALL';
+          document.getElementById('prj-search').value = '';
           applyPortfolioFilter();
         });
       });
