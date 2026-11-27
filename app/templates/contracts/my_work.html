@@ -18,7 +18,7 @@
 <div class="pme-shell ts-ed">
   {% include "contracts/_pm_ribbon.html" %}
 
-  <main class="pme-content">
+  <main class="pme-stage-scroll">
     {% if _mv == 'work' %}
     <section class="pms-metrics" aria-label="My Work summary">
       <div class="pms-metric">
@@ -208,14 +208,14 @@
     {% endif %}
   </main>
 
-  <footer class="pme-statusbar">
+  <footer class="ts-ed__statusbar">
     <div>
-      <span>TrustSeal PME</span>
+      <span>TrustSeal Projects</span>
       <span>·</span>
-      <span>My Work &amp; Weekly Timesheet</span>
+      <span>{{ pm_crumb_label }}</span>
     </div>
     <div>
-      <span>This Week: {{ week_total_hours }}h</span>
+      <span style="color:#17633a;font-weight:600;">This Week: {{ week_total_hours }}h</span>
       <span>·</span>
       <span>PostgreSQL Audit Verified</span>
     </div>

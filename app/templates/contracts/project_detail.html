@@ -21,8 +21,8 @@
 <div class="pme-shell ts-ed">
   {% include "contracts/_pm_ribbon.html" %}
 
-  {# ======================= CLEAN PROJECT DETAIL SIDEBAR + MAIN CANVAS (ZERO INTERNAL TABS / ZERO DUPLICATE HERO) ======================= #}
-  <div class="pme-detail-grid">
+  {# ======================= 3-PANE TRUSTSEAL PROJECT STUDIO (Sidebar + Stage + Collapsible Inspector) ======================= #}
+  <div class="pme-detail-grid" id="pd-detail-grid">
     <aside class="pme-detail-side" aria-label="Project sections">
       <div class="pme-detail-side__grp">Delivery</div>
       <button type="button" class="pme-detail-nav is-active" data-pdtab="overview"><span>Overview</span></button>
@@ -48,6 +48,12 @@
       <button type="button" class="pme-detail-nav" data-pdtab="settings"><span>Project Settings</span></button>
     </aside>
 
+    <div class="pme-detail-stage">
+      <button type="button" class="pme-pane-rail" id="pd-pane-toggle" aria-expanded="true" title="Collapse / expand project summary pane">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
     <main class="pme-detail-main">
     {# ======================= PROJECT WORKSPACE PANES ======================= #}
     <div>
@@ -91,53 +97,25 @@
           </button>
         </section>
 
-        <div class="pms-studio-grid">
-          <div class="pms-studio-stack">
-            <section class="pms-panel pms-studio-section">
-              <div class="pms-section-line">
-                <h2>Contract obligations</h2>
-                <button type="button" class="pms-btn pms-btn--sm" data-pdtab="contracts">View register</button>
-              </div>
-              <ul class="pms-activity-stack">
-                {% for ob in ob_rows[:4] %}
-                <li>
-                  <div>
-                    <strong style="font-size:13px;">{{ ob.title }}</strong>
-                    <span class="pms-row-meta">{{ ob.contract_title }} · {{ ob.due_date or 'No due date' }}</span>
-                  </div>
-                  <span class="pms-state {% if ob.status == 'completed' %}pms-state--good{% elif ob.status == 'overdue' %}pms-state--bad{% else %}pms-state--warn{% endif %}">{{ ob.status|title }}</span>
-                </li>
-                {% else %}
-                <li style="color:#4c6273;font-size:13px;">No contract obligations tracked yet. Projects may operate contract-free or link contracts under Procurement &amp; Contracts.</li>
-                {% endfor %}
-              </ul>
-            </section>
+        <section class="pms-panel pms-studio-section">
+          <div class="pms-section-line">
+            <h2>Contract obligations</h2>
+            <button type="button" class="pms-btn pms-btn--sm" data-pdtab="contracts">View register</button>
           </div>
-
-          <div class="pms-studio-stack">
-            <section class="pms-panel pms-studio-section">
-              <div class="pms-section-line">
-                <h2>Delivery plan</h2>
-                <div style="display:inline-flex;gap:4px;align-items:center;">
-                  <select id="pd-lc-target" class="st-select" style="min-height:28px;font-size:12px;">
-                    {% for ls in (lifecycle_states if lifecycle_states is defined else ['draft','authorized','planning','executing','handing_over','closing','closed','on_hold']) %}
-                    <option value="{{ ls }}" {% if project.lifecycle_state == ls %}selected{% endif %}>{{ ls|replace('_',' ')|title }}</option>
-                    {% endfor %}
-                  </select>
-                  <button type="button" id="pd-lc-go" class="pms-btn pms-btn--sm">Stage</button>
-                </div>
+          <ul class="pms-activity-stack">
+            {% for ob in ob_rows[:4] %}
+            <li>
+              <div>
+                <strong style="font-size:13px;">{{ ob.title }}</strong>
+                <span class="pms-row-meta">{{ ob.contract_title }} · {{ ob.due_date or 'No due date' }}</span>
               </div>
-              <ul class="pms-detail-list">
-                <li><span>Methodology</span><strong>{{ (project.delivery_methodology or 'hybrid')|title }}</strong></li>
-                <li><span>Sponsor</span><strong>{{ project.client_name or 'Internal' }}</strong></li>
-                <li><span>Approved budget</span><strong>{{ (project.currency ~ ' ' ~ ('{:,.0f}'.format(project.budget_amount))) if project.budget_amount else '—' }}</strong></li>
-                <li><span>Spend + Committed</span><strong>{{ project.currency }} {{ '{:,.0f}'.format((financials.total_exposure|float) if (financials is defined and financials.total_exposure) else (committed_value or 0)) }}</strong></li>
-                <li><span>Deliverables accepted</span><strong>{{ overall_prog.accepted }} of {{ overall_prog.total }}</strong></li>
-                <li><span>Open RAID risks</span><strong>{{ h.open_risks }}</strong></li>
-              </ul>
-            </section>
-          </div>
-        </div>
+              <span class="pms-state {% if ob.status == 'completed' %}pms-state--good{% elif ob.status == 'overdue' %}pms-state--bad{% else %}pms-state--warn{% endif %}">{{ ob.status|title }}</span>
+            </li>
+            {% else %}
+            <li style="color:#718494;font-size:12.5px;">No contract obligations tracked yet. Projects may operate contract-free or link contracts under Contract Overview.</li>
+            {% endfor %}
+          </ul>
+        </section>
 
         <div class="pms-card">
           <div class="pms-card__head">
@@ -1404,6 +1382,63 @@
       </section>
     </div>
     </main>
+    </div>
+
+    {# ======================= COLLAPSIBLE RIGHT PROJECT INSPECTOR (MATCHING TRUSTSEAL STUDIO) ======================= #}
+    <aside class="pme-right-pane" aria-label="Project summary inspector">
+      <div class="pme-props__header">
+        <h3 class="pme-props__title">Project Inspector</h3>
+        <span class="pms-state {% if h.rag == 'on_track' %}pms-state--good{% elif h.rag == 'at_risk' %}pms-state--warn{% else %}pms-state--bad{% endif %}">{{ h.label }} · {{ h.score }}</span>
+      </div>
+      <div class="pme-props__scroll">
+        <div class="pme-props__grp">
+          <div class="pme-props__glabel">Delivery Profile</div>
+          <div class="pme-props__kv">
+            <div class="pme-props__row"><span>Code</span><strong style="font-family:var(--ts-font-mono);color:#002769;">{{ project.project_code }}</strong></div>
+            <div class="pme-props__row"><span>Methodology</span><strong>{{ (project.delivery_methodology or 'hybrid')|title }}</strong></div>
+            <div class="pme-props__row"><span>Category</span><strong>{{ project.category|replace('_',' ')|title }}</strong></div>
+            <div class="pme-props__row"><span>Sponsor</span><strong>{{ project.client_name or 'Internal' }}</strong></div>
+            <div class="pme-props__row"><span>Timeline</span><strong>{{ project.start_date or '—' }} → {{ project.end_date or '—' }}</strong></div>
+          </div>
+        </div>
+
+        <div class="pme-props__grp">
+          <div class="pme-props__glabel">Financial Posture</div>
+          <div class="pme-props__kv">
+            <div class="pme-props__row"><span>Approved Budget</span><strong>{{ (project.currency ~ ' ' ~ ('{:,.0f}'.format(project.budget_amount))) if project.budget_amount else '—' }}</strong></div>
+            <div class="pme-props__row"><span>Spend + Committed</span><strong>{{ project.currency }} {{ '{:,.0f}'.format((financials.total_exposure|float) if (financials is defined and financials.total_exposure) else (committed_value or 0)) }}</strong></div>
+            <div class="pme-props__row"><span>Linked Contracts</span><strong>{{ contracts|length }}</strong></div>
+          </div>
+        </div>
+
+        <div class="pme-props__grp">
+          <div class="pme-props__glabel">Lifecycle Stage</div>
+          <div class="pme-props__field">
+            <select id="pd-lc-target">
+              {% for ls in (lifecycle_states if lifecycle_states is defined else ['draft','authorized','planning','executing','handing_over','closing','closed','on_hold']) %}
+              <option value="{{ ls }}" {% if project.lifecycle_state == ls %}selected{% endif %}>{{ ls|replace('_',' ')|title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="button" id="pd-lc-go" class="ts-btn ts-btn--primary" style="width:100%;">Update Lifecycle Stage</button>
+        </div>
+
+        <div class="pme-props__grp">
+          <div class="pme-props__glabel">Quick Actions</div>
+          <div class="pme-props__actions">
+            <button type="button" class="ts-btn ts-btn--primary" onclick="document.getElementById('pd-open-new').click();" style="width:100%;">+ New Project Contract</button>
+            <a href="/api/projects/{{ project.id }}/export.csv" class="ts-btn" style="width:100%;">Export Project CSV</a>
+            <a href="{{ url_for('contracts_views.my_work_page', view='timesheet') }}" class="ts-btn" style="width:100%;">Log Time (My Timesheet)</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="pme-props__meta">
+        <div class="pme-meta-row"><span>Deliverables Accepted</span><b>{{ overall_prog.accepted }} / {{ overall_prog.total }}</b></div>
+        <div class="pme-meta-row"><span>Tasks Completed</span><b>{{ t_done }} / {{ t_rows|length }}</b></div>
+        <div class="pme-meta-row"><span>Open RAID Risks</span><b style="color:{{ '#9b2c2c' if h.open_risks else '#17633a' }};">{{ h.open_risks }}</b></div>
+      </div>
+    </aside>
   </div>
 
   <footer class="ts-ed__statusbar">
@@ -1786,6 +1821,14 @@
         method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
         body: JSON.stringify({ name: document.getElementById('pd-set-name').value.trim(), client_name: document.getElementById('pd-set-client').value.trim(), status: document.getElementById('pd-set-status').value, category: document.getElementById('pd-set-cat').value, budget_amount: document.getElementById('pd-set-budget').value || null, currency: document.getElementById('pd-set-curr').value.trim() || 'USD', start_date: document.getElementById('pd-set-start').value, end_date: document.getElementById('pd-set-end').value, description: document.getElementById('pd-set-desc').value.trim() }),
       }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
+    });
+  }
+  var pdGrid = document.getElementById('pd-detail-grid');
+  var pdPaneTog = document.getElementById('pd-pane-toggle');
+  if (pdGrid && pdPaneTog) {
+    pdPaneTog.addEventListener('click', function () {
+      var hidden = pdGrid.classList.toggle('is-pane-hidden');
+      pdPaneTog.setAttribute('aria-expanded', String(!hidden));
     });
   }
 })();

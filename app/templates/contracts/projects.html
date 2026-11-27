@@ -43,7 +43,17 @@
 <div class="pme-shell ts-ed">
   {% include "contracts/_pm_ribbon.html" %}
 
-  <main class="pme-content" id="pms-main">
+  <div class="pme-workspace {% if sec != 'projects' %}pme-workspace--single{% endif %}" id="pme-workspace">
+    <section class="pme-stage">
+      {% if sec == 'projects' %}
+      <button type="button" class="pme-pane-rail" id="pme-pane-toggle" aria-expanded="true" title="Collapse / expand inspector">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      {% endif %}
+
+      <main class="pme-stage-scroll" id="pms-main">
 
     {# ======================= SECTION: HOME OVERVIEW ======================= #}
     {% if sec == 'home' %}
@@ -179,10 +189,11 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="15" height="15" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg>
           Export
         </button>
-        <span style="width:1px;height:18px;background:#dbe3ee;margin:0 2px;"></span>
-        <button type="button" class="pms-btn pms-btn--sm" data-pview="table" id="prj-v-table">Table</button>
-        <button type="button" class="pms-btn pms-btn--plain pms-btn--sm" data-pview="cards" id="prj-v-cards">Cards</button>
-        <button type="button" class="pms-btn pms-btn--plain pms-btn--sm" data-pview="kanban" id="prj-v-kanban">Status Board</button>
+        <div class="pme-view-switch" role="group" aria-label="View mode">
+          <button type="button" class="pme-vbtn is-active" data-pview="table" id="prj-v-table">☰ Table</button>
+          <button type="button" class="pme-vbtn" data-pview="cards" id="prj-v-cards">⊞ Cards</button>
+          <button type="button" class="pme-vbtn" data-pview="kanban" id="prj-v-kanban" title="Status Board">▦ Board</button>
+        </div>
       </form>
 
       {# Active filter summary & quick sort links #}
@@ -245,8 +256,7 @@
                 {{ (p.currency ~ ' ' ~ ('{:,.0f}'.format(p.budget_amount))) if p.budget_amount else '—' }}
               </td>
               <td style="text-align:right;white-space:nowrap;">
-                <a class="pms-btn pms-btn--sm" href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}">Open</a>
-                <button type="button" class="pms-btn pms-btn--plain pms-iconbtn prj-inspect-btn" aria-label="Inspect {{ p.name }}" title="Quick inspect">⋯</button>
+                <button type="button" class="pme-dots prj-more-btn" aria-label="Project actions" title="More actions">⋮</button>
               </td>
             </tr>
             {% else %}
@@ -281,14 +291,16 @@
         {% set col_rows = projects|selectattr('status', 'equalto', st_k)|list %}
         <section class="pms-board-col">
           <h3><span>{{ st_l }}</span><span>{{ col_rows|length }}</span></h3>
-          {% for p in col_rows %}
-          <a class="pms-board-card" href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}">
-            <strong style="font-size:13px;display:block;">{{ p.name }}</strong>
-            <span class="pms-row-meta">{{ p.project_code }} · {{ p.deliverables_pct }}%</span>
-          </a>
-          {% else %}
-          <div style="font-size:12px;color:#8494a7;padding:8px 0;">No projects</div>
-          {% endfor %}
+          <div class="pms-board-cards">
+            {% for p in col_rows %}
+            <a class="pms-board-card" href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}">
+              <strong style="font-size:12.5px;display:block;">{{ p.name }}</strong>
+              <span class="pms-row-meta">{{ p.project_code }} · {{ p.deliverables_pct }}% · {{ p.contracts_total }} contract(s)</span>
+            </a>
+            {% else %}
+            <div style="font-size:11.5px;color:#718494;padding:8px 2px;">No projects</div>
+            {% endfor %}
+          </div>
         </section>
         {% endfor %}
       </div>
@@ -916,20 +928,146 @@
       </section>
     </div>
     {% endif %}
-  </main>
+      </main>
+    </section>
 
-  <footer class="pme-statusbar">
+    {% if sec == 'projects' %}
+    {# ======================= COLLAPSIBLE RIGHT STUDIO INSPECTOR PANE (MATCHING CONTRACTS STUDIO) ======================= #}
+    <aside class="pme-right-pane" aria-label="Project inspector and quick create">
+      <div class="pme-props__tabs" role="tablist">
+        <button type="button" role="tab" class="ts-is-active" data-pmrp="inspect" aria-selected="true">Inspector</button>
+        <button type="button" role="tab" data-pmrp="create" aria-selected="false">New Project</button>
+      </div>
+
+      <div class="pme-props__scroll">
+        {# TAB 1: LIVE ROW INSPECTOR #}
+        <div data-pmrpane="inspect">
+          <div id="pme-insp-empty" class="pme-props__empty">
+            Select any project row to inspect its delivery health, lifecycle status, budget, or launch its workspace.
+          </div>
+          <div id="pme-insp-content" hidden>
+            <div class="pme-props__grp">
+              <div class="pme-props__glabel">Project Summary</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+                <span id="pme-i-code" class="pme-appbar-code"></span>
+                <span id="pme-i-health" class="pms-state pms-state--good"></span>
+              </div>
+              <div id="pme-i-name" style="font-size:14px;font-weight:700;color:#1d3648;margin-bottom:10px;"></div>
+              <div class="pme-props__kv">
+                <div class="pme-props__row"><span>Category</span><strong id="pme-i-cat">—</strong></div>
+                <div class="pme-props__row"><span>Sponsor</span><strong id="pme-i-client">—</strong></div>
+                <div class="pme-props__row"><span>Budget</span><strong id="pme-i-budget">—</strong></div>
+                <div class="pme-props__row"><span>Deliverables</span><strong id="pme-i-prog">—</strong></div>
+                <div class="pme-props__row"><span>Tasks</span><strong id="pme-i-tasks">—</strong></div>
+                <div class="pme-props__row"><span>Linked Contracts</span><strong id="pme-i-contracts">—</strong></div>
+              </div>
+            </div>
+
+            <div class="pme-props__grp">
+              <div class="pme-props__glabel">Lifecycle Status</div>
+              <div class="pme-props__field">
+                <select id="pme-i-status-sel">
+                  <option value="active">Active</option>
+                  <option value="on_hold">On Hold</option>
+                  <option value="completed">Completed</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
+              <button type="button" class="ts-btn ts-btn--primary" id="pme-i-status-apply" style="width:100%;">Update Status</button>
+            </div>
+
+            <div class="pme-props__grp">
+              <div class="pme-props__glabel">Workspace Actions</div>
+              <div class="pme-props__actions">
+                <a id="pme-i-open" href="#" class="ts-btn ts-btn--primary" style="width:100%;">Open Project Workspace →</a>
+                <a id="pme-i-wbs" href="#" class="ts-btn" style="width:100%;">Plan &amp; WBS Schedule</a>
+                <a id="pme-i-spend" href="#" class="ts-btn" style="width:100%;">Contract Spend &amp; Burn</a>
+                <a id="pme-i-contracts-url" href="#" class="ts-btn" style="width:100%;">Contract Overview</a>
+                <a id="pme-i-csv" href="#" class="ts-btn" style="width:100%;">Export Project CSV</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {# TAB 2: QUICK CREATE NEW PROJECT #}
+        <div data-pmrpane="create" hidden>
+          <form id="prj-side-form">
+            <div class="pme-props__grp">
+              <div class="pme-props__glabel">Project Identity</div>
+              <div class="pme-props__field">
+                <label for="prj-s-name">Project Name *</label>
+                <input type="text" id="prj-s-name" required placeholder="National Health Data Platform">
+              </div>
+              <div class="pme-props__field">
+                <label for="prj-s-code">Project Code</label>
+                <input type="text" id="prj-s-code" placeholder="Auto-generated">
+              </div>
+              <div class="pme-props__field">
+                <label for="prj-s-cat">Category</label>
+                <select id="prj-s-cat">{% for key, lbl in categories %}<option value="{{ key }}">{{ lbl }}</option>{% endfor %}</select>
+              </div>
+              <div class="pme-props__field">
+                <label for="prj-s-client">Client / Sponsor</label>
+                <input type="text" id="prj-s-client" placeholder="Acme Holdings Ltd">
+              </div>
+            </div>
+            <div class="pme-props__grp">
+              <div class="pme-props__glabel">Budget &amp; Mandate</div>
+              <div style="display:grid;grid-template-columns:1fr 86px;gap:8px;">
+                <div class="pme-props__field">
+                  <label for="prj-s-budget">Approved Budget</label>
+                  <input type="number" id="prj-s-budget" placeholder="250000">
+                </div>
+                <div class="pme-props__field">
+                  <label for="prj-s-curr">Currency</label>
+                  <select id="prj-s-curr"><option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option><option value="KES">KES</option><option value="UGX">UGX</option><option value="ZAR">ZAR</option></select>
+                </div>
+              </div>
+              <div class="pme-props__field">
+                <label for="prj-s-desc">Description</label>
+                <input type="text" id="prj-s-desc" placeholder="Scope, objectives, or department">
+              </div>
+              <button type="submit" class="ts-btn ts-btn--primary" style="width:100%;height:33px !important;">Create &amp; Open Project →</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="pme-props__meta">
+        <div class="pme-meta-row"><span>Total Projects</span><b>{{ mc.total }}</b></div>
+        <div class="pme-meta-row"><span>On Track</span><b style="color:#17633a;">{{ mc.on_track }}</b></div>
+        <div class="pme-meta-row"><span>At Risk / Delayed</span><b style="color:{{ '#8a5300' if mc.attention else '#4c6273' }};">{{ mc.attention }}</b></div>
+        <div class="pme-meta-row"><span>Tracked Obligations</span><b style="color:#002769;">{{ global_obligations|length if global_obligations is defined else 0 }}</b></div>
+      </div>
+    </aside>
+    {% endif %}
+  </div>
+
+  <footer class="ts-ed__statusbar">
     <div>
-      <span>TrustSeal PME</span>
+      <span>TrustSeal Projects</span>
       <span>·</span>
       <span>{{ cur_title }}</span>
       <span>·</span>
       <span>{{ all_projects_count|default(projects|length) }} project(s)</span>
     </div>
     <div>
+      <span style="color:#17633a;font-weight:600;">{{ mc.on_track }} on track</span>
+      <span>·</span>
       <span>PostgreSQL Audit Verified</span>
     </div>
   </footer>
+</div>
+
+{# Row Action Context Menu (matching Contracts Studio .ct-ctx) #}
+<div id="pme-ctx" class="pme-ctx" hidden role="menu">
+  <a class="pme-ctx__item" id="pme-ctx-open" href="#" style="font-weight:600;color:#002769;">Open Project Workspace →</a>
+  <div class="pme-ctx__sep"></div>
+  <a class="pme-ctx__item" id="pme-ctx-wbs" href="#">Plan &amp; WBS Schedule</a>
+  <a class="pme-ctx__item" id="pme-ctx-contracts" href="#">Contract Overview</a>
+  <a class="pme-ctx__item" id="pme-ctx-spend" href="#">Spend &amp; Burn</a>
+  <div class="pme-ctx__sep"></div>
+  <a class="pme-ctx__item" id="pme-ctx-csv" href="#">Export Project CSV</a>
 </div>
 
 {# ======================= SLIDE-OVER DRAWER: NEW PROJECT ======================= #}
@@ -1106,11 +1244,67 @@
     }
   });
 
-  // New Project Drawer
+  // New Project: prefer embedded Right Studio Pane tab when present, else slide-over drawer
   var prjDrawer = document.getElementById('prj-drawer');
   var openNew = document.getElementById('prj-open-new');
-  if (openNew && prjDrawer) {
-    openNew.addEventListener('click', function () { prjDrawer.showModal(); document.getElementById('prj-name').focus(); });
+  var wsEl = document.getElementById('pme-workspace');
+  var paneToggle = document.getElementById('pme-pane-toggle');
+  function switchRightTab(tabName) {
+    if (wsEl) wsEl.classList.remove('is-pane-hidden');
+    if (paneToggle) paneToggle.setAttribute('aria-expanded', 'true');
+    document.querySelectorAll('[data-pmrp]').forEach(function (b) {
+      var on = b.dataset.pmrp === tabName;
+      b.classList.toggle('ts-is-active', on);
+      b.setAttribute('aria-selected', String(on));
+    });
+    document.querySelectorAll('[data-pmrpane]').forEach(function (p) {
+      p.hidden = p.dataset.pmrpane !== tabName;
+    });
+  }
+  document.querySelectorAll('[data-pmrp]').forEach(function (b) {
+    b.addEventListener('click', function () { switchRightTab(b.dataset.pmrp); });
+  });
+  if (paneToggle && wsEl) {
+    paneToggle.addEventListener('click', function () {
+      var hidden = wsEl.classList.toggle('is-pane-hidden');
+      paneToggle.setAttribute('aria-expanded', String(!hidden));
+    });
+  }
+  if (openNew) {
+    openNew.addEventListener('click', function () {
+      var sName = document.getElementById('prj-s-name');
+      if (sName && wsEl && !wsEl.classList.contains('pme-workspace--single')) {
+        switchRightTab('create');
+        sName.focus();
+      } else if (prjDrawer) {
+        prjDrawer.showModal();
+        document.getElementById('prj-name').focus();
+      }
+    });
+  }
+  var prjSideForm = document.getElementById('prj-side-form');
+  if (prjSideForm) {
+    prjSideForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = document.getElementById('prj-s-name').value.trim();
+      if (!name) return;
+      fetch('/api/projects', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({
+          name: name,
+          project_code: document.getElementById('prj-s-code').value.trim(),
+          category: document.getElementById('prj-s-cat').value,
+          client_name: document.getElementById('prj-s-client').value.trim(),
+          budget_amount: document.getElementById('prj-s-budget').value || null,
+          currency: document.getElementById('prj-s-curr').value,
+          description: document.getElementById('prj-s-desc').value.trim(),
+        }),
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d.ok && d.project) window.location.href = '/projects/' + d.project.id;
+        else if (d.ok) window.location.reload();
+      });
+    });
   }
   var prjCreateForm = document.getElementById('prj-create-form');
   if (prjCreateForm) {
@@ -1220,29 +1414,80 @@
     });
   }
 
-  // Quick Record Inspector Drawer
-  var inspDrawer = document.getElementById('pms-inspect-drawer');
-  document.querySelectorAll('.prj-inspect-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var tr = btn.closest('tr[data-row-json]');
-      if (!tr || !inspDrawer) return;
-      var r = JSON.parse(tr.dataset.rowJson);
-      document.getElementById('pms-insp-title').textContent = r.name;
-      document.getElementById('pms-insp-code').textContent = r.code;
-      document.getElementById('pms-insp-open').href = '/projects/' + r.id;
-      document.getElementById('pms-insp-body').innerHTML =
-        '<ul class="pms-detail-list">' +
-        '<li><span>Category</span><strong>' + r.category + '</strong></li>' +
-        '<li><span>Sponsor</span><strong>' + r.client + '</strong></li>' +
-        '<li><span>Lifecycle</span><strong>' + r.status + '</strong></li>' +
-        '<li><span>Health</span><strong>' + r.health + '</strong></li>' +
-        '<li><span>Progress</span><strong>' + r.progress + ' (' + r.tasks + ' tasks)</strong></li>' +
-        '<li><span>Linked contracts</span><strong>' + r.contracts + '</strong></li>' +
-        '<li><span>Budget</span><strong>' + r.budget + '</strong></li>' +
-        '</ul>';
-      inspDrawer.showModal();
+  // Live Right Inspector Pane on Row Click + Floating ⋮ Context Menu
+  var selectedProjId = null;
+  function inspectProjectRow(tr) {
+    if (!tr || !tr.dataset.rowJson) return;
+    var r = JSON.parse(tr.dataset.rowJson);
+    selectedProjId = r.id;
+    document.querySelectorAll('#prj-register-table tbody tr').forEach(function (x) {
+      x.classList.toggle('is-row-selected', x === tr);
+    });
+    var emptyEl = document.getElementById('pme-insp-empty');
+    var contEl = document.getElementById('pme-insp-content');
+    if (emptyEl && contEl) {
+      emptyEl.hidden = true;
+      contEl.hidden = false;
+      document.getElementById('pme-i-code').textContent = r.code;
+      document.getElementById('pme-i-name').textContent = r.name;
+      document.getElementById('pme-i-health').textContent = r.health;
+      document.getElementById('pme-i-cat').textContent = String(r.category || '').replace(/_/g, ' ');
+      document.getElementById('pme-i-client').textContent = r.client || 'Internal';
+      document.getElementById('pme-i-budget').textContent = r.budget || '—';
+      document.getElementById('pme-i-prog').textContent = r.progress || '0%';
+      document.getElementById('pme-i-tasks').textContent = r.tasks || '0/0';
+      document.getElementById('pme-i-contracts').textContent = String(r.contracts || 0);
+      var stSel = document.getElementById('pme-i-status-sel');
+      if (stSel) stSel.value = r.status || 'active';
+      document.getElementById('pme-i-open').href = '/projects/' + r.id;
+      document.getElementById('pme-i-wbs').href = '/projects/' + r.id + '#wbs';
+      document.getElementById('pme-i-spend').href = '/projects/' + r.id + '#spend';
+      document.getElementById('pme-i-contracts-url').href = '/projects/' + r.id + '#contracts';
+      document.getElementById('pme-i-csv').href = '/api/projects/' + r.id + '/export.csv';
+      switchRightTab('inspect');
+    }
+  }
+  document.querySelectorAll('#prj-register-table tbody tr[data-row-json]').forEach(function (tr) {
+    tr.addEventListener('click', function (ev) {
+      if (ev.target.closest('a, button')) return;
+      inspectProjectRow(tr);
     });
   });
+  var stApplyBtn = document.getElementById('pme-i-status-apply');
+  if (stApplyBtn) {
+    stApplyBtn.addEventListener('click', function () {
+      if (!selectedProjId) return;
+      var newSt = document.getElementById('pme-i-status-sel').value;
+      fetch('/api/projects/' + selectedProjId, {
+        method: 'PATCH', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({ status: newSt }),
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d.ok) window.location.reload();
+      });
+    });
+  }
+  // Floating ⋮ Row Context Menu
+  var ctxEl = document.getElementById('pme-ctx');
+  document.querySelectorAll('.prj-more-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      var tr = btn.closest('tr[data-row-json]');
+      if (!tr || !ctxEl) return;
+      inspectProjectRow(tr);
+      var r = JSON.parse(tr.dataset.rowJson);
+      document.getElementById('pme-ctx-open').href = '/projects/' + r.id;
+      document.getElementById('pme-ctx-wbs').href = '/projects/' + r.id + '#wbs';
+      document.getElementById('pme-ctx-contracts').href = '/projects/' + r.id + '#contracts';
+      document.getElementById('pme-ctx-spend').href = '/projects/' + r.id + '#spend';
+      document.getElementById('pme-ctx-csv').href = '/api/projects/' + r.id + '/export.csv';
+      var rect = btn.getBoundingClientRect();
+      ctxEl.hidden = false;
+      ctxEl.style.top = Math.min(window.innerHeight - 190, rect.bottom + 4) + 'px';
+      ctxEl.style.left = Math.max(8, rect.right - 196) + 'px';
+    });
+  });
+  document.addEventListener('click', function () { if (ctxEl) ctxEl.hidden = true; });
 
   // View Switcher (Table / Cards / Board)
   var tblWrap = document.getElementById('prj-table-wrap');
@@ -1256,7 +1501,7 @@
       if (kanbanWrap) { kanbanWrap.hidden = (mode !== 'kanban'); kanbanWrap.style.display = (mode === 'kanban') ? 'grid' : 'none'; }
       ['table', 'cards', 'kanban'].forEach(function (m) {
         var b = document.getElementById('prj-v-' + m);
-        if (b) b.classList.toggle('pms-btn--plain', m !== mode);
+        if (b) b.classList.toggle('is-active', m === mode);
       });
     });
   });
