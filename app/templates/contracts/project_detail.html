@@ -18,70 +18,37 @@
 {% set pm_ribbon_ctx = 'project_detail' %}
 {% set pm_ribbon_tab = 'Home' %}
 
-<div class="pme-shell">
+<div class="pme-shell ts-ed">
   {% include "contracts/_pm_ribbon.html" %}
 
-  <main class="pme-content">
-    <div class="pms-hero">
-      <div>
-        <h1>{{ project.name }}</h1>
-        <div class="pms-context">
-          <strong>{{ project.project_code }}</strong>
-          <span>{{ project.category|replace('_', ' ')|title }}</span>
-          <span class="pms-state pms-state--info">{{ (project.lifecycle_state or 'executing')|replace('_',' ')|title }}</span>
-          <span class="pms-state {% if h.rag == 'on_track' %}pms-state--good{% elif h.rag == 'at_risk' %}pms-state--warn{% else %}pms-state--bad{% endif %}">{{ h.label }} · {{ h.score }}</span>
-        </div>
-      </div>
-      <div class="pms-hero-actions">
-        <a class="pms-btn pms-btn--sm" href="/api/projects/{{ project.id }}/export.csv">Export CSV</a>
-      </div>
-    </div>
+  {# ======================= CLEAN PROJECT DETAIL SIDEBAR + MAIN CANVAS (ZERO INTERNAL TABS / ZERO DUPLICATE HERO) ======================= #}
+  <div class="pme-detail-grid">
+    <aside class="pme-detail-side" aria-label="Project sections">
+      <div class="pme-detail-side__grp">Delivery</div>
+      <button type="button" class="pme-detail-nav is-active" data-pdtab="overview"><span>Overview</span></button>
+      <button type="button" class="pme-detail-nav" data-pdtab="wbs"><span>Plan &amp; WBS</span><span class="pme-detail-nav__cnt">{{ wbs_nodes|length if wbs_nodes is defined else 0 }}</span></button>
+      <button type="button" class="pme-detail-nav" data-pdtab="tasks"><span>Work &amp; Tasks</span><span class="pme-detail-nav__cnt">{{ t_rows|length }}</span></button>
+      <button type="button" class="pme-detail-nav" data-pdtab="resources"><span>Resources</span><span class="pme-detail-nav__cnt">{{ alloc_rows|length if alloc_rows is defined else 0 }}</span></button>
+      <button type="button" class="pme-detail-nav" data-pdtab="timesheets"><span>Timesheets</span><span class="pme-detail-nav__cnt">{{ time_rows|length if time_rows is defined else 0 }}</span></button>
+      <button type="button" class="pme-detail-nav" data-pdtab="agile"><span>Requirements &amp; Agile</span><span class="pme-detail-nav__cnt">{{ (req_rows|length if req_rows is defined else 0) + (backlog_rows|length if backlog_rows is defined else 0) }}</span></button>
 
-    {# ======================= PRO CONTEXTUAL SECTION BAR + 2-COLUMN POPOVER ======================= #}
-    <div class="pme-context">
-      <nav class="pms-tabs pms-project-tabs" role="tablist" aria-label="Project sections">
-        <button type="button" class="pms-tab is-active" data-pdtab="overview">Overview</button>
-        <button type="button" class="pms-tab" data-pdtab="wbs">Plan<span class="pms-tab__cnt">{{ wbs_nodes|length if wbs_nodes is defined else 0 }}</span></button>
-        <button type="button" class="pms-tab" data-pdtab="tasks">Work<span class="pms-tab__cnt">{{ t_rows|length }}</span></button>
-        <button type="button" class="pms-tab" data-pdtab="resources">Resources<span class="pms-tab__cnt">{{ alloc_rows|length if alloc_rows is defined else 0 }}</span></button>
-        <button type="button" class="pms-tab" data-pdtab="timesheets">Timesheets<span class="pms-tab__cnt">{{ time_rows|length if time_rows is defined else 0 }}</span></button>
-        {% if show_finance is not defined or show_finance %}
-        <button type="button" class="pms-tab" data-pdtab="finance">Budgets &amp; EVM</button>
-        <button type="button" class="pms-tab" data-pdtab="spend">Spend &amp; Burn<span class="pms-tab__cnt">{{ contract_burn_rows|length if contract_burn_rows is defined else 0 }}</span></button>
-        {% endif %}
-        <button type="button" class="pms-tab" data-pdtab="contracts">Contracts<span class="pms-tab__cnt">{{ contracts|length }}</span></button>
-        <button type="button" class="pms-tab" data-pdtab="agile">Requirements &amp; Agile<span class="pms-tab__cnt">{{ (req_rows|length if req_rows is defined else 0) + (backlog_rows|length if backlog_rows is defined else 0) }}</span></button>
-      </nav>
-      <details class="pme-popover-wrap" id="pms-sections-popover">
-        <summary>Project sections <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
-        <div class="pme-popover">
-          <div>
-            <h4>Delivery</h4>
-            <button type="button" data-pdtab="overview"><span>Overview</span></button>
-            <button type="button" data-pdtab="wbs"><span>Plan &amp; Schedule</span><span>{{ wbs_nodes|length if wbs_nodes is defined else 0 }}</span></button>
-            <button type="button" data-pdtab="tasks"><span>Work &amp; Tasks</span><span>{{ t_rows|length }}</span></button>
-            <button type="button" data-pdtab="resources"><span>Resources</span><span>{{ alloc_rows|length if alloc_rows is defined else 0 }}</span></button>
-            <button type="button" data-pdtab="timesheets"><span>Timesheets</span><span>{{ time_rows|length if time_rows is defined else 0 }}</span></button>
-            <button type="button" data-pdtab="agile"><span>Requirements &amp; Agile</span><span>{{ (req_rows|length if req_rows is defined else 0) + (backlog_rows|length if backlog_rows is defined else 0) }}</span></button>
-          </div>
-          <div>
-            <h4>Commercial &amp; governance</h4>
-            {% if show_finance is not defined or show_finance %}
-            <button type="button" data-pdtab="finance"><span>Budgets &amp; EVM</span></button>
-            <button type="button" data-pdtab="spend"><span>Contract Spend &amp; Burn Rate</span><span>{{ contract_burn_rows|length if contract_burn_rows is defined else 0 }}</span></button>
-            {% endif %}
-            <button type="button" data-pdtab="contracts"><span>Procurement &amp; Contracts</span><span>{{ contracts|length }}</span></button>
-            <button type="button" data-pdtab="governance"><span>Charter &amp; Stage Gates</span></button>
-            <button type="button" data-pdtab="procurement"><span>Supplier Procurement &amp; Assets</span><span>{{ (proc_rows|length if proc_rows is defined else 0) + (asset_rows|length if asset_rows is defined else 0) }}</span></button>
-            <button type="button" data-pdtab="risks"><span>RAID &amp; Change Control</span><span>{{ (r_rows|length) + (change_rows|length if change_rows is defined else 0) }}</span></button>
-            <button type="button" data-pdtab="compliance"><span>QA, Compliance &amp; Portal</span><span>{{ (qa_rows|length if qa_rows is defined else 0) + (compliance_rows|length if compliance_rows is defined else 0) }}</span></button>
-            <button type="button" data-pdtab="results"><span>Results &amp; Closure</span><span>{{ ind_rows|length if ind_rows is defined else 0 }}</span></button>
-            <button type="button" data-pdtab="settings"><span>Project Settings</span></button>
-          </div>
-        </div>
-      </details>
-    </div>
+      <div class="pme-detail-side__grp">Commercial</div>
+      {% if show_finance is not defined or show_finance %}
+      <button type="button" class="pme-detail-nav" data-pdtab="finance"><span>Budgets &amp; EVM</span></button>
+      <button type="button" class="pme-detail-nav" data-pdtab="spend"><span>Spend &amp; Burn</span><span class="pme-detail-nav__cnt">{{ contract_burn_rows|length if contract_burn_rows is defined else 0 }}</span></button>
+      {% endif %}
+      <button type="button" class="pme-detail-nav" data-pdtab="contracts"><span>Contract Overview</span><span class="pme-detail-nav__cnt">{{ contracts|length }}</span></button>
+      <button type="button" class="pme-detail-nav" data-pdtab="procurement"><span>Procurement &amp; Assets</span><span class="pme-detail-nav__cnt">{{ (proc_rows|length if proc_rows is defined else 0) + (asset_rows|length if asset_rows is defined else 0) }}</span></button>
 
+      <div class="pme-detail-side__grp">Governance</div>
+      <button type="button" class="pme-detail-nav" data-pdtab="governance"><span>Charter &amp; Gates</span></button>
+      <button type="button" class="pme-detail-nav" data-pdtab="risks"><span>RAID &amp; Changes</span><span class="pme-detail-nav__cnt">{{ (r_rows|length) + (change_rows|length if change_rows is defined else 0) }}</span></button>
+      <button type="button" class="pme-detail-nav" data-pdtab="compliance"><span>QA &amp; Compliance</span><span class="pme-detail-nav__cnt">{{ (qa_rows|length if qa_rows is defined else 0) + (compliance_rows|length if compliance_rows is defined else 0) }}</span></button>
+      <button type="button" class="pme-detail-nav" data-pdtab="results"><span>Results &amp; Closure</span><span class="pme-detail-nav__cnt">{{ ind_rows|length if ind_rows is defined else 0 }}</span></button>
+      <button type="button" class="pme-detail-nav" data-pdtab="settings"><span>Project Settings</span></button>
+    </aside>
+
+    <main class="pme-detail-main">
     {# ======================= PROJECT WORKSPACE PANES ======================= #}
     <div>
 
@@ -1435,11 +1402,12 @@
         </div>
       </section>
     </div>
-  </main>
+    </main>
+  </div>
 
-  <footer class="pme-statusbar">
+  <footer class="ts-ed__statusbar">
     <div>
-      <span>TrustSeal PME</span>
+      <span>TrustSeal Projects</span>
       <span>·</span>
       <span>{{ project.project_code }}</span>
       <span>·</span>
@@ -1487,16 +1455,14 @@
     });
   }
 
-  // Studio Underline Tabs + Sections Popover (persisted in URL hash)
-  var popEl = document.getElementById('pms-sections-popover');
+  // Project Detail Sidebar + Ribbon Tab Navigation (persisted in URL hash)
   function activatePane(target) {
-    document.querySelectorAll('.pms-project-tabs [data-pdtab], .pme-popover [data-pdtab]').forEach(function (b) {
+    document.querySelectorAll('.pme-detail-nav[data-pdtab]').forEach(function (b) {
       b.classList.toggle('is-active', b.dataset.pdtab === target);
     });
     document.querySelectorAll('[data-pdpane]').forEach(function (p) {
       p.hidden = p.dataset.pdpane !== target;
     });
-    if (popEl && popEl.open) popEl.open = false;
     try { window.history.replaceState(null, '', '#' + target); } catch (e) {}
   }
 

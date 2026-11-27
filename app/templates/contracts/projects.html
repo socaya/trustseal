@@ -30,7 +30,7 @@
 {% set pm_ribbon_tab = 'Contracts' if sec in ('contracts','obligations','spend') else ('Plan' if sec in ('portfolios','programmes') else ('File' if sec == 'templates' else 'Home')) %}
 {% set pm_crumb_label = cur_title %}
 
-<div class="pme-shell">
+<div class="pme-shell ts-ed">
   {% include "contracts/_pm_ribbon.html" %}
 
   <main class="pme-content" id="pms-main">
