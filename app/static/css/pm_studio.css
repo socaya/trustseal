@@ -1086,18 +1086,20 @@ body.pm-density-comfortable .pme-shell tbody td {
 .pms-activity-stack li:nth-child(odd) { background: var(--pms-stripe); }
 
 .pms-pane[hidden] { display: none !important; }
-.pms-pane { display: flex; flex-direction: column; gap: 10px; }
-.pms-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.pms-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.pms-pane { display: flex; flex-direction: column; gap: 12px; }
+.pms-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.pms-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .pms-grid-2 > *, .pms-grid-3 > * { min-width: 0; }
-.pms-sec-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.pms-sec-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-bottom: 2px; }
 .pms-sec-title { margin: 0; font-size: 15px; font-weight: 700; color: var(--pms-ink); }
 .pms-sec-sub { margin: 1px 0 0; font-size: 12px; color: var(--pms-muted); }
 
+div.pms-drawer[hidden],
+.pms-drawer[hidden] { display: none !important; }
 div.pms-drawer,
 .pms-drawer-inline {
   background: #f5f7fb;
-  padding: 10px 14px;
+  padding: 12px 14px;
   border-bottom: 1px solid #e6ecf4;
 }
 .pms-form-grid {
