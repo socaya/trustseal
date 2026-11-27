@@ -15,23 +15,13 @@
 {% set ob_rows = obligation_rows if obligation_rows is defined else [] %}
 {% set t_done = t_rows|selectattr('status', 'equalto', 'done')|list|length %}
 
-<div class="pms-mobile-bar">
-  <button type="button" class="pms-btn pms-btn--plain" id="pms-mobile-nav-btn" aria-label="Toggle workspace navigation">☰ Workspace menu</button>
-  <strong style="font-size:13px;">{{ project.project_code }}</strong>
-</div>
+{% set pm_ribbon_ctx = 'project_detail' %}
+{% set pm_ribbon_tab = 'Home' %}
 
-<div class="pms-studio">
-  {% include "contracts/_pm_sidebar.html" %}
+<div class="pme-shell">
+  {% include "contracts/_pm_ribbon.html" %}
 
-  <main class="pms-frame">
-    <nav class="pms-crumb" aria-label="Breadcrumb">
-      <a href="{{ url_for('contracts_views.projects_page', section='home') }}">Workspace</a>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-      <a href="{{ url_for('contracts_views.projects_page') }}">Projects</a>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-      <span aria-current="page">{{ project.project_code }}</span>
-    </nav>
-
+  <main class="pme-content">
     <div class="pms-hero">
       <div>
         <h1>{{ project.name }}</h1>
@@ -43,24 +33,12 @@
         </div>
       </div>
       <div class="pms-hero-actions">
-        {% if all_org_projects is defined and all_org_projects|length > 1 %}
-        <span class="pms-select-wrap">
-          <select id="pms-switcher" class="pms-select-btn" aria-label="Switch project" style="max-width:310px;">
-            {% for op in all_org_projects %}
-            <option value="{{ op.id }}" {% if op.id == project.id %}selected{% endif %}>{{ op.name }} ({{ op.project_code }})</option>
-            {% endfor %}
-          </select>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-        </span>
-        {% endif %}
-        <a class="pms-btn" href="{{ url_for('contracts_views.my_work_page') }}">My Timesheet</a>
-        <a class="pms-btn" href="/api/projects/{{ project.id }}/export.csv">Export CSV</a>
-        <button type="button" class="pms-btn pms-btn--primary" id="pd-open-new">+ New Contract</button>
+        <a class="pms-btn pms-btn--sm" href="/api/projects/{{ project.id }}/export.csv">Export CSV</a>
       </div>
     </div>
 
-    {# ======================= PROTOTYPE PROJECT BAR (8 PRIMARY TABS + MORE SECTIONS) ======================= #}
-    <div class="pms-project-bar">
+    {# ======================= PRO CONTEXTUAL SECTION BAR + 2-COLUMN POPOVER ======================= #}
+    <div class="pme-context">
       <nav class="pms-tabs pms-project-tabs" role="tablist" aria-label="Project sections">
         <button type="button" class="pms-tab is-active" data-pdtab="overview">Overview</button>
         <button type="button" class="pms-tab" data-pdtab="wbs">Plan<span class="pms-tab__cnt">{{ wbs_nodes|length if wbs_nodes is defined else 0 }}</span></button>
@@ -73,18 +51,33 @@
         <button type="button" class="pms-tab" data-pdtab="contracts">Procurement &amp; Contracts<span class="pms-tab__cnt">{{ contracts|length }}</span></button>
         <button type="button" class="pms-tab" data-pdtab="agile">Requirements &amp; Agile<span class="pms-tab__cnt">{{ (req_rows|length if req_rows is defined else 0) + (backlog_rows|length if backlog_rows is defined else 0) }}</span></button>
       </nav>
-      <span class="pms-select-wrap">
-        <select id="pms-section-picker" class="pms-select-btn" aria-label="More project sections">
-          <option value="">More sections</option>
-          <option value="governance">Charter &amp; Stage Gates</option>
-          <option value="procurement">Supplier Procurement &amp; Assets ({{ (proc_rows|length if proc_rows is defined else 0) + (asset_rows|length if asset_rows is defined else 0) }})</option>
-          <option value="risks">RAID &amp; Change Control ({{ (r_rows|length) + (change_rows|length if change_rows is defined else 0) }})</option>
-          <option value="compliance">QA, Compliance &amp; Portal ({{ (qa_rows|length if qa_rows is defined else 0) + (compliance_rows|length if compliance_rows is defined else 0) }})</option>
-          <option value="results">Results &amp; Closure ({{ ind_rows|length if ind_rows is defined else 0 }})</option>
-          <option value="settings">Project Settings</option>
-        </select>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-      </span>
+      <details class="pme-popover-wrap" id="pms-sections-popover">
+        <summary>Project sections <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="pme-popover">
+          <div>
+            <h4>Delivery</h4>
+            <button type="button" data-pdtab="overview"><span>Overview</span></button>
+            <button type="button" data-pdtab="wbs"><span>Plan &amp; Schedule</span><span>{{ wbs_nodes|length if wbs_nodes is defined else 0 }}</span></button>
+            <button type="button" data-pdtab="tasks"><span>Work &amp; Tasks</span><span>{{ t_rows|length }}</span></button>
+            <button type="button" data-pdtab="resources"><span>Resources</span><span>{{ alloc_rows|length if alloc_rows is defined else 0 }}</span></button>
+            <button type="button" data-pdtab="timesheets"><span>Timesheets</span><span>{{ time_rows|length if time_rows is defined else 0 }}</span></button>
+            <button type="button" data-pdtab="agile"><span>Requirements &amp; Agile</span><span>{{ (req_rows|length if req_rows is defined else 0) + (backlog_rows|length if backlog_rows is defined else 0) }}</span></button>
+          </div>
+          <div>
+            <h4>Commercial &amp; governance</h4>
+            {% if show_finance is not defined or show_finance %}
+            <button type="button" data-pdtab="finance"><span>Finance &amp; EVM</span></button>
+            {% endif %}
+            <button type="button" data-pdtab="contracts"><span>Procurement &amp; Contracts</span><span>{{ contracts|length }}</span></button>
+            <button type="button" data-pdtab="governance"><span>Charter &amp; Stage Gates</span></button>
+            <button type="button" data-pdtab="procurement"><span>Supplier Procurement &amp; Assets</span><span>{{ (proc_rows|length if proc_rows is defined else 0) + (asset_rows|length if asset_rows is defined else 0) }}</span></button>
+            <button type="button" data-pdtab="risks"><span>RAID &amp; Change Control</span><span>{{ (r_rows|length) + (change_rows|length if change_rows is defined else 0) }}</span></button>
+            <button type="button" data-pdtab="compliance"><span>QA, Compliance &amp; Portal</span><span>{{ (qa_rows|length if qa_rows is defined else 0) + (compliance_rows|length if compliance_rows is defined else 0) }}</span></button>
+            <button type="button" data-pdtab="results"><span>Results &amp; Closure</span><span>{{ ind_rows|length if ind_rows is defined else 0 }}</span></button>
+            <button type="button" data-pdtab="settings"><span>Project Settings</span></button>
+          </div>
+        </div>
+      </details>
     </div>
 
     {# ======================= PROJECT WORKSPACE PANES ======================= #}
@@ -92,6 +85,24 @@
 
       {# ---- 1. EXECUTIVE SUMMARY ---- #}
       <section class="pms-pane" data-pdpane="overview">
+        {# 6-Stage Project Lifecycle Stepper (from PRO prototype) #}
+        {% set _lc = (project.lifecycle_state or 'executing')|lower %}
+        {% set _stage_map = {'draft': 0, 'authorized': 0, 'planning': 1, 'mobilizing': 2, 'executing': 3, 'handing_over': 4, 'closing': 5, 'closed': 5} %}
+        {% set _cur_idx = _stage_map.get(_lc, 3) %}
+        <section class="pme-lifecycle" aria-label="Project lifecycle">
+          <div class="pms-section-line" style="margin-bottom:0;">
+            <h2>Project lifecycle</h2>
+            <span class="pms-state pms-state--info">{{ _lc|replace('_',' ')|title }}</span>
+          </div>
+          <ol>
+            {% for st_lbl, st_tab in [('Initiate','governance'),('Plan','wbs'),('Mobilize','resources'),('Execute','tasks'),('Hand over','contracts'),('Close','results')] %}
+            <li {% if loop.index0 == _cur_idx %}aria-current="step"{% endif %}>
+              <button type="button" data-pdtab="{{ st_tab }}">{{ st_lbl }}</button>
+              <small>{% if loop.index0 == _cur_idx %}Current stage{% elif loop.index0 < _cur_idx %}Completed{% else %}Upcoming{% endif %}</small>
+            </li>
+            {% endfor %}
+          </ol>
+        </section>
         <section class="pms-metrics" aria-label="Project delivery summary">
           <button type="button" class="pms-metric" data-pdtab="wbs">
             <span class="pms-metric-icon pms-metric-icon--green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="18" height="18"><path d="m5 12 4 4L19 6"/></svg></span>
@@ -1275,6 +1286,21 @@
       </section>
     </div>
   </main>
+
+  <footer class="pme-statusbar">
+    <div>
+      <span>TrustSeal PME</span>
+      <span>·</span>
+      <span>{{ project.project_code }}</span>
+      <span>·</span>
+      <span>{{ project.name }}</span>
+    </div>
+    <div>
+      <span>Health: {{ h.label }} ({{ h.score }})</span>
+      <span>·</span>
+      <span>PostgreSQL Audit Verified</span>
+    </div>
+  </footer>
 </div>
 
 <!-- Instantiate Contract inside this Project -->
@@ -1311,33 +1337,17 @@
     });
   }
 
-  // Mobile sidebar toggle
-  var mBtn = document.getElementById('pms-mobile-nav-btn');
-  var sideEl = document.getElementById('pms-side');
-  if (mBtn && sideEl) mBtn.addEventListener('click', function () { sideEl.classList.toggle('is-open'); });
-
-  // Studio Underline Tabs + More Sections Picker (persisted in URL hash)
-  var secPicker = document.getElementById('pms-section-picker');
+  // Studio Underline Tabs + Sections Popover (persisted in URL hash)
+  var popEl = document.getElementById('pms-sections-popover');
   function activatePane(target) {
-    var primaryMatched = false;
-    document.querySelectorAll('.pms-project-tabs [data-pdtab]').forEach(function (b) {
-      var match = b.dataset.pdtab === target;
-      b.classList.toggle('is-active', match);
-      if (match) primaryMatched = true;
+    document.querySelectorAll('.pms-project-tabs [data-pdtab], .pme-popover [data-pdtab]').forEach(function (b) {
+      b.classList.toggle('is-active', b.dataset.pdtab === target);
     });
-    if (secPicker) {
-      if (primaryMatched) { secPicker.value = ''; secPicker.classList.remove('is-active'); }
-      else { secPicker.value = target; secPicker.classList.add('is-active'); }
-    }
     document.querySelectorAll('[data-pdpane]').forEach(function (p) {
       p.hidden = p.dataset.pdpane !== target;
     });
+    if (popEl && popEl.open) popEl.open = false;
     try { window.history.replaceState(null, '', '#' + target); } catch (e) {}
-  }
-  if (secPicker) {
-    secPicker.addEventListener('change', function () {
-      if (secPicker.value) activatePane(secPicker.value);
-    });
   }
 
   // Contract Obligation Add & Complete (CON-02 / SCR-10)

@@ -24,34 +24,18 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pm_studio.css') }}">
 {% include "stamps/_flat_ui.html" %}
 
-<div class="pms-mobile-bar">
-  <button type="button" class="pms-btn pms-btn--plain" id="pms-mobile-nav-btn" aria-label="Toggle workspace navigation">☰ Workspace menu</button>
-  <strong style="font-size:13px;">{{ cur_title }}</strong>
-</div>
+{% set pm_ribbon_ctx = 'projects' %}
+{% set pm_ribbon_tab = 'Contracts' if sec == 'obligations' else ('Plan' if sec in ('portfolios','programmes') else ('File' if sec == 'templates' else 'Home')) %}
+{% set pm_crumb_label = cur_title %}
 
-<div class="pms-studio">
-  {% include "contracts/_pm_sidebar.html" %}
+<div class="pme-shell">
+  {% include "contracts/_pm_ribbon.html" %}
 
-  <main class="pms-frame" id="pms-main">
-    <nav class="pms-crumb" aria-label="Breadcrumb">
-      <a href="{{ url_for('contracts_views.projects_page', section='home') }}">Workspace</a>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-      <span aria-current="page">{{ cur_title }}</span>
-    </nav>
-
+  <main class="pme-content" id="pms-main">
     <div class="pms-hero">
       <div>
         <h1>{{ cur_title }}</h1>
         <p>{{ cur_desc }}</p>
-      </div>
-      <div class="pms-hero-actions">
-        {% if sec != 'obligations' %}
-        <a class="pms-btn" href="{{ url_for('contracts_views.projects_page', section='obligations') }}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="15" height="15" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          Contract obligations ({{ global_obligations|length if global_obligations is defined else 0 }})
-        </a>
-        {% endif %}
-        <button type="button" class="pms-btn pms-btn--primary" id="prj-open-new">+ New project</button>
       </div>
     </div>
 
@@ -534,6 +518,19 @@
     </div>
     {% endif %}
   </main>
+
+  <footer class="pme-statusbar">
+    <div>
+      <span>TrustSeal PME</span>
+      <span>·</span>
+      <span>{{ cur_title }}</span>
+      <span>·</span>
+      <span>{{ all_projects_count|default(projects|length) }} project(s)</span>
+    </div>
+    <div>
+      <span>PostgreSQL Audit Verified</span>
+    </div>
+  </footer>
 </div>
 
 {# ======================= SLIDE-OVER DRAWER: NEW PROJECT ======================= #}

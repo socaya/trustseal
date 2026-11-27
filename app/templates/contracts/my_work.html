@@ -9,28 +9,18 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pm_studio.css') }}">
 {% include "stamps/_flat_ui.html" %}
 
-<div class="pms-mobile-bar">
-  <button type="button" class="pms-btn pms-btn--plain" id="pms-mobile-nav-btn" aria-label="Toggle workspace navigation">☰ Workspace menu</button>
-  <strong style="font-size:13px;">My Work</strong>
-</div>
+{% set pm_ribbon_ctx = 'my_work' %}
+{% set pm_ribbon_tab = 'Work' %}
+{% set pm_crumb_label = 'My Work' %}
 
-<div class="pms-studio">
-  {% include "contracts/_pm_sidebar.html" %}
+<div class="pme-shell">
+  {% include "contracts/_pm_ribbon.html" %}
 
-  <main class="pms-frame">
-    <nav class="pms-crumb" aria-label="Breadcrumb">
-      <a href="{{ url_for('contracts_views.projects_page', section='home') }}">Workspace</a>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-      <span aria-current="page">My Work</span>
-    </nav>
-
+  <main class="pme-content">
     <div class="pms-hero">
       <div>
         <h1>My Work</h1>
         <p>See your project assignments, record weekly effort and complete pending governance approvals.</p>
-      </div>
-      <div class="pms-hero-actions">
-        <a class="pms-btn" href="{{ url_for('contracts_views.projects_page') }}">Projects register</a>
       </div>
     </div>
 
@@ -178,6 +168,19 @@
       </section>
     </div>
   </main>
+
+  <footer class="pme-statusbar">
+    <div>
+      <span>TrustSeal PME</span>
+      <span>·</span>
+      <span>My Work &amp; Weekly Timesheet</span>
+    </div>
+    <div>
+      <span>This Week: {{ week_total_hours }}h</span>
+      <span>·</span>
+      <span>PostgreSQL Audit Verified</span>
+    </div>
+  </footer>
 </div>
 
 <script>

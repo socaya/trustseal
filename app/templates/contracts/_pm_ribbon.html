@@ -1,0 +1,459 @@
+{# TrustSeal Project Management Engine (TS PME) — TSD-Aligned Command Ribbon & AppBar #}
+{# Context: pm_ribbon_ctx ('projects' | 'project_detail' | 'my_work'), pm_ribbon_tab (default 'Home'), project (optional) #}
+{% set _ctx = pm_ribbon_ctx if pm_ribbon_ctx is defined else 'projects' %}
+{% set _rtab = pm_ribbon_tab if pm_ribbon_tab is defined else 'Home' %}
+{% set _is_proj = (_ctx == 'project_detail' and project is defined and project) %}
+{% set _pid = project.id if _is_proj else (all_org_projects[0].id if (all_org_projects is defined and all_org_projects) else (projects[0].id if (projects is defined and projects) else None)) %}
+
+<div class="pme-top">
+  {# ---- 38px STUDIO APPLICATION BAR (matching TSD Docs .ts-ed__appbar) ---- #}
+  <div class="pme-appbar">
+    <div class="pme-identity">
+      <div class="pme-name">
+        <strong>TRUSTSEAL</strong><small>PME</small>
+      </div>
+      <span class="pme-appbar-div" aria-hidden="true"></span>
+      <nav class="pme-crumb" aria-label="Workspace breadcrumb">
+        <a href="{{ url_for('contracts_views.projects_page', section='home') }}">Workspace</a>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        {% if _is_proj %}
+          <a href="{{ url_for('contracts_views.projects_page') }}">Projects</a>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+          <span aria-current="page">{{ project.project_code }}</span>
+        {% else %}
+          <span aria-current="page">{{ pm_crumb_label if pm_crumb_label is defined else 'Projects' }}</span>
+        {% endif %}
+      </nav>
+    </div>
+
+    <div class="pme-quick">
+      {% if _is_proj %}
+        {% if all_org_projects is defined and all_org_projects|length > 1 %}
+        <span class="pms-select-wrap">
+          <select id="pms-switcher" class="pms-select-btn" aria-label="Switch project" style="max-width:270px;">
+            {% for op in all_org_projects %}
+            <option value="{{ op.id }}" {% if op.id == project.id %}selected{% endif %}>{{ op.name }} ({{ op.project_code }})</option>
+            {% endfor %}
+          </select>
+        </span>
+        {% endif %}
+        <a class="pms-btn pms-btn--sm" href="{{ url_for('contracts_views.my_work_page') }}">My Timesheet</a>
+        <button type="button" class="pms-btn pms-btn--primary pms-btn--sm" id="pd-open-new">+ New Contract</button>
+      {% elif _ctx == 'projects' %}
+        <a class="pms-btn pms-btn--sm" href="{{ url_for('contracts_views.projects_page', section='obligations') }}">Obligations ({{ global_obligations|length if global_obligations is defined else 0 }})</a>
+        <button type="button" class="pms-btn pms-btn--primary pms-btn--sm" id="prj-open-new">+ New project</button>
+      {% else %}
+        <a class="pms-btn pms-btn--sm" href="{{ url_for('contracts_views.projects_page') }}">Projects register</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ---- TSD-STYLE 8-TAB COMMAND RIBBON ---- #}
+  <section class="pm-ribbon" id="pm-ribbon" aria-label="Project command ribbon">
+    <div class="pm-ribbon-head">
+      <div class="pm-ribbon-tabs" role="tablist" aria-label="Project commands">
+        {% for tab_name in ['File','Home','Plan','Work','Resources','Contracts','Review','View'] %}
+        <button type="button" class="pm-ribbon-tab" role="tab" data-rtab="{{ tab_name }}" aria-selected="{{ 'true' if tab_name == _rtab else 'false' }}">{{ tab_name }}</button>
+        {% endfor %}
+      </div>
+      <button type="button" class="pm-ribbon-toggle" id="pm-ribbon-toggle" aria-label="Collapse or expand ribbon" aria-expanded="true" title="Collapse / Expand ribbon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="14" height="14"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+    </div>
+
+    <div class="pm-ribbon-panel" id="pm-ribbon-panel">
+      {# --- FILE TAB --- #}
+      <div class="pm-ribbon-pane" data-rpane="File" {% if _rtab != 'File' %}hidden{% endif %}>
+        <section class="pm-ribbon-group">
+          <div class="pm-ribbon-items">
+            <a class="pm-ribbon-command" href="{{ url_for('contracts_views.projects_page') }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h7l2 2h9v12H3z"/></svg>
+              <span>Projects</span>
+            </a>
+            {% if _ctx == 'projects' %}
+            <button type="button" class="pm-ribbon-command" data-rcmd="new-project">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 5v14M5 12h14"/></svg>
+              <span>New project</span>
+            </button>
+            {% endif %}
+            {% if _is_proj %}
+            <button type="button" class="pm-ribbon-command" data-pdtab="settings">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M4 12h16M4 18h16M8 3v6m8 0v6m-6 0v6"/></svg>
+              <span>Settings</span>
+            </button>
+            {% else %}
+            <a class="pm-ribbon-command" href="{{ url_for('contracts_views.projects_page', section='templates') }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M4 12h16M4 18h16M8 3v6m8 0v6m-6 0v6"/></svg>
+              <span>Templates</span>
+            </a>
+            {% endif %}
+          </div>
+          <span class="pm-ribbon-label">Project files</span>
+        </section>
+        <section class="pm-ribbon-group">
+          <div class="pm-ribbon-items">
+            {% if _is_proj %}
+            <a class="pm-ribbon-command" href="/api/projects/{{ project.id }}/export.csv">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg>
+              <span>Export CSV</span>
+            </a>
+            {% else %}
+            <button type="button" class="pm-ribbon-command" data-rcmd="export-csv">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg>
+              <span>Export table</span>
+            </button>
+            {% endif %}
+          </div>
+          <span class="pm-ribbon-label">Data</span>
+        </section>
+      </div>
+
+      {# --- HOME TAB --- #}
+      <div class="pm-ribbon-pane" data-rpane="Home" {% if _rtab != 'Home' %}hidden{% endif %}>
+        <section class="pm-ribbon-group">
+          <div class="pm-ribbon-items">
+            <a class="pm-ribbon-command {% if _ctx == 'projects' and active_section == 'home' %}is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='home') }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m3 10 9-7 9 7v10H3z"/><path d="M10 20v-6h4v6"/></svg>
+              <span>Home</span>
+            </a>
+            <a class="pm-ribbon-command {% if _ctx == 'projects' and active_section == 'projects' %}is-active{% endif %}" href="{{ url_for('contracts_views.projects_page') }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h7l2 2h9v12H3z"/></svg>
+              <span>Projects</span>
+            </a>
+            <a class="pm-ribbon-command {% if _ctx == 'my_work' %}is-active{% endif %}" href="{{ url_for('contracts_views.my_work_page') }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 5h16v15H4zM8 3v4m8-4v4M8 13l2 2 5-5"/></svg>
+              <span>My Work</span>
+            </a>
+            <a class="pm-ribbon-command {% if _ctx == 'projects' and active_section == 'intake' %}is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='intake') }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 13l3-8h12l3 8v6H3zM3 13h5l2 3h4l2-3h5"/></svg>
+              <span>Intake</span>
+            </a>
+          </div>
+          <span class="pm-ribbon-label">Workspace</span>
+        </section>
+
+        <section class="pm-ribbon-group">
+          <div class="pm-ribbon-items">
+            {% if _is_proj %}
+            <button type="button" class="pm-ribbon-command" data-pdtab="overview">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 3v17h17M8 16v-4m5 4V8m5 8V5"/></svg>
+              <span>Overview</span>
+            </button>
+            <button type="button" class="pm-ribbon-command" data-pdtab="governance">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m5 12 4 4L19 6"/></svg>
+              <span>Charter &amp; gates</span>
+            </button>
+            <button type="button" class="pm-ribbon-command" data-pdtab="contracts">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              <span>Obligations</span>
+            </button>
+            {% else %}
+            <a class="pm-ribbon-command {% if _ctx == 'projects' and active_section == 'portfolios' %}is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='portfolios') }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m12 3 9 5-9 5-9-5zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg>
+              <span>Portfolios</span>
+            </a>
+            <a class="pm-ribbon-command {% if _ctx == 'projects' and active_section == 'programmes' %}is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='programmes') }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3h8v6H8zM2 16h7v5H2zm13 0h7v5h-7zM12 9v4m-7 3v-3h14v3"/></svg>
+              <span>Programmes</span>
+            </a>
+            <a class="pm-ribbon-command {% if _ctx == 'projects' and active_section == 'obligations' %}is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='obligations') }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              <span>Obligations</span>
+            </a>
+            {% endif %}
+          </div>
+          <span class="pm-ribbon-label">{{ 'Project' if _is_proj else 'Portfolio & tracking' }}</span>
+        </section>
+      </div>
+
+      {# --- PLAN TAB --- #}
+      <div class="pm-ribbon-pane" data-rpane="Plan" {% if _rtab != 'Plan' %}hidden{% endif %}>
+        {% if _is_proj %}
+        <section class="pm-ribbon-group">
+          <div class="pm-ribbon-items">
+            <button type="button" class="pm-ribbon-command" data-pdtab="wbs">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3h8v6H8zM2 16h7v5H2zm13 0h7v5h-7zM12 9v4m-7 3v-3h14v3"/></svg>
+              <span>WBS &amp; Gantt</span>
+            </button>
+            <button type="button" class="pm-ribbon-command" data-pdtab="agile">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 5h16v15H4zM8 3v4m8-4v4M8 13l2 2 5-5"/></svg>
+              <span>Requirements</span>
+            </button>
+            <button type="button" class="pm-ribbon-command" data-pdtab="governance">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m5 12 4 4L19 6"/></svg>
+              <span>Charter &amp; gates</span>
+            </button>
+          </div>
+          <span class="pm-ribbon-label">Schedule &amp; baselines</span>
+        </section>
+        {% else %}
+        <section class="pm-ribbon-group">
+          <div class="pm-ribbon-items">
+            <a class="pm-ribbon-command" href="{{ url_for('contracts_views.projects_page', section='portfolios') }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m12 3 9 5-9 5-9-5zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg>
+              <span>Portfolios</span>
+            </a>
+            <a class="pm-ribbon-command" href="{{ url_for('contracts_views.projects_page', section='programmes') }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3h8v6H8zM2 16h7v5H2zm13 0h7v5h-7zM12 9v4m-7 3v-3h14v3"/></svg>
+              <span>Programmes</span>
+            </a>
+            <a class="pm-ribbon-command" href="{{ url_for('contracts_views.projects_page', section='intake') }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 13l3-8h12l3 8v6H3zM3 13h5l2 3h4l2-3h5"/></svg>
+              <span>Intake</span>
+            </a>
+          </div>
+          <span class="pm-ribbon-label">Portfolio &amp; programme</span>
+        </section>
+        {% endif %}
+      </div>
+
+      {# --- WORK TAB --- #}
+      <div class="pm-ribbon-pane" data-rpane="Work" {% if _rtab != 'Work' %}hidden{% endif %}>
+        {% if _is_proj %}
+        <section class="pm-ribbon-group">
+          <div class="pm-ribbon-items">
+            <button type="button" class="pm-ribbon-command" data-pdtab="tasks">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 5h16v15H4zM8 3v4m8-4v4M8 13l2 2 5-5"/></svg>
+              <span>Tasks</span>
+            </button>
+            <button type="button" class="pm-ribbon-command" data-pdtab="agile">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m12 3 9 5-9 5-9-5zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg>
+              <span>Backlog &amp; sprints</span>
+            </button>
+            <button type="button" class="pm-ribbon-command" data-pdtab="risks">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 4 3 20h18zM12 10v4m0 3v1"/></svg>
+              <span>RAID register</span>
+            </button>
+          </div>
+          <span class="pm-ribbon-label">Execution &amp; delivery</span>
+        </section>
+        {% endif %}
+        <section class="pm-ribbon-group">
+          <div class="pm-ribbon-items">
+            <a class="pm-ribbon-command" href="{{ url_for('contracts_views.my_work_page') }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 13l3-8h12l3 8v6H3zM3 13h5l2 3h4l2-3h5"/></svg>
+              <span>My Work</span>
+            </a>
+            <a class="pm-ribbon-command" href="{{ url_for('contracts_views.my_work_page') }}#approvals">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              <span>My Timesheet</span>
+            </a>
+          </div>
+          <span class="pm-ribbon-label">Personal</span>
+        </section>
+      </div>
+
+      {# --- RESOURCES TAB --- #}
+      <div class="pm-ribbon-pane" data-rpane="Resources" {% if _rtab != 'Resources' %}hidden{% endif %}>
+        <section class="pm-ribbon-group">
+          <div class="pm-ribbon-items">
+            {% if _is_proj %}
+            <button type="button" class="pm-ribbon-command" data-pdtab="resources">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2m2-15a3 3 0 0 1 0 6m1 3a4 4 0 0 1 3 4v2"/></svg>
+              <span>Allocations</span>
+            </button>
+            <button type="button" class="pm-ribbon-command" data-pdtab="procurement">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18m-11-1h4v3h-4z"/></svg>
+              <span>Equipment</span>
+            </button>
+            {% elif _pid %}
+            <a class="pm-ribbon-command" href="{{ url_for('contracts_views.project_detail_page', project_id=_pid) }}#resources">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2m2-15a3 3 0 0 1 0 6m1 3a4 4 0 0 1 3 4v2"/></svg>
+              <span>Resources</span>
+            </a>
+            {% endif %}
+          </div>
+          <span class="pm-ribbon-label">Team &amp; assets</span>
+        </section>
+        <section class="pm-ribbon-group">
+          <div class="pm-ribbon-items">
+            {% if _is_proj %}
+            <button type="button" class="pm-ribbon-command" data-pdtab="timesheets">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              <span>Timesheets</span>
+            </button>
+            {% endif %}
+            <a class="pm-ribbon-command" href="{{ url_for('contracts_views.my_work_page') }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 5h16v15H4zM8 3v4m8-4v4M8 13l2 2 5-5"/></svg>
+              <span>My Timesheet</span>
+            </a>
+          </div>
+          <span class="pm-ribbon-label">Time tracking</span>
+        </section>
+      </div>
+
+      {# --- CONTRACTS TAB --- #}
+      <div class="pm-ribbon-pane" data-rpane="Contracts" {% if _rtab != 'Contracts' %}hidden{% endif %}>
+        <section class="pm-ribbon-group">
+          <div class="pm-ribbon-items">
+            {% if _is_proj %}
+            <button type="button" class="pm-ribbon-command" data-pdtab="contracts">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18"/></svg>
+              <span>Agreements</span>
+            </button>
+            <button type="button" class="pm-ribbon-command" data-pdtab="contracts">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              <span>Obligations</span>
+            </button>
+            {% else %}
+            <a class="pm-ribbon-command" href="{{ url_for('contracts_views.projects_page', section='obligations') }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              <span>Obligations</span>
+            </a>
+            {% endif %}
+          </div>
+          <span class="pm-ribbon-label">Contract tracking</span>
+        </section>
+        <section class="pm-ribbon-group">
+          <div class="pm-ribbon-items">
+            {% if _is_proj %}
+            <button type="button" class="pm-ribbon-command" data-pdtab="finance">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 3v17h17M8 16v-4m5 4V8m5 8V5"/></svg>
+              <span>Budgets &amp; EVM</span>
+            </button>
+            <button type="button" class="pm-ribbon-command" data-pdtab="procurement">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18m-11-1h4v3h-4z"/></svg>
+              <span>Procurement</span>
+            </button>
+            {% elif _pid %}
+            <a class="pm-ribbon-command" href="{{ url_for('contracts_views.project_detail_page', project_id=_pid) }}#finance">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 3v17h17M8 16v-4m5 4V8m5 8V5"/></svg>
+              <span>Finance</span>
+            </a>
+            {% endif %}
+          </div>
+          <span class="pm-ribbon-label">Commercial</span>
+        </section>
+      </div>
+
+      {# --- REVIEW TAB --- #}
+      <div class="pm-ribbon-pane" data-rpane="Review" {% if _rtab != 'Review' %}hidden{% endif %}>
+        <section class="pm-ribbon-group">
+          <div class="pm-ribbon-items">
+            <a class="pm-ribbon-command" href="{{ url_for('contracts_views.my_work_page') }}#approvals">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m5 12 4 4L19 6"/></svg>
+              <span>Approvals</span>
+            </a>
+            {% if _is_proj %}
+            <button type="button" class="pm-ribbon-command" data-pdtab="risks">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 4 3 20h18zM12 10v4m0 3v1"/></svg>
+              <span>RAID &amp; Changes</span>
+            </button>
+            <button type="button" class="pm-ribbon-command" data-pdtab="compliance">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2 21 6v5c0 5-3.4 8.9-9 11-5.6-2.1-9-6-9-11V6z"/><path d="m8 12 3 3 5-6"/></svg>
+              <span>QA &amp; Compliance</span>
+            </button>
+            <button type="button" class="pm-ribbon-command" data-pdtab="results">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 3v17h17M8 16v-4m5 4V8m5 8V5"/></svg>
+              <span>Results &amp; Closure</span>
+            </button>
+            {% endif %}
+          </div>
+          <span class="pm-ribbon-label">Governance &amp; controls</span>
+        </section>
+      </div>
+
+      {# --- VIEW TAB --- #}
+      <div class="pm-ribbon-pane" data-rpane="View" {% if _rtab != 'View' %}hidden{% endif %}>
+        <section class="pm-ribbon-group">
+          <div class="pm-ribbon-items">
+            <button type="button" class="pm-ribbon-command" data-rcmd="toggle-density">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+              <span>Row density</span>
+            </button>
+            {% if _is_proj %}
+            <button type="button" class="pm-ribbon-command" data-rcmd="toggle-context">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 5h18v14H3zm0 5h18"/></svg>
+              <span>Section bar</span>
+            </button>
+            {% endif %}
+          </div>
+          <span class="pm-ribbon-label">Workspace</span>
+        </section>
+        {% if _ctx == 'projects' %}
+        <section class="pm-ribbon-group">
+          <div class="pm-ribbon-items">
+            <button type="button" class="pm-ribbon-command" data-rcmd="focus-search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg>
+              <span>Find</span>
+            </button>
+            <button type="button" class="pm-ribbon-command" data-rcmd="open-filters">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h18M6 12h12m-9 6h6"/></svg>
+              <span>Filters</span>
+            </button>
+            <button type="button" class="pm-ribbon-command" data-rcmd="open-columns">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 5h18v14H3zm6 0v14m6-14v14"/></svg>
+              <span>Columns</span>
+            </button>
+            <button type="button" class="pm-ribbon-command" data-rcmd="export-csv">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg>
+              <span>Export</span>
+            </button>
+          </div>
+          <span class="pm-ribbon-label">Table</span>
+        </section>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  var tabs = Array.from(document.querySelectorAll('[data-rtab]'));
+  var panes = Array.from(document.querySelectorAll('[data-rpane]'));
+  var panel = document.getElementById('pm-ribbon-panel');
+  var tog = document.getElementById('pm-ribbon-toggle');
+
+  function setCollapsed(val) {
+    if (!panel || !tog) return;
+    panel.hidden = !!val;
+    tog.setAttribute('aria-expanded', String(!val));
+    try { localStorage.setItem('ts_pme_ribbon_collapsed', val ? '1' : '0'); } catch (e) {}
+  }
+  try {
+    if (localStorage.getItem('ts_pme_ribbon_collapsed') === '1') setCollapsed(true);
+    if (localStorage.getItem('ts_pme_density') === 'comfortable') document.body.classList.add('pm-density-comfortable');
+  } catch (e) {}
+
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+      var target = t.dataset.rtab;
+      tabs.forEach(function (x) { x.setAttribute('aria-selected', String(x === t)); });
+      panes.forEach(function (p) { p.hidden = p.dataset.rpane !== target; });
+      if (panel && panel.hidden) setCollapsed(false);
+    });
+    t.addEventListener('keydown', function (ev) {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(ev.key)) return;
+      ev.preventDefault();
+      var idx = tabs.indexOf(t);
+      var next = ev.key === 'Home' ? 0 : ev.key === 'End' ? tabs.length - 1 : (idx + (ev.key === 'ArrowLeft' ? -1 : 1) + tabs.length) % tabs.length;
+      tabs[next].click(); tabs[next].focus();
+    });
+  });
+
+  if (tog) tog.addEventListener('click', function () { setCollapsed(!panel.hidden); });
+
+  document.querySelectorAll('[data-rcmd]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var cmd = btn.dataset.rcmd;
+      if (cmd === 'toggle-density') {
+        var c = document.body.classList.toggle('pm-density-comfortable');
+        try { localStorage.setItem('ts_pme_density', c ? 'comfortable' : 'compact'); } catch (e) {}
+      } else if (cmd === 'toggle-context') {
+        document.body.classList.toggle('pme-context-hidden');
+      } else if (cmd === 'new-project') {
+        var b = document.getElementById('prj-open-new'); if (b) b.click();
+      } else if (cmd === 'focus-search') {
+        var s = document.getElementById('prj-search'); if (s) s.focus();
+      } else if (cmd === 'open-filters') {
+        var f = document.getElementById('pms-open-filters'); if (f) f.click();
+      } else if (cmd === 'open-columns') {
+        var col = document.getElementById('pms-open-columns'); if (col) col.click();
+      } else if (cmd === 'export-csv') {
+        var ex = document.getElementById('pms-export-csv'); if (ex) ex.click();
+      }
+    });
+  });
+})();
+</script>
