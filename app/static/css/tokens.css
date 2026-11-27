@@ -124,13 +124,13 @@
   --ts-dur-base:              160ms;
   --ts-ease:                  cubic-bezier(0.2, 0, 0.1, 1);
 
-  /* Layering --------------------------------------------------- */
+  /* Layering (Topbar strictly above all module ribbons/menus) --- */
   --ts-z-sidebar:             10;
-  --ts-z-topbar:              20;
   --ts-z-inspector:           15;
-  --ts-z-overlay:             50;
-  --ts-z-toast:               60;
-  --ts-z-modal:               70;
+  --ts-z-topbar:              2500;
+  --ts-z-overlay:             4000;
+  --ts-z-toast:               5000;
+  --ts-z-modal:               9500;
 }
 
 .ts-density-comfortable {
