@@ -177,7 +177,7 @@ def projects_page():
 
     # UI-05 & UI-06: Server-side search, multi-facet filtering, deterministic sorting & pagination
     active_section = (request.args.get("section") or "projects").strip().lower()
-    if active_section not in ("home", "projects", "portfolios", "programmes", "intake", "obligations", "templates"):
+    if active_section not in ("home", "projects", "portfolios", "programmes", "intake", "obligations", "spend", "templates"):
         active_section = "projects"
 
     q_str = (request.args.get("q") or "").strip()
@@ -231,6 +231,72 @@ def projects_page():
             d["project_name"] = prj_info["name"] if prj_info else "Unlinked"
             d["project_code"] = prj_info["project_code"] if prj_info else "—"
             global_obligations.append(d)
+
+    # Global Contract Spend & Burn Rate rollup across org projects
+    from datetime import date as _date
+    from app.models.project_management import ProjectCostEvent
+
+    org_costs = ProjectCostEvent.query.filter_by(organization_id=org_id).all()
+    global_contract_burns = []
+    today_dt = _date.today()
+    for wf in wf_by_id.values():
+        c_val = _parse_num_val(wf.deal_value)
+        doc_id = wf.document_id
+        c_ref = wf.contract_number or f"CTR-{doc_id:04d}"
+        c_title = doc_titles.get(doc_id) or f"Contract #{doc_id}"
+        prj_info = proj_by_id.get(wf.project_id) if wf.project_id else None
+        actual_sp = 0.0
+        comm_sp = 0.0
+        for ce in org_costs:
+            sref = (ce.source_ref or "").lower()
+            desc_l = (ce.description or "").lower()
+            matched = (
+                (f"contract:{doc_id}" in sref)
+                or (c_ref.lower() in sref)
+                or (wf.project_id and ce.project_id == wf.project_id and (f"contract:{doc_id}" in desc_l or c_ref.lower() in desc_l))
+            )
+            if not matched:
+                continue
+            amt = float(ce.amount or 0)
+            if ce.event_type == "actual":
+                actual_sp += amt
+            elif ce.event_type == "commitment":
+                comm_sp += amt
+            elif ce.event_type == "reversal":
+                actual_sp -= amt
+        actual_sp = max(0.0, actual_sp)
+        total_exp = actual_sp + comm_sp
+        burn_pct = round((total_exp / c_val) * 100.0, 1) if c_val > 0 else 0.0
+        remaining = max(0.0, c_val - total_exp) if c_val > 0 else 0.0
+        start_d = getattr(wf, "effective_date", None) or (wf.created_at.date() if wf.created_at else today_dt)
+        if isinstance(start_d, str):
+            try:
+                start_d = _date.fromisoformat(start_d[:10])
+            except ValueError:
+                start_d = today_dt
+        elapsed_m = max(1.0, ((today_dt - start_d).days or 30) / 30.0)
+        monthly_burn = round(actual_sp / elapsed_m, 2)
+        runway_m = round(remaining / monthly_burn, 1) if monthly_burn > 0 else None
+        rag = "critical" if burn_pct >= 95 else ("at_risk" if burn_pct >= 75 else "on_track")
+        global_contract_burns.append({
+            "document_id": doc_id,
+            "contract_number": c_ref,
+            "contract_title": c_title,
+            "counterparty": wf.counterparty_name or "—",
+            "project_id": wf.project_id,
+            "project_name": prj_info["name"] if prj_info else "Unlinked",
+            "project_code": prj_info["project_code"] if prj_info else "—",
+            "currency": wf.currency or "USD",
+            "contract_value": c_val,
+            "actual_spend": round(actual_sp, 2),
+            "commitments": round(comm_sp, 2),
+            "total_exposure": round(total_exp, 2),
+            "remaining": round(remaining, 2),
+            "burn_pct": burn_pct,
+            "monthly_burn": monthly_burn,
+            "runway_months": runway_m,
+            "rag": rag,
+        })
 
     metrics_counts = {
         "total": len(project_cards),
@@ -289,6 +355,7 @@ def projects_page():
         "contracts/projects.html",
         active_section=active_section,
         global_obligations=global_obligations,
+        global_contract_burns=global_contract_burns,
         metrics_counts=metrics_counts,
         projects=paged_projects,
         all_projects_count=len(project_cards),
@@ -640,6 +707,75 @@ def project_detail_page(project_id: int):
         for p in Project.query.filter_by(organization_id=org_id).order_by(Project.updated_at.desc()).limit(50).all()
     ]
 
+    # Contract Spend & Burn Rate rows for this project
+    from datetime import date as _pdate
+
+    _today_p = _pdate.today()
+    contract_burn_rows = []
+    tot_c_val = 0.0
+    tot_c_actual = 0.0
+    tot_c_comm = 0.0
+    for w in wfs:
+        d = docs.get(w.document_id)
+        if not d or d.deleted_at:
+            continue
+        c_val = _parse_num_val(w.deal_value)
+        c_ref = w.contract_number or f"CTR-{d.id:04d}"
+        act_sp = 0.0
+        com_sp = 0.0
+        for ce in cost_events:
+            sref = (ce.source_ref or "").lower()
+            desc_l = (ce.description or "").lower()
+            if (f"contract:{d.id}" in sref) or (c_ref.lower() in sref) or (f"contract:{d.id}" in desc_l) or (c_ref.lower() in desc_l):
+                amt = float(ce.amount or 0)
+                if ce.event_type == "actual":
+                    act_sp += amt
+                elif ce.event_type == "commitment":
+                    com_sp += amt
+                elif ce.event_type == "reversal":
+                    act_sp -= amt
+        act_sp = max(0.0, act_sp)
+        tot_exp = act_sp + com_sp
+        burn_pct = round((tot_exp / c_val) * 100.0, 1) if c_val > 0 else 0.0
+        rem_val = max(0.0, c_val - tot_exp) if c_val > 0 else 0.0
+        s_dt = getattr(w, "effective_date", None) or (w.created_at.date() if w.created_at else _today_p)
+        if isinstance(s_dt, str):
+            try:
+                s_dt = _pdate.fromisoformat(s_dt[:10])
+            except ValueError:
+                s_dt = _today_p
+        el_m = max(1.0, ((_today_p - s_dt).days or 30) / 30.0)
+        m_burn = round(act_sp / el_m, 2)
+        rw_m = round(rem_val / m_burn, 1) if m_burn > 0 else None
+        rag = "critical" if burn_pct >= 95 else ("at_risk" if burn_pct >= 75 else "on_track")
+        tot_c_val += c_val
+        tot_c_actual += act_sp
+        tot_c_comm += com_sp
+        contract_burn_rows.append({
+            "document_id": d.id,
+            "contract_number": c_ref,
+            "title": d.title,
+            "counterparty": w.counterparty_name or "—",
+            "currency": w.currency or proj.currency or "USD",
+            "contract_value": c_val,
+            "actual_spend": round(act_sp, 2),
+            "commitments": round(com_sp, 2),
+            "total_exposure": round(tot_exp, 2),
+            "remaining": round(rem_val, 2),
+            "burn_pct": burn_pct,
+            "monthly_burn": m_burn,
+            "runway_months": rw_m,
+            "rag": rag,
+            "url": f"/contracts/{d.id}/workflow",
+        })
+    spend_summary = {
+        "total_contract_value": round(tot_c_val, 2),
+        "total_actual": round(tot_c_actual, 2),
+        "total_commitments": round(tot_c_comm, 2),
+        "total_remaining": round(max(0.0, tot_c_val - (tot_c_actual + tot_c_comm)), 2),
+        "avg_burn_pct": round(((tot_c_actual + tot_c_comm) / tot_c_val) * 100.0, 1) if tot_c_val > 0 else 0.0,
+    }
+
     overall_prog = compute_deliverable_progress(all_proj_delivs)
     templates = ensure_default_templates(org_id, actor)
     return render_template(
@@ -647,6 +783,8 @@ def project_detail_page(project_id: int):
         project=proj.to_dict(),
         all_org_projects=all_org_projects,
         obligation_rows=obligation_rows,
+        contract_burn_rows=contract_burn_rows,
+        spend_summary=spend_summary,
         contracts=contracts,
         deliverable_rows=deliverable_rows,
         key_term_rows=key_term_rows,

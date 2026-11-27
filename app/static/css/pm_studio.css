@@ -96,6 +96,45 @@
 .pme-name small  { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: var(--pms-blue); }
 .pme-appbar-div  { width: 1px; height: 15px; background: #cbd6e4; flex-shrink: 0; }
 
+/* PRO Platform Popover Menus (Apps + 3-Col Workspaces from TrustSeal_PM_Studio_UI_PRO.html) */
+.pme-nav-menus { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.pme-menu { position: relative; }
+.pme-menu[open] { z-index: 40; }
+.pme-menu summary {
+  display: inline-flex; align-items: center; gap: 5px;
+  min-height: 28px; padding: 3px 8px;
+  color: var(--pms-navy); font-weight: 600; font-size: 12px;
+  cursor: pointer; list-style: none; white-space: nowrap;
+}
+.pme-menu summary::-webkit-details-marker { display: none; }
+.pme-menu summary:hover { background: #dfe8f4; }
+.pme-menu[open] summary svg { transform: rotate(180deg); }
+.pme-menu-popover {
+  position: absolute; top: 100%; left: 0;
+  width: min(560px, calc(100vw - 32px));
+  background: #ffffff;
+  border: 1px solid #d5e0ec;
+  box-shadow: 0 8px 26px rgba(24, 46, 67, 0.16) !important;
+  padding: 10px 12px;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;
+  z-index: 45;
+}
+.pme-menu-popover--apps { width: 185px; grid-template-columns: 1fr; }
+.pme-menu-popover h4 {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--pms-muted); margin: 0 0 4px; padding: 2px 6px 0;
+}
+.pme-menu-popover a {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  min-height: 29px; padding: 4px 6px;
+  color: var(--pms-ink); font-size: 12.5px; text-decoration: none;
+}
+.pme-menu-popover a:hover { background: #edf2f9; color: var(--pms-navy); text-decoration: none; }
+.pme-menu-popover a[aria-current="page"] {
+  font-weight: 700; color: var(--pms-navy); box-shadow: inset 2px 0 var(--pms-navy) !important;
+}
+.pme-menu-popover a svg { width: 14px; height: 14px; color: var(--pms-navy); flex-shrink: 0; }
+
 .pme-crumb {
   display: flex;
   align-items: center;

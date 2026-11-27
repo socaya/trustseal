@@ -655,16 +655,24 @@ def test_srs_server_side_register_and_obligations(pg_app, pm_env):
     })
     assert r_ob.status_code in (200, 201)
 
-    # Verify /projects/<id> renders PRO Command Ribbon + lifecycle stepper + contextual section bar + Obligations Register
+    # Verify /projects/<id> renders PRO Menus + Command Ribbon + lifecycle stepper + Spend & Burn Rate + Obligations Register
     r_det = c.get(f"/projects/{p1}")
     assert r_det.status_code == 200
     assert b"Contract Obligations Register" in r_det.data
     assert b"Submit Q4 Environmental Compliance Certificate" in r_det.data
-    assert b"Procurement &amp; Contracts" in r_det.data
-    assert b"Requirements &amp; Agile" in r_det.data
+    assert b"Spend &amp; Burn" in r_det.data
+    assert b"Contract Burn Rate Register" in r_det.data
+    assert b"pme-apps-menu" in r_det.data
+    assert b"pme-workspaces-menu" in r_det.data
     assert b"pm-ribbon" in r_det.data
     assert b"pme-context" in r_det.data
     assert b"pme-lifecycle" in r_det.data
+
+    # Verify global Contract Spend & Burn Rate view (?section=spend)
+    r_sp = c.get("/projects?section=spend")
+    assert r_sp.status_code == 200
+    assert b"Contract Spend &amp; Burn Rate" in r_sp.data
+    assert b"Alpha EPC Supply Contract" in r_sp.data
 
 
 

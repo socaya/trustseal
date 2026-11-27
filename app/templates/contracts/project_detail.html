@@ -46,9 +46,10 @@
         <button type="button" class="pms-tab" data-pdtab="resources">Resources<span class="pms-tab__cnt">{{ alloc_rows|length if alloc_rows is defined else 0 }}</span></button>
         <button type="button" class="pms-tab" data-pdtab="timesheets">Timesheets<span class="pms-tab__cnt">{{ time_rows|length if time_rows is defined else 0 }}</span></button>
         {% if show_finance is not defined or show_finance %}
-        <button type="button" class="pms-tab" data-pdtab="finance">Finance</button>
+        <button type="button" class="pms-tab" data-pdtab="finance">Budgets &amp; EVM</button>
+        <button type="button" class="pms-tab" data-pdtab="spend">Spend &amp; Burn<span class="pms-tab__cnt">{{ contract_burn_rows|length if contract_burn_rows is defined else 0 }}</span></button>
         {% endif %}
-        <button type="button" class="pms-tab" data-pdtab="contracts">Procurement &amp; Contracts<span class="pms-tab__cnt">{{ contracts|length }}</span></button>
+        <button type="button" class="pms-tab" data-pdtab="contracts">Contracts<span class="pms-tab__cnt">{{ contracts|length }}</span></button>
         <button type="button" class="pms-tab" data-pdtab="agile">Requirements &amp; Agile<span class="pms-tab__cnt">{{ (req_rows|length if req_rows is defined else 0) + (backlog_rows|length if backlog_rows is defined else 0) }}</span></button>
       </nav>
       <details class="pme-popover-wrap" id="pms-sections-popover">
@@ -66,7 +67,8 @@
           <div>
             <h4>Commercial &amp; governance</h4>
             {% if show_finance is not defined or show_finance %}
-            <button type="button" data-pdtab="finance"><span>Finance &amp; EVM</span></button>
+            <button type="button" data-pdtab="finance"><span>Budgets &amp; EVM</span></button>
+            <button type="button" data-pdtab="spend"><span>Contract Spend &amp; Burn Rate</span><span>{{ contract_burn_rows|length if contract_burn_rows is defined else 0 }}</span></button>
             {% endif %}
             <button type="button" data-pdtab="contracts"><span>Procurement &amp; Contracts</span><span>{{ contracts|length }}</span></button>
             <button type="button" data-pdtab="governance"><span>Charter &amp; Stage Gates</span></button>
@@ -730,6 +732,98 @@
       </section>
       {% endif %}
 
+      {# ---- 8B. CONTRACT SPEND & BURN RATE (right after Budgets) ---- #}
+      <section class="pms-pane" data-pdpane="spend" hidden>
+        <div class="pms-sec-head">
+          <div>
+            <h2 class="pms-sec-title">Contract Spend &amp; Burn Rate</h2>
+            <p class="pms-sec-sub">Capture contract spend against linked TSD contracts and monitor real-time burn rate, remaining ceiling, and runway.</p>
+          </div>
+          {% if contracts %}
+          <button type="button" class="pms-btn pms-btn--primary pms-btn--sm" data-toggle-drawer="dr-cspend">+ Record Contract Spend</button>
+          {% endif %}
+        </div>
+
+        {% set sp = spend_summary if spend_summary is defined else {'total_contract_value':0,'total_actual':0,'total_commitments':0,'total_remaining':0,'avg_burn_pct':0} %}
+        <div class="pms-kpis">
+          <div class="pms-kpi"><span class="pms-kpi__label">Total Contract Value</span><span class="pms-kpi__val">{{ project.currency }} {{ '{:,.2f}'.format(sp.total_contract_value) }}</span></div>
+          <div class="pms-kpi"><span class="pms-kpi__label">Actual Contract Spend</span><span class="pms-kpi__val">{{ project.currency }} {{ '{:,.2f}'.format(sp.total_actual) }}</span></div>
+          <div class="pms-kpi"><span class="pms-kpi__label">Remaining Ceiling</span><span class="pms-kpi__val" style="color:{{ '#17664c' if sp.total_remaining > 0 else '#8a3041' }};">{{ project.currency }} {{ '{:,.2f}'.format(sp.total_remaining) }}</span></div>
+          <div class="pms-kpi"><span class="pms-kpi__label">Portfolio Burn Rate</span><span class="pms-kpi__val" style="color:{{ '#983945' if sp.avg_burn_pct >= 95 else ('#85500c' if sp.avg_burn_pct >= 75 else '#17664c') }};">{{ sp.avg_burn_pct }}%</span></div>
+        </div>
+
+        {% if contracts %}
+        <div class="pms-drawer" id="dr-cspend" hidden>
+          <form id="pd-cspend-form" class="pms-form-grid">
+            <div class="pms-field">
+              <label>Contract</label>
+              <select id="pd-csp-doc" class="st-select" required>
+                {% for c in contracts %}
+                <option value="{{ c.document_id }}">{{ c.contract_number }} — {{ c.title }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="pms-field">
+              <label>Entry Type</label>
+              <select id="pd-csp-type" class="st-select">
+                <option value="actual">Actual Spend (Invoice / Payment)</option>
+                <option value="commitment">Commitment (PO / Milestone)</option>
+              </select>
+            </div>
+            <div class="pms-field"><label>Amount ({{ project.currency }})</label><input type="number" step="0.01" min="0.01" id="pd-csp-amt" class="ts-input" placeholder="12500.00" required></div>
+            <div class="pms-field"><label>Invoice / Reference</label><input type="text" id="pd-csp-desc" class="ts-input" placeholder="INV-2026-014 — Milestone 2" required></div>
+            <div class="pms-field"><label>&nbsp;</label><button type="submit" class="pms-btn pms-btn--primary pms-btn--sm">Record Spend</button></div>
+          </form>
+        </div>
+        {% endif %}
+
+        <div class="pms-card">
+          <div class="pms-card__head">
+            <h3 class="pms-card__title">Contract Burn Rate Register ({{ contract_burn_rows|length if contract_burn_rows is defined else 0 }})</h3>
+          </div>
+          <div class="pms-card__table-wrap">
+            <table class="st-table">
+              <thead>
+                <tr>
+                  <th>Contract</th>
+                  <th>Counterparty</th>
+                  <th style="text-align:right;">Contract Value</th>
+                  <th style="text-align:right;">Actual Spend</th>
+                  <th style="text-align:right;">Commitments</th>
+                  <th style="text-align:right;">Remaining</th>
+                  <th>Burn Rate</th>
+                  <th style="text-align:right;">Monthly Burn / Runway</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for cb in (contract_burn_rows if contract_burn_rows is defined else []) %}
+                <tr>
+                  <td>
+                    <a class="pms-row-name" href="{{ cb.url }}">{{ cb.title }}</a>
+                    <span class="pms-row-meta">{{ cb.contract_number }}</span>
+                  </td>
+                  <td>{{ cb.counterparty }}</td>
+                  <td style="text-align:right;font-weight:600;">{{ cb.currency }} {{ '{:,.2f}'.format(cb.contract_value) }}</td>
+                  <td style="text-align:right;">{{ cb.currency }} {{ '{:,.2f}'.format(cb.actual_spend) }}</td>
+                  <td style="text-align:right;">{{ cb.currency }} {{ '{:,.2f}'.format(cb.commitments) }}</td>
+                  <td style="text-align:right;font-weight:600;color:{{ '#17664c' if cb.remaining > 0 else '#8a3041' }};">{{ cb.currency }} {{ '{:,.2f}'.format(cb.remaining) }}</td>
+                  <td>
+                    <span class="pms-meter"><span class="pms-track"><i style="width:{{ [cb.burn_pct, 100]|min }}%;background:{{ '#983945' if cb.rag=='critical' else ('#b87320' if cb.rag=='at_risk' else '#17664c') }};"></i></span>{{ cb.burn_pct }}%</span>
+                  </td>
+                  <td style="text-align:right;">
+                    <span>{{ cb.currency }} {{ '{:,.2f}'.format(cb.monthly_burn) }}/mo</span>
+                    <span class="pms-row-meta">{% if cb.runway_months is not none %}{{ cb.runway_months }} mo runway{% else %}No burn yet{% endif %}</span>
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" style="text-align:center;padding:26px;color:#4c6273;">No linked contracts yet. Link or create a contract under <strong>Contracts</strong> to track spend and burn rates.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       {# ---- 9. TSD CONTRACTS, DELIVERABLES & PROBATION ---- #}
       <section class="pms-pane" data-pdpane="contracts" hidden>
         <div class="pms-sec-head">
@@ -1348,6 +1442,31 @@
     });
     if (popEl && popEl.open) popEl.open = false;
     try { window.history.replaceState(null, '', '#' + target); } catch (e) {}
+  }
+
+  // Record Contract Spend & Recalculate Burn Rate
+  var cspForm = document.getElementById('pd-cspend-form');
+  if (cspForm) {
+    cspForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var docId = document.getElementById('pd-csp-doc').value;
+      var amt = document.getElementById('pd-csp-amt').value;
+      var desc = document.getElementById('pd-csp-desc').value.trim();
+      if (!docId || !amt || !desc) return;
+      fetch('/api/projects/{{ project.id }}/costs', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({
+          event_type: document.getElementById('pd-csp-type').value,
+          category: 'vendor',
+          description: desc + ' [contract:' + docId + ']',
+          amount: amt,
+          source_ref: 'contract:' + docId + ':' + Date.now(),
+        }),
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d.ok) { window.location.hash = '#spend'; window.location.reload(); }
+      });
+    });
   }
 
   // Contract Obligation Add & Complete (CON-02 / SCR-10)

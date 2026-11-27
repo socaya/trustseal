@@ -13,6 +13,66 @@
         <strong>TRUSTSEAL</strong><small>PME</small>
       </div>
       <span class="pme-appbar-div" aria-hidden="true"></span>
+
+      {# PRO Platform Menus: Apps + 3-Column Workspaces (from TrustSeal_PM_Studio_UI_PRO.html) #}
+      <div class="pme-nav-menus">
+        <details class="pme-menu" id="pme-apps-menu">
+          <summary><span>Apps</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" width="12" height="12"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <div class="pme-menu-popover pme-menu-popover--apps">
+            <div>
+              <h4>TrustSeal</h4>
+              <a href="{{ url_for('contracts_views.projects_page') }}" aria-current="page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h7l2 2h9v12H3z"/></svg>
+                <span>Projects</span>
+              </a>
+              {% if 'tsd_views.library' in url_map_endpoints %}
+              <a href="{{ url_for('tsd_views.library') }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                <span>Docs</span>
+              </a>
+              {% endif %}
+              {% if 'workspace_assets_views.signed_contracts_page' in url_map_endpoints %}
+              <a href="{{ url_for('workspace_assets_views.signed_contracts_page') }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18"/></svg>
+                <span>Contracts</span>
+              </a>
+              {% endif %}
+            </div>
+          </div>
+        </details>
+
+        <details class="pme-menu" id="pme-workspaces-menu">
+          <summary><span>Workspaces</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" width="12" height="12"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <div class="pme-menu-popover">
+            <div>
+              <h4>Portfolio</h4>
+              <a href="{{ url_for('contracts_views.projects_page', section='home') }}" {% if _ctx=='projects' and active_section=='home' %}aria-current="page"{% endif %}><span>Home</span></a>
+              <a href="{{ url_for('contracts_views.projects_page') }}" {% if _ctx=='projects' and active_section=='projects' %}aria-current="page"{% endif %}><span>Projects</span></a>
+              <a href="{{ url_for('contracts_views.projects_page', section='portfolios') }}" {% if _ctx=='projects' and active_section=='portfolios' %}aria-current="page"{% endif %}><span>Portfolios</span></a>
+              <a href="{{ url_for('contracts_views.projects_page', section='programmes') }}" {% if _ctx=='projects' and active_section=='programmes' %}aria-current="page"{% endif %}><span>Programmes</span></a>
+              <a href="{{ url_for('contracts_views.projects_page', section='intake') }}" {% if _ctx=='projects' and active_section=='intake' %}aria-current="page"{% endif %}><span>Intake</span></a>
+            </div>
+            <div>
+              <h4>Delivery</h4>
+              <a href="{{ url_for('contracts_views.my_work_page') }}" {% if _ctx=='my_work' %}aria-current="page"{% endif %}><span>My Work</span></a>
+              <a href="{{ url_for('contracts_views.project_detail_page', project_id=_pid) ~ '#resources' if _pid else url_for('contracts_views.projects_page') }}"><span>Resources</span></a>
+              <a href="{{ url_for('contracts_views.projects_page', section='spend') }}" {% if _ctx=='projects' and active_section=='spend' %}aria-current="page"{% endif %}><span>Spend &amp; Burn</span></a>
+              <a href="{{ url_for('contracts_views.projects_page', section='obligations') }}" {% if _ctx=='projects' and active_section=='obligations' %}aria-current="page"{% endif %}><span>Obligations</span></a>
+              {% if 'tsd_views.library' in url_map_endpoints %}
+              <a href="{{ url_for('tsd_views.library') }}"><span>Documents</span></a>
+              {% endif %}
+            </div>
+            <div>
+              <h4>Governance</h4>
+              <a href="{{ url_for('contracts_views.my_work_page') }}#approvals"><span>Approvals</span></a>
+              <a href="{{ url_for('contracts_views.project_detail_page', project_id=_pid) ~ '#results' if _pid else url_for('contracts_views.projects_page') }}"><span>Reports</span></a>
+              <a href="{{ url_for('contracts_views.projects_page', section='templates') }}" {% if _ctx=='projects' and active_section=='templates' %}aria-current="page"{% endif %}><span>Administration</span></a>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <span class="pme-appbar-div" aria-hidden="true"></span>
       <nav class="pme-crumb" aria-label="Workspace breadcrumb">
         <a href="{{ url_for('contracts_views.projects_page', section='home') }}">Workspace</a>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
@@ -307,18 +367,32 @@
         <section class="pm-ribbon-group">
           <div class="pm-ribbon-items">
             {% if _is_proj %}
-            <button type="button" class="pm-ribbon-command" data-pdtab="finance">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 3v17h17M8 16v-4m5 4V8m5 8V5"/></svg>
-              <span>Budgets &amp; EVM</span>
-            </button>
             <button type="button" class="pm-ribbon-command" data-pdtab="procurement">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18m-11-1h4v3h-4z"/></svg>
               <span>Procurement</span>
             </button>
-            {% elif _pid %}
+            <button type="button" class="pm-ribbon-command" data-pdtab="finance">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 3v17h17M8 16v-4m5 4V8m5 8V5"/></svg>
+              <span>Budgets</span>
+            </button>
+            <button type="button" class="pm-ribbon-command" data-pdtab="spend">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              <span>Spend &amp; Burn</span>
+            </button>
+            {% else %}
+            {% if _pid %}
+            <a class="pm-ribbon-command" href="{{ url_for('contracts_views.project_detail_page', project_id=_pid) }}#procurement">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18m-11-1h4v3h-4z"/></svg>
+              <span>Procurement</span>
+            </a>
             <a class="pm-ribbon-command" href="{{ url_for('contracts_views.project_detail_page', project_id=_pid) }}#finance">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 3v17h17M8 16v-4m5 4V8m5 8V5"/></svg>
-              <span>Finance</span>
+              <span>Budgets</span>
+            </a>
+            {% endif %}
+            <a class="pm-ribbon-command {% if _ctx=='projects' and active_section=='spend' %}is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='spend') }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              <span>Spend &amp; Burn</span>
             </a>
             {% endif %}
           </div>
@@ -433,6 +507,18 @@
   });
 
   if (tog) tog.addEventListener('click', function () { setCollapsed(!panel.hidden); });
+
+  // Close PRO Apps / Workspaces popovers on outside click or Escape
+  document.addEventListener('click', function (ev) {
+    document.querySelectorAll('details.pme-menu[open]').forEach(function (m) {
+      if (!m.contains(ev.target)) m.open = false;
+    });
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape') {
+      document.querySelectorAll('details.pme-menu[open]').forEach(function (m) { m.open = false; });
+    }
+  });
 
   document.querySelectorAll('[data-rcmd]').forEach(function (btn) {
     btn.addEventListener('click', function () {

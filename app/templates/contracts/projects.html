@@ -13,6 +13,7 @@
   'programmes': ('Programmes', 'Coordinate related projects, shared outcomes and dependencies.'),
   'intake': ('Demand & Intake', 'Assess incoming proposals, score value/urgency and convert approved requests to projects.'),
   'obligations': ('Contract obligations', 'Track contractual deadlines, owners and acceptance across linked projects.'),
+  'spend': ('Contract Spend & Burn Rate', 'Track contract spend, commitments, remaining ceiling and monthly burn rates.'),
   'templates': ('Administration & Templates', 'Manage reusable project templates, delivery methodologies and governance defaults.')
 } %}
 {% set cur_title, cur_desc = sec_titles.get(sec, sec_titles['projects']) %}
@@ -25,19 +26,13 @@
 {% include "stamps/_flat_ui.html" %}
 
 {% set pm_ribbon_ctx = 'projects' %}
-{% set pm_ribbon_tab = 'Contracts' if sec == 'obligations' else ('Plan' if sec in ('portfolios','programmes') else ('File' if sec == 'templates' else 'Home')) %}
+{% set pm_ribbon_tab = 'Contracts' if sec in ('obligations','spend') else ('Plan' if sec in ('portfolios','programmes') else ('File' if sec == 'templates' else 'Home')) %}
 {% set pm_crumb_label = cur_title %}
 
 <div class="pme-shell">
   {% include "contracts/_pm_ribbon.html" %}
 
   <main class="pme-content" id="pms-main">
-    <div class="pms-hero">
-      <div>
-        <h1>{{ cur_title }}</h1>
-        <p>{{ cur_desc }}</p>
-      </div>
-    </div>
 
     {# ======================= SECTION: HOME OVERVIEW ======================= #}
     {% if sec == 'home' %}
@@ -105,43 +100,10 @@
       </div>
     </div>
 
-    {# ======================= SECTION: PROJECTS REGISTER (DEFAULT) ======================= #}
+    {# ======================= SECTION: PROJECTS REGISTER (DEFAULT — COMPACT, ZERO REDUNDANT BLOCKS) ======================= #}
     {% elif sec == 'projects' %}
-    <section class="pms-metrics" aria-label="Project health and lifecycle">
-      <a class="pms-metric {% if flt.view == 'all' %}is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', view='all') }}">
-        <span class="pms-metric-icon pms-metric-icon--gray"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="18" height="18"><path d="M3 6h7l2 2h9v12H3z"/></svg></span>
-        <span><small>Total projects</small><strong>{{ mc.total }}</strong></span>
-      </a>
-      <a class="pms-metric {% if flt.view == 'on_track' %}is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', view='on_track') }}">
-        <span class="pms-metric-icon pms-metric-icon--green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="18" height="18"><path d="m5 12 4 4L19 6"/></svg></span>
-        <span><small>On track</small><strong>{{ mc.on_track }}</strong></span>
-      </a>
-      <a class="pms-metric {% if flt.view == 'attention' %}is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', view='attention') }}">
-        <span class="pms-metric-icon pms-metric-icon--amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="18" height="18"><path d="M12 4 3 20h18zM12 10v4m0 3v1"/></svg></span>
-        <span><small>At risk or delayed</small><strong>{{ mc.attention }}</strong></span>
-      </a>
-      <a class="pms-metric {% if flt.view == 'closed' %}is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', view='closed') }}">
-        <span class="pms-metric-icon pms-metric-icon--gray"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="18" height="18"><path d="M4 5h16v15H4zM8 3v4m8-4v4M8 13l2 2 5-5"/></svg></span>
-        <span><small>Closed</small><strong>{{ mc.closed }}</strong></span>
-      </a>
-    </section>
-
     <section class="pms-panel" aria-label="Projects register">
-      <div class="pms-panel-header">
-        <div class="pms-tabs" role="tablist" aria-label="Project views">
-          <a class="pms-tab {% if flt.view == 'all' %}is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', view='all') }}">All projects</a>
-          <a class="pms-tab {% if flt.view == 'on_track' %}is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', view='on_track') }}">On track</a>
-          <a class="pms-tab {% if flt.view == 'attention' %}is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', view='attention') }}">Needs attention</a>
-          <a class="pms-tab {% if flt.view == 'closed' %}is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', view='closed') }}">Closed</a>
-        </div>
-        <div style="display:inline-flex;gap:4px;">
-          <button type="button" class="pms-btn pms-btn--sm" data-pview="table" id="prj-v-table">Table</button>
-          <button type="button" class="pms-btn pms-btn--plain pms-btn--sm" data-pview="cards" id="prj-v-cards">Cards</button>
-          <button type="button" class="pms-btn pms-btn--plain pms-btn--sm" data-pview="kanban" id="prj-v-kanban">Status Board</button>
-        </div>
-      </div>
-
-      {# Contextual Ribbon Toolbar (Search + Quick Facets + Advanced Filters Drawer + Columns + Export) #}
+      {# Contextual Ribbon Toolbar (Search + Quick Facets + Advanced Filters Drawer + Columns + Export + View Switch) #}
       <form method="GET" action="{{ url_for('contracts_views.projects_page') }}" id="prj-filter-form" class="pms-tools">
         <input type="hidden" name="view" value="{{ flt.view }}">
         <input type="hidden" name="sort" value="{{ flt.sort }}">
@@ -206,6 +168,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="15" height="15" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg>
           Export
         </button>
+        <span style="width:1px;height:18px;background:#dbe3ee;margin:0 2px;"></span>
+        <button type="button" class="pms-btn pms-btn--sm" data-pview="table" id="prj-v-table">Table</button>
+        <button type="button" class="pms-btn pms-btn--plain pms-btn--sm" data-pview="cards" id="prj-v-cards">Cards</button>
+        <button type="button" class="pms-btn pms-btn--plain pms-btn--sm" data-pview="kanban" id="prj-v-kanban">Status Board</button>
       </form>
 
       {# Active filter summary & quick sort links #}
@@ -371,6 +337,58 @@
             </tr>
             {% else %}
             <tr><td colspan="7" style="text-align:center;padding:30px;color:#4c6273;">No contract obligations tracked across projects yet. Open any project's <strong>Procurement &amp; contracts</strong> tab to add obligations.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    {# ======================= SECTION: GLOBAL CONTRACT SPEND & BURN RATE ======================= #}
+    {% elif sec == 'spend' %}
+    <section class="pms-panel" aria-label="Contract spend and burn rate register">
+      <div class="pms-panel-header">
+        <h2>Contract Spend &amp; Burn Rate ({{ global_contract_burns|length if global_contract_burns is defined else 0 }})</h2>
+      </div>
+      <div class="pms-table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Contract</th>
+              <th>Project</th>
+              <th>Counterparty</th>
+              <th style="text-align:right;">Contract Value</th>
+              <th style="text-align:right;">Actual Spend</th>
+              <th style="text-align:right;">Commitments</th>
+              <th style="text-align:right;">Remaining</th>
+              <th>Burn Rate</th>
+              <th style="text-align:right;">Monthly Burn / Runway</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for cb in (global_contract_burns if global_contract_burns is defined else []) %}
+            <tr>
+              <td>
+                {% if cb.project_id %}
+                <a class="pms-row-name" href="{{ url_for('contracts_views.project_detail_page', project_id=cb.project_id) }}#spend">{{ cb.contract_title }}</a>
+                {% else %}<strong>{{ cb.contract_title }}</strong>{% endif %}
+                <span class="pms-row-meta">{{ cb.contract_number }}</span>
+              </td>
+              <td>{{ cb.project_name }}<span class="pms-row-meta">{{ cb.project_code }}</span></td>
+              <td>{{ cb.counterparty }}</td>
+              <td style="text-align:right;font-weight:600;">{{ cb.currency }} {{ '{:,.2f}'.format(cb.contract_value) }}</td>
+              <td style="text-align:right;">{{ cb.currency }} {{ '{:,.2f}'.format(cb.actual_spend) }}</td>
+              <td style="text-align:right;">{{ cb.currency }} {{ '{:,.2f}'.format(cb.commitments) }}</td>
+              <td style="text-align:right;font-weight:600;color:{{ '#17664c' if cb.remaining > 0 else '#8a3041' }};">{{ cb.currency }} {{ '{:,.2f}'.format(cb.remaining) }}</td>
+              <td>
+                <span class="pms-meter"><span class="pms-track"><i style="width:{{ [cb.burn_pct, 100]|min }}%;background:{{ '#983945' if cb.rag=='critical' else ('#b87320' if cb.rag=='at_risk' else '#17664c') }};"></i></span>{{ cb.burn_pct }}%</span>
+              </td>
+              <td style="text-align:right;">
+                <span>{{ cb.currency }} {{ '{:,.2f}'.format(cb.monthly_burn) }}/mo</span>
+                <span class="pms-row-meta">{% if cb.runway_months is not none %}{{ cb.runway_months }} mo runway{% else %}No burn yet{% endif %}</span>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9" style="text-align:center;padding:30px;color:#4c6273;">No contracts tracked yet. Link contracts to a project and record spend to calculate burn rates.</td></tr>
             {% endfor %}
           </tbody>
         </table>
