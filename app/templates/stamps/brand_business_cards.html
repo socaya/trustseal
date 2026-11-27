@@ -1,0 +1,316 @@
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'brand-studio' %}
+{% block title %}{{ kit.brand_name }} — Executive Business Cards | TRUSTSEAL{% endblock %}
+{% block page_header %}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .ts-page { padding: 0 !important; max-width: none !important; }
+  .bc-page { background: #f4f7fc; min-height: calc(100vh - var(--ts-topbar-h)); color: #0f172a; }
+  .bc-bar {
+    background: linear-gradient(110deg, #00163d 0%, #002769 65%, #013688 100%);
+    border-bottom: 2.5px solid #02982e;
+    color: #ffffff;
+    padding: 14px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .bc-bar strong { font-size: 16px; font-weight: 700; }
+  .bc-bar small { color: #7ee29a; font-weight: 700; margin-left: 8px; }
+  .bc-bar-acts { display: flex; gap: 10px; align-items: center; }
+  .bc-btn {
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 5px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgba(255,255,255,0.34);
+    background: rgba(255,255,255,0.1);
+    color: #ffffff;
+  }
+  .bc-btn:hover { background: rgba(255,255,255,0.2); color: #ffffff; }
+  .bc-btn--solid { background: #ffffff; color: #002769; border-color: #ffffff; font-weight: 700; }
+  .bc-btn--solid:hover { background: #eef4ff; color: #001a4d; }
+
+  .bc-workspace {
+    display: grid;
+    grid-template-columns: 360px minmax(0, 1fr);
+    min-height: calc(100vh - 190px);
+  }
+  .bc-form {
+    background: #ffffff;
+    border-right: 1px solid #d5dfee;
+    padding: 24px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .bc-form h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #002769;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .bc-field label { display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px; }
+  .bc-field input, .bc-field select {
+    width: 100%;
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    font-size: 13.5px;
+    color: #0f172a;
+    background: #ffffff;
+  }
+
+  .bc-stage {
+    padding: 36px 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    align-items: center;
+  }
+  .bc-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 440px));
+    gap: 28px;
+    width: 100%;
+    max-width: 920px;
+    justify-content: center;
+  }
+  .bc-card-box {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .bc-card-box__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #334155;
+  }
+  .bc-card-box svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    box-shadow: 0 12px 30px rgba(0, 39, 105, 0.14);
+    border-radius: 8px;
+  }
+
+  /* 8-Up A4 Print Sheet (shown cleanly in print / PDF) */
+  .bc-print-sheet { display: none; }
+
+  @media print {
+    .ts-topbar, .bc-bar, .bc-workspace { display: none !important; }
+    .bc-page { background: #ffffff !important; }
+    .bc-print-sheet {
+      display: grid !important;
+      grid-template-columns: repeat(2, 85mm);
+      gap: 6mm;
+      justify-content: center;
+      padding: 12mm 0;
+    }
+    .bc-print-cell {
+      width: 85mm;
+      height: 55mm;
+      border: 0.25mm dashed #94a3b8;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .bc-print-cell svg { width: 100%; height: 100%; display: block; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bc-page">
+  <div class="bc-bar">
+    <div>
+      <strong>{{ kit.brand_name }} — Executive Business Cards</strong>
+      <small>{{ kit.kit_ref }} · 85 × 55 mm (3.5" × 2")</small>
+    </div>
+    <div class="bc-bar-acts">
+      <a href="/brand-studio" class="bc-btn">Back to Brand Studio</a>
+      <button type="button" class="bc-btn" id="bcDlFront">Download Front SVG</button>
+      <button type="button" class="bc-btn" id="bcDlBack">Download Back SVG</button>
+      <button type="button" class="bc-btn bc-btn--solid" onclick="window.print()">Print 8-Up A4 Sheet / PDF</button>
+    </div>
+  </div>
+
+  <div class="bc-workspace">
+    <aside class="bc-form">
+      <h2>Cardholder Details</h2>
+      <div class="bc-field">
+        <label for="bcStyle">Card Layout Style</label>
+        <select id="bcStyle">
+          <option value="executive_split">Executive Side Bar (Crisp White + Brand Back)</option>
+          <option value="midnight_luxury">Executive Dark Mode (Both Sides Dark)</option>
+          <option value="minimal_grid">Swiss Architectural Minimal</option>
+        </select>
+      </div>
+      <div class="bc-field">
+        <label for="bcFullName">Full Name</label>
+        <input type="text" id="bcFullName" value="{{ (current_user.first_name or '') ~ ' ' ~ (current_user.last_name or '') if (current_user.first_name or current_user.last_name) else 'Elena Vance, CFA' }}">
+      </div>
+      <div class="bc-field">
+        <label for="bcTitle">Job Title / Role</label>
+        <input type="text" id="bcTitle" value="Managing Director">
+      </div>
+      <div class="bc-field">
+        <label for="bcPhone">Direct Phone</label>
+        <input type="text" id="bcPhone" value="+1 (800) 555-0194">
+      </div>
+      <div class="bc-field">
+        <label for="bcEmail">Email Address</label>
+        <input type="text" id="bcEmail" value="{{ current_user.email }}">
+      </div>
+      <div class="bc-field">
+        <label for="bcWeb">Website</label>
+        <input type="text" id="bcWeb" value="www.{{ kit.brand_name | lower | replace(' ', '') }}.com">
+      </div>
+      <div class="bc-field">
+        <label for="bcAddr">Office Address</label>
+        <input type="text" id="bcAddr" value="Corporate Headquarters · Executive Tower, Floor 14">
+      </div>
+    </aside>
+
+    <section class="bc-stage">
+      <div class="bc-pair">
+        <div class="bc-card-box">
+          <div class="bc-card-box__head">
+            <span>Front Side · 85 × 55 mm</span>
+            <span>300 DPI Vector Ready</span>
+          </div>
+          <div id="bcFrontMount"></div>
+        </div>
+        <div class="bc-card-box">
+          <div class="bc-card-box__head">
+            <span>Reverse Side · Brand Signature</span>
+            <span>CMYK Color Matched</span>
+          </div>
+          <div id="bcBackMount"></div>
+        </div>
+      </div>
+      <p style="max-width:740px;text-align:center;font-size:13.5px;color:#475569;margin:0;">
+        Clicking <strong>Print 8-Up A4 Sheet / PDF</strong> outputs a press-ready A4 layout with dashed crop guides (4 front cards + 4 reverse cards at exact 85×55mm dimensions).
+      </p>
+    </section>
+  </div>
+
+  <div class="bc-print-sheet" id="bcPrintSheet"></div>
+</div>
+{% endblock %}
+
+{% block extra_body %}
+<script>
+(function () {
+  "use strict";
+  const KIT = {{ kit.to_dict(include_svgs=False) | tojson }};
+  const ICONS = {{ icons | tojson }};
+  const ICONS_BY_ID = Object.fromEntries(ICONS.map(i => [i.id, i]));
+
+  function esc(s) {
+    return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+  function markPaths(primary, secondary, contrast) {
+    const ic = ICONS_BY_ID[KIT.icon_id] || ICONS[0];
+    return ic.paths.replace(/\{primary\}/g, primary).replace(/\{secondary\}/g, secondary).replace(/\{contrast\}/g, contrast);
+  }
+
+  function renderCards() {
+    const style = document.getElementById("bcStyle").value;
+    const fullName = esc(document.getElementById("bcFullName").value.trim() || "Elena Vance");
+    const role = esc(document.getElementById("bcTitle").value.trim() || "Managing Director").toUpperCase();
+    const phone = esc(document.getElementById("bcPhone").value.trim());
+    const email = esc(document.getElementById("bcEmail").value.trim());
+    const web = esc(document.getElementById("bcWeb").value.trim());
+    const addr = esc(document.getElementById("bcAddr").value.trim());
+
+    const brand = esc((KIT.brand_name || "TRUSTSEAL").toUpperCase());
+    const rawBrandLen = (KIT.brand_name || "TRUSTSEAL").length;
+    const frontBrandFs = rawBrandLen > 20 ? 12.5 : (rawBrandLen > 15 ? 14 : 16);
+    const backBrandFs = rawBrandLen > 20 ? 15.5 : (rawBrandLen > 15 ? 18 : 21);
+    const tag = esc((KIT.tagline || "Verified Integrity").toUpperCase());
+    const p = KIT.primary_color || "#002769";
+    const s = KIT.secondary_color || "#02982e";
+    const d = KIT.dark_color || "#0f172a";
+    const ff = (KIT.font_heading || "Inter, sans-serif").replace(/"/g, "'");
+
+    const isDarkFront = style === "midnight_luxury";
+    const fBg = isDarkFront ? d : "#ffffff";
+    const fMain = isDarkFront ? "#ffffff" : "#0f172a";
+    const fBrand = isDarkFront ? "#ffffff" : p;
+    const fSub = isDarkFront ? "rgba(255,255,255,0.78)" : "#475569";
+    const fMark = isDarkFront ? markPaths("#ffffff", s, p) : markPaths(p, s, "#ffffff");
+    const bBg = style === "minimal_grid" ? d : p;
+    const bMark = markPaths("#ffffff", s, p);
+
+    const frontSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 425 275" width="425" height="275">
+      <rect width="425" height="275" fill="${fBg}"/>
+      ${style === "minimal_grid"
+        ? `<rect x="0" y="0" width="425" height="6" fill="${p}"/><rect x="0" y="6" width="140" height="3" fill="${s}"/>`
+        : `<rect x="0" y="0" width="12" height="275" fill="${p}"/><rect x="12" y="0" width="4" height="275" fill="${s}"/>`}
+      <g transform="translate(34,26) scale(0.95)">${fMark}</g>
+      <text x="90" y="50" font-family="${ff}" font-size="${frontBrandFs}" font-weight="800" letter-spacing="1.1" fill="${fBrand}">${brand}</text>
+      <text x="90" y="68" font-family="${ff}" font-size="8.5" font-weight="600" letter-spacing="2" fill="${fSub}">${tag}</text>
+      <line x1="34" y1="106" x2="392" y2="106" stroke="${isDarkFront ? 'rgba(255,255,255,0.18)' : '#e2e8f0'}" stroke-width="1"/>
+      <text x="34" y="138" font-family="${ff}" font-size="18" font-weight="800" fill="${fMain}">${fullName}</text>
+      <text x="34" y="158" font-family="${ff}" font-size="10" font-weight="700" letter-spacing="1.4" fill="${s}">${role}</text>
+      <text x="34" y="196" font-family="${ff}" font-size="11" fill="${fSub}">${phone}   ·   ${email}</text>
+      <text x="34" y="216" font-family="${ff}" font-size="11" font-weight="700" fill="${fBrand}">${web}</text>
+      <text x="34" y="240" font-family="${ff}" font-size="9.5" fill="${fSub}">${addr}</text>
+    </svg>`;
+
+    const backSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 425 275" width="425" height="275">
+      <rect width="425" height="275" fill="${bBg}"/>
+      <polygon points="315,0 425,0 425,275 265,275" fill="${s}" fill-opacity="0.16"/>
+      <rect x="0" y="264" width="425" height="11" fill="${s}"/>
+      <g transform="translate(174,56) scale(1.6)">${bMark}</g>
+      <text x="212" y="168" text-anchor="middle" font-family="${ff}" font-size="${backBrandFs}" font-weight="800" letter-spacing="1.6" fill="#ffffff">${brand}</text>
+      <text x="212" y="192" text-anchor="middle" font-family="${ff}" font-size="9.5" font-weight="600" letter-spacing="2.2" fill="rgba(255,255,255,0.82)">${tag}</text>
+      <text x="212" y="236" text-anchor="middle" font-family="${ff}" font-size="10" font-weight="600" letter-spacing="1" fill="rgba(255,255,255,0.72)">${web}</text>
+    </svg>`;
+
+    document.getElementById("bcFrontMount").innerHTML = frontSvg;
+    document.getElementById("bcBackMount").innerHTML = backSvg;
+    window._bcFrontSvg = frontSvg;
+    window._bcBackSvg = backSvg;
+
+    document.getElementById("bcPrintSheet").innerHTML =
+      `<div class="bc-print-cell">${frontSvg}</div>`.repeat(4) +
+      `<div class="bc-print-cell">${backSvg}</div>`.repeat(4);
+  }
+
+  function dl(svg, filename) {
+    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  ["bcStyle","bcFullName","bcTitle","bcPhone","bcEmail","bcWeb","bcAddr"].forEach(id => {
+    document.getElementById(id).addEventListener("input", renderCards);
+    document.getElementById(id).addEventListener("change", renderCards);
+  });
+  document.getElementById("bcDlFront").addEventListener("click", () => dl(window._bcFrontSvg, `${KIT.kit_ref.toLowerCase()}-business-card-front.svg`));
+  document.getElementById("bcDlBack").addEventListener("click", () => dl(window._bcBackSvg, `${KIT.kit_ref.toLowerCase()}-business-card-back.svg`));
+  renderCards();
+})();
+</script>
+{% endblock %}

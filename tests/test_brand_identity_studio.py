@@ -14,6 +14,8 @@ import pytest
 from app.extensions import db
 from app.models.media_asset import MediaAsset
 from app.models.organization import Organization
+from app.models.tsd_letterhead import TSDLetterhead
+from app.models.tsd_stamp import TSDStamp
 from app.models.user import User
 from app.services.brand_studio_engine import (
     BRAND_ICONS,
@@ -189,7 +191,71 @@ def test_brand_studio_api_and_views_end_to_end(pg_app):
     assert b"Vanguard Logistics" in book_page.data
     assert b"Official Color System" in book_page.data
 
-    # 10. Soft-delete Kit
+    # 10. Printable Executive Business Cards route
+    cards_page = client.get(f"/brand-studio/business-cards/{kit_id}")
+    assert cards_page.status_code == 200
+    assert b"Executive Business Cards" in cards_page.data
+    assert b"8-Up A4 Sheet" in cards_page.data
+
+    # 11. Cross-module integration: Brand Kit -> Letterhead Studio
+    lh_res = client.post(
+        f"/api/brand-studio/kits/{kit_id}/create-letterhead",
+        headers=hdrs,
+        json={"style": "ceremonial_crest", "address": "14th Floor, Vanguard Plaza"},
+    )
+    assert lh_res.status_code == 201
+    lh_data = lh_res.get_json()
+    assert lh_data["created"] is True
+    assert lh_data["edit_url"].startswith("/letterheads?id=")
+    with pg_app.app_context():
+        lh_row = db.session.get(TSDLetterhead, lh_data["letterhead"]["id"])
+        assert lh_row is not None
+        assert lh_row.layout["accent_color"] == "#0b1930"
+        assert "data:image/svg+xml;base64," in lh_row.layout["logo_data_uri"]
+
+    # 12. Cross-module integration: Brand Kit -> Stamp Studio (seal + rect)
+    for st_kind in ("seal", "company_rect"):
+        st_res = client.post(
+            f"/api/brand-studio/kits/{kit_id}/create-stamp",
+            headers=hdrs,
+            json={"kind": st_kind, "center_text": "VERIFIED SEAL"},
+        )
+        assert st_res.status_code == 201
+        st_data = st_res.get_json()
+        assert st_data["created"] is True
+        assert st_data["edit_url"].startswith("/stamps/studio/")
+        assert "<svg" in st_data["stamp"]["svg"]
+        with pg_app.app_context():
+            st_row = db.session.get(TSDStamp, st_data["stamp"]["id"])
+            assert st_row is not None
+            assert st_row.kind == st_kind
+            assert st_row.layout["color"] == "#0b1930"
+
+    # 13. One-click Deploy Complete Brand Suite (Media + Letterhead + 2 Seals)
+    suite_res = client.post(
+        f"/api/brand-studio/kits/{kit_id}/deploy-brand-suite",
+        headers=hdrs,
+        json={"style": "executive_split"},
+    )
+    assert suite_res.status_code == 201
+    suite = suite_res.get_json()
+    assert suite["deployed"] is True
+    assert len(suite["media_assets"]) == 2
+    assert suite["links"]["letterhead_url"].startswith("/letterheads?id=")
+    assert suite["links"]["stamp_seal_url"].startswith("/stamps/studio/")
+    assert suite["links"]["stamp_dated_url"].startswith("/stamps/studio/")
+    assert suite["links"]["business_cards_url"] == f"/brand-studio/business-cards/{kit_id}"
+
+    # 14. Bidirectional pull selectors render cleanly in Letterhead & Stamp Studios
+    lh_view = client.get(suite["links"]["letterhead_url"])
+    assert lh_view.status_code == 200
+    assert b"lh-brand-kit-sel" in lh_view.data
+
+    st_view = client.get(suite["links"]["stamp_seal_url"])
+    assert st_view.status_code == 200
+    assert b"st-brand-kit-sel" in st_view.data
+
+    # 15. Soft-delete Kit
     deleted = client.delete(f"/api/brand-studio/kits/{kit_id}", headers=hdrs)
     assert deleted.status_code == 200
     assert deleted.get_json()["deleted"] is True

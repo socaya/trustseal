@@ -588,6 +588,81 @@
   }
   .bs-toast.is-show { display: block; }
 
+  /* ---------- TAB 5: DEPLOY TO MODULES (LETTERHEAD · STAMP · CARDS) ---------- */
+  .bs-deploy-hero {
+    background: linear-gradient(112deg, #00163d 0%, #002769 68%, #013688 100%);
+    border-bottom: 3px solid #02982e;
+    color: #ffffff;
+    padding: 28px 36px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .bs-deploy-hero h2 { margin: 0 0 6px; font-size: 22px; font-weight: 800; color: #ffffff; }
+  .bs-deploy-hero p { margin: 0; font-size: 14px; color: rgba(230, 238, 255, 0.88); max-width: 720px; }
+  .bs-deploy-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    background: #d5dfee;
+    border-bottom: 1px solid #d5dfee;
+    flex: 1 1 auto;
+  }
+  .bs-deploy-col {
+    background: #ffffff;
+    padding: 26px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .bs-deploy-col__num {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #02982e;
+  }
+  .bs-deploy-col h3 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 800;
+    color: #002769;
+  }
+  .bs-deploy-col p {
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: #475569;
+  }
+  .bs-deploy-result {
+    padding: 12px 14px;
+    background: #f4f7fc;
+    border-left: 3px solid #02982e;
+    font-size: 13px;
+    color: #0f172a;
+    display: none;
+  }
+  .bs-deploy-result.is-show { display: block; }
+  .bs-deploy-result a {
+    color: #002769;
+    font-weight: 700;
+    text-decoration: underline;
+    margin-right: 14px;
+  }
+  .bs-deploy-banner-res {
+    background: #ffffff;
+    border-bottom: 1px solid #d5dfee;
+    padding: 16px 36px;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .bs-deploy-banner-res.is-show { display: flex; }
+
   @media (max-width: 1120px) {
     .bs-workspace { grid-template-columns: 1fr; }
     .bs-inspector { max-height: none; }
@@ -596,6 +671,7 @@
     .bs-gen-bar { grid-template-columns: 1fr 1fr; }
     .bs-guide-lockups { grid-template-columns: repeat(2, 1fr); }
     .bs-dos-grid { grid-template-columns: 1fr; }
+    .bs-deploy-grid { grid-template-columns: 1fr; }
   }
 </style>
 {% endblock %}
@@ -615,11 +691,14 @@
            placeholder="Enter company or brand name">
     <span id="kitRefLabel" class="ts-ed__savestate">Unsaved Draft</span>
     <span class="ts-ed__spacer"></span>
+    <button type="button" class="ts-ed__btn" id="btnDeployQuick" title="Create Letterhead, Corporate Stamps & Business Cards from this brand">
+      Deploy to Modules
+    </button>
     <button type="button" class="ts-ed__btn" id="btnPublishMedia" title="Publish current logo SVG into TRUSTSEAL Media Library">
-      Publish to Media Library
+      Publish to Media
     </button>
     <button type="button" class="ts-ed__btn" id="btnPrintBook" title="Open printable Executive Brand Guidelines Book">
-      Print Brand Book
+      Brand Book
     </button>
     <button type="button" class="ts-ed__btn ts-ed__btn--primary" id="btnSaveKit">
       Save Brand Kit
@@ -631,6 +710,7 @@
     <button type="button" class="ts-ed__tab ts-is-active" role="tab" data-bs-tab="studio">Logo Studio</button>
     <button type="button" class="ts-ed__tab" role="tab" data-bs-tab="generator">Concept Generator (12 Concepts)</button>
     <button type="button" class="ts-ed__tab" role="tab" data-bs-tab="mockups">Branded Merchandise &amp; Mockups (10)</button>
+    <button type="button" class="ts-ed__tab" role="tab" data-bs-tab="deploy">Deploy to Modules (Letterhead · Stamp · Cards)</button>
     <button type="button" class="ts-ed__tab" role="tab" data-bs-tab="guidelines">Brand Guidelines Book</button>
     <button type="button" class="ts-ed__tab" role="tab" data-bs-tab="kits">Saved Kits (<span id="savedKitsCount">{{ saved_kits|length }}</span>)</button>
   </div>
@@ -831,7 +911,106 @@
     <div class="bs-mockups-grid" id="mockupsGrid"></div>
   </section>
 
-  <!-- ==================== TAB 4: EXECUTIVE BRAND GUIDELINES BOOK ==================== -->
+  <!-- ==================== TAB 4: DEPLOY TO EXISTING MODULES ==================== -->
+  <section class="bs-panel" data-bs-panel="deploy">
+    <div class="bs-deploy-hero">
+      <div>
+        <div style="font-size:11px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#7ee29a;margin-bottom:6px;">ONE-CLICK CROSS-MODULE BRAND ROLLOUT</div>
+        <h2>Create Stunning Letterheads, Corporate Stamps &amp; Business Cards</h2>
+        <p>Push your active Brand Identity Kit directly into TRUSTSEAL Letterhead Studio, Stamp Studio, Media Library, and print-ready 8-Up Executive Business Cards — preserving your exact vector emblem, HEX/CMYK palette, and typography.</p>
+      </div>
+      <button type="button" class="bs-rbtn bs-rbtn--emerald" id="btnDeployFullSuite" style="height:40px;padding:0 22px;font-size:14px;">
+        Deploy Complete Brand Suite (All Modules)
+      </button>
+    </div>
+
+    <div class="bs-deploy-banner-res" id="deploySuiteBanner">
+      <div id="deploySuiteText" style="font-size:13.5px;font-weight:700;color:#002769;"></div>
+      <div id="deploySuiteLinks" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
+    </div>
+
+    <div class="bs-deploy-grid">
+      <!-- 01. Letterhead Studio -->
+      <div class="bs-deploy-col">
+        <span class="bs-deploy-col__num">01 · Letterhead Studio</span>
+        <h3>Official Corporate Letterhead</h3>
+        <p>Generates a live editable A4 letterhead in Letterhead Studio using your vector emblem, Primary &amp; Secondary colors, and typography.</p>
+        <div class="bs-field">
+          <label for="depLhStyle">Letterhead Design Style</label>
+          <select id="depLhStyle" class="bs-select">
+            <option value="executive_split">Executive Split + Geometric Corners</option>
+            <option value="ceremonial_crest">Centered Ceremonial Crest + Double Frame</option>
+            <option value="side_ribbon">Architectural Side Accent Ribbon</option>
+          </select>
+        </div>
+        <div class="bs-field">
+          <label for="depLhAddr">Headquarters Address</label>
+          <input type="text" id="depLhAddr" class="bs-input" value="14th Floor, Executive Plaza · Corporate Headquarters">
+        </div>
+        <div class="bs-field">
+          <label for="depLhContact">Phone &amp; Official Email</label>
+          <input type="text" id="depLhContact" class="bs-input" value="+1 (800) 555-0194">
+        </div>
+        <div style="margin-top:auto;padding-top:6px;">
+          <button type="button" class="bs-rbtn is-active" id="btnCreateLetterhead" style="height:36px;padding:0 16px;width:100%;justify-content:center;">
+            Create Branded Letterhead
+          </button>
+        </div>
+        <div class="bs-deploy-result" id="resLetterhead"></div>
+      </div>
+
+      <!-- 02. Stamp Studio -->
+      <div class="bs-deploy-col">
+        <span class="bs-deploy-col__num">02 · Stamp Studio</span>
+        <h3>Corporate Seals &amp; Dated Stamps</h3>
+        <p>Generates a live forensic-ready vector stamp in Stamp Studio embedding your exact brand mark in your official brand ink color.</p>
+        <div class="bs-field">
+          <label for="depStKind">Corporate Stamp Format</label>
+          <select id="depStKind" class="bs-select">
+            <option value="seal">Official Round Corporate Seal (Ø 42mm)</option>
+            <option value="company_dated">Dated Corporate Approval Seal (Ø 42mm)</option>
+            <option value="company_rect">Executive Rectangular Registry Stamp (75×38mm)</option>
+          </select>
+        </div>
+        <div class="bs-field">
+          <label for="depStCenter">Center Seal Wording / Approval Verb</label>
+          <input type="text" id="depStCenter" class="bs-input" value="OFFICIAL SEAL">
+        </div>
+        <div class="bs-field">
+          <label for="depStInk">Ink Color Source</label>
+          <select id="depStInk" class="bs-select">
+            <option value="primary">Brand Primary Color</option>
+            <option value="secondary">Brand Secondary Color</option>
+            <option value="dark">Executive Ink Dark</option>
+          </select>
+        </div>
+        <div style="margin-top:auto;padding-top:6px;">
+          <button type="button" class="bs-rbtn is-active" id="btnCreateStamp" style="height:36px;padding:0 16px;width:100%;justify-content:center;">
+            Create Branded Stamp
+          </button>
+        </div>
+        <div class="bs-deploy-result" id="resStamp"></div>
+      </div>
+
+      <!-- 03. Business Cards & Brand Book -->
+      <div class="bs-deploy-col">
+        <span class="bs-deploy-col__num">03 · Business Cards &amp; Collateral</span>
+        <h3>Executive Business Cards (85×55mm)</h3>
+        <p>Customize cardholder details, download front &amp; reverse vector SVGs, and print a press-ready 8-Up A4 Business Card sheet with crop marks.</p>
+        <div id="deployBcMiniPreview" style="border:1px solid #d5dfee;background:#f4f7fc;padding:10px;border-radius:5px;"></div>
+        <div style="margin-top:auto;display:flex;flex-direction:column;gap:8px;padding-top:6px;">
+          <button type="button" class="bs-rbtn bs-rbtn--emerald" id="btnOpenBusinessCards" style="height:36px;padding:0 16px;width:100%;justify-content:center;">
+            Open Business Cards Studio &amp; Print Sheet
+          </button>
+          <button type="button" class="bs-rbtn" id="btnOpenBookFromDeploy" style="height:34px;padding:0 16px;width:100%;justify-content:center;">
+            Open Printable Brand Guidelines Book
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TAB 5: EXECUTIVE BRAND GUIDELINES BOOK ==================== -->
   <section class="bs-panel" data-bs-panel="guidelines">
     <div class="bs-guide-wrap" id="guidelinesContainer"></div>
   </section>
@@ -1543,6 +1722,8 @@
     renderLogoStudio();
     renderMockups();
     renderGuidelines();
+    const mini = document.getElementById("deployBcMiniPreview");
+    if (mini) mini.innerHTML = renderMerchMockupSvg("business_card", state, state.merchFinish);
   }
 
   /* ---------- Build Pickers ---------- */
@@ -1809,6 +1990,7 @@
         <td style="font-size:12.5px;color:#334155;">${escXml(k.industry)} · ${escXml(k.logo_layout)}</td>
         <td style="text-align:right;white-space:nowrap;">
           <button type="button" class="bs-rbtn" data-kit-load="${k.id}">Edit</button>
+          <a class="bs-rbtn" href="/brand-studio/business-cards/${k.id}" target="_blank" rel="noopener" style="text-decoration:none;">Cards</a>
           <a class="bs-rbtn" href="/brand-studio/guidelines/${k.id}" target="_blank" rel="noopener" style="text-decoration:none;">Brand Book</a>
           <a class="bs-rbtn" href="/api/brand-studio/kits/${k.id}/export/primary" style="text-decoration:none;">SVG</a>
           <button type="button" class="bs-rbtn" data-kit-del="${k.id}" style="color:#b91c1c;">Delete</button>
@@ -1946,6 +2128,86 @@
     document.getElementById("btnSaveFromMockups").addEventListener("click", () => saveCurrentKit().catch(e => showToast(e.message)));
     document.getElementById("btnPublishMedia").addEventListener("click", publishCurrentToMedia);
     document.getElementById("btnPrintBook").addEventListener("click", openPrintableBrandBook);
+    document.getElementById("btnDeployQuick").addEventListener("click", () => activateTab("deploy"));
+    document.getElementById("btnOpenBookFromDeploy").addEventListener("click", openPrintableBrandBook);
+    document.getElementById("btnOpenBusinessCards").addEventListener("click", async () => {
+      try {
+        const kit = state.kitId ? { id: state.kitId } : await saveCurrentKit();
+        window.open(`/brand-studio/business-cards/${kit.id}`, "_blank", "noopener");
+      } catch (e) { showToast(e.message); }
+    });
+    document.getElementById("btnCreateLetterhead").addEventListener("click", async () => {
+      const btn = document.getElementById("btnCreateLetterhead");
+      btn.disabled = true; btn.textContent = "Creating Letterhead...";
+      try {
+        const kit = state.kitId ? { id: state.kitId } : await saveCurrentKit();
+        const res = await apiFetch(`/api/brand-studio/kits/${kit.id}/create-letterhead`, {
+          method: "POST",
+          body: JSON.stringify({
+            style: document.getElementById("depLhStyle").value,
+            address: document.getElementById("depLhAddr").value.trim(),
+            phone: document.getElementById("depLhContact").value.trim(),
+          }),
+        });
+        const box = document.getElementById("resLetterhead");
+        box.innerHTML = `Created <strong>${escXml(res.letterhead.name)}</strong>.<div style="margin-top:6px;"><a href="${res.edit_url}">Open in Letterhead Studio →</a></div>`;
+        box.classList.add("is-show");
+        showToast("Official Brand Letterhead created in Letterhead Studio!");
+      } catch (e) { showToast(e.message); }
+      finally { btn.disabled = false; btn.textContent = "Create Branded Letterhead"; }
+    });
+    document.getElementById("btnCreateStamp").addEventListener("click", async () => {
+      const btn = document.getElementById("btnCreateStamp");
+      btn.disabled = true; btn.textContent = "Creating Stamp...";
+      try {
+        const kit = state.kitId ? { id: state.kitId } : await saveCurrentKit();
+        const inkKey = document.getElementById("depStInk").value;
+        const inkColor = inkKey === "secondary" ? state.secondary_color : (inkKey === "dark" ? state.dark_color : state.primary_color);
+        const centerVal = document.getElementById("depStCenter").value.trim() || "OFFICIAL SEAL";
+        const res = await apiFetch(`/api/brand-studio/kits/${kit.id}/create-stamp`, {
+          method: "POST",
+          body: JSON.stringify({
+            kind: document.getElementById("depStKind").value,
+            center_text: centerVal,
+            verb: centerVal,
+            color: inkColor,
+          }),
+        });
+        const box = document.getElementById("resStamp");
+        box.innerHTML = `Created <strong>${escXml(res.stamp.name)}</strong>.<div style="margin-top:6px;"><a href="${res.edit_url}">Open in Stamp Studio →</a></div>`;
+        box.classList.add("is-show");
+        showToast("Corporate Brand Stamp created in Stamp Studio!");
+      } catch (e) { showToast(e.message); }
+      finally { btn.disabled = false; btn.textContent = "Create Branded Stamp"; }
+    });
+    document.getElementById("btnDeployFullSuite").addEventListener("click", async () => {
+      const btn = document.getElementById("btnDeployFullSuite");
+      btn.disabled = true; btn.textContent = "Deploying Brand Suite...";
+      try {
+        const kit = state.kitId ? { id: state.kitId } : await saveCurrentKit();
+        const res = await apiFetch(`/api/brand-studio/kits/${kit.id}/deploy-brand-suite`, {
+          method: "POST",
+          body: JSON.stringify({
+            style: document.getElementById("depLhStyle").value,
+            address: document.getElementById("depLhAddr").value.trim(),
+            phone: document.getElementById("depLhContact").value.trim(),
+          }),
+        });
+        const banner = document.getElementById("deploySuiteBanner");
+        document.getElementById("deploySuiteText").textContent =
+          `Deployed Complete Brand Suite (${res.kit_ref}): 2 Media Logos + Official Letterhead + Round Seal + Dated Stamp`;
+        document.getElementById("deploySuiteLinks").innerHTML = `
+          <a class="bs-rbtn is-active" href="${res.links.letterhead_url}" style="text-decoration:none;">Open Letterhead →</a>
+          <a class="bs-rbtn is-active" href="${res.links.stamp_seal_url}" style="text-decoration:none;">Open Corporate Seal →</a>
+          <a class="bs-rbtn" href="${res.links.stamp_dated_url}" style="text-decoration:none;">Open Dated Stamp →</a>
+          <a class="bs-rbtn bs-rbtn--emerald" href="${res.links.business_cards_url}" target="_blank" rel="noopener" style="text-decoration:none;">Print Business Cards →</a>
+          <a class="bs-rbtn" href="${res.links.media_url}" style="text-decoration:none;">Media Library →</a>
+        `;
+        banner.classList.add("is-show");
+        showToast(`Complete Brand Suite deployed for ${state.brand_name}!`);
+      } catch (e) { showToast(e.message); }
+      finally { btn.disabled = false; btn.textContent = "Deploy Complete Brand Suite (All Modules)"; }
+    });
     document.getElementById("btnGenerateConcepts").addEventListener("click", generateConcepts);
     document.getElementById("btnToggleConceptBg").addEventListener("click", e => {
       state.conceptDarkBg = !state.conceptDarkBg;

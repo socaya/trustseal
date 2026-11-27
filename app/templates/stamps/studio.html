@@ -35,7 +35,7 @@
            placeholder="Untitled stamp"
            aria-label="Stamp name">
     <input type="text" id="st-desc" class="ts-ed__filename"
-           style="max-width:240px;font-weight:400;font-size:12px;color:#5a6676;"
+           style="max-width:220px;font-weight:400;font-size:12px;color:#dbe7ff;"
            value="{{ (stamp.layout.get('description') if stamp and stamp.layout is mapping else '') or '' }}"
            placeholder="Short description…"
            aria-label="Stamp description">
@@ -44,6 +44,9 @@
     <span class="ts-ed__class-mark">
       Kind: <b id="st-kind-badge">Round seal</b>
     </span>
+    <select id="st-brand-kit-sel" aria-label="Apply Brand Identity Kit" title="Apply saved Brand Identity Studio kit to this stamp" style="max-width:138px;white-space:nowrap;">
+      <option value="">Brand Kit…</option>
+    </select>
     <button type="button" id="st-preview-final" class="ts-ed__btn ts-ed__btn--ghost" aria-pressed="false" title="Toggle final preview (hides all handles &amp; guides)">
       Final preview
     </button>
@@ -9750,6 +9753,68 @@
       if (modes[idx].cls) workspace.classList.add(modes[idx].cls);
       surfBtn.textContent = modes[idx].label;
       surfBtn.setAttribute('aria-pressed', String(idx !== 0));
+    });
+  })();
+
+  // ------------------- Brand Identity Studio Sync (Apply Brand Kit) -------
+  (function () {
+    var bkSel = document.getElementById('st-brand-kit-sel');
+    if (!bkSel) return;
+    var brandKits = [];
+    fetch('/api/brand-studio/kits', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : { kits: [] }; })
+      .then(function (d) {
+        brandKits = (d && d.kits) || [];
+        bkSel.innerHTML = '<option value="">Brand Kit…</option>' + brandKits.map(function (k) {
+          var lbl = String(k.brand_name || 'Brand').replace(/</g, '&lt;') + ' (' + String(k.kit_ref || '') + ')';
+          return '<option value="' + k.id + '">' + lbl + '</option>';
+        }).join('');
+      }).catch(function () {});
+
+    bkSel.addEventListener('change', function () {
+      var id = parseInt(bkSel.value || '0', 10);
+      var k = brandKits.find(function (x) { return x.id === id; });
+      if (!k) return;
+      var brandUp = String(k.brand_name || '').trim().toUpperCase();
+      var tagUp = String(k.tagline || 'OFFICIAL SEAL').trim().toUpperCase();
+      var ink = k.primary_color || '#002769';
+      if (state.kind === 'seal') {
+        state.seal.top = brandUp;
+        state.seal.bottom = tagUp;
+        state.seal.color = ink;
+      } else if (state.kind === 'company_dated') {
+        state.cd.company = brandUp;
+        state.cd.tagline = tagUp;
+        state.cd.color = ink;
+      } else if (state.kind === 'company_rect') {
+        state.company_rect.company = brandUp;
+        state.company_rect.subtitle = tagUp;
+        state.company_rect.color = ink;
+      } else if (state.kind === 'rubber') {
+        state.rubber.text = brandUp;
+        state.rubber.color = ink;
+      } else if (state.kind === 'date') {
+        state.date.byline = brandUp;
+        state.date.color = ink;
+      }
+      var svgSrc = k.icon_only_svg || k.primary_svg || '';
+      if (svgSrc) {
+        try {
+          state.logo.data = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgSrc)));
+          state.logo.x = 50;
+          state.logo.y = 38;
+          state.logo.size = 22;
+          state.logo.style = 'original';
+          state.logo.auto_match_color = false;
+        } catch (e) {}
+      }
+      var nameEl = document.getElementById('st-name');
+      if (nameEl && !nameEl.value.trim()) nameEl.value = (k.brand_name || 'Brand') + ' — Official Seal';
+      render();
+      var activeTabBtn = document.querySelector('.st-props__tabs .ts-ed__tab.ts-is-active');
+      if (activeTabBtn) renderRibbon(activeTabBtn.getAttribute('data-tab'));
+      markDirty();
+      bkSel.value = '';
     });
   })();
 

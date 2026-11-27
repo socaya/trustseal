@@ -1,9 +1,11 @@
-{% extends "layouts/public.html" %}
+{% extends "layouts/app.html" %}
+{% set active_nav_item = 'brand-studio' %}
 {% block title %}{{ kit.brand_name }} — Brand Guidelines Book | TRUSTSEAL{% endblock %}
-{% block main_modifier %}ts-public-main--full{% endblock %}
+{% block page_header %}{% endblock %}
 
 {% block extra_head %}
 <style>
+  .ts-page { padding: 0 !important; max-width: none !important; }
   .bg-book {
     width: 100%;
     background: #ffffff;
@@ -96,7 +98,7 @@
   .bg-list { margin: 0; padding-left: 20px; line-height: 1.8; font-size: 14.5px; color: #1e293b; }
 
   @media print {
-    .ts-public-nav, .ts-public-footer, .bg-toolbar { display: none !important; }
+    .ts-topbar, .bg-toolbar { display: none !important; }
     .bg-cover, .bg-lockup--dark { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .bg-sec { break-inside: avoid; padding: 28px 32px; }
   }

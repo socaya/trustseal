@@ -412,7 +412,7 @@ def render_logo_svg(
 
     if mode == "icon_only":
         return (
-            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="{name} Mark">'
+            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="{name} Mark">'
             f'<g transform="translate(12,12) scale(1.5)">{mark_inner}</g>'
             f'</svg>'
         )

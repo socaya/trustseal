@@ -29,6 +29,9 @@
     <span id="lh-save-msg" class="ts-ed__savestate"></span>
     <div class="ts-ed__spacer"></div>
 
+    <select id="lh-brand-kit-sel" class="lh-appbar-sel" style="max-width:138px;white-space:nowrap;" aria-label="Apply Brand Identity Kit" title="Apply saved Brand Identity Studio kit">
+      <option value="">Brand Kit…</option>
+    </select>
     <select id="lh-switcher" class="lh-appbar-sel" aria-label="Switch letterhead">
       <option value="">+ New Letterhead</option>
     </select>
@@ -3746,6 +3749,52 @@
   }
 
   loadAll();
+
+  /* --- Brand Identity Studio Sync (Apply Brand Kit) --- */
+  (function () {
+    var bkSel = document.getElementById('lh-brand-kit-sel');
+    if (!bkSel) return;
+    var brandKits = [];
+    fetch('/api/brand-studio/kits', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : { kits: [] }; })
+      .then(function (d) {
+        brandKits = (d && d.kits) || [];
+        bkSel.innerHTML = '<option value="">Brand Kit…</option>' + brandKits.map(function (k) {
+          return '<option value="' + k.id + '">' + escH(k.brand_name) + ' (' + escH(k.kit_ref) + ')</option>';
+        }).join('');
+      }).catch(function () {});
+
+    bkSel.addEventListener('change', function () {
+      var id = parseInt(bkSel.value || '0', 10);
+      var k = brandKits.find(function (x) { return x.id === id; });
+      if (!k) return;
+      if (F.org) F.org.value = (k.brand_name || '').toUpperCase();
+      if (F.tagline) F.tagline.value = k.tagline || '';
+      if (F.accent && k.primary_color) F.accent.value = k.primary_color;
+      if (F.brand2 && k.secondary_color) F.brand2.value = k.secondary_color;
+      if (F.sec && k.dark_color) F.sec.value = k.dark_color;
+      var svgSrc = k.icon_only_svg || k.primary_svg || '';
+      if (svgSrc) {
+        try {
+          customLogoUri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgSrc)));
+          if (mediaSel) mediaSel.value = '';
+        } catch (e) {}
+      }
+      if (F.font && k.font_heading) {
+        var fh = String(k.font_heading).toLowerCase();
+        F.font.value = (fh.indexOf('georgia') !== -1 || fh.indexOf('palatino') !== -1 || fh.indexOf('serif') !== -1) ? 'serif'
+          : (fh.indexOf('helvetica') !== -1 ? 'modern' : 'sans');
+      }
+      syncHexFromPickers();
+      syncRibbonFromState();
+      renderPreview();
+      if (saveMsg) {
+        saveMsg.textContent = 'Applied Brand Kit ' + k.kit_ref;
+        setTimeout(function () { if (saveMsg.textContent.indexOf('Applied Brand Kit') === 0) saveMsg.textContent = ''; }, 3000);
+      }
+      bkSel.value = '';
+    });
+  })();
 })();
 </script>
 {% endblock %}

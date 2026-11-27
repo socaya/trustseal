@@ -61,3 +61,20 @@ def guidelines_print_page(kit_id: int):
         kit=kit,
         guidelines=guidelines,
     )
+
+
+@brand_studio_views.route("/business-cards/<int:kit_id>", methods=["GET"])
+@login_required
+def business_cards_print_page(kit_id: int):
+    ensure_brand_studio_tables()
+    kit = BrandIdentityKit.query.filter_by(
+        id=kit_id, organization_id=current_user.organization_id, is_active=True
+    ).first()
+    if not kit:
+        abort(404)
+    return render_template(
+        "stamps/brand_business_cards.html",
+        kit=kit,
+        icons=BRAND_ICONS,
+        current_user=current_user,
+    )
