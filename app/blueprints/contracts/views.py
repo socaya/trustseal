@@ -176,11 +176,16 @@ def projects_page():
     ]
 
     # UI-05 & UI-06: Server-side search, multi-facet filtering, deterministic sorting & pagination
+    active_section = (request.args.get("section") or "projects").strip().lower()
+    if active_section not in ("home", "projects", "portfolios", "programmes", "intake", "obligations", "templates"):
+        active_section = "projects"
+
     q_str = (request.args.get("q") or "").strip()
     f_cat = (request.args.get("category") or "ALL").strip()
     f_status = (request.args.get("status") or "ALL").strip()
     f_health = (request.args.get("health") or "ALL").strip()
     f_contracts = (request.args.get("contracts") or "ALL").strip()
+    f_view = (request.args.get("view") or "all").strip().lower()
     sort_by = (request.args.get("sort") or "updated").strip()
     sort_dir = (request.args.get("dir") or "desc").strip().lower()
     if sort_dir not in ("asc", "desc"):
@@ -194,9 +199,55 @@ def projects_page():
     except ValueError:
         page = 1
 
+    # Cross-project Contract Obligations Register (CON-02 / Sidebar Obligations)
+    from app.models.contract_workflow import ContractObligation
+
+    wf_by_id = {
+        w.id: w
+        for w in ContractWorkflow.query.filter_by(organization_id=org_id).all()
+    }
+    proj_by_id = {p["id"]: p for p in project_cards}
+    doc_titles = {
+        d.id: d.title
+        for d in TSDocument.query.filter_by(organization_id=org_id).all()
+    }
+    global_obligations = []
+    if wf_by_id:
+        for ob in (
+            ContractObligation.query.filter(
+                ContractObligation.organization_id == org_id,
+                ContractObligation.contract_id.in_(list(wf_by_id.keys())),
+            )
+            .order_by(ContractObligation.due_date.asc().nullslast(), ContractObligation.id.desc())
+            .all()
+        ):
+            d = ob.to_dict()
+            wf = wf_by_id.get(ob.contract_id)
+            doc_id = wf.document_id if wf else None
+            prj_info = proj_by_id.get(wf.project_id) if (wf and wf.project_id) else None
+            d["document_id"] = doc_id
+            d["contract_title"] = doc_titles.get(doc_id) or (f"Contract #{doc_id}" if doc_id else "Contract")
+            d["project_id"] = wf.project_id if wf else None
+            d["project_name"] = prj_info["name"] if prj_info else "Unlinked"
+            d["project_code"] = prj_info["project_code"] if prj_info else "—"
+            global_obligations.append(d)
+
+    metrics_counts = {
+        "total": len(project_cards),
+        "on_track": sum(1 for pc in project_cards if pc["health"]["rag"] == "on_track" and pc["status"] not in ("completed", "archived")),
+        "attention": sum(1 for pc in project_cards if pc["health"]["rag"] in ("at_risk", "critical")),
+        "closed": sum(1 for pc in project_cards if pc["status"] in ("completed", "archived")),
+    }
+
     filtered = []
     q_low = q_str.lower()
     for pc in project_cards:
+        if f_view == "on_track" and not (pc["health"]["rag"] == "on_track" and pc["status"] not in ("completed", "archived")):
+            continue
+        if f_view == "attention" and pc["health"]["rag"] not in ("at_risk", "critical"):
+            continue
+        if f_view == "closed" and pc["status"] not in ("completed", "archived"):
+            continue
         if f_cat != "ALL" and pc["category"] != f_cat:
             continue
         if f_status != "ALL" and pc["status"] != f_status:
@@ -236,6 +287,9 @@ def projects_page():
     portfolio_prog = compute_deliverable_progress(all_delivs)
     return render_template(
         "contracts/projects.html",
+        active_section=active_section,
+        global_obligations=global_obligations,
+        metrics_counts=metrics_counts,
         projects=paged_projects,
         all_projects_count=len(project_cards),
         categories=PROJECT_CATEGORIES,
@@ -249,6 +303,7 @@ def projects_page():
             "status": f_status,
             "health": f_health,
             "contracts": f_contracts,
+            "view": f_view,
             "sort": sort_by,
             "dir": sort_dir,
         },

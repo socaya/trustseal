@@ -1,0 +1,797 @@
+<!doctype html>
+<!--
+TrustSeal PM Studio UI prototype
+
+Integration into socaya/trustseal
+- Use app/templates/layouts/app.html for the authenticated shell and existing navigation.
+- Project register maps to app/templates/contracts/projects.html.
+- Project workspace maps to app/templates/contracts/project_detail.html.
+- Personal assignments and time entry map to app/templates/contracts/my_work.html.
+- Scope the PM visual styles in app/static/css/pm_studio.css using app/static/css/tokens.css.
+- Reuse the native project and timesheet blueprints. Bind contract evidence submission and
+  decisions to the governed contracts, documents, and signatures workflows.
+- Replace hash navigation, sample data, and local browser writes with scoped routes and
+  requests. Enforce authorization, validation, version checks, and audit on the server.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="TrustSeal Projects desktop and mobile UI prototype">
+<title>TrustSeal · Project Management</title>
+<style>
+:root{--navy:#112b4a;--blue:#244f8f;--ink:#16283e;--muted:#52647a;--paper:#fff;--soft:#f4f7fb;--stripe:#f8fafc;--active:#e7eef8;--green:#17664c;--amber:#85500c;--red:#983945;--sidebar:232px}
+*{box-sizing:border-box}body{margin:0;color:var(--ink);background:var(--soft);font:14px/1.45 "Inter","Segoe UI",Arial,sans-serif}button,input,select{font:inherit;color:inherit;border:0;border-radius:0;background:transparent}button{cursor:pointer}button:disabled{opacity:.42;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid var(--blue);outline-offset:2px}button:hover:not(:disabled){filter:brightness(.96)}h1,h2,h3,p{margin:0}h1{font-size:35px;letter-spacing:-1.3px;font-weight:700;line-height:1.12}h2{font-size:20px;letter-spacing:-.4px}h3{font-size:15px}small,.muted{color:var(--muted)}small{font-size:12px}svg{width:17px;height:17px;display:inline-block;vertical-align:middle;flex-shrink:0}a{color:var(--blue)}.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}[hidden]{display:none!important}
+.top{height:63px;position:sticky;top:0;z-index:5;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 26px 0 21px}.brand,.topright,.crumb,.btn,.nav-item,.identity{display:flex;align-items:center;gap:9px}.brand{font-size:19px;letter-spacing:-.4px;font-weight:700;padding:0}.brand svg{width:29px;height:29px}.suite{margin-left:5px;color:#d9e5f4;font-size:12px;font-weight:600;letter-spacing:.3px}.topright{gap:18px}.topright small{color:#d9e5f4}.identity{font-size:13px}.initials{color:var(--navy);font-size:11px;font-weight:750}.top .initials{color:#d9e5f4}#toggle-nav{display:none}.shell{display:grid;grid-template-columns:var(--sidebar) minmax(0,1fr);min-height:calc(100vh - 63px)}.side{background:#edf2f8;padding:18px 13px 24px;position:sticky;top:63px;height:calc(100vh - 63px);overflow:auto}.workspace{display:flex;align-items:center;gap:10px;padding:9px 8px 14px;width:100%;text-align:left}.workspace strong{display:block;font-size:13px}.workspace small{display:block}.ws-icon{width:25px;height:31px;display:grid;place-items:center;color:var(--blue)}.side h2{font-size:10px;font-weight:750;letter-spacing:1.15px;color:#4d627a;text-transform:uppercase;margin:21px 8px 6px}.nav-item{width:100%;text-align:left;padding:7px 9px;min-height:34px;color:#374d66;font-size:13px;margin:1px 0;gap:10px}.nav-item[aria-current=page]{color:#173f7a;background:#dce7f6;font-weight:700;box-shadow:inset 3px 0 #2d5d9d}.nav-item:hover{background:#e4ecf7}.nav-item svg{width:15px;height:15px}.nav-sub{padding-top:9px}.nav-sub summary{cursor:pointer;padding:5px 8px;color:#374d66;font-size:12px;font-weight:650}.nav-sub .nav-item{padding-left:17px}.demo{display:inline-flex;align-items:center;gap:6px;color:#52667f;font-size:12px}.frame{padding:19px 31px 25px;max-width:1760px;width:100%;margin-inline:auto}.crumb{font-size:12px;color:var(--muted);margin-bottom:21px;min-height:19px}.crumb button{padding:0;color:var(--blue)}.crumb svg{width:13px;height:13px}.hero{display:flex;align-items:flex-end;justify-content:space-between;gap:15px;margin-bottom:20px}.hero p{color:var(--muted);margin-top:6px}.context{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-top:9px;color:var(--muted)}.btn{display:inline-flex;justify-content:center;background:#edf2f8;padding:7px 10px;font-weight:650;font-size:13px;min-height:34px;white-space:nowrap}.btn-primary{background:#214b83;color:#fff;padding-inline:13px}.btn-plain{background:transparent;padding-inline:5px}.iconbtn{padding:6px;min-width:32px}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--paper);margin-bottom:20px}.metric{padding:12px 15px 13px;display:flex;align-items:center;gap:11px;text-align:left}.metric[aria-pressed=true]{background:#f7faff}.metric + .metric{box-shadow:inset 1px 0 #edf2f8}.metric-icon{width:26px;height:32px;display:grid;place-items:center;color:var(--blue)}.metric-icon.green{color:var(--green)}.metric-icon.amber{color:var(--amber)}.metric-icon.gray{color:#53637a}.metric small{display:block;margin-bottom:2px}.metric strong{font-size:22px;line-height:1.05;font-variant-numeric:tabular-nums;letter-spacing:-.55px}.panel{background:var(--paper);min-width:0}.panel-header{display:flex;align-items:center;justify-content:space-between;padding:13px 15px 0;gap:10px}.tabs{display:flex;gap:17px;overflow:auto;min-width:0}.tab{padding:8px 1px;white-space:nowrap;font-size:13px;color:var(--muted);font-weight:600}.tab[aria-current=page],.tab[aria-pressed=true]{color:var(--blue);box-shadow:inset 0 -2px var(--blue)}.project-bar{display:flex;align-items:center;gap:8px;margin-bottom:15px;background:var(--paper);padding:0 9px}.project-tabs{flex:1;gap:14px}.project-tabs .tab{padding-block:9px}.project-bar .select-btn{max-width:178px;min-height:30px;padding-block:5px}.project-bar .select-btn.current{background:transparent;color:var(--blue);box-shadow:inset 0 -2px var(--blue)}.subtabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}.subtabs .btn{background:transparent}.subtabs .btn:hover{color:var(--blue)}.subtabs .btn[aria-current=page]{color:#194780;box-shadow:inset 0 -2px #2d5d9d}.tools{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:12px 15px;background:white}.search{display:flex;align-items:center;gap:8px;background:#f0f4f9;color:var(--muted);min-height:34px;padding:0 9px;flex:1;min-width:180px;max-width:365px}.search input{min-width:0;width:100%;outline:none;padding:6px 0}.search:focus-within{outline:2px solid var(--blue)}.kbd{font-size:11px;min-width:17px;text-align:center;color:var(--muted)}.select-btn{appearance:none;background:#edf2f8;padding:7px 29px 7px 9px;min-height:34px;font-weight:600;font-size:13px;width:auto}.select-wrap{position:relative;display:inline-flex;max-width:100%}.select-wrap svg{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:13px;height:13px;pointer-events:none;color:var(--muted)}.spacer{flex:1}.filters{padding:0 15px 10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}.filters .btn{background:transparent;min-height:26px;padding:4px 7px;font-size:12px;color:var(--blue)}.table-scroll{overflow:auto;max-width:100%}table{width:100%;border-collapse:collapse;text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap}thead{background:#edf2f8}th{font-size:11px;color:#43566d;font-weight:750;text-transform:uppercase;letter-spacing:.55px}th,td{padding:8px 12px;text-align:left}th:first-child,td:first-child{padding-left:15px}th button{padding:0;display:inline-flex;align-items:center;gap:4px;text-transform:inherit;letter-spacing:inherit;font-weight:inherit;font-size:inherit;color:inherit}th svg{width:12px;height:12px}td{height:45px;font-size:13px}tr:nth-child(even) td{background:#f7f9fc}tbody tr:hover td{background:#edf3fb}.row-name{color:var(--ink);font-weight:700;background:transparent;text-align:left;padding:0;white-space:normal;min-width:125px}.row-name:hover{text-decoration:underline}.row-meta{display:block;margin-top:0;color:var(--muted);font-size:11px}.who{display:inline-flex;align-items:center;gap:7px}.who .initials{min-width:17px;color:#34547a}.state{font-size:12px;font-weight:650;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;color:#465972}.state:before{content:"";width:5px;height:5px;background:currentColor}.state.good{color:#205e49}.state.warn{color:#794907}.state.bad{color:#8a3041}.state.info{color:#24518b}.meter{display:inline-flex;align-items:center;gap:6px;color:var(--muted);min-width:77px}.track{width:50px;height:4px;background:#dce6f3;display:inline-block}.track i{display:block;background:#4376ae;height:100%}.table-footer{padding:11px 15px;display:flex;align-items:center;justify-content:space-between;gap:9px;flex-wrap:wrap;background:white}.pagination{display:inline-flex;align-items:center;gap:4px}.pagination button{min-width:28px;min-height:28px;font-size:12px}.pagination button[aria-current=page]{color:var(--blue);font-weight:750;box-shadow:inset 0 -2px var(--blue)}.rowcount{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}.rowcount .select-btn{min-height:27px;padding-block:4px}.empty{padding:38px 16px;text-align:center;color:var(--muted)}.overview-grid{display:grid;grid-template-columns:1.55fr 1fr;gap:14px}.overview-grid .panel{padding:16px}.brief{color:var(--muted);margin:6px 0 15px}.tile-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:12px}.tile-links button{justify-content:flex-start;white-space:normal}.detail-list{list-style:none;padding:0;margin:9px 0 0}.detail-list li{padding:8px 0;display:flex;justify-content:space-between;gap:9px}.detail-list li:nth-child(even){background:var(--stripe)}.detail-list span{color:var(--muted)}.gantt{min-width:750px}.pinned-first :is(td,th):first-child{position:sticky;left:0;z-index:1;background:white}.pinned-first th:first-child{background:#edf2f8}.pinned-first tr:nth-child(even) td:first-child{background:#f7f9fc}.schedule-week{padding-inline:0;min-width:51px}.g-cell,.g-bar{display:block;height:10px;background:#e8eef6}.g-bar{background:#4b7eb8}.g-bar.warn{background:#c28a41}.heat{display:block;padding:6px;text-align:center;background:#e9f3f7}.heat.warn{background:#faeedb;color:var(--amber)}.heat.bad{background:#f7e6ea;color:var(--red)}.hours{width:51px;background:#eaf0f8;padding:5px;min-height:29px}.special-pad{padding:12px 15px}.special-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}.board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:0 15px 15px}.board section{background:var(--soft);padding:9px}.board .row-name{display:block;padding:8px;margin-top:5px;background:white;min-width:0;width:100%}.notice{padding:7px 0;margin-bottom:10px;color:var(--muted)}.mobile-only{display:none}
+dialog{padding:0;border:0;border-radius:0;color:var(--ink);background:#fff;max-width:100vw;max-height:100dvh}dialog::backdrop{background:#132b48a0}.drawer{margin:0 0 0 auto;height:100dvh;width:min(450px,100vw);max-width:100vw}.dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;background:#edf2f8;padding:18px 19px}.dialog-body{padding:17px 19px}.dialog-actions{display:flex;justify-content:flex-end;gap:8px;padding:12px 19px;background:#f4f7fb;flex-wrap:wrap}.dialog-body label.field{display:grid;gap:4px;margin-bottom:12px;font-weight:650}.dialog-body .field input,.dialog-body .field select{background:#eff3f8;padding:8px;min-height:36px;width:100%}.dialog-body .check{display:block;padding:5px 0}.dialog-body input[type=checkbox]{accent-color:#244f8f}.filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}.toast{position:fixed;z-index:10;bottom:15px;right:15px;background:var(--navy);color:white;padding:10px 15px;max-width:calc(100vw - 30px)}
+@media(max-width:1050px){:root{--sidebar:193px}.frame{padding-inline:18px}.topright .org{display:none}.metric{padding-inline:9px}.tools .spacer{display:none}}@media(max-width:760px){.top{padding-inline:12px;height:53px}.topright{gap:7px}.identity span+span,.suite{display:none}#toggle-nav{display:flex;color:white}.shell{grid-template-columns:minmax(0,1fr)}.side{display:none;position:fixed;top:53px;left:0;bottom:0;height:auto;width:232px;z-index:4;box-shadow:12px 0 32px #18314c24}.side.open{display:block}.frame{padding:14px 12px}.crumb{margin-bottom:14px}.hero{align-items:flex-start;flex-wrap:wrap}.hero h1{font-size:29px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:12px}.overview-grid{grid-template-columns:1fr}.panel-header{padding-inline:10px}.tools{padding:9px 10px}.search{max-width:none;flex-basis:100%}.project-tabs{gap:12px}.project-bar .select-btn{max-width:125px}.desktop-only{display:none}.mobile-only{display:inline}.time-grid [data-time-day]:not(.current-day){display:none}.time-grid{white-space:normal}.time-grid th,.time-grid td{padding-inline:8px}.board{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(prefers-reduced-motion:no-preference){button{transition:background-color .12s}}
+:root{--navy:#002769;--blue:#002769;--ink:#182e43;--muted:#4c6273;--soft:#f6f8fb;--stripe:#f9fafc;--sidebar:212px}
+.top{height:61px;background:white;color:var(--ink);box-shadow:0 1px #ebeff4;padding-inline:21px 26px}
+.brand{gap:12px}.brand-image{height:31px;max-width:160px;object-fit:contain;display:block}.suite{color:var(--muted);font-size:13px;margin-left:0;font-weight:600}
+.top .initials{color:var(--navy)}.topright{font-size:13px}.topright .org{color:var(--muted)}
+.side{top:61px;background:#f0f3f8;height:calc(100vh - 61px);padding-top:15px}.shell{min-height:calc(100vh - 61px)}
+.workspace{padding:8px 8px 10px}.workspace strong{font-size:14px}.side h2{margin-top:19px}
+.nav-item{min-height:35px}.nav-item[aria-current=page]{background:#e1e9f5;color:var(--navy)}
+.frame{padding:19px 30px 28px}.crumb{margin-bottom:20px}.hero{margin-bottom:20px}.hero h1{font-size:36px;font-weight:720;letter-spacing:-1.25px}
+.hero-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.btn-primary{background:var(--navy)}.btn-plain.iconbtn{color:inherit}
+.metrics{margin-bottom:17px}.metric{min-height:73px;padding:11px 15px}.metric strong{font-size:25px}.metric small{font-size:12px}.metric + .metric{box-shadow:inset 1px 0 #f0f3f7}
+.metric[aria-pressed=true]{background:var(--paper)}.metric[aria-pressed=true] strong{color:var(--navy)}
+.panel-header{padding-top:10px}.tools{padding-top:10px;padding-bottom:10px}.table-footer{padding-block:10px}
+td{height:45px}.row-name{font-size:13px}.row-meta{margin-top:2px}.state{font-size:12px}.state:before{width:5px;height:5px}
+.project-bar{padding-inline:13px}.project-tabs .tab{padding-block:11px}.subtabs .btn{padding-inline:8px}
+.studio-heading{padding:12px 15px 0}.studio-heading p{margin-top:4px}.studio-heading h2{font-size:19px}
+.studio-grid{display:grid;gap:14px;grid-template-columns:minmax(0,1.8fr) minmax(268px,1fr)}
+.studio-grid>*{min-width:0}.studio-grid .panel h2{font-size:18px}
+.studio-section{padding:14px 16px}.studio-section+.studio-section{margin-top:12px}.studio-section h2{margin-bottom:9px}
+.studio-summary{margin-top:10px}.studio-summary dl,.obligation-dates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0}
+.studio-summary dt,.obligation-dates dt{color:var(--muted);font-size:12px}.studio-summary dd,.obligation-dates dd{margin:4px 0 0;font-weight:700;font-size:14px}
+.obligation-dates{grid-template-columns:repeat(4,minmax(0,1fr));padding:14px 16px;margin-bottom:14px;background:white}
+.obligation-dates .late{color:#8a3041}.obligation-dates .ahead{color:#205e49}.date-variance{font-variant-numeric:tabular-nums}
+.obligation-intro{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}.obligation-intro p{margin-bottom:9px}.obligation-intro .hero-actions{margin-bottom:3px}
+.activity-stack{padding:0;margin:0;list-style:none}.activity-stack li{padding:9px 8px;display:flex;justify-content:space-between;align-items:baseline;gap:10px}.activity-stack li:nth-child(odd){background:var(--stripe)}.activity-stack strong{font-size:13px}
+.evidence-item{display:grid;align-items:start;gap:5px;padding:8px 9px}.evidence-item:nth-child(odd){background:var(--stripe)}.evidence-item small{overflow-wrap:anywhere}
+.studio-stack{display:grid;gap:14px}.studio-overview .panel+ .panel{margin-top:0}
+.contract-nav{margin-bottom:11px}.contract-nav .btn{background:transparent}.contract-nav .btn[aria-current]{box-shadow:inset 0 -2px var(--navy);color:var(--navy)}
+.filter-date{font-variant-numeric:tabular-nums}.compact-meta{color:var(--muted);font-size:12px}
+.neutral-alert{padding:9px 12px;margin:0 0 12px;background:#eef3fa;color:var(--navy)}
+.section-line{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:10px}.section-line h2{margin:0}
+.form-note{margin:0 0 12px;color:var(--muted)}
+@media(max-width:1050px){.frame{padding-inline:18px}.studio-grid{grid-template-columns:minmax(0,1.35fr) minmax(235px,1fr)}.topright .org{display:none}}
+@media(max-width:760px){.top{height:53px;padding-inline:12px}.side{top:53px;height:auto}.top #toggle-nav{color:var(--navy)}.brand-image{height:27px;max-width:135px}.frame{padding:13px 12px}.hero h1{font-size:28px}.hero-actions{gap:5px}.studio-grid{grid-template-columns:1fr}.obligation-dates,.studio-summary dl{grid-template-columns:repeat(2,minmax(0,1fr))}.metric{min-height:60px}.metric strong{font-size:21px}}
+</style>
+</head>
+<body>
+<header class="top"><div class="brand"><button class="btn btn-plain iconbtn mobile-toggle" id="toggle-nav" aria-label="Open navigation" aria-expanded="false"></button><button class="brand" data-go="Home" aria-label="TrustSeal Projects home"><img alt="TrustSeal" class="brand-image" src="data:image/png;base64,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"></button><span class="suite">Projects</span></div><div class="topright"><span class="org">Vitalworks Limited</span><div class="identity"><span class="initials" aria-hidden="true">AN</span><span>Amina Namusoke</span></div></div></header>
+<div class="shell"><aside class="side" id="side" aria-label="Workspace navigation"></aside><main class="frame" id="main"></main></div>
+<dialog id="dialog" class="drawer" aria-labelledby="dialog-title"></dialog><div class="toast" id="toast" role="status" hidden></div>
+<script>
+const paths={
+shield:'<path d="M12 2 21 6v5c0 5-3.4 8.9-9 11-5.6-2.1-9-6-9-11V6z"/><path d="m8 12 3 3 5-6"/>',
+home:'<path d="m3 10 9-7 9 7v10H3z"/><path d="M10 20v-6h4v6"/>',work:'<path d="M4 5h16v15H4zM8 3v4m8-4v4M8 13l2 2 5-5"/>',
+stack:'<path d="m12 3 9 5-9 5-9-5zm-9 9 9 5 9-5M3 16l9 5 9-5"/>',program:'<path d="M8 3h8v6H8zM2 16h7v5H2zm13 0h7v5h-7zM12 9v4m-7 3v-3h14v3"/>',
+folder:'<path d="M3 6h7l2 2h9v12H3z"/>',people:'<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2m2-15a3 3 0 0 1 0 6m1 3a4 4 0 0 1 3 4v2"/>',
+operations:'<path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18m-11-1h4v3h-4z"/>',report:'<path d="M4 3v17h17M8 16v-4m5 4V8m5 8V5"/>',
+inbox:'<path d="M3 13l3-8h12l3 8v6H3zM3 13h5l2 3h4l2-3h5"/>',admin:'<path d="M4 6h16M4 12h16M4 18h16M8 3v6m8 0v6m-6 0v6"/>',
+building:'<path d="M4 21h16M6 21V3h12v18M9 7h1m4 0h1M9 11h1m4 0h1M9 15h1m4 0h1"/>',
+plus:'<path d="M12 5v14M5 12h14"/>', search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/>',down:'<path d="m6 9 6 6 6-6"/>',right:'<path d="m9 6 6 6-6 6"/>',left:'<path d="m15 6-6 6 6 6"/>',
+sort:'<path d="m8 8 4-4 4 4m-8 8 4 4 4-4"/>',filter:'<path d="M3 6h18M6 12h12m-9 6h6"/>',column:'<path d="M3 5h18v14H3zm6 0v14m6-14v14"/>',
+export:'<path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/>',dots:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',check:'<path d="m5 12 4 4L19 6"/>',alert:'<path d="M12 4 3 20h18zM12 10v4m0 3v1"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',close:'<path d="m6 6 12 12M18 6 6 18"/>',bookmark:'<path d="M6 3h12v18l-6-4-6 4z"/>'
+};
+const icon=name=>'<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+(paths[name]||paths.folder)+'</svg>';
+const sampleProjects=[
+['National Health Data Platform','Digital Health','Amina Namusoke','Executing','At risk','2027-02-26',68],
+['Kampala Service Delivery Portal','Public Services','Daniel Okello','Executing','At risk','2027-01-29',54],
+['Regional Laboratory Network','Digital Health','Grace Aciro','Handing over','On track','2026-12-18',91],
+['Community Connectivity Pilot','Digital Inclusion','Martin Kato','Planning','On track','2027-03-12',22],
+['Primary Care Modernisation','Digital Health','Sarah Atim','Executing','Delayed','2027-01-15',47],
+['Urban Mobility Data Exchange','Public Services','Daniel Okello','Mobilizing','On track','2027-03-31',35],
+['Northern Region Skills Programme','Digital Inclusion','Grace Aciro','Executing','At risk','2027-02-12',61],
+['Open Budget Reporting','Public Services','Amina Namusoke','Planning','On track','2027-04-09',17],
+['Facility Asset Register','Digital Health','Martin Kato','Executing','On track','2027-03-19',64],
+['District Monitoring Dashboard','Public Services','Sarah Atim','On hold','Delayed','2027-03-26',31],
+['Citizen Feedback Platform','Public Services','Daniel Okello','Executing','On track','2027-02-19',73],
+['Village Learning Hubs','Digital Inclusion','Grace Aciro','Executing','At risk','2027-04-23',51],
+['Referral Pathways Pilot','Digital Health','Sarah Atim','Executing','On track','2027-05-07',41],
+['Public Records Digitisation','Public Services','Martin Kato','Closed','On track','2026-11-06',100],
+['Health Reporting Modernisation','Digital Health','Amina Namusoke','Executing','On track','2027-05-21',36],
+['Community Support Index','Digital Inclusion','Grace Aciro','Planning','On track','2027-06-04',18],
+['Supply Chain Visibility','Digital Health','Martin Kato','Executing','At risk','2027-06-18',57],
+['Open Procurement Register','Public Services','Daniel Okello','Closed','On track','2026-10-30',100],
+['District Care Quality Review','Digital Health','Sarah Atim','Executing','On track','2027-06-25',71],
+['Field Training Curriculum','Digital Inclusion','Grace Aciro','Handing over','On track','2026-12-04',96],
+['Enterprise Knowledge Base','Public Services','Amina Namusoke','Planning','On track','2027-07-02',25],
+['Regional Service Desk','Public Services','Martin Kato','Closed','On track','2026-10-16',100],
+['Health Data Quality Baseline','Digital Health','Sarah Atim','Executing','On track','2027-07-23',44],
+['Connectivity Readiness Review','Digital Inclusion','Grace Aciro','Closing','On track','2026-12-11',98]
+];
+const people=[...new Set(sampleProjects.map(row=>row[2]))];
+const portfolioNames=[...new Set(sampleProjects.map(row=>row[1]))];
+const projects=sampleProjects.map(([name,portfolio,owner,status,health,date,progress],i)=>({id:'TS-P'+(1048-i),name,portfolio,owner,status,health,date,progress}));
+const moduleData=[
+[1,'Intake','Request','Strategic fit','National shared reporting|Facility connectivity expansion|Digital service registry','High|Medium|High','Submitted|Under review|Deferred'],
+[2,'Portfolios','Portfolio','Strategic objective','Digital Health|Public Services|Digital Inclusion','Strengthen routine reporting|Improve access to public services|Expand reliable connectivity','Active|Active|Active'],
+[3,'Programmes','Programme','Outcome','Health Systems Strengthening|Connected Districts|Public Service Modernisation','Reliable national reporting|Connected facilities|Digital service access','Active|Planning|Active'],
+[4,'Charter & gates','Gate or charter','Evidence','Project charter|Planning gate|Mobilisation readiness|Handover gate','Charter v2|Baseline schedule v1|Readiness checklist v3|Acceptance plan v1','Approved|Approved|In review|Draft'],
+[5,'Scope & requirements','Requirement','Priority','Offline capture|Facility role matrix|Data exchange audit trail','High|High|Medium','Approved|In review|Draft'],
+[6,'Work breakdown','Work package','WBS code','1 · Foundation|↳ Security and access|↳ Data migration|2 · Deployment','1.0|1.1|1.2|2.0','In progress|Complete|In progress|Planned'],
+[7,'Schedule','Schedule activity','Dependency','Discovery and design|Platform configuration|Integration testing|Pilot rollout|Operational handover','—|ACT-001|ACT-002|ACT-003|ACT-004','Complete|In progress|At risk|Planned|Planned'],
+[8,'Tasks','Task','Priority','Review access roles|Validate indicator catalogue|Prepare pilot training|Resolve data import error|Draft handover checklist|Confirm district focal points','High|Medium|Medium|High|Low|Medium','Complete|In progress|To do|Blocked|To do|In progress'],
+[9,'Backlog & sprints','Backlog item','Sprint','Export district dashboard|Offline sync acceptance|Refresh indicator mapping','Sprint 04|Sprint 05|Unscheduled','In progress|Ready|Draft'],
+[10,'Deliverables','Deliverable or milestone','Submission','Pilot implementation report|Data quality baseline|Facility training pack','Version 2|Version 1|Version 3','In review|Accepted|Draft'],
+[11,'Resource directory','Resource','Role or skill','Amina Namusoke|Daniel Okello|Grace Aciro|Martin Kato|Sarah Atim','Project management|Software engineering|Monitoring and evaluation|Integration engineering|Training facilitation','Active|Active|Active|Active|Active'],
+[12,'Capacity & allocations','Allocation','Work package','Solution design team|Field implementation team|Monitoring and evaluation team','Platform configuration|Pilot rollout|Indicator validation','Confirmed|Tentative|Confirmed'],
+[13,'Timesheets','Timesheet','Hours','Joseph Otema|Daniel Okello|Grace Aciro|Martin Kato|Sarah Atim','34 h|39 h|32 h|36 h|28 h','Submitted|Approved|Posted|Returned|Draft'],
+[14,'Equipment & logistics','Asset or reservation','Resource type','Field tablets|Training venue|Mobile internet kits','Equipment|Facility|Consumable','Reserved|Confirmed|Available'],
+[15,'Budgets & funding','Budget line','Approved budget','Implementation support|Capacity building|Hosting and connectivity','UGX 480,000,000|UGX 106,000,000|UGX 93,000,000','Approved|Approved|In review'],
+[16,'Costs & forecasts','Cost record','Amount','Pilot training expenses|Approved labour posting|Field equipment commitment','UGX 8,400,000|UGX 4,200,000|UGX 12,800,000','Posted|Pending posting|Committed'],
+[17,'Procurement','Procurement item','Method','Facility tablet purchase|Connectivity support|Training facilitation','Open tender|Framework call-off|Request for quotations','Evaluating|Awarded|Draft'],
+[18,'Contracts','Contract or obligation','Counterparty','Platform support agreement|District connectivity services|Training support contract','Integration Services Ltd|Regional Networks Ltd|Field Learning Group','Active|Active|In review'],
+[19,'RAID register','Register item','Type','Connectivity delays|Incomplete facility data|District rollout sequence|Availability of trainers','Risk|Issue|Dependency|Assumption','At risk|Open|Monitoring|Open'],
+[20,'Change control','Change request','Baseline affected','Extend pilot schedule|Modify offline acceptance criteria|Increase training capacity','Schedule|Scope|Budget','In review|Approved|Draft'],
+[21,'Quality assurance','Inspection or test','Evidence','Platform integration test|User acceptance test|Field readiness check','Test report v2|Acceptance worksheet v1|Inspection notes v1','Passed|In progress|Draft'],
+[22,'Stakeholders & meetings','Stakeholder or meeting','Responsibility','Steering committee|District focal point meeting|Data governance lead','Sponsor oversight|Coordination|Data standards','Scheduled|Complete|Active'],
+[23,'My Work','Work item','Priority','Review pilot evidence|Update field readiness checklist|Confirm timesheet|Review schedule change','High|Medium|High|Medium','To do|In progress|To do|Blocked'],
+[24,'Documents','Document','Version','Project charter|Implementation plan|Training guide|Change decision log','v2|v3|v1|v4','Approved|In review|Draft|Approved'],
+[25,'Approvals','Approval request','Subject type','Pilot implementation report|Planning baseline|November effort review','Deliverable|Stage gate|Timesheet','In review|Approved|Submitted'],
+[26,'Results & indicators','Indicator','Target','Facilities reporting on time|Staff trained|Facility readiness','95%|180 people|85%','On track|At risk|On track'],
+[27,'Reports','Report','Reporting period','Executive portfolio summary|Project status report|Resource capacity review','November 2026|November 2026|December 2026','Published|Draft|Scheduled'],
+[28,'Compliance & safeguards','Obligation','Evidence','Data protection assessment|Site inspection|Supplier compliance review','Assessment v1|Inspection v2|Compliance statement v1','In review|Scheduled|Approved'],
+[29,'Client portal','Shared item','Audience','Approved delivery summary|Pilot acceptance package|Upcoming milestones','Project clients|Acceptance reviewers|Project partners','Published|In review|Published'],
+[30,'Handover & closure','Closure item','Evidence','Operational handover pack|Asset transfer record|Benefits review schedule','Handover v1|Asset list v2|Benefits plan v1','In review|Draft|Scheduled'],
+[31,'Templates & automation','Template or rule','Type','Standard delivery charter|Overdue approval reminder|Project closure checklist','Project template|Automation rule|Checklist','Active|Active|Draft'],
+[32,'Integrations','Connection or import','Direction','Finance cost posting|Staff roster import|Task tracker integration','Outbound|Inbound|Bidirectional','Healthy|In review|Failed'],
+[33,'Access governance','Role or grant','Scope','Project manager|Finance reviewer|Client reviewer','Project|Costs and approvals|Shared records','Active|Active|In review'],
+[34,'Audit & retention','Event or retention item','Event type','Approved baseline recorded|Document access reviewed|Project evidence hold','Approval|Access review|Legal hold','Recorded|Recorded|Active']
+];
+const modules=new Map(moduleData.map(([id,name,head,detail,names,values,statuses])=>[name,{id,name,head,detail,names:names.split('|'),values:values.split('|'),statuses:statuses.split('|')}]));
+const navGroups=[
+['Workspace',[['Home','home'],['My Work','work'],['Intake','inbox'],['Portfolios','stack'],['Programmes','program'],['Projects','folder']]],
+['Management',[['Resources','people'],['Operations','operations'],['Obligations','work'],['Approvals','check'],['Reports','report'],['Administration','admin']]]
+];
+const tabGroups={
+Overview:[],Plan:['Charter & gates','Scope & requirements','Work breakdown','Schedule'],
+Work:['Tasks','Backlog & sprints'],Resources:['Resource directory','Capacity & allocations','Equipment & logistics'],
+Timesheets:[],Finance:['Budgets & funding','Costs & forecasts'],'Procurement & contracts':['Contracts','Obligations','Procurement','Closeout checks'],
+Deliverables:[],'Risks & quality':['RAID register','Change control','Quality assurance','Compliance & safeguards'],
+'Documents & approvals':['Documents','Approvals'],Stakeholders:['Stakeholders & meetings','Client portal'],
+Results:['Results & indicators'],Closure:['Handover & closure'],Settings:['Templates & automation','Integrations','Access governance','Audit & retention']
+};
+const globalGroups={Resources:['Resource directory','Capacity & allocations','Equipment & logistics'],Operations:['Budgets & funding','Costs & forecasts','Procurement','Contracts'],Administration:['Templates & automation','Integrations','Access governance','Audit & retention'],'My Work':['My Work','Timesheets']};
+const $=id=>document.getElementById(id);
+const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const E=escapeHtml;
+function readLocal(key,fallback){try{return JSON.parse(localStorage.getItem('trustseal-pm-studio/'+key))??fallback}catch{return fallback}}
+function writeLocal(key,value){try{localStorage.setItem('trustseal-pm-studio/'+key,JSON.stringify(value));return true}catch{return false}}
+const repository=readLocal('records',{});
+const views=readLocal('views',{});
+const columnPrefs=readLocal('columns',{});
+const timeDrafts=readLocal('time',{});
+const filterNames={status:'Status',health:'Health',portfolio:'Portfolio',owner:'Owner',detail:'Category',due:'Due state',from:'Due from',to:'Due through'};
+const pageState={query:'',filters:{},page:1,size:8,view:'all',sort:'',direction:1};
+let route={area:'Projects',project:'',group:'',module:'',mode:''};
+let shownRows=[],resultRows=[],shownCols=[],toastTimer;
+const activeProjectRows=()=>[...projects,...(repository.Projects||[])];
+const select=(id,values,current,label)=>'<span class="select-wrap"><select class="select-btn" id="'+id+'" aria-label="'+E(label)+'">'+values.map(([value,caption])=>'<option value="'+E(value)+'" '+(String(value)===String(current)?'selected':'')+'>'+E(caption)+'</option>').join('')+'</select>'+icon('down')+'</span>';
+const button=(label,attrs='',glyph='',kind='')=>'<button type="button" class="btn '+kind+'" '+attrs+'>'+(glyph?icon(glyph):'')+label+'</button>';
+const navButton=(name,glyph,active,attrs)=>'<button class="nav-item" '+attrs+(active?' aria-current="page"':'')+'>'+icon(glyph)+E(name)+'</button>';
+const tab=(name,active,attrs)=>'<button type="button" class="tab" '+attrs+(active?' aria-current="page"':'')+'>'+E(name)+'</button>';
+const badge=(v)=>'<span class="state '+tone(v)+'">'+E(v)+'</span>';
+function tone(v){
+ if(/^(on track|complete|closed|approved|accepted|posted|passed|healthy|published|confirmed|active)$/i.test(v))return 'good';
+ if(/^(at risk|in review|under review|on hold|pending posting|tentative|monitoring|returned)$/i.test(v))return 'warn';
+ if(/^(delayed|blocked|failed|rejected|overdue)$/i.test(v))return 'bad';
+ if(/^(executing|in progress|submitted|handing over|scheduled|mobilizing|authorized)$/i.test(v))return 'info';
+ return '';
+}
+const avatar=name=>'<span class="who"><span aria-hidden="true" class="initials">'+E(name.split(' ').map(n=>n[0]).slice(0,2).join(''))+'</span>'+E(name)+'</span>';
+const formatDate=v=>v?new Intl.DateTimeFormat('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(v+'T00:00:00Z')):'—';
+function resetTable(){Object.assign(pageState,{query:'',filters:{},page:1,view:'all',sort:'',direction:1})}
+function navigate(area,project='',group='',module='',mode=''){
+ const url=new URLSearchParams({area});
+ if(project)url.set('project',project);
+ if(group)url.set('group',group);
+ if(module)url.set('module',module);
+ if(mode)url.set('mode',mode);
+ if(location.hash.slice(1)===url.toString())return;
+ location.hash=url.toString();
+}
+function syncRoute(){
+ const hash=new URLSearchParams(location.hash.slice(1));
+ const area=hash.get('area')||'Projects', project=hash.get('project')||'';
+ const requestedGroup=hash.get('group'), requestedModule=hash.get('module');
+ const available=navGroups.flatMap(([,items])=>items.map(([name])=>name));
+ const isProject=area==='Projects'&&activeProjectRows().some(row=>row.id===project);
+ const group=isProject&&Object.hasOwn(tabGroups,requestedGroup)?requestedGroup:(isProject?'Overview':'');
+ const children=isProject?tabGroups[group]:globalGroups[area];
+ const module=children?.includes(requestedModule)?requestedModule:(children?.[0]||'');
+ route={area:available.includes(area)?area:'Projects',project:isProject?project:'',group,module,mode:hash.get('mode')||''};
+ resetTable();
+ if(type()==='Obligations'){
+  if(route.mode==='overdue')pageState.filters.due='Overdue';
+  if(route.mode==='review')pageState.filters.status='In review';
+  if(route.mode.startsWith('contract:'))pageState.filters.detail=route.mode.slice(9);
+ }
+ if(type()==='Tasks'&&route.mode.startsWith('task:'))pageState.query=route.mode.slice(5);
+ if(!isProject&&route.area==='Projects'&&['attention','closed','on-track'].includes(route.mode))pageState.view=route.mode;
+ $('side').classList.remove('open');
+ $('toggle-nav').setAttribute('aria-expanded','false');
+ render();
+ window.scrollTo(0,0);
+}
+function nav(){
+ $('side').innerHTML='<div class="workspace"><span class="ws-icon">'+icon('building')+'</span><span><strong>Project workspace</strong><small>Vitalworks Limited</small></span></div>'+
+ navGroups.map(([title,items])=>'<h2>'+title+'</h2>'+items.map(([name,glyph])=>navButton(name,glyph,route.area===name,'data-go="'+name+'"')).join('')).join('')+
+ '<h2>Environment</h2><div style="padding:3px 8px"><span class="demo">Demo data</span></div>';
+}
+function crumbs(project,area){
+ const part=button('Workspace','data-go="Home"','','btn-plain');
+ if(project)return part+icon('right')+button('Projects','data-go="Projects"','','btn-plain')+icon('right')+'<span aria-current="page">'+E(project.id)+'</span>';
+ return part+icon('right')+'<span aria-current="page">'+E(area)+'</span>';
+}
+const areaDescription={
+ 'Home':'Delivery status and work that needs your attention.',
+ 'Projects':'Manage delivery, progress and governance across your projects.',
+ 'Portfolios':'Review strategic investments and delivery priorities.',
+ 'Programmes':'Coordinate related projects, shared outcomes and dependencies.',
+ 'Intake':'Assess incoming proposals and investment requests.',
+ 'My Work':'See your assignments and record your time.',
+ 'Resources':'Plan people, skills and equipment across projects.',
+ 'Operations':'Review spend, funding, procurement and contracts.',
+ 'Obligations':'Follow contractual deadlines, delivery work and acceptance across projects.',
+ 'Approvals':'Review work awaiting a decision and completed approvals.',
+ 'Reports':'Review delivery, performance and resource reports.',
+ 'Administration':'Manage templates, integrations, access and audit records.'
+};
+function type(){
+ if(route.project)return route.module||route.group;
+ return route.module||route.area;
+}
+function projectTabs(){
+ const groups=Object.keys(tabGroups);
+ const primary=groups.slice(0,8), secondary=groups.slice(8);
+ const current=secondary.includes(route.group)?route.group:'';
+ return '<div class="project-bar"><nav class="tabs project-tabs" aria-label="Project sections">'+primary.map(group=>tab(group,group===route.group,'data-group="'+E(group)+'"')).join('')+'</nav>'+
+ select('section-picker',[['','More sections'],...secondary.map(group=>[group,group])],current,'More project sections')+'</div>';
+}
+function subnav(names){
+ if(!names||names.length<2)return '';
+ return '<nav class="subtabs" aria-label="Submodules">'+names.map(name=>button(E(name),'data-module="'+E(name)+'"'+(type()===name?' aria-current="page"':''))).join('')+'</nav>';
+}
+function render(){
+ nav();
+ const project=activeProjectRows().find(row=>row.id===route.project);
+ const name=type(), home=route.area==='Home', overview=route.group==='Overview';
+ const canCreate=['Projects','Intake','Tasks','Deliverables','Change control','RAID register'].includes(name)&&!home;
+ const action=canCreate?button(({Projects:'New project',Intake:'New request',Tasks:'New task',Deliverables:'New deliverable','Change control':'New change request','RAID register':'New entry'})[name],'data-action="create"','plus','btn-primary'):'';
+ const top=project
+ ? '<div class="hero"><div><h1>'+E(project.name)+'</h1><div class="context"><strong>'+E(project.id)+'</strong><span>'+E(project.portfolio)+'</span>'+badge(project.status)+badge(project.health)+'</div></div><div>'+select('project-picker',activeProjectRows().map(p=>[p.id,p.name]),project.id,'Switch project')+'</div></div>'
+ : '<div class="hero"><div><h1>'+E(route.area)+'</h1><p>'+E(areaDescription[route.area])+'</p></div>'+'<div class="hero-actions">'+(name==='Projects'?portfolioAttention():'')+action+'</div></div>';
+ const other=project?projectTabs()+subnav(tabGroups[route.group]):subnav(globalGroups[route.area]);
+ let body;
+ if(home||overview)body=studioOverview(project);
+ else if(name==='Obligations')body=route.mode.startsWith('ob:')?obligationPage(route.mode.slice(3)):register(name);
+ else if(project&&name==='Contracts')body=contractCards();
+ else if(name==='Closeout checks')body=closeout();
+ else if(name==='Timesheets'&&route.area==='My Work')body=personalTime();
+ else if(name==='Timesheets')body=projectTime();
+ else if(name==='Schedule')body=schedule(project);
+ else if(name==='Capacity & allocations')body=capacity(project);
+ else if(name==='Tasks'&&route.mode==='board')body=board(action);
+ else body=(name==='Projects'?metrics():'')+register(name,project?action:'');
+ $('main').innerHTML='<nav class="crumb" aria-label="Breadcrumb">'+crumbs(project,route.area)+'</nav>'+top+other+body;
+ if(project){
+  const current=$('main').querySelector('.project-tabs [aria-current=page]');
+  if(current){
+   const rail=current.parentNode, bounds=rail.getBoundingClientRect(), target=current.getBoundingClientRect();
+   if(target.right>bounds.right)rail.scrollLeft+=target.right-bounds.right+7;
+  }else $('section-picker').classList.add('current');
+ }
+ if($('result')) updateResult();
+ updateTimeTotals();
+}
+function metrics(){
+ const rows=activeProjectRows(), counts=[['Total projects',rows.length,'folder','gray','all'],['On track',rows.filter(r=>r.health==='On track'&&!['Closed','Archived'].includes(r.status)).length,'check','green','on-track'],['At risk or delayed',rows.filter(r=>['At risk','Delayed'].includes(r.health)).length,'alert','amber','attention'],['Closed',rows.filter(r=>r.status==='Closed').length,'work','gray','closed']];
+ return '<section class="metrics" aria-label="Project health and lifecycle">'+counts.map(([label,value,glyph,color,view])=>'<button class="metric" data-view="'+view+'" aria-pressed="'+(view===pageState.view)+'"><span class="metric-icon '+color+'">'+icon(glyph)+'</span><span><small>'+label+'</small><strong>'+value+'</strong></span></button>').join('')+'</section>';
+}
+function summary(project){
+ const primary=activeProjectRows()[0];
+ if(!project)return metrics().replaceAll('data-view=','data-home-view=')+'<div class="overview-grid"><section class="panel"><h2>Projects requiring attention</h2><ul class="detail-list">'+activeProjectRows().filter(r=>['At risk','Delayed'].includes(r.health)).slice(0,4).map(r=>'<li><button class="row-name" data-project="'+E(r.id)+'">'+E(r.name)+'</button>'+badge(r.health)+'</li>').join('')+'</ul></section><section class="panel"><h2>Your workspace</h2><div class="tile-links">'+[['Projects','folder'],['My Work','work'],['Approvals','check'],['Reports','report']].map(([name,glyph])=>button(name,'data-go="'+name+'"',glyph)).join('')+'</div></section></div>';
+ return '<div class="overview-grid"><section class="panel"><h2>Project summary</h2><p class="brief">'+(project.id===primary.id?'Roll out a shared national reporting platform and validate adoption through district pilots.':'Review delivery progress, project controls and the current lifecycle stage.')+'</p><ul class="detail-list"><li><span>Project manager</span><strong>'+avatar(project.owner)+'</strong></li><li><span>Target finish</span><strong>'+formatDate(project.date)+'</strong></li><li><span>Earned progress</span>'+meter(project.progress)+'</li><li><span>Portfolio</span><strong>'+E(project.portfolio)+'</strong></li></ul></section><section class="panel"><h2>Delivery workspace</h2><div class="tile-links">'+[['Plan','program'],['Work','work'],['Resources','people'],['Timesheets','clock'],['Deliverables','check'],['Risks & quality','alert']].map(([name,glyph])=>button(name,'data-group="'+E(name)+'"',glyph)).join('')+'</div></section></div>';
+}
+function dataKey(name){return route.project?route.project+'/'+name:name}
+function rowsFor(name){
+ if(name==='Projects')return activeProjectRows();
+ if(name==='Obligations')return obligationRows();
+ const m=modules.get(name) || modules.get('Tasks');
+ const inDemo=!route.project||route.project===projects[0].id;
+ const records=inDemo?m.names.map((record,i)=>{
+  const prefixes={7:'ACT',8:'TASK',13:'TIME',19:'RAID'};
+  return {id:(prefixes[m.id]||'PM'+String(m.id).padStart(2,'0'))+'-'+String(i+1).padStart(3,'0'),name:record,detail:m.values[i],status:m.statuses[i],owner:name==='Timesheets'?record:name==='My Work'?people[0]:people[i%people.length],date:name==='Timesheets'?'2026-11-29':'2026-12-'+String(4+i*3).padStart(2,'0')};
+ }):[];
+ const all=[...records,...(repository[dataKey(name)]||[])];
+ if(name==='Timesheets'&&route.mode==='review')return all.filter(row=>['Submitted','In review','Returned'].includes(row.status));
+ if(name==='Timesheets'&&route.mode==='posting')return all.filter(row=>['Approved','Pending posting','Posted','Failed','Locked'].includes(row.status));
+ return all;
+}
+function columns(name){
+ if(name==='Obligations')return contractColumn;
+ if(name==='Projects')return [['name','Project'],['portfolio','Portfolio'],['owner','Project manager'],['status','Lifecycle'],['health','Health'],['date','Target finish'],['progress','Progress']];
+ const m=modules.get(name)||modules.get('Tasks');
+ if(name==='Timesheets')return [['name','Contributor'],['detail','Hours recorded'],['status','Status'],['date','Period ending']];
+ return [['name',m.head],['detail',m.detail],['owner','Owner'],['status','Status'],['date','Due date']];
+}
+function meter(v){return '<span class="meter"><span class="track" aria-hidden="true"><i style="width:'+Number(v)+'%"></i></span>'+Number(v)+'%</span>'}
+function register(name,action=''){
+ const rows=rowsFor(name);
+ const stages=[...new Set(rows.map(r=>r.status))].sort();
+ const owners=[...new Set(rows.map(r=>r.owner))].sort();
+ const projectsView=name==='Projects';
+ const hasTaskModes=name==='Tasks', obligationMode=name==='Obligations';
+ const saved=(views[dataKey(name)]||[]);
+ const tabs=projectsView?'<div class="tabs" aria-label="Project views">'+[['all','All projects'],['mine','My projects'],['attention','Needs attention'],['closed','Closed']].map(([v,l])=>'<button class="tab" data-view="'+v+'" aria-pressed="'+(pageState.view===v)+'">'+l+'</button>').join('')+'</div>':
+ obligationMode?'<div class="tabs" aria-label="Obligation views">'+[['','All obligations'],['overdue','Overdue'],['review','In review']].map(([mode,label])=>tab(label,route.mode===mode,'data-mode="'+mode+'"')).join('')+'</div>':
+ '<div><h2>'+E(name)+'</h2></div>';
+ const controls=hasTaskModes?button('Board','data-mode="board"','column'):action;
+ const commonControls='<div class="tools"><label class="search">'+icon('search')+'<span class="sr">Search '+E(name)+'</span><input id="query" placeholder="'+(projectsView?'Search projects by name, code or owner':'Search '+E(name.toLowerCase()))+'" type="search" autocomplete="off" value="'+E(pageState.query)+'"><span class="kbd desktop-only" aria-hidden="true">/</span></label>'+
+ select('f-status',[['','All statuses'],...stages.map(v=>[v,v])],pageState.filters.status||'','Filter by status')+
+ (obligationMode?select('f-due',[['','All due states'],['Overdue','Overdue'],['Upcoming','Upcoming'],['Accepted','Accepted']],pageState.filters.due||'','Filter by due state'):'')+
+ (projectsView?select('f-portfolio',[['','All portfolios'],...portfolioNames.map(v=>[v,v])],pageState.filters.portfolio||'','Filter by portfolio'):select('f-owner',[['','All owners'],...owners.map(v=>[v,v])],pageState.filters.owner||'','Filter by owner'))+
+ button('Filters','data-action="filters"','filter')+'<span class="spacer"></span>'+
+ (saved.length?select('saved-view',[['','Saved views'],...saved.map((v,i)=>[i,v.name])],'','Saved views'):'')+
+ button('<span class="desktop-only">Columns</span>','data-action="columns" aria-label="Columns" title="Columns"','column')+
+ button('<span class="desktop-only">Export</span>','data-action="export" aria-label="Export filtered results" title="Export filtered results"','export')+'</div>';
+ return '<section class="panel" aria-label="'+E(name)+' register"><div class="panel-header">'+tabs+'<div style="display:flex;gap:6px">'+controls+(hasTaskModes&&action?action:'')+'</div></div>'+commonControls+'<div class="filters" id="chips" hidden></div><div id="result"></div></section>';
+}
+function filtered(rows){
+ const f=pageState.filters;
+ const tokens=Array.from(pageState.query.matchAll(/(?:(\w+):)?(?:"([^"]+)"|([^\s"]+))/g),m=>({field:(m[1]||'').toLowerCase(),value:(m[2]||m[3]).toLowerCase()}));
+ const allowed={code:'id',name:'name',owner:'owner',status:'status',health:'health',portfolio:'portfolio',category:'detail',date:'date',contract:'contract',clause:'clause',due:'due'};
+ const queryMatch=row=>tokens.every(t=>{
+  const key=Object.hasOwn(allowed,t.field)?allowed[t.field]:'';
+  const haystack=key?row[key]:Object.values(row).join(' ');
+  return String(haystack||'').toLowerCase().includes(key||!t.field?t.value:t.field+':'+t.value);
+ });
+ return rows.filter(r=>{
+  if(pageState.view==='mine'&&r.owner!==people[0])return false;
+  if(pageState.view==='attention'&&!['At risk','Delayed'].includes(r.health))return false;
+  if(pageState.view==='on-track'&&(r.health!=='On track'||['Closed','Archived'].includes(r.status)))return false;
+  if(pageState.view==='closed'&&r.status!=='Closed')return false;
+  return Object.keys(filterNames).every(k=>{
+   if(!f[k])return true;
+   if(k==='from')return Boolean(r.date)&&r.date>=f[k];
+   if(k==='to')return Boolean(r.date)&&r.date<=f[k];
+   return r[k]===f[k];
+  })&&queryMatch(r);
+ }).sort((a,b)=>{
+  if(!pageState.sort)return 0;
+  const x=a[pageState.sort],y=b[pageState.sort];
+  return pageState.direction*(typeof x==='number'?x-y:String(x??'').localeCompare(String(y??''),'en',{numeric:true}));
+ });
+}
+function cell(row,key){
+ if(key==='name')return '<button class="row-name" '+(type()==='Projects'?'data-project':type()==='Obligations'?'data-obligation':'data-detail')+'="'+E(row.id)+'">'+E(row.name)+'</button><span class="row-meta">'+E(row.id)+'</span>';
+ if(['status','health','work','due'].includes(key))return badge(row[key]);
+ if(key==='owner')return avatar(row.owner||'Unassigned');
+ if(key==='date'||key==='forecast')return formatDate(row[key]);
+ if(key==='progress')return meter(row.progress);
+ return E(row[key])||'—';
+}
+function updateResult(){
+ const name=type(), all=rowsFor(name);
+ resultRows=filtered(all);
+ shownCols=columns(name).filter(([key])=>key==='name'||!(columnPrefs[dataKey(name)]||[]).includes(key));
+ const pages=Math.max(1,Math.ceil(resultRows.length/pageState.size));
+ pageState.page=Math.min(pageState.page,pages);
+ const start=(pageState.page-1)*pageState.size;
+ shownRows=resultRows.slice(start,start+pageState.size);
+ $('chips').innerHTML=Object.entries(pageState.filters).filter(([,v])=>v).map(([k,v])=>button(E(filterNames[k]+' · '+((k==='from'||k==='to')?formatDate(v):v))+' '+icon('close'),'data-remove="'+k+'" aria-label="'+E('Remove '+filterNames[k]+' filter')+'"')).join('')+
+ (Object.values(pageState.filters).some(Boolean)?button('Clear filters','data-action="clear"','','btn-plain'):'');
+ $('chips').hidden=!$('chips').innerHTML;
+ const headers=shownCols.map(([key,label])=>'<th scope="col" '+(pageState.sort===key?'aria-sort="'+(pageState.direction===1?'ascending':'descending')+'"':'')+'><button data-sort="'+key+'">'+E(label)+icon(pageState.sort===key?(pageState.direction===1?'down':'sort'):'sort')+'</button></th>').join('');
+ const body=shownRows.map(r=>'<tr>'+shownCols.map(([key])=>'<td>'+cell(r,key)+'</td>').join('')+'<td><button class="btn btn-plain iconbtn" data-detail="'+E(r.id)+'" aria-label="'+E('Details for '+r.name)+'">'+icon('dots')+'</button></td></tr>').join('');
+ const links=[];
+ for(let i=1;i<=pages;i++){
+  if(pages<=7||i===1||i===pages||Math.abs(i-pageState.page)<2)links.push('<button data-page="'+i+'" aria-label="Page '+i+'" '+(i===pageState.page?'aria-current="page"':'')+'>'+i+'</button>');
+  else if(links.at(-1)!=='<span aria-hidden="true">…</span>')links.push('<span aria-hidden="true">…</span>');
+ }
+ const pageBtn=(i,glyph,label,enabled)=>'<button data-page="'+i+'" title="'+label+'" aria-label="'+label+'" '+(enabled?'':'disabled')+'>'+icon(glyph)+'</button>';
+ $('result').innerHTML='<div class="table-scroll" tabindex="0" role="region" aria-label="'+E(name)+' table"><table><caption class="sr">'+E(name)+'</caption><thead><tr>'+headers+'<th scope="col"><span class="sr">Actions</span></th></tr></thead><tbody>'+body+'</tbody></table>'+
+ (!shownRows.length?'<div class="empty"><strong>'+(all.length?'No matching records':'No records in this view')+'</strong><p>'+(all.length?'Adjust the search or clear the active filters.':'Records will appear here when added to this workspace.')+'</p>'+(all.length?button('Reset view','data-action="reset"','','btn-plain'):'')+'</div>':'')+'</div>'+
+ '<div class="table-footer"><div class="rowcount"><span role="status">'+(shownRows.length?(start+1)+'–'+(start+shownRows.length):'0')+' of '+resultRows.length+'</span><span>·</span>'+select('rows-size',[[8,'8 per page'],[15,'15 per page'],[25,'25 per page'],[50,'50 per page']],pageState.size,'Rows per page')+'</div><nav class="pagination" aria-label="Table pages">'+pageBtn(pageState.page-1,'left','Previous page',pageState.page>1)+links.join('')+pageBtn(pageState.page+1,'right','Next page',pageState.page<pages)+'</nav></div>';
+}
+function changeMode(mode){navigate(route.area,route.project,route.group,route.module,mode)}
+function modeTabs(options,label){
+ return '<nav class="subtabs" aria-label="'+E(label)+'">'+options.map(([mode,name])=>button(name,'data-mode="'+mode+'"'+(route.mode===mode?' aria-current="page"':''))).join('')+'</nav>';
+}
+function schedule(project){
+ const stages=rowsFor('Schedule'), weeks=['23 Nov','30 Nov','07 Dec','14 Dec','21 Dec','28 Dec','04 Jan','11 Jan'];
+ const spans=[[0,2],[1,3],[3,2],[4,3],[7,1]];
+ const body=stages.map((r,i)=>{
+  const [start,length]=spans[i];
+  return '<tr><td>'+cell(r,'name')+'</td><td>'+E(r.detail)+'</td><td>'+badge(r.status)+'</td>'+weeks.map((w,j)=>'<td class="schedule-week">'+(j>=start&&j<start+length?'<span class="g-bar '+(r.status==='At risk'?'warn':'')+'" aria-label="'+E('Scheduled week of '+w)+'"></span>':'<span class="g-cell"></span>')+'</td>').join('')+'</tr>';
+ }).join('');
+ return modeTabs([['','Timeline'],['list','Activities']],'Schedule views')+(route.mode==='list'?register('Schedule'):
+ '<section class="panel"><div class="special-pad"><h2>Schedule</h2><small>Weekly lookahead · 23 November 2026 to 17 January 2027</small></div><div class="table-scroll" role="region" aria-label="Schedule timeline" tabindex="0"><table class="gantt pinned-first"><thead><tr><th scope="col">Activity</th><th scope="col">Predecessor</th><th scope="col">Status</th>'+weeks.map(w=>'<th scope="col">'+w+'</th>').join('')+'</tr></thead><tbody>'+body+'</tbody></table>'+(!stages.length?'<p class="empty">No scheduled activities for '+E(project.name)+'.</p>':'')+'</div></section>');
+}
+function capacity(project){
+ const owners=[['Amina Namusoke',72,94,105,84],['Daniel Okello',80,109,104,90],['Grace Aciro',65,77,86,88],['Martin Kato',58,73,92,76],['Sarah Atim',74,81,89,92]];
+ return modeTabs([['','Capacity'],['list','Allocations']],'Resource views')+(route.mode==='list'?register('Capacity & allocations'):
+ '<section class="panel"><div class="special-pad"><h2>Team capacity</h2><p class="muted">Confirmed allocation as a share of available hours.</p></div><div class="table-scroll" role="region" aria-label="Capacity calendar" tabindex="0"><table class="pinned-first"><thead><tr><th scope="col">Resource</th>'+['23 Nov','30 Nov','07 Dec','14 Dec'].map(d=>'<th scope="col">Week of '+d+'</th>').join('')+'</tr></thead><tbody>'+
+ (!project||project.id===projects[0].id?owners.map(([name,...loads])=>'<tr><td>'+avatar(name)+'</td>'+loads.map(load=>'<td><span class="heat '+(load>100?'bad':load>=90?'warn':'')+'">'+load+'%</span></td>').join('')+'</tr>').join(''):'')+
+ '</tbody></table>'+(project&&project.id!==projects[0].id?'<p class="empty">No resource allocations for this project.</p>':'')+'</div><div class="table-footer"><small>Over capacity: above 100% · Near capacity: 90–100%</small></div></section>');
+}
+function board(action){
+ const statuses=['To do','In progress','Blocked','Complete'];
+ const items=rowsFor('Tasks');
+ return '<section class="panel"><div class="special-pad special-head"><h2>Task board</h2><div style="display:flex;gap:6px">'+button('List','data-mode=""','work')+action+'</div></div><div class="board">'+statuses.map(status=>'<section><h3>'+badge(status)+' <small>'+items.filter(t=>t.status===status).length+'</small></h3>'+items.filter(t=>t.status===status).map(t=>'<button class="row-name" data-detail="'+E(t.id)+'">'+E(t.name)+'<span class="row-meta">'+E(t.owner)+'</span></button>').join('')+'</section>').join('')+'</div></section>';
+}
+function projectTime(){
+ const tabs=modeTabs([['','Team entries'],['review','Approval queue'],['posting','Labour posting']],'Project timesheet views');
+ const rows=rowsFor('Timesheets');
+ const total=rows.reduce((sum,r)=>sum+parseFloat(r.detail),0);
+ const summary='<div class="notice">'+E(route.mode==='review'?'Submitted, in-review and returned entries for this project.':route.mode==='posting'?'Approved, posted and reconciliation entries for this project.':total+' hours across '+rows.length+' team entries.')+'</div>';
+ return tabs+summary+register('Timesheets');
+}
+const periodLabels={'2026-11-16':'16–22 November 2026','2026-11-23':'23–29 November 2026','2026-11-30':'30 November–6 December 2026'};
+const dayLabels=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const workLines=[['National Health Data Platform','Platform configuration'],['Open Budget Reporting','Requirements review']];
+let period='2026-11-23', activeDay=4;
+function draft(periodKey){
+ return timeDrafts[periodKey] ||= {status:'Draft',hours:periodKey==='2026-11-23'?[[5,6,5,6,4,0,0],[2,1,2,2,1,0,0]]:workLines.map(()=>Array(7).fill(0))};
+}
+function personalTime(){
+ const sheet=draft(period), locked=sheet.status==='Submitted';
+ const dateLabel=i=>{const date=new Date(period+'T12:00:00Z');date.setUTCDate(date.getUTCDate()+i);return dayLabels[i]+' '+date.getUTCDate()};
+ const hours=sheet.hours;
+ const dayAttrs=i=>' data-time-day="'+i+'"'+(i===activeDay?' class="current-day"':'');
+ const table='<div class="table-scroll" role="region" tabindex="0" aria-label="Weekly effort grid"><table class="time-grid"><caption class="sr">Weekly personal effort in hours</caption><thead><tr><th scope="col">Project / activity</th>'+dayLabels.map((_,i)=>'<th scope="col"'+dayAttrs(i)+'>'+dateLabel(i)+'</th>').join('')+'<th scope="col">Total</th></tr></thead><tbody>'+workLines.map(([project,activity],r)=>'<tr><td><strong>'+project+'</strong><small class="row-meta">'+activity+'</small></td>'+dayLabels.map((day,c)=>'<td'+dayAttrs(c)+'><input class="hours" type="number" min="0" max="24" step="0.25" data-hours="'+r+','+c+'" aria-label="'+E(activity+' '+dateLabel(c)+' hours')+'" value="'+hours[r][c]+'" '+(locked?'readonly':'')+'></td>').join('')+'<td id="time-row-'+r+'"></td></tr>').join('')+'<tr><td><strong>Daily total</strong></td>'+dayLabels.map((_,c)=>'<td id="time-day-'+c+'"'+dayAttrs(c)+'></td>').join('')+'<td id="time-total"></td></tr></tbody></table></div>';
+ return '<section class="panel"><div class="special-pad special-head"><div><h2>My timesheet</h2><small>Record hours against your assigned project activities.</small></div>'+badge(sheet.status)+'</div><div class="tools">'+select('period',Object.entries(periodLabels),period,'Reporting period')+'<span class="mobile-only">'+select('time-day-picker',dayLabels.map((_,i)=>[i,dateLabel(i)]),activeDay,'Day of the week')+'</span>'+
+ (locked?'':button('Copy previous week','data-action="copy-week" '+(period==='2026-11-16'?'disabled':''),'work'))+
+ '</div>'+table+'<div class="table-footer"><small id="time-feedback" role="status">'+(locked?'Submitted for review':'Enter time in increments of 0.25 h.')+'</small><div style="display:flex;gap:6px">'+(locked?button('Withdraw submission','data-action="withdraw"'):button('Review & submit','data-action="review-time"','check','btn-primary'))+'</div></div></section>';
+}
+function updateTimeTotals(){
+ if(!$('time-total'))return;
+ const values=draft(period).hours;
+ const dayTotals=dayLabels.map((_,c)=>values.reduce((sum,row)=>sum+row[c],0));
+ values.forEach((row,i)=>$('time-row-'+i).textContent=row.reduce((sum,x)=>sum+x,0)+' h');
+ dayTotals.forEach((value,i)=>{$('time-day-'+i).textContent=value+' h';$('time-day-'+i).style.color=value>24?'#983945':''});
+ $('time-total').textContent=dayTotals.reduce((sum,x)=>sum+x,0)+' h';
+}
+function flash(message){
+ clearTimeout(toastTimer);
+ $('toast').textContent=message;
+ $('toast').hidden=false;
+ toastTimer=setTimeout(()=>$('toast').hidden=true,2800);
+}
+function dialog(title,caption,body,actions='',labelledForm=''){
+ const el=$('dialog');
+ const html='<div class="dialog-body">'+body+'</div>'+(actions?'<div class="dialog-actions">'+actions+'</div>':'');
+ el.innerHTML='<div class="dialog-head"><div><h2 id="dialog-title">'+E(title)+'</h2>'+(caption?'<small>'+E(caption)+'</small>':'')+'</div>'+button(icon('close'),'data-action="dismiss" aria-label="Close"','','btn-plain iconbtn')+'</div>'+
+ (labelledForm?'<form id="'+labelledForm+'">'+html+'</form>':html);
+ if(!el.open)el.showModal();
+}
+function field(label,name,value='',kind='text',attrs=''){
+ return '<label class="field">'+E(label)+'<input type="'+kind+'" name="'+name+'" value="'+E(value)+'" '+attrs+'></label>';
+}
+function formSelect(label,name,options,value='',prompt=''){
+ return '<label class="field">'+E(label)+'<select name="'+name+'">'+(prompt?'<option value="">'+E(prompt)+'</option>':'')+
+ options.map(v=>'<option '+(v===value?'selected':'')+' value="'+E(v)+'">'+E(v)+'</option>').join('')+'</select></label>';
+}
+const cancel=()=>button('Cancel','data-action="dismiss"');
+const submit=(label,kind='btn-primary')=>'<button type="submit" class="btn '+kind+'">'+label+'</button>';
+function openFilters(){
+ const name=type(), all=rowsFor(name), f=pageState.filters;
+ const pick=key=>formSelect(name==='Obligations'&&key==='detail'?'Contract':filterNames[key],key,[...new Set(all.map(r=>r[key]).filter(Boolean))].sort(),f[key],'Any '+filterNames[key].toLowerCase());
+ const body='<p class="brief">Combine text search with exact filters. Use quotes for phrases, such as <strong>owner:"Amina Namusoke"</strong> or <strong>status:"In review"</strong>. Search by code, name, owner, status, health, portfolio, category, date, contract, clause or due.</p>'+
+ field('Search query','query',pageState.query,'search','placeholder="Search words or field:value"')+'<div class="filter-grid">'+
+ pick('status')+pick('owner')+(name==='Projects'?pick('health')+pick('portfolio'):pick('detail')+(name==='Obligations'?pick('due'):''))+
+ field(name==='Projects'?'Target finish from':name==='Timesheets'?'Period end from':'Due from','from',f.from,'date')+field(name==='Projects'?'Target finish through':name==='Timesheets'?'Period end through':'Due through','to',f.to,'date')+'</div>'+field('Saved view name','viewName','','text','maxlength="50" placeholder="Optional"');
+ dialog('Advanced filters',name,body,cancel()+submit('Apply filters'),'filter-form');
+}
+function openColumns(){
+ dialog('Table columns',type(),columns(type()).map(([k,label])=>'<label class="check"><input type="checkbox" name="visible" value="'+k+'" '+((columnPrefs[dataKey(type())]||[]).includes(k)?'':'checked')+(k==='name'?' disabled':'')+'> '+E(label)+'</label>').join(''),cancel()+submit('Apply columns'),'column-form');
+}
+function openRecord(id){
+ const name=type(), row=rowsFor(name).find(item=>item.id===id);
+ if(!row)return;
+ if(name==='Obligations'){obligationsUrl(id);return}
+ const body='<ul class="detail-list">'+columns(name).filter(([key])=>key!=='name').map(([key,label])=>'<li><span>'+E(label)+'</span><strong>'+cell(row,key)+'</strong></li>').join('')+'</ul>';
+ dialog(row.name,row.id,body,name==='Projects'?cancel()+button('Open project','data-project="'+E(id)+'"','folder','btn-primary'):button('Done','data-action="dismiss"','','btn-primary'));
+}
+function openCreate(){
+ const name=type(), isProject=name==='Projects', m=modules.get(name);
+ const title=isProject?'New project':'New '+({Intake:'request',Tasks:'task',Deliverables:'deliverable','Change control':'change request','RAID register':'register entry'})[name];
+ const owner=formSelect(isProject?'Project manager':'Owner','owner',people,people[0]);
+ const measures=isProject?formSelect('Portfolio','portfolio',portfolioNames):field(m.detail,'detail','','text','maxlength="100" required');
+ dialog(title,isProject?'Saved in this browser as a draft project.':'Saved in this browser.',field('Name','name','','text','required maxlength="110"')+owner+measures+field(isProject?'Target finish':'Due date','date','','date','required'),cancel()+submit(isProject?'Create draft':'Save record'),'create-form');
+}
+function reviewTime(){
+ const invalid=Array.from(document.querySelectorAll('[data-hours]')).find(input=>!input.checkValidity());
+ if(invalid){invalid.reportValidity();return}
+ const hours=draft(period).hours;
+ const daily=dayLabels.map((_,i)=>hours.reduce((sum,row)=>sum+row[i],0));
+ const total=daily.reduce((sum,h)=>sum+h,0);
+ if(!total||daily.some(h=>h>24)){flash(total?'Daily totals must be 24 hours or less.':'Enter time before submitting.');return}
+ dialog('Submit timesheet',periodLabels[period],'<p class="brief">Review '+total+' hours before submitting.</p><ul class="detail-list">'+workLines.map(([project],i)=>'<li><span>'+E(project)+'</span><strong>'+hours[i].reduce((sum,h)=>sum+h,0)+' h</strong></li>').join('')+'</ul>',cancel()+button('Submit timesheet','data-action="submit-time"','check','btn-primary'));
+}
+function publishGrid(){
+ const sheet=draft(period);
+ const name='Timesheets';
+ workLines.forEach(([project],i)=>{
+  const rowProject=activeProjectRows().find(p=>p.name===project);
+  const key=rowProject.id+'/'+name;
+  const id='TIME-'+i+'-'+period;
+  const records=(repository[key]||[]).filter(row=>row.id!==id);
+  const hours=sheet.hours[i].reduce((sum,n)=>sum+n,0);
+  if(sheet.status==='Submitted'&&hours){
+   const end=new Date(period+'T12:00:00Z');
+   end.setUTCDate(end.getUTCDate()+6);
+   records.push({id,name:people[0],owner:people[0],status:'Submitted',detail:hours+' h',date:end.toISOString().slice(0,10)});
+  }
+  repository[key]=records;
+ });
+ writeLocal('records',repository);
+ writeLocal('time',timeDrafts);
+}
+function exportRows(){
+ if(!resultRows.length){flash('There are no records to export.');return}
+ const csvCell=value=>'"'+String(value??'').replace(/^[=+\-@\t\r]/,"'$&").replaceAll('"','""')+'"';
+ const data=[['Code',...shownCols.map(([,label])=>label)],...resultRows.map(row=>[row.id,...shownCols.map(([key])=>row[key])])].map(row=>row.map(csvCell).join(',')).join('\r\n');
+ const url=URL.createObjectURL(new Blob([data],{type:'text/csv;charset=utf-8'}));
+ const link=document.createElement('a');
+ link.href=url;
+ link.download='trustseal-'+type().toLowerCase().replace(/[^a-z0-9]+/g,'-')+'.csv';
+ link.click();
+ setTimeout(()=>URL.revokeObjectURL(url),500);
+ flash(resultRows.length+' records exported');
+}
+const actions={
+ dismiss:()=>$('dialog').close(),filters:openFilters,columns:openColumns,create:openCreate,export:exportRows,
+ clear:()=>{pageState.filters={};pageState.page=1;render()},
+ reset:()=>{resetTable();render()},
+ 'review-time':reviewTime,
+ 'submit-time':()=>{draft(period).status='Submitted';publishGrid();$('dialog').close();render();flash('Timesheet submitted in this prototype.')},
+ withdraw:()=>{draft(period).status='Draft';publishGrid();render();flash('Timesheet returned to draft.')},
+ 'copy-week':()=>{
+  dialog('Copy previous week',periodLabels[period],'<p>Copy hours from the previous week and replace the current draft hours.</p>',cancel()+button('Copy hours','data-action="confirm-copy"','','btn-primary'));
+ },
+ 'confirm-copy':()=>{
+  const start=Object.keys(periodLabels), previous=draft(start[start.indexOf(period)-1]);
+  draft(period).hours=previous.hours.map(row=>[...row]);
+  writeLocal('time',timeDrafts);$('dialog').close();render();flash('Previous week copied to draft.');
+ }
+};
+document.addEventListener('click',event=>{
+ const btn=event.target.closest('button');
+ if(!btn||btn.disabled)return;
+ if(btn.id==='toggle-nav'){
+  btn.setAttribute('aria-expanded',$('side').classList.toggle('open'));
+  return;
+ }
+ const d=btn.dataset;
+ if(d.obligation){obligationsUrl(d.obligation);return}
+ if(d.obligationBack!==undefined){obligationsUrl();return}
+ if(d.moduleJump&&route.project){navigate('Projects',route.project,'Procurement & contracts',d.moduleJump);return}
+ if(d.queue){navigate('Projects',route.project,'Procurement & contracts','Obligations',d.queue.toLowerCase());return}
+ if(d.contract){navigate('Projects',route.project,'Procurement & contracts','Obligations','contract:'+d.contract);return}
+ if(d.submitObligation){openObligationDecision(d.submitObligation,false);return}
+ if(d.reviewObligation){openObligationDecision(d.reviewObligation,true);return}
+ if(d.taskJump){navigate('Projects',route.project,'Work','Tasks','task:'+d.taskJump);return}
+ if(d.project){if($('dialog').open)$('dialog').close();navigate('Projects',d.project);return}
+ if(d.go){navigate(d.go);return}
+ if(d.group){navigate('Projects',route.project,d.group);return}
+ if(d.module){navigate(route.area,route.project,route.group,d.module);return}
+ if(d.mode!==undefined){changeMode(d.mode);return}
+ if(d.homeView){navigate('Projects','','','',d.homeView);return}
+ if(d.view){
+  pageState.view=d.view;pageState.page=1;
+  document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===d.view)));
+  updateResult();return;
+ }
+ if(d.page){pageState.page=Number(d.page);updateResult();$('result').querySelector('[aria-current=page]')?.focus();return}
+ if(d.sort){
+  pageState.direction=pageState.sort===d.sort?-pageState.direction:1;
+  pageState.sort=d.sort;pageState.page=1;updateResult();
+  $('result').querySelector('[data-sort="'+d.sort+'"]')?.focus();return;
+ }
+ if(d.remove){delete pageState.filters[d.remove];pageState.page=1;render();$('query')?.focus();return}
+ if(d.detail){openRecord(d.detail);return}
+ if(d.action&&Object.hasOwn(actions,d.action))actions[d.action]();
+});
+document.addEventListener('input',event=>{
+ const el=event.target;
+ if(el.id==='query'){pageState.query=el.value;pageState.page=1;updateResult();return}
+ if(!el.dataset.hours)return;
+ const [r,c]=el.dataset.hours.split(',').map(Number);
+ if(!el.validity.valid){$('time-feedback').textContent='Use a value from 0 to 24 hours in increments of 0.25 h.';return}
+ draft(period).hours[r][c]=Number(el.value);
+ const saved=writeLocal('time',timeDrafts);
+ $('time-feedback').textContent=saved?'Draft saved in this browser.':'Draft saved for this session.';
+ updateTimeTotals();
+});
+document.addEventListener('change',event=>{
+ const {id,value}=event.target;
+ if(['f-status','f-portfolio','f-owner','f-due'].includes(id)){
+  pageState.filters[id.slice(2)]=value;pageState.page=1;updateResult();
+ }
+ if(id==='rows-size'){pageState.size=Number(value);pageState.page=1;updateResult();$('rows-size').focus()}
+ if(id==='period'){period=value;render();$('period').focus()}
+ if(id==='time-day-picker'){
+  activeDay=Number(value);
+  document.querySelectorAll('[data-time-day]').forEach(cell=>cell.classList.toggle('current-day',Number(cell.dataset.timeDay)===activeDay));
+ }
+ if(id==='section-picker'&&value)navigate('Projects',route.project,value);
+ if(id==='project-picker')navigate('Projects',value,route.group,route.module,route.mode);
+ if(id==='saved-view'&&value!==''){
+  const saved=(views[dataKey(type())]||[])[Number(value)];
+  Object.assign(pageState,{query:saved.query,filters:{...saved.filters},view:saved.view,page:1,sort:saved.sort,direction:saved.direction});
+  render();$('saved-view').value=value;$('saved-view').focus();
+ }
+});
+document.addEventListener('submit',event=>{
+ const form=event.target, id=form.id;
+ event.preventDefault();
+ if(id==='obligation-submit'||id==='obligation-review'){saveObligation(event);return}
+ const fields=new FormData(form);
+ if(id==='filter-form'){
+  const query=fields.get('query'), filterValues=Object.fromEntries(Object.keys(filterNames).map(key=>[key,fields.get(key)||'']));
+  if(filterValues.from&&filterValues.to&&filterValues.from>filterValues.to){
+   const end=form.elements.to;end.setCustomValidity('Choose a date on or after the start date.');end.reportValidity();end.addEventListener('input',()=>end.setCustomValidity(''),{once:true});return;
+  }
+  Object.assign(pageState,{query,filters:filterValues,page:1});
+  const name=fields.get('viewName').trim();
+  if(name){
+   const key=dataKey(type());
+   views[key]=(views[key]||[]).filter(v=>v.name!==name);
+   views[key].push({name,query,filters:{...filterValues},view:pageState.view,sort:pageState.sort,direction:pageState.direction});writeLocal('views',views);
+   flash('View saved.');
+  }
+ }
+ if(id==='column-form'){
+  const visible=['name',...fields.getAll('visible')];
+  columnPrefs[dataKey(type())]=columns(type()).map(([key])=>key).filter(key=>!visible.includes(key));
+  writeLocal('columns',columnPrefs);
+ }
+ if(id==='create-form'){
+  const typeName=type(), key=dataKey(typeName), name=fields.get('name').trim(), isProject=typeName==='Projects';
+  if(!name){form.elements.name.setCustomValidity('Enter a name.');form.elements.name.reportValidity();form.elements.name.addEventListener('input',()=>form.elements.name.setCustomValidity(''),{once:true});return}
+  const count=(repository[key]||[]).length+1;
+  const entry={id:isProject?'TS-P'+(1048+count):'LOCAL-'+String(count).padStart(3,'0'),name,owner:fields.get('owner'),date:fields.get('date'),
+   ...(isProject?{portfolio:fields.get('portfolio'),status:'Draft',health:'Not assessed',progress:0}:{detail:fields.get('detail'),status:typeName==='Tasks'?'To do':typeName==='RAID register'?'Open':'Draft'})};
+  (repository[key] ||= []).push(entry);
+  writeLocal('records',repository);
+  resetTable();
+  pageState.query=entry.id;
+  flash(isProject?'Draft project created.':'Record saved.');
+ }
+ $('dialog').close();
+ render();
+ if(id==='filter-form')$('query')?.focus();
+});
+document.addEventListener('keydown',event=>{
+ if(event.key==='/'&&!$('dialog').open&&$('query')&&!['INPUT','SELECT','TEXTAREA'].includes(event.target.tagName)){
+  event.preventDefault();$('query').focus();
+ }
+});
+$('toggle-nav').innerHTML=icon('menu');
+const exampleContract='TSD-018';
+const pilotProject=projects[0].id;
+const referenceToday='2026-11-27';
+const agreementFixtures=[
+ {id:exampleContract,name:'Platform implementation agreement',party:'Integration Services Ltd',version:'v3',effective:'2026-08-03',expiry:'2027-02-26'},
+ {id:'TSD-024',name:'District connectivity services',party:'Regional Networks Ltd',version:'v2',effective:'2026-09-07',expiry:'2027-03-31'}
+];
+const obligationFixtures=[
+ {id:'OBL-014',name:'Submit pilot implementation report',contract:'TSD-018',clause:'SOW §4.2',owner:'Amina Namusoke',date:'2026-11-25',baseline:'2026-11-24',forecast:'2026-12-02',work:'In progress',status:'Awaiting evidence',mandatory:true,criterion:'The report covers all pilot sites and includes the signed training attendance record.',links:['Validate indicator catalogue','Prepare pilot training'],history:[{state:'Assigned',when:'2026-11-12',note:'Assigned to Amina Namusoke.'}]},
+ {id:'OBL-015',name:'Approve the data quality baseline',contract:'TSD-018',clause:'SOW §4.3',owner:'Grace Aciro',date:'2026-11-30',baseline:'2026-11-27',forecast:'2026-11-27',work:'Complete',status:'In review',mandatory:true,criterion:'Baseline indicator coverage and validation findings are documented.',links:['Validate indicator catalogue'],history:[{state:'In review',when:'2026-11-26',note:'Data quality baseline v1 submitted.'}],evidence:[{ref:'Data quality baseline v1',version:1}]},
+ {id:'OBL-016',name:'Deliver facility training materials',contract:'TSD-018',clause:'SOW §5.1',owner:'Sarah Atim',date:'2026-12-04',baseline:'2026-12-01',forecast:'2026-12-04',work:'In progress',status:'Awaiting evidence',mandatory:true,criterion:'Approved materials and a facilitator guide cover the agreed training scope.',links:['Prepare pilot training'],history:[]},
+ {id:'OBL-017',name:'Confirm site access and roles',contract:'TSD-018',clause:'SOW §3.1',owner:'Daniel Okello',date:'2026-11-20',baseline:'2026-11-18',forecast:'2026-11-19',work:'Complete',status:'Accepted',mandatory:true,criterion:'The site access matrix is approved by the designated reviewer.',links:['Review access roles'],history:[{state:'Accepted',when:'2026-11-19',note:'Version 1 approved.'}],evidence:[{ref:'Site access matrix v1',version:1}]},
+ {id:'OBL-019',name:'Commission district connectivity',contract:'TSD-024',clause:'Schedule B §2',owner:'Martin Kato',date:'2026-11-26',baseline:'2026-11-26',forecast:'2026-12-08',work:'Blocked',status:'Returned',mandatory:true,criterion:'Each commissioned site has a signed installation checklist and a completed connectivity test.',links:['Confirm district focal points'],history:[{state:'Returned',when:'2026-11-26',note:'Include signed checklists for the two remaining sites.'}],evidence:[{ref:'Connectivity commissioning bundle v1',version:1}]},
+ {id:'OBL-020',name:'Submit network support plan',contract:'TSD-024',clause:'Schedule B §5',owner:'Daniel Okello',date:'2026-12-11',baseline:'2026-12-10',forecast:'2026-12-10',work:'Planned',status:'Awaiting evidence',mandatory:true,criterion:'Include incident contacts, response hours and an escalation roster.',links:[],history:[]}
+];
+const obligationEdits=readLocal('obligations',{});
+function obligationRows(){
+ if(route.project&&route.project!==pilotProject)return [];
+ return obligationFixtures.map(row=>{
+  const current={...row,...obligationEdits[row.id]};
+  const due=current.status==='Accepted'?'Accepted':current.date<referenceToday?'Overdue':'Upcoming';
+  return {...current,due,detail:current.contract};
+ });
+}
+const findObligation=id=>obligationRows().find(row=>row.id===id);
+const obligationsUrl=(id='')=>navigate('Projects',pilotProject,'Procurement & contracts','Obligations',id?'ob:'+id:'');
+const contractColumn=[['name','Obligation'],['detail','Contract'],['clause','Source clause'],['owner','Owner'],['date','Contract due'],['forecast','Forecast'],['work','Work status'],['status','Acceptance'],['due','Due state']];
+function compareDate(row){
+ const delta=Math.round((Date.parse(row.forecast)-Date.parse(row.date))/86400000);
+ return '<span class="date-variance '+(delta>0?'late':delta<0?'ahead':'')+'">'+(delta>0?delta+' days late':delta<0?Math.abs(delta)+' days early':'On the due date')+'</span>';
+}
+function portfolioAttention(){
+ return button('Contract obligations','data-go="Obligations"','work');
+}
+function obligationIntro(global=false){
+ const rows=obligationRows();
+ const late=rows.filter(row=>row.due==='Overdue').length;
+ const pending=rows.filter(row=>row.status==='In review').length;
+ return '<div class="obligation-intro studio-section panel"><p class="muted">'+(rows.length
+  ? E(rows.length+' obligations · '+late+' overdue · '+pending+' in review')
+  : 'Linked obligations appear when a contract is assigned to this project.')+'</p>'+
+  (global?button('Open linked project','data-project="'+pilotProject+'"','folder','',''):'')+'</div>';
+}
+function contractCards(){
+ if(route.project!==pilotProject)return '<section class="panel studio-section"><h2>Contracts</h2><p class="muted">This project has no linked contracts in the preview.</p></section>';
+ return '<div class="studio-stack">'+agreementFixtures.map(item=>{
+  const rel=obligationRows().filter(row=>row.contract===item.id);
+  return '<section class="panel studio-section"><div class="section-line"><h2>'+E(item.name)+'</h2>'+
+   button('View obligations','data-contract="'+item.id+'"','work')+'</div><p class="compact-meta">'+E(item.id+' · '+item.party)+'</p><div class="studio-summary"><dl><div><dt>Executed version</dt><dd>'+E(item.version)+'</dd></div><div><dt>Effective date</dt><dd>'+formatDate(item.effective)+'</dd></div><div><dt>Open obligations</dt><dd>'+rel.filter(row=>row.status!=='Accepted').length+'</dd></div></dl></div></section>';
+ }).join('')+'</div>';
+}
+function closeout(){
+ const rows=obligationRows(), blocked=rows.filter(r=>r.mandatory&&r.status!=='Accepted');
+ return '<section class="panel studio-section"><div class="section-line"><h2>Contract closeout checks</h2>'+badge(!rows.length?'No linked obligations':blocked.length?'Blocked':'Obligations complete')+'</div>'+
+ '<p class="brief">'+(!rows.length?'No linked contract obligations in this project.':blocked.length?'Resolve these mandatory obligations before contract closeout.':'All sample mandatory obligations are accepted. Review financial reconciliation, asset transfer and continuing obligations before closing an agreement.')+'</p>'+
+ '<ul class="activity-stack">'+blocked.map(row=>'<li><button class="row-name" data-obligation="'+E(row.id)+'">'+E(row.name)+'</button>'+badge(row.status)+'</li>').join('')+'</ul></section>';
+}
+function studioOverview(project){
+ if(!project||project.id!==pilotProject)return summary(project);
+ const rows=obligationRows(), late=rows.filter(r=>r.due==='Overdue'), waiting=rows.filter(r=>r.status==='In review'), completed=rows.filter(r=>r.status==='Accepted');
+ const track=[['Project progress',meter(project.progress),'Plan'],['Linked contracts',agreementFixtures.length,'Procurement & contracts'],['Overdue obligations',late.length,'Overdue'],['Evidence for review',waiting.length,'Review']];
+ const first=track.map(([label,value,view])=>'<button class="metric" '+(view==='Overdue'||view==='Review'?'data-queue="'+view+'"':'data-group="'+E(view)+'"')+'><span><small>'+label+'</small><strong>'+value+'</strong></span></button>').join('');
+ return '<div class="studio-overview"><section class="metrics" aria-label="Project delivery summary">'+first+'</section><div class="studio-grid">'+
+ '<section class="panel studio-section"><div class="section-line"><h2>Contract obligations</h2>'+button('View register','data-module-jump="Obligations"','work')+'</div>'+
+ '<ul class="activity-stack">'+rows.filter(r=>r.status!=='Accepted').slice(0,4).map(r=>'<li><button class="row-name" data-obligation="'+r.id+'">'+E(r.name)+'<small class="row-meta">'+E(r.clause)+' · '+formatDate(r.date)+'</small></button>'+badge(r.due==='Overdue'?'Overdue':r.status)+'</li>').join('')+'</ul></section>'+
+ '<div class="studio-stack"><section class="panel studio-section"><h2>Delivery plan</h2><ul class="detail-list"><li><span>Project manager</span><strong>'+E(project.owner)+'</strong></li><li><span>Target finish</span><strong>'+formatDate(project.date)+'</strong></li><li><span>Accepted obligations</span><strong>'+completed.length+' of '+rows.length+'</strong></li></ul></section>'+
+ '<section class="panel studio-section"><h2>Upcoming milestones</h2><ul class="detail-list"><li><span>Pilot rollout</span><strong>21 Dec 2026</strong></li><li><span>Operational handover</span><strong>11 Jan 2027</strong></li></ul></section></div></div></div>';
+}
+function obligationPage(id){
+ const row=findObligation(id);
+ if(!row)return obligationIntro()+register('Obligations');
+ const agreement=agreementFixtures.find(item=>item.id===row.contract);
+ const work=row.links.map(link=>'<li><button class="row-name" data-task-jump="'+E(link)+'">'+E(link)+'</button></li>').join('');
+ const history=row.history.map(item=>'<li><span><strong>'+E(item.state)+'</strong><small class="row-meta">'+E(item.note)+'</small></span><small>'+formatDate(item.when)+'</small></li>').join('');
+ const evidence=(row.evidence||[]).map(entry=>'<div class="evidence-item"><strong>'+E(entry.ref)+'</strong><small>Submission '+entry.version+'</small></div>').reverse().join('');
+ const evidenceAction=row.status==='Accepted'?'':row.status==='In review'
+  ?button('Review evidence','data-review-obligation="'+row.id+'"','check','btn-primary')
+  :button('Submit evidence','data-submit-obligation="'+row.id+'"','plus','btn-primary');
+ return '<div class="section-line"><h2>'+E(row.name)+'</h2><div class="hero-actions">'+button('Back to obligations','data-obligation-back','','btn-plain')+evidenceAction+'</div></div>'+
+ '<div class="context" style="margin:0 0 13px"><strong>'+E(row.id)+'</strong><span>'+E(row.mandatory?'Mandatory obligation':'Optional obligation')+'</span>'+badge(row.status)+'</div>'+
+ '<dl class="obligation-dates"><div><dt>Contract due</dt><dd>'+formatDate(row.date)+'</dd></div><div><dt>Approved baseline</dt><dd>'+formatDate(row.baseline)+'</dd></div><div><dt>Delivery forecast</dt><dd>'+formatDate(row.forecast)+'</dd></div><div><dt>Forecast variance</dt><dd>'+compareDate(row)+'</dd></div></dl>'+
+ '<div class="studio-grid"><div class="studio-stack"><section class="panel studio-section"><h2>Acceptance evidence</h2><p class="brief">'+E(row.criterion)+'</p>'+(evidence||'<p class="muted">No evidence submitted.</p>')+'</section>'+
+ '<section class="panel studio-section"><h2>Decision history</h2>'+(history?'<ul class="activity-stack">'+history+'</ul>':'<p class="muted">No decisions recorded.</p>')+'</section></div>'+
+ '<div class="studio-stack"><section class="panel studio-section"><h2>Agreement source</h2><p>'+E(agreement.name)+'</p><p class="compact-meta">'+E(agreement.id+' · '+agreement.version+' · '+row.clause)+'</p>'+
+ '<ul class="detail-list"><li><span>Effective date</span><strong>'+formatDate(agreement.effective)+'</strong></li><li><span>Owner</span><strong>'+E(row.owner)+'</strong></li><li><span>Work status</span>'+badge(row.work)+'</li></ul></section>'+
+ '<section class="panel studio-section"><h2>Linked delivery work</h2>'+(work?'<ul class="activity-stack">'+work+'</ul>':'<p class="muted">No work items linked.</p>')+'</section></div></div>';
+}
+function openObligationDecision(id,review){
+ const row=findObligation(id);
+ if(!row)return;
+ const version=(row.evidence||[]).at(-1);
+ const body='<input type="hidden" name="obligation" value="'+E(id)+'">'+(review
+  ? '<p class="form-note">Review '+E(version?.ref||'submitted evidence')+' against the acceptance criterion. This records a demo decision in this browser.</p>'+
+  formSelect('Decision','decision',['Accepted','Returned'])+field('Decision note','note','','text','maxlength="150" required')
+  : '<p class="form-note">Enter a reference to a demo evidence version. The integrated workspace will use the native TrustSeal document picker.</p>'+
+  field('Evidence reference','ref','','text','maxlength="120" required'));
+ dialog(review?'Review obligation evidence':'Submit evidence',row.name,body,cancel()+submit(review?'Record decision':'Send for review'),review?'obligation-review':'obligation-submit');
+}
+function saveObligation(event){
+ const review=event.target.id==='obligation-review';
+ const fields=new FormData(event.target), row=findObligation(fields.get('obligation'));
+ if(!row)return;
+ if(review&&row.status!=='In review'||!review&&['In review','Accepted'].includes(row.status))return;
+ const evidence=[...(row.evidence||[])];
+ let status='In review', note=(fields.get(review?'note':'ref')||'').trim();
+ if(!note)return;
+ if(review)status=fields.get('decision');
+ else evidence.push({ref:note,version:evidence.length+1});
+ const history=[{state:status,when:referenceToday,note:review?note:note+' submitted.'},...row.history];
+ obligationEdits[row.id]={status,evidence,history};
+ writeLocal('obligations',obligationEdits);
+ $('dialog').close();
+ render();
+ flash(review?'Demo decision recorded.':'Evidence sent for demo review.');
+}
+
+window.addEventListener('hashchange',syncRoute);
+syncRoute();
+</script>
+</body>
+</html>

@@ -655,15 +655,16 @@ def test_srs_server_side_register_and_obligations(pg_app, pm_env):
     })
     assert r_ob.status_code in (200, 201)
 
-    # Verify /projects/<id> renders horizontal primary tabs + More menu + Contract Obligations Register
+    # Verify /projects/<id> renders PM Studio Workspace sidebar + horizontal primary tabs + More sections + Obligations Register
     r_det = c.get(f"/projects/{p1}")
     assert r_det.status_code == 200
     assert b"Contract Obligations Register" in r_det.data
     assert b"Submit Q4 Environmental Compliance Certificate" in r_det.data
     assert b"Procurement &amp; Contracts" in r_det.data
     assert b"Requirements &amp; Agile" in r_det.data
-    assert b"pms-more__menu" in r_det.data
-    assert b"pms-rail" not in r_det.data
+    assert b"pms-project-bar" in r_det.data
+    assert b"pms-side" in r_det.data
+    assert b"pms-section-picker" in r_det.data
 
 
 
