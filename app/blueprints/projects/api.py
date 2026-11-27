@@ -56,6 +56,8 @@ from app.blueprints.projects.permissions import (
 )
 from app.blueprints.projects.services import (
     approve_time_entry,
+    compute_critical_path,
+    compute_project_evm,
     compute_project_financials,
     convert_intake_to_project,
     count_overallocated_resources,
@@ -776,6 +778,15 @@ def project_timesheets_collection(project_id: int):
     if hours <= Decimal("0.00") or hours > Decimal("24.00"):
         return jsonify({"error": "hours must be between 0.01 and 24.00"}), 422
     wdate = parse_iso_date(data.get("work_date")) or datetime.utcnow().date()
+    # PM-13.05: Enforce 24h daily limit across all entries for this user on work_date
+    existing_day_hrs = sum(
+        (Decimal(e.hours or 0) for e in ProjectTimeEntry.query.filter_by(
+            organization_id=proj.organization_id, user_id=actor.id, work_date=wdate
+        ).all()),
+        Decimal("0.00"),
+    )
+    if existing_day_hrs + hours > Decimal("24.00"):
+        return jsonify({"error": f"Daily limit exceeded: {existing_day_hrs}h already logged on {wdate.isoformat()}; adding {hours}h exceeds 24.00h"}), 422
     tid = int(data["task_id"]) if str(data.get("task_id") or "").isdigit() else None
     if tid is not None:
         if ProjectTask.query.filter_by(id=tid, project_id=proj.id, organization_id=proj.organization_id).first() is None:
@@ -809,6 +820,8 @@ def approve_project_timesheet(project_id: int, entry_id: int):
     if entry is None:
         abort(404)
     data = request.get_json(silent=True) or {}
+    if data.get("enforce_sod") and entry.user_id == actor.id:
+        return jsonify({"error": "Separation of duties: contributor cannot approve own timesheet entry"}), 403
     explicit_rate = to_decimal(data.get("hourly_rate")) if data.get("hourly_rate") not in (None, "") else None
     ev = approve_time_entry(entry, proj, actor, hourly_rate=explicit_rate)
     db.session.commit()
@@ -1091,3 +1104,23 @@ def project_health_detail(project_id: int):
         overallocated_resources=overalloc,
     )
     return jsonify({"ok": True, "health": health})
+
+
+@projects_v2_api.route("/<int:project_id>/schedule", methods=["GET"])
+@login_required
+def project_cpm_schedule(project_id: int):
+    """PM-07: Deterministic Critical Path Method (CPM) schedule & Gantt data."""
+    actor = _actor()
+    proj = load_authorized_project(project_id, actor)
+    return jsonify({"ok": True, "schedule": compute_critical_path(proj)})
+
+
+@projects_v2_api.route("/<int:project_id>/evm", methods=["GET"])
+@login_required
+def project_evm_analytics(project_id: int):
+    """PM-15/16: Decimal Earned Value Management (EVM) analytics."""
+    actor = _actor()
+    proj = load_authorized_project(project_id, actor)
+    if not can_view_project_finance(proj, actor):
+        abort(403, description="finance_permission_required")
+    return jsonify({"ok": True, "evm": compute_project_evm(proj)})

@@ -519,6 +519,35 @@
         </table>
       </div>
     </div>
+
+    {% if cpm_schedule is defined and cpm_schedule.activities %}
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid #ebeef2;overflow-x:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <strong style="font-size:13px;color:#0f172a;">Critical Path &amp; Gantt Timeline (PM-07 · Duration: {{ cpm_schedule.project_duration_days }}d)</strong>
+        <span style="font-size:11.5px;color:#64748b;"><span style="display:inline-block;width:10px;height:10px;background:#b91c1c;margin-right:4px;"></span>Critical Path (0d float) · <span style="display:inline-block;width:10px;height:10px;background:#002769;margin-right:4px;margin-left:8px;"></span>Standard Activity</span>
+      </div>
+      {% set tot_d = cpm_schedule.project_duration_days if cpm_schedule.project_duration_days > 0 else 1 %}
+      <table class="st-table" style="font-size:12px;">
+        <thead><tr><th style="width:220px;">Activity</th><th style="width:70px;">Dur.</th><th style="width:70px;">Float</th><th>Timeline Bar (Day 0 → Day {{ tot_d }})</th></tr></thead>
+        <tbody>
+          {% for act in cpm_schedule.activities %}
+          {% set left_pct = ((act.early_start / tot_d) * 100)|round(1) %}
+          {% set width_pct = [((act.duration_days / tot_d) * 100)|round(1), 6]|max %}
+          <tr>
+            <td style="font-weight:600;">{{ act.title }} {% if act.is_critical %}<span class="st-tag st-tag--bad" style="font-size:9.5px;">CRITICAL</span>{% endif %}</td>
+            <td style="font-variant-numeric:tabular-nums;">{{ act.duration_days }}d</td>
+            <td style="font-variant-numeric:tabular-nums;">{{ act.total_float }}d</td>
+            <td>
+              <div style="position:relative;height:16px;background:#f1f5f9;border-radius:2px;min-width:240px;">
+                <div style="position:absolute;left:{{ left_pct }}%;width:{{ width_pct }}%;top:2px;bottom:2px;background:{{ '#b91c1c' if act.is_critical else '#002769' }};border-radius:2px;" title="ES: Day {{ act.early_start }}, EF: Day {{ act.early_finish }}, Float: {{ act.total_float }}d"></div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
   </section>
 
   {# ---- ENTERPRISE TAB: RESOURCES & TIMESHEETS (PM-12/13) ---- #}
@@ -635,6 +664,18 @@
       <div style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;"><div style="font-size:11px;color:#64748b;">Posted Actuals</div><strong style="font-size:15px;">{{ financials.currency }} {{ financials.actuals_str }}</strong></div>
       <div style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;"><div style="font-size:11px;color:#64748b;">Open Commitments</div><strong style="font-size:15px;">{{ financials.currency }} {{ financials.commitments_str }}</strong></div>
       <div style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;"><div style="font-size:11px;color:#64748b;">Available Budget</div><strong style="font-size:15px;color:{{ '#b91c1c' if financials.available_budget < 0 else '#17633a' }};">{{ financials.currency }} {{ financials.available_budget_str }}</strong></div>
+    </div>
+    {% endif %}
+    {% if evm_metrics is defined and evm_metrics.enabled %}
+    <div style="margin-bottom:14px;padding:10px 12px;border:1px solid #d5dce6;background:#ffffff;display:flex;flex-wrap:wrap;gap:16px;align-items:center;font-size:12px;">
+      <strong style="color:#002769;">EVM Scorecard:</strong>
+      <span><strong>BAC:</strong> {{ evm_metrics.currency }} {{ evm_metrics.bac }}</span>
+      <span><strong>PV:</strong> {{ evm_metrics.pv }}</span>
+      <span><strong>EV:</strong> {{ evm_metrics.ev }}</span>
+      <span><strong>AC:</strong> {{ evm_metrics.ac }}</span>
+      <span><strong>SPI:</strong> {{ evm_metrics.spi or 'N/A' }}</span>
+      <span><strong>CPI:</strong> {{ evm_metrics.cpi or 'N/A' }}</span>
+      <span><strong>EAC:</strong> {{ evm_metrics.eac or 'N/A' }}</span>
     </div>
     {% endif %}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;">

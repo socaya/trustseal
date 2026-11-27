@@ -526,4 +526,63 @@ def test_enterprise_pm_v21_timesheets_end_to_end(pg_app, pm_env):
     assert c_mgr.post(f"/api/projects/{pid}/transition", headers=hdrs, json={"lifecycle_state": "closed"}).status_code == 200
 
 
+def test_enterprise_pm_cpm_evm_my_work_and_timesheet_lock(pg_app, pm_env):
+    """Verify CPM Critical Path engine, EVM Decimal analytics, /my-work weekly grid, 24h cap, SoD & lock."""
+    hdrs = {"X-Requested-With": "fetch"}
+    mgr = pm_env["mgr_a"]
+    mem = pm_env["member_a"]
+    c_mgr = _as_user(pg_app, mgr)
+
+    pid = c_mgr.post("/api/projects", headers=hdrs, json={"name": "CPM & EVM Showcase", "budget_amount": "100000.00"}).get_json()["project"]["id"]
+    assert c_mgr.post(f"/api/projects/{pid}/members", headers=hdrs, json={"user_id": mem.id, "project_role": "member"}).status_code == 201
+    assert c_mgr.post(f"/api/projects/{pid}/allocations", headers=hdrs, json={"user_id": mem.id, "allocation_pct": 80, "hourly_cost_rate": "100.00"}).status_code == 201
+
+    # 1. CPM Critical Path: A(2d) -> B(3d) = 5d critical; C(1d) parallel has 4d float
+    t_a = c_mgr.post(f"/api/projects/{pid}/tasks", headers=hdrs, json={"title": "Task A", "planned_hours": "16.00", "progress_pct": 100, "status": "done"}).get_json()["task"]["id"]
+    t_b = c_mgr.post(f"/api/projects/{pid}/tasks", headers=hdrs, json={"title": "Task B", "planned_hours": "24.00", "progress_pct": 50, "status": "in_progress"}).get_json()["task"]["id"]
+    t_c = c_mgr.post(f"/api/projects/{pid}/tasks", headers=hdrs, json={"title": "Task C", "planned_hours": "8.00", "progress_pct": 0, "status": "todo"}).get_json()["task"]["id"]
+    assert c_mgr.post(f"/api/projects/{pid}/dependencies", headers=hdrs, json={"predecessor_task_id": t_a, "successor_task_id": t_b, "dependency_type": "FS"}).status_code == 201
+
+    sched = c_mgr.get(f"/api/projects/{pid}/schedule").get_json()["schedule"]
+    assert sched["project_duration_days"] == 5
+    assert set(sched["critical_path_task_ids"]) == {t_a, t_b}
+    c_act = next(a for a in sched["activities"] if a["task_id"] == t_c)
+    assert c_act["total_float"] == 4 and c_act["is_critical"] is False
+
+    # 2. Timesheet 24h daily cap, self-approval SoD & lock
+    c_mem = _as_user(pg_app, mem)
+    te1 = c_mem.post(f"/api/projects/{pid}/timesheets", headers=hdrs, json={"work_date": "2026-11-27", "hours": "16.00", "submit": True}).get_json()["time_entry"]["id"]
+    # Adding 10h on same day exceeds 24h -> 422
+    assert c_mem.post(f"/api/projects/{pid}/timesheets", headers=hdrs, json={"work_date": "2026-11-27", "hours": "10.00"}).status_code == 422
+
+    # Manager logs own entry -> self-approval denied when enforce_sod=True (403)
+    c_mgr = _as_user(pg_app, mgr)
+    mgr_te = c_mgr.post(f"/api/projects/{pid}/timesheets", headers=hdrs, json={"work_date": "2026-11-27", "hours": "4.00", "submit": True}).get_json()["time_entry"]["id"]
+    assert c_mgr.post(f"/api/projects/{pid}/timesheets/{mgr_te}/approve", headers=hdrs, json={"enforce_sod": True}).status_code == 403
+
+    # Approve member entry & lock it -> subsequent adjust rejected (409)
+    assert c_mgr.post(f"/api/projects/{pid}/timesheets/{te1}/approve", headers=hdrs, json={}).status_code == 200
+    assert c_mgr.post(f"/api/projects/{pid}/timesheets/{te1}/lock", headers=hdrs).status_code == 200
+    assert c_mgr.post(f"/api/projects/{pid}/timesheets/{te1}/adjust", headers=hdrs, json={"delta_hours": "-1.00", "reason": "Locked test"}).status_code == 409
+
+    # 3. EVM Decimal Analytics
+    evm = c_mgr.get(f"/api/projects/{pid}/evm").get_json()["evm"]
+    assert evm["enabled"] is True
+    assert evm["bac"] == "100000.00"
+    assert evm["ev"] == "50000.00"  # avg progress (100+50+0)/3 = 50% of 100k
+    assert evm["ac"] == "1600.00"   # 16h * 100.00
+    assert evm["cpi"] is not None
+
+    # 4. /my-work page renders HTTP 200 with weekly grid & Gantt/EVM render on /projects/<id>
+    r_mw = c_mgr.get("/my-work")
+    assert r_mw.status_code == 200
+    assert b"Personal Weekly Timesheet Grid" in r_mw.data
+
+    r_pd = c_mgr.get(f"/projects/{pid}")
+    assert r_pd.status_code == 200
+    assert b"Critical Path &amp; Gantt Timeline" in r_pd.data
+    assert b"EVM Scorecard:" in r_pd.data
+
+
+
 

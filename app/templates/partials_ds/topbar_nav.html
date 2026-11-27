@@ -7,12 +7,13 @@
     "id": "workspace",
     "label": "Workspace",
     "tier": "all",
-    "keys": ["overview", "documents", "signed-contracts", "projects"],
+    "keys": ["overview", "my_work", "documents", "signed-contracts", "projects"],
     "items": [
-      {"endpoint": "system.main_views.home",                      "label": "Overview",       "desc": "Workspace KPIs & recent activity",   "key": "overview"},
-      {"endpoint": "tsd_views.library",                           "label": "Documents",      "desc": "Live TSD records & drafts",          "key": "documents"},
-      {"endpoint": "workspace_assets_views.signed_contracts_page","label": "Contracts",      "desc": "Active & executed agreements",       "key": "signed-contracts"},
-      {"endpoint": "contracts_views.projects_page",               "label": "Projects",       "desc": "Matters, deals & deliverables",      "key": "projects"}
+      {"endpoint": "system.main_views.home",                      "label": "Overview",              "desc": "Workspace KPIs & recent activity",       "key": "overview"},
+      {"endpoint": "contracts_views.my_work_page",                "label": "My Work & Timesheets",  "desc": "Weekly timesheet grid & personal inbox", "key": "my_work"},
+      {"endpoint": "tsd_views.library",                           "label": "Documents",             "desc": "Live TSD records & drafts",              "key": "documents"},
+      {"endpoint": "workspace_assets_views.signed_contracts_page","label": "Contracts",             "desc": "Active & executed agreements",           "key": "signed-contracts"},
+      {"endpoint": "contracts_views.projects_page",               "label": "Projects",              "desc": "Enterprise PPM, WBS & deliverables",     "key": "projects"}
     ]
   },
   {

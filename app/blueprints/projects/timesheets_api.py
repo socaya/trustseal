@@ -175,6 +175,8 @@ def adjust_approved_time_entry(project_id: int, entry_id: int):
         abort(404)
     if entry.status != "approved":
         return jsonify({"error": "Only approved entries require linked adjustments"}), 409
+    if entry.locked_at is not None:
+        return jsonify({"error": "Entry is locked in a closed period; audited reopen required"}), 409
 
     data = request.get_json(silent=True) or {}
     reason = str(data.get("reason") or "").strip()[:400]
@@ -226,6 +228,32 @@ def adjust_approved_time_entry(project_id: int, entry_id: int):
     )
     db.session.commit()
     return jsonify({"ok": True, "adjustment": adj.to_dict(), "cost_event": ev.to_dict()}), 201
+
+
+@project_timesheets_v21_api.route("/<int:project_id>/timesheets/<int:entry_id>/lock", methods=["POST"])
+@login_required
+def lock_approved_time_entry(project_id: int, entry_id: int):
+    """PM-13.06/08: Lock an approved time entry against further adjustments."""
+    actor = _actor()
+    proj = load_authorized_project(project_id, actor, require_write=True)
+    if not can_approve_project_governance(proj, actor):
+        abort(403, description="timesheet_lock_permission_required")
+    entry = ProjectTimeEntry.query.filter_by(id=entry_id, project_id=proj.id, organization_id=proj.organization_id).first()
+    if entry is None:
+        abort(404)
+    if entry.status != "approved":
+        return jsonify({"error": "Only approved entries can be locked"}), 409
+    entry.locked_at = _utcnow()
+    emit_project_event(
+        organization_id=proj.organization_id,
+        actor_id=actor.id,
+        event_type="timesheet.locked",
+        aggregate_type="project_time_entry",
+        aggregate_id=entry.id,
+        payload={"project_id": proj.id},
+    )
+    db.session.commit()
+    return jsonify({"ok": True, "time_entry": entry.to_dict(include_rates=can_view_project_finance(proj, actor))})
 
 
 @project_timesheets_v21_api.route("/<int:project_id>/timesheets/export.csv", methods=["GET"])

@@ -347,3 +347,192 @@ def approve_time_entry(entry: ProjectTimeEntry, project: Project, actor, hourly_
         idempotency_key=f"timesheet.approved:{entry.id}",
     )
     return ev
+
+
+def compute_critical_path(project: Project) -> dict[str, Any]:
+    """Deterministic Critical Path Method (CPM) engine across project tasks & dependencies (PM-07).
+
+    Computes topological forward pass (ES/EF), backward pass (LS/LF),
+    total float, and critical path task IDs (float == 0).
+    Duration per task is derived from (end - start) days, or ceil(planned_hours / 8), min 1 day.
+    """
+    tasks = (
+        ProjectTask.query.filter_by(organization_id=project.organization_id, project_id=project.id)
+        .order_by(ProjectTask.id.asc())
+        .all()
+    )
+    deps = ProjectTaskDependency.query.filter_by(
+        organization_id=project.organization_id, project_id=project.id
+    ).all()
+
+    task_map = {t.id: t for t in tasks}
+    dur: dict[int, int] = {}
+    for t in tasks:
+        if t.start_date_typed and t.due_date_typed and t.due_date_typed >= t.start_date_typed:
+            d = max(1, (t.due_date_typed - t.start_date_typed).days + 1)
+        elif t.planned_hours and Decimal(t.planned_hours) > 0:
+            d = max(1, int((Decimal(t.planned_hours) + Decimal("7.99")) // Decimal("8")))
+        else:
+            d = 1
+        dur[t.id] = d
+
+    preds: dict[int, list[tuple[int, str, int]]] = {t.id: [] for t in tasks}
+    succs: dict[int, list[tuple[int, str, int]]] = {t.id: [] for t in tasks}
+    in_deg: dict[int, int] = {t.id: 0 for t in tasks}
+    for dep in deps:
+        if dep.predecessor_task_id in task_map and dep.successor_task_id in task_map:
+            preds[dep.successor_task_id].append((dep.predecessor_task_id, dep.dependency_type or "FS", int(dep.lag_days or 0)))
+            succs[dep.predecessor_task_id].append((dep.successor_task_id, dep.dependency_type or "FS", int(dep.lag_days or 0)))
+            in_deg[dep.successor_task_id] += 1
+
+    # Kahn topological sort
+    queue = [tid for tid, deg in in_deg.items() if deg == 0]
+    order: list[int] = []
+    while queue:
+        cur = queue.pop(0)
+        order.append(cur)
+        for nxt, _, _ in succs[cur]:
+            in_deg[nxt] -= 1
+            if in_deg[nxt] == 0:
+                queue.append(nxt)
+    # Include any remaining tasks deterministically
+    for tid in task_map:
+        if tid not in order:
+            order.append(tid)
+
+    es: dict[int, int] = {}
+    ef: dict[int, int] = {}
+    for tid in order:
+        start = 0
+        for pid, dtype, lag in preds[tid]:
+            if dtype == "SS":
+                cand = es.get(pid, 0) + lag
+            elif dtype == "FF":
+                cand = ef.get(pid, 0) + lag - dur[tid]
+            elif dtype == "SF":
+                cand = es.get(pid, 0) + lag - dur[tid]
+            else:  # FS
+                cand = ef.get(pid, 0) + lag
+            if cand > start:
+                start = cand
+        es[tid] = max(0, start)
+        ef[tid] = es[tid] + dur[tid]
+
+    project_duration = max(ef.values(), default=0)
+
+    ls: dict[int, int] = {}
+    lf: dict[int, int] = {}
+    for tid in reversed(order):
+        finish = project_duration
+        for sid, dtype, lag in succs[tid]:
+            if dtype == "SS":
+                cand = ls.get(sid, project_duration) - lag + dur[tid]
+            elif dtype == "FF":
+                cand = lf.get(sid, project_duration) - lag
+            elif dtype == "SF":
+                cand = lf.get(sid, project_duration) - lag + dur[tid]
+            else:  # FS
+                cand = ls.get(sid, project_duration) - lag
+            if cand < finish:
+                finish = cand
+        lf[tid] = max(0, finish)
+        ls[tid] = max(0, lf[tid] - dur[tid])
+
+    activities = []
+    critical_ids = []
+    for tid in order:
+        t = task_map[tid]
+        t_float = max(0, ls[tid] - es[tid])
+        is_crit = (t_float == 0) and project_duration > 0
+        if is_crit:
+            critical_ids.append(tid)
+        activities.append({
+            "task_id": tid,
+            "title": t.title,
+            "status": t.status,
+            "progress_pct": int(t.progress_pct or 0),
+            "duration_days": dur[tid],
+            "early_start": es[tid],
+            "early_finish": ef[tid],
+            "late_start": ls[tid],
+            "late_finish": lf[tid],
+            "total_float": t_float,
+            "is_critical": is_crit,
+        })
+
+    return {
+        "project_duration_days": project_duration,
+        "critical_path_task_ids": critical_ids,
+        "activities": activities,
+    }
+
+
+def compute_project_evm(project: Project, financials: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Earned Value Management (EVM) analytics using strict Decimal arithmetic (Spec Section 6).
+
+    - BAC = Approved Budget
+    - EV  = BAC * weighted earned completion (from tasks progress_pct)
+    - PV  = BAC * planned schedule progress (tasks with due_date <= today, or 100% if past end_date)
+    - AC  = Posted Actual Costs
+    - SV = EV - PV, CV = EV - AC
+    - SPI = EV / PV (None if PV == 0), CPI = EV / AC (None if AC == 0)
+    - EAC = BAC / CPI (if CPI > 0 else None), VAC = BAC - EAC
+    """
+    from datetime import date as _date
+
+    fin = financials or compute_project_financials(project)
+    bac = Decimal(fin["approved_budget"])
+    ac = Decimal(fin["actuals"])
+    if bac <= Decimal("0.00"):
+        return {
+            "enabled": False,
+            "reason": "No approved budget baseline configured (BAC = 0)",
+            "currency": fin["currency"],
+            "bac": "0.00",
+            "pv": None,
+            "ev": None,
+            "ac": str(ac.quantize(Decimal("0.01"))),
+            "sv": None,
+            "cv": None,
+            "spi": None,
+            "cpi": None,
+            "eac": None,
+            "vac": None,
+        }
+
+    tasks = ProjectTask.query.filter_by(
+        organization_id=project.organization_id, project_id=project.id
+    ).all()
+    today = _date.today()
+
+    if tasks:
+        earned_ratio = sum((Decimal(int(t.progress_pct or 0)) for t in tasks), Decimal("0")) / (Decimal(len(tasks)) * Decimal("100"))
+        due_cnt = sum(1 for t in tasks if (t.effective_due_date() and t.effective_due_date() <= today))
+        planned_ratio = (Decimal(due_cnt) / Decimal(len(tasks))) if due_cnt > 0 else Decimal("0.50")
+    else:
+        earned_ratio = Decimal("0.00")
+        planned_ratio = Decimal("0.00")
+
+    ev = (bac * earned_ratio).quantize(Decimal("0.01"))
+    pv = (bac * planned_ratio).quantize(Decimal("0.01"))
+    sv = (ev - pv).quantize(Decimal("0.01"))
+    cv = (ev - ac).quantize(Decimal("0.01"))
+    spi = (ev / pv).quantize(Decimal("0.01")) if pv > Decimal("0.00") else None
+    cpi = (ev / ac).quantize(Decimal("0.01")) if ac > Decimal("0.00") else None
+    eac = (bac / cpi).quantize(Decimal("0.01")) if (cpi is not None and cpi > Decimal("0.00")) else None
+    vac = (bac - eac).quantize(Decimal("0.01")) if eac is not None else None
+
+    return {
+        "enabled": True,
+        "currency": fin["currency"],
+        "bac": str(bac.quantize(Decimal("0.01"))),
+        "pv": str(pv),
+        "ev": str(ev),
+        "ac": str(ac.quantize(Decimal("0.01"))),
+        "sv": str(sv),
+        "cv": str(cv),
+        "spi": str(spi) if spi is not None else None,
+        "cpi": str(cpi) if cpi is not None else None,
+        "eac": str(eac) if eac is not None else None,
+        "vac": str(vac) if vac is not None else None,
+    }

@@ -166,6 +166,15 @@ def projects_page():
         .all()
     ]
 
+    from app.models.project_enterprise_batch3 import ProjectTemplate
+
+    proj_templates_list = [
+        pt.to_dict()
+        for pt in ProjectTemplate.query.filter_by(organization_id=org_id)
+        .order_by(ProjectTemplate.id.desc())
+        .all()
+    ]
+
     portfolio_prog = compute_deliverable_progress(all_delivs)
     return render_template(
         "contracts/projects.html",
@@ -174,6 +183,7 @@ def projects_page():
         portfolios=portfolios_list,
         programmes=programmes_list,
         intakes=intakes_list,
+        project_templates=proj_templates_list,
         portfolio={
             "total_budget": total_budget,
             "total_committed": total_committed,
@@ -459,6 +469,11 @@ def project_detail_page(project_id: int):
     comment_rows = [cm.to_dict() for cm in ProjectComment.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectComment.id.desc()).all()]
     grant_rows = [g.to_dict() for g in ProjectExternalGrant.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectExternalGrant.id.desc()).all()]
 
+    from app.blueprints.projects.services import compute_critical_path, compute_project_evm
+
+    cpm_schedule = compute_critical_path(proj)
+    evm_metrics = compute_project_evm(proj, financials=financials)
+
     overall_prog = compute_deliverable_progress(all_proj_delivs)
     templates = ensure_default_templates(org_id, actor)
     return render_template(
@@ -481,6 +496,8 @@ def project_detail_page(project_id: int):
         lifecycle_states=LIFECYCLE_STATES,
         wbs_nodes=wbs_nodes,
         task_deps=task_deps,
+        cpm_schedule=cpm_schedule,
+        evm_metrics=evm_metrics,
         alloc_rows=alloc_rows,
         time_rows=time_rows,
         budget_lines=[b.to_dict() for b in budget_lines],
@@ -529,4 +546,89 @@ def contract_templates_page():
         projects=[p.to_dict() for p in projects],
         contract_types=CONTRACT_TYPES,
         categories=PROJECT_CATEGORIES,
+    )
+
+
+@contracts_views.route("/my-work", methods=["GET"])
+@login_required
+def my_work_page():
+    """PM-13.03 & PM-23: Personal Work Inbox & Consolidated Weekly Timesheet Grid."""
+    from datetime import date, timedelta
+    from decimal import Decimal
+    from app.models.project_enterprise_batch3 import ProjectApprovalRequest
+    from app.models.project_management import ProjectTask, ProjectTimeEntry
+
+    actor = _actor()
+    org_id = actor.organization_id
+    ensure_contract_workflow_table()
+    ensure_default_project(org_id, actor)
+
+    projs = Project.query.filter_by(organization_id=org_id).order_by(Project.updated_at.desc()).all()
+    proj_map = {p.id: p for p in projs}
+
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    week_dates = [monday + timedelta(days=i) for i in range(7)]
+    week_days = [
+        {"iso": d.isoformat(), "label": d.strftime("%a"), "short": d.strftime("%d %b")}
+        for d in week_dates
+    ]
+
+    entries = ProjectTimeEntry.query.filter(
+        ProjectTimeEntry.organization_id == org_id,
+        ProjectTimeEntry.user_id == actor.id,
+        ProjectTimeEntry.work_date >= week_dates[0],
+        ProjectTimeEntry.work_date <= week_dates[-1],
+    ).all()
+
+    by_proj_day: dict[int, dict[date, Decimal]] = {}
+    for e in entries:
+        by_proj_day.setdefault(e.project_id, {})
+        by_proj_day[e.project_id][e.work_date] = by_proj_day[e.project_id].get(e.work_date, Decimal("0.00")) + Decimal(e.hours or 0)
+
+    daily_totals = [Decimal("0.00")] * 7
+    grid_rows = []
+    for pid, dmap in by_proj_day.items():
+        p = proj_map.get(pid)
+        if not p:
+            continue
+        cells = []
+        row_tot = Decimal("0.00")
+        for idx, wd in enumerate(week_dates):
+            v = dmap.get(wd, Decimal("0.00"))
+            cells.append(float(v))
+            row_tot += v
+            daily_totals[idx] += v
+        grid_rows.append({
+            "project_id": p.id,
+            "project_code": p.project_code,
+            "project_name": p.name,
+            "cells": cells,
+            "total": float(row_tot),
+        })
+
+    week_total = sum(daily_totals, Decimal("0.00"))
+    my_tasks_raw = ProjectTask.query.filter_by(organization_id=org_id, assignee_user_id=actor.id).filter(ProjectTask.status != "done").order_by(ProjectTask.id.desc()).all()
+    my_tasks = [
+        {**t.to_dict(), "project_name": proj_map[t.project_id].name if t.project_id in proj_map else f"Project #{t.project_id}"}
+        for t in my_tasks_raw
+    ]
+    pending_approvals = [
+        a.to_dict()
+        for a in ProjectApprovalRequest.query.filter_by(organization_id=org_id, status="pending")
+        .filter(ProjectApprovalRequest.requested_by_id != actor.id)
+        .order_by(ProjectApprovalRequest.id.desc())
+        .all()
+    ]
+
+    return render_template(
+        "contracts/my_work.html",
+        my_projects=[p.to_dict() for p in projs],
+        week_days=week_days,
+        grid_rows=grid_rows,
+        daily_totals=[float(x) for x in daily_totals],
+        week_total_hours=str(week_total.quantize(Decimal("0.01"))),
+        today_iso=today.isoformat(),
+        my_tasks=my_tasks,
+        pending_approvals=pending_approvals,
     )
