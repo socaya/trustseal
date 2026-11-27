@@ -1,1130 +1,1225 @@
 {% extends "layouts/app.html" %}
 {% set active_nav_item = 'projects' %}
 
-{% block title %}{{ project.name }} · Project Portfolio · TRUSTSEAL{% endblock %}
-{% block page_title %}{{ project.name }}{% endblock %}
-{% block page_description %}
-  <p class="ts-page-header__description">
-    {{ project.project_code }} · {{ project.category|replace('_', ' ')|title }}{% if project.client_name %} · Sponsor: {{ project.client_name }}{% endif %}{% if project.description %} — {{ project.description }}{% endif %}
-  </p>
-{% endblock %}
-{% block page_actions %}
-  <a class="ts-btn ts-btn--secondary" href="{{ url_for('contracts_views.projects_page') }}">← Project Portfolio</a>
-  <button type="button" class="ts-btn ts-btn--primary" id="pd-open-new">+ New contract from template</button>
-{% endblock %}
+{% block title %}{{ project.name }} · PM Studio · TRUSTSEAL{% endblock %}
+{% block page_title %}{% endblock %}
+{% block page_description %}{% endblock %}
+{% block page_actions %}{% endblock %}
 
 {% block content %}
-<div class="st-flat">
-  {% include "stamps/_flat_ui.html" %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pm_studio.css') }}">
+{% include "stamps/_flat_ui.html" %}
 
-  {% set h = health if health is defined else {'rag': 'on_track', 'label': 'On Track', 'score': 100, 'open_risks': 0} %}
-  {% set t_rows = task_rows if task_rows is defined else [] %}
-  {% set r_rows = risk_rows if risk_rows is defined else [] %}
-  {% set t_done = t_rows|selectattr('status', 'equalto', 'done')|list|length %}
-  <section class="st-metrics" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));" aria-label="Project summary">
-    <div class="st-metric">
-      <span class="st-metric__label">Project Health (RAG)</span>
-      <span class="st-metric__value" style="color:{{ '#17633a' if h.rag == 'on_track' else ('#b45309' if h.rag == 'at_risk' else '#b91c1c') }};">{{ h.label }} · {{ h.score }}</span>
-      <span class="st-metric__sub">{{ h.open_risks }} open risk(s) · {{ project.status|replace('_',' ')|title }}</span>
+{% set h = health if health is defined else {'rag': 'on_track', 'label': 'On Track', 'score': 100, 'open_risks': 0} %}
+{% set t_rows = task_rows if task_rows is defined else [] %}
+{% set r_rows = risk_rows if risk_rows is defined else [] %}
+{% set t_done = t_rows|selectattr('status', 'equalto', 'done')|list|length %}
+
+<div class="pms-shell">
+  {# ======================= STUDIO COMMAND BAR ======================= #}
+  <header class="pms-topbar">
+    <div class="pms-topbar__left">
+      <a class="pms-back" href="{{ url_for('contracts_views.projects_page') }}">← Projects</a>
+      <span class="pms-code">{{ project.project_code }}</span>
+      <h1 class="pms-title">{{ project.name }}</h1>
+      <span class="pms-pill pms-pill--stage">{{ (project.lifecycle_state or 'executing')|replace('_',' ')|upper }}</span>
+      <span class="pms-pill {% if h.rag == 'on_track' %}pms-pill--ok{% elif h.rag == 'at_risk' %}pms-pill--warn{% else %}pms-pill--bad{% endif %}">
+        <span class="pms-dot"></span>{{ h.label }} · {{ h.score }}
+      </span>
     </div>
-    <div class="st-metric">
-      <span class="st-metric__label">Governed TSD Contracts</span>
-      <span class="st-metric__value">{{ contracts|length }}</span>
-      <span class="st-metric__sub">{{ contracts|selectattr('contract_status', 'equalto', 'SIGNED')|list|length }} signed · {{ contracts|selectattr('contract_status', 'equalto', 'DRAFT')|list|length }} draft</span>
+    <div class="pms-topbar__actions">
+      <a class="ts-btn ts-btn--secondary ts-btn--sm" href="{{ url_for('contracts_views.my_work_page') }}">My Timesheet</a>
+      <a class="ts-btn ts-btn--secondary ts-btn--sm" href="/api/projects/{{ project.id }}/export.csv">↓ Export CSV</a>
+      <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" id="pd-open-new">+ New Contract</button>
     </div>
-    <div class="st-metric">
-      <span class="st-metric__label">Tasks &amp; Workstreams</span>
-      <span class="st-metric__value">{{ t_done }}/{{ t_rows|length }}</span>
-      <span class="st-metric__sub">{{ (t_rows|length) - t_done }} remaining task(s)</span>
-    </div>
-    <div class="st-metric">
-      <span class="st-metric__label">Deliverables Progress</span>
-      <span class="st-metric__value" style="color:#17633a;">{{ overall_prog.pct }}%</span>
-      <span class="st-metric__sub">{{ overall_prog.accepted }} / {{ overall_prog.total }} milestones accepted</span>
-    </div>
-    <div class="st-metric">
-      <span class="st-metric__label">Budget vs Committed</span>
-      <span class="st-metric__value">{{ (project.currency ~ ' ' ~ ('{:,.0f}'.format(project.budget_amount))) if project.budget_amount else '—' }}</span>
-      <span class="st-metric__sub">Spend + Committed: {{ project.currency }} {{ '{:,.0f}'.format((financials.total_exposure|float) if (financials is defined and financials.total_exposure) else (committed_value or 0)) }}{% if budget_util_pct %} ({{ budget_util_pct }}%){% endif %}</span>
-    </div>
-  </section>
+  </header>
 
-  {# ======================= ENTERPRISE PROJECT WORKSPACE TABS ======================= #}
-  <nav style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;border-bottom:1px solid #ebeef2;padding-bottom:10px;" role="tablist">
-    <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-pdtab="contracts">TSD Contracts ({{ contracts|length }})</button>
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pdtab="governance">Governance &amp; Charter</button>
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pdtab="wbs">Plan &amp; WBS ({{ wbs_nodes|length if wbs_nodes is defined else 0 }})</button>
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pdtab="tasks">Tasks &amp; Workstreams ({{ t_rows|length }})</button>
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pdtab="resources">Resources ({{ alloc_rows|length if alloc_rows is defined else 0 }})</button>
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pdtab="timesheets">Timesheets ({{ time_rows|length if time_rows is defined else 0 }})</button>
-    {% if show_finance is not defined or show_finance %}
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pdtab="finance">Finance &amp; Budget</button>
-    {% endif %}
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pdtab="deliverables">Deliverables Rollup ({{ deliverable_rows|length }})</button>
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pdtab="terms">Key Terms &amp; Probation ({{ key_term_rows|length }})</button>
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pdtab="risks">Risks &amp; Issues ({{ r_rows|length }})</button>
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pdtab="changes">Changes &amp; Access ({{ change_rows|length if change_rows is defined else 0 }})</button>
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pdtab="agile">Requirements &amp; Agile ({{ (req_rows|length if req_rows is defined else 0) + (backlog_rows|length if backlog_rows is defined else 0) }})</button>
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pdtab="procurement">Procurement &amp; Assets ({{ (proc_rows|length if proc_rows is defined else 0) + (asset_rows|length if asset_rows is defined else 0) }})</button>
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pdtab="quality">QA &amp; Stakeholders ({{ (qa_rows|length if qa_rows is defined else 0) + (sh_rows|length if sh_rows is defined else 0) }})</button>
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pdtab="results">M&amp;E Results &amp; Closure ({{ ind_rows|length if ind_rows is defined else 0 }})</button>
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pdtab="compliance">Compliance, Portal &amp; Comms ({{ (compliance_rows|length if compliance_rows is defined else 0) + (approval_rows|length if approval_rows is defined else 0) }})</button>
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pdtab="settings">Project Settings</button>
-  </nav>
+  <div class="pms-body">
+    {# ======================= LEFT STUDIO NAVIGATION RAIL ======================= #}
+    <aside class="pms-rail" aria-label="PM Studio navigation">
+      <div class="pms-rail__group">
+        <div class="pms-rail__label">Overview</div>
+        <button type="button" class="pms-nav-btn is-active" data-pdtab="overview">
+          <span>Executive Summary</span>
+        </button>
+        <button type="button" class="pms-nav-btn" data-pdtab="governance">
+          <span>Charter &amp; Stage Gates</span>
+        </button>
+      </div>
 
-  {# ---- TAB 1: TSD CONTRACTS + LINK EXISTING ---- #}
-  <section class="st-panel" data-pdpane="contracts" style="overflow-x:auto;">
-    {% if available_contracts %}
-    <div style="padding:10px 14px;background:#f8fafc;border-bottom:1px solid #ebeef2;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;">
-      <span style="font-size:12px;color:#475569;font-weight:600;">Align an existing TSD Contract to this Project:</span>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <select id="pd-link-sel" class="st-select" style="height:30px;font-size:12px;min-width:260px;">
-          {% for ac in available_contracts %}
-          <option value="{{ ac.document_id }}">{{ ac.contract_number }} — {{ ac.title }}</option>
-          {% endfor %}
-        </select>
-        <button type="button" id="pd-link-btn" class="ts-btn ts-btn--secondary ts-btn--sm">+ Link Contract</button>
+      <div class="pms-rail__group">
+        <div class="pms-rail__label">Planning &amp; Delivery</div>
+        <button type="button" class="pms-nav-btn" data-pdtab="wbs">
+          <span>Plan, WBS &amp; Gantt</span>
+          <span class="pms-nav-btn__count">{{ wbs_nodes|length if wbs_nodes is defined else 0 }}</span>
+        </button>
+        <button type="button" class="pms-nav-btn" data-pdtab="tasks">
+          <span>Tasks &amp; Workstreams</span>
+          <span class="pms-nav-btn__count">{{ t_rows|length }}</span>
+        </button>
+        <button type="button" class="pms-nav-btn" data-pdtab="agile">
+          <span>Requirements &amp; Agile</span>
+          <span class="pms-nav-btn__count">{{ (req_rows|length if req_rows is defined else 0) + (backlog_rows|length if backlog_rows is defined else 0) }}</span>
+        </button>
       </div>
-    </div>
-    {% endif %}
-    <table class="st-table">
-      <thead>
-        <tr>
-          <th style="width:130px;">Ref #</th>
-          <th>Contract Title</th>
-          <th>Type</th>
-          <th>Counterparty</th>
-          <th>Status</th>
-          <th>Deliverables</th>
-          <th>Value</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for c in contracts %}
-        <tr>
-          <td style="font-family:var(--ts-font-mono);font-size:12px;color:#4c6273;">{{ c.contract_number }}</td>
-          <td style="font-weight:600;"><a href="{{ c.url }}" style="color:#1d3648;text-decoration:none;">{{ c.title }}</a></td>
-          <td style="color:#5a6676;">{{ c.contract_type|replace('_', ' ')|upper }}</td>
-          <td style="color:#5a6676;">{{ c.counterparty_name }}</td>
-          <td>
-            <span class="st-tag {% if c.contract_status == 'SIGNED' %}st-tag--ok{% elif c.contract_status == 'SUSPENDED' %}st-tag--warn{% elif c.contract_status == 'TERMINATED' %}st-tag--bad{% else %}st-tag--info{% endif %}">{{ c.contract_status }}</span>
-          </td>
-          <td style="font-variant-numeric:tabular-nums;">{{ c.deliverables_pct }}% ({{ c.deliverables_total }})</td>
-          <td style="color:#5a6676;">{{ c.deal_value }}</td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="7" style="text-align:center;padding:28px;color:#718494;">
-            No contracts in this project yet. Click <strong>+ New contract from template</strong> above to create one.
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </section>
 
-  {# ---- TAB 2: DELIVERABLES ROLLUP ---- #}
-  <section class="st-panel" data-pdpane="deliverables" hidden style="overflow-x:auto;">
-    <table class="st-table">
-      <thead>
-        <tr>
-          <th>Deliverable / Milestone</th>
-          <th>Contract</th>
-          <th>Phase</th>
-          <th>Due Date</th>
-          <th>Weight</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for dl in deliverable_rows %}
-        <tr>
-          <td style="font-weight:600;">{{ dl.title }}</td>
-          <td><a href="{{ dl.url }}" style="color:#002769;font-family:var(--ts-font-mono);font-size:12px;text-decoration:none;">{{ dl.contract_number }}</a></td>
-          <td style="color:#5a6676;">{{ dl.project_phase or '—' }}</td>
-          <td style="color:#5a6676;font-variant-numeric:tabular-nums;">{{ dl.due_date or '—' }}</td>
-          <td style="font-variant-numeric:tabular-nums;">{{ dl.weight_pct }}%</td>
-          <td><span class="st-tag {% if dl.status == 'accepted' %}st-tag--ok{% elif dl.status == 'suspended' %}st-tag--warn{% elif dl.status == 'rejected' %}st-tag--bad{% else %}st-tag--info{% endif %}">{{ dl.status|replace('_', ' ')|title }}</span></td>
-        </tr>
-        {% else %}
-        <tr><td colspan="6" style="text-align:center;padding:24px;color:#718494;">No deliverables tracked across this project's contracts yet.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </section>
+      <div class="pms-rail__group">
+        <div class="pms-rail__label">Resources &amp; Time</div>
+        <button type="button" class="pms-nav-btn" data-pdtab="resources">
+          <span>Team &amp; Allocations</span>
+          <span class="pms-nav-btn__count">{{ alloc_rows|length if alloc_rows is defined else 0 }}</span>
+        </button>
+        <button type="button" class="pms-nav-btn" data-pdtab="timesheets">
+          <span>Timesheets</span>
+          <span class="pms-nav-btn__count">{{ time_rows|length if time_rows is defined else 0 }}</span>
+        </button>
+      </div>
 
-  {# ---- TAB 3: KEY TERMS & PROBATION COHORT ---- #}
-  <section class="st-panel" data-pdpane="terms" hidden style="overflow-x:auto;">
-    <table class="st-table">
-      <thead>
-        <tr>
-          <th>Category</th>
-          <th>Key Term / Probation</th>
-          <th>Value</th>
-          <th>Contract</th>
-          <th>Target / End Date</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for kt in key_term_rows %}
-        <tr>
-          <td><span class="st-tag st-tag--info">{{ kt.category|upper }}</span></td>
-          <td style="font-weight:600;">{{ kt.label }}</td>
-          <td style="color:#5a6676;">{{ kt.value_text or '—' }}</td>
-          <td><a href="{{ kt.url }}" style="color:#002769;font-family:var(--ts-font-mono);font-size:12px;text-decoration:none;">{{ kt.contract_number }}</a></td>
-          <td style="color:#5a6676;font-variant-numeric:tabular-nums;">{{ kt.end_date or '—' }}{% if kt.days_remaining is not none %} ({{ kt.days_remaining }}d){% endif %}</td>
-          <td><span class="st-tag {% if kt.status == 'met' %}st-tag--ok{% else %}st-tag--info{% endif %}">{{ kt.status|upper }}</span></td>
-        </tr>
-        {% else %}
-        <tr><td colspan="6" style="text-align:center;padding:24px;color:#718494;">No key terms or probation periods tracked across this project yet.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </section>
-
-  {# ---- TAB 4: TASKS & WORKSTREAMS ---- #}
-  <section class="st-panel" data-pdpane="tasks" hidden style="padding:14px;">
-    <form id="pd-task-form" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 130px auto;gap:8px;align-items:end;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #ebeef2;">
-      <div>
-        <label class="ts-field__label" style="font-size:11px;">Task Title</label>
-        <input type="text" id="pd-t-title" class="ts-input" required placeholder="e.g. Complete Phase 1 technical sign-off">
-      </div>
-      <div>
-        <label class="ts-field__label" style="font-size:11px;">Assignee</label>
-        <input type="text" id="pd-t-assignee" class="ts-input" placeholder="Team / Officer">
-      </div>
-      <div>
-        <label class="ts-field__label" style="font-size:11px;">Priority</label>
-        <select id="pd-t-prio" class="st-select" style="width:100%;height:34px;">
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-          <option value="critical">Critical</option>
-          <option value="low">Low</option>
-        </select>
-      </div>
-      <div>
-        <label class="ts-field__label" style="font-size:11px;">Phase</label>
-        <input type="text" id="pd-t-phase" class="ts-input" value="Execution">
-      </div>
-      <div>
-        <label class="ts-field__label" style="font-size:11px;">Due Date</label>
-        <input type="date" id="pd-t-due" class="ts-input">
-      </div>
-      <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm" style="height:34px;">+ Add Task</button>
-    </form>
-    <div style="overflow-x:auto;">
-      <table class="st-table">
-        <thead>
-          <tr>
-            <th>Task</th>
-            <th>Phase</th>
-            <th>Assignee</th>
-            <th>Priority</th>
-            <th>Due Date</th>
-            <th>Status</th>
-            <th style="width:60px;text-align:right;"></th>
-          </tr>
-        </thead>
-        <tbody id="pd-tasks-tbody">
-          {% for t in t_rows %}
-          <tr data-task-id="{{ t.id }}">
-            <td style="font-weight:600;color:#0f172a;">{{ t.title }}</td>
-            <td style="color:#5a6676;">{{ t.phase }}</td>
-            <td style="color:#5a6676;">{{ t.assignee_name or '—' }}</td>
-            <td><span class="st-tag {% if t.priority in ('high','critical') %}st-tag--bad{% elif t.priority == 'medium' %}st-tag--info{% else %}{% endif %}">{{ t.priority|upper }}</span></td>
-            <td style="color:#5a6676;font-variant-numeric:tabular-nums;">{{ t.due_date or '—' }}</td>
-            <td>
-              <select class="st-select pd-task-st" data-tid="{{ t.id }}" style="height:28px;font-size:11.5px;">
-                {% for st_k, st_l in [('todo','To Do'),('in_progress','In Progress'),('review','Review'),('done','Done'),('blocked','Blocked')] %}
-                <option value="{{ st_k }}" {% if t.status == st_k %}selected{% endif %}>{{ st_l }}</option>
-                {% endfor %}
-              </select>
-            </td>
-            <td style="text-align:right;"><button type="button" class="ts-btn ts-btn--ghost ts-btn--sm pd-task-del" data-tid="{{ t.id }}">✕</button></td>
-          </tr>
-          {% else %}
-          <tr><td colspan="7" style="text-align:center;padding:24px;color:#718494;">No tasks logged yet. Add your first workstream task above.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  {# ---- TAB 5: RISKS & ISSUES REGISTER (RAID) ---- #}
-  <section class="st-panel" data-pdpane="risks" hidden style="padding:14px;">
-    <form id="pd-risk-form" style="display:grid;grid-template-columns:2fr 1fr 1fr 1.5fr 1fr auto;gap:8px;align-items:end;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #ebeef2;">
-      <div>
-        <label class="ts-field__label" style="font-size:11px;">Risk / Issue Title</label>
-        <input type="text" id="pd-r-title" class="ts-input" required placeholder="e.g. Vendor milestone delay impacting SLA">
-      </div>
-      <div>
-        <label class="ts-field__label" style="font-size:11px;">Category</label>
-        <select id="pd-r-cat" class="st-select" style="width:100%;height:34px;">
-          <option value="contractual">Contractual</option>
-          <option value="financial">Financial</option>
-          <option value="schedule">Schedule</option>
-          <option value="compliance">Compliance</option>
-          <option value="operational">Operational</option>
-        </select>
-      </div>
-      <div>
-        <label class="ts-field__label" style="font-size:11px;">Severity</label>
-        <select id="pd-r-sev" class="st-select" style="width:100%;height:34px;">
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-          <option value="critical">Critical</option>
-          <option value="low">Low</option>
-        </select>
-      </div>
-      <div>
-        <label class="ts-field__label" style="font-size:11px;">Mitigation Plan</label>
-        <input type="text" id="pd-r-mit" class="ts-input" placeholder="Action plan / owner response">
-      </div>
-      <div>
-        <label class="ts-field__label" style="font-size:11px;">Owner</label>
-        <input type="text" id="pd-r-owner" class="ts-input" placeholder="Risk owner">
-      </div>
-      <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm" style="height:34px;">+ Log Risk</button>
-    </form>
-    <div style="overflow-x:auto;">
-      <table class="st-table">
-        <thead>
-          <tr>
-            <th>Risk / Issue</th>
-            <th>Category</th>
-            <th>Severity</th>
-            <th>Mitigation Plan</th>
-            <th>Owner</th>
-            <th>Status</th>
-            <th style="width:60px;text-align:right;"></th>
-          </tr>
-        </thead>
-        <tbody id="pd-risks-tbody">
-          {% for r in r_rows %}
-          <tr data-risk-id="{{ r.id }}">
-            <td style="font-weight:600;color:#0f172a;">{{ r.title }}</td>
-            <td style="color:#5a6676;">{{ r.category|title }}</td>
-            <td><span class="st-tag {% if r.severity in ('high','critical') %}st-tag--bad{% elif r.severity == 'medium' %}st-tag--warn{% else %}st-tag--info{% endif %}">{{ r.severity|upper }}</span></td>
-            <td style="color:#5a6676;">{{ r.mitigation_plan or '—' }}</td>
-            <td style="color:#5a6676;">{{ r.owner_name or '—' }}</td>
-            <td>
-              <select class="st-select pd-risk-st" data-rid="{{ r.id }}" style="height:28px;font-size:11.5px;">
-                {% for rst in ('open','mitigating','closed') %}
-                <option value="{{ rst }}" {% if r.status == rst %}selected{% endif %}>{{ rst|title }}</option>
-                {% endfor %}
-              </select>
-            </td>
-            <td style="text-align:right;"><button type="button" class="ts-btn ts-btn--ghost ts-btn--sm pd-risk-del" data-rid="{{ r.id }}">✕</button></td>
-          </tr>
-          {% else %}
-          <tr><td colspan="7" style="text-align:center;padding:24px;color:#718494;">No risks or issues logged — Project health is clear.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  {# ---- TAB 6: PROJECT SETTINGS ---- #}
-  <section class="st-panel" data-pdpane="settings" hidden style="padding:18px;max-width:760px;">
-    <form id="pd-settings-form" class="ts-stack" style="gap:12px;">
-      <div class="ts-form-row ts-form-row--split">
-        <div class="ts-field">
-          <label class="ts-field__label">Project Name</label>
-          <input type="text" id="pd-set-name" class="ts-input" value="{{ project.name }}" required>
-        </div>
-        <div class="ts-field">
-          <label class="ts-field__label">Client / Sponsor</label>
-          <input type="text" id="pd-set-client" class="ts-input" value="{{ project.client_name }}">
-        </div>
-      </div>
-      <div class="ts-form-row ts-form-row--split">
-        <div class="ts-field">
-          <label class="ts-field__label">Status</label>
-          <select id="pd-set-status" class="ts-select">
-            {% for sk, sl in [('active','Active'),('on_hold','On Hold'),('completed','Completed'),('archived','Archived')] %}
-            <option value="{{ sk }}" {% if project.status == sk %}selected{% endif %}>{{ sl }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="ts-field">
-          <label class="ts-field__label">Category</label>
-          <select id="pd-set-cat" class="ts-select">
-            {% for ck, cl in categories %}
-            <option value="{{ ck }}" {% if project.category == ck %}selected{% endif %}>{{ cl }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-      <div class="ts-form-row ts-form-row--split">
-        <div class="ts-field">
-          <label class="ts-field__label">Budget Amount</label>
-          <input type="number" id="pd-set-budget" class="ts-input" value="{{ project.budget_amount if project.budget_amount is not none else '' }}">
-        </div>
-        <div class="ts-field">
-          <label class="ts-field__label">Currency</label>
-          <input type="text" id="pd-set-curr" class="ts-input" value="{{ project.currency }}">
-        </div>
-      </div>
-      <div class="ts-form-row ts-form-row--split">
-        <div class="ts-field">
-          <label class="ts-field__label">Start Date</label>
-          <input type="date" id="pd-set-start" class="ts-input" value="{{ project.start_date }}">
-        </div>
-        <div class="ts-field">
-          <label class="ts-field__label">Target End Date</label>
-          <input type="date" id="pd-set-end" class="ts-input" value="{{ project.end_date }}">
-        </div>
-      </div>
-      <div class="ts-field">
-        <label class="ts-field__label">Description &amp; Mandate</label>
-        <input type="text" id="pd-set-desc" class="ts-input" value="{{ project.description }}">
-      </div>
-      <div>
-        <button type="submit" class="ts-btn ts-btn--primary">Save Project Settings</button>
-      </div>
-    </form>
-  </section>
-
-  {# ---- ENTERPRISE TAB: GOVERNANCE, LIFECYCLE GATES, HEALTH v2.0 & CHARTER (PM-04/27) ---- #}
-  <section class="st-panel" data-pdpane="governance" hidden style="padding:16px;">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px;margin-bottom:16px;">
-      <div style="border:1px solid #e2e8f0;padding:14px;background:#fafbfc;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-          <strong style="font-size:13px;color:#0f172a;">Explainable Health Policy (v{{ h.policy_version if h.policy_version is defined else '2.0.0' }})</strong>
-          <span class="st-tag {% if h.rag == 'on_track' %}st-tag--ok{% elif h.rag == 'at_risk' %}st-tag--warn{% else %}st-tag--bad{% endif %}">{{ h.label }} · {{ h.score }}/100</span>
-        </div>
-        {% if h.dimensions is defined %}
-        <table class="st-table" style="font-size:12px;">
-          <thead><tr><th>Dimension</th><th>Status</th><th>Rationale</th></tr></thead>
-          <tbody>
-            {% for dkey, dim in h.dimensions.items() %}
-            <tr>
-              <td style="font-weight:600;">{{ dkey|replace('_',' ')|title }}</td>
-              <td><span class="st-tag {% if dim.rag == 'on_track' %}st-tag--ok{% elif dim.rag == 'at_risk' %}st-tag--warn{% elif dim.rag == 'critical' %}st-tag--bad{% else %}st-tag--info{% endif %}">{{ dim.label }}</span></td>
-              <td style="color:#475569;">{{ dim.reason }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="pms-rail__group">
+        <div class="pms-rail__label">Commercial &amp; Finance</div>
+        {% if show_finance is not defined or show_finance %}
+        <button type="button" class="pms-nav-btn" data-pdtab="finance">
+          <span>Finance, Budget &amp; EVM</span>
+        </button>
         {% endif %}
+        <button type="button" class="pms-nav-btn" data-pdtab="contracts">
+          <span>TSD Contracts &amp; Terms</span>
+          <span class="pms-nav-btn__count">{{ contracts|length }}</span>
+        </button>
+        <button type="button" class="pms-nav-btn" data-pdtab="procurement">
+          <span>Procurement &amp; Assets</span>
+          <span class="pms-nav-btn__count">{{ (proc_rows|length if proc_rows is defined else 0) + (asset_rows|length if asset_rows is defined else 0) }}</span>
+        </button>
       </div>
 
-      <div style="border:1px solid #e2e8f0;padding:14px;background:#fafbfc;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-          <strong style="font-size:13px;color:#0f172a;">Lifecycle State &amp; Stage Gates</strong>
-          <span class="st-tag st-tag--info">{{ (project.lifecycle_state or 'executing')|replace('_',' ')|upper }}</span>
+      <div class="pms-rail__group">
+        <div class="pms-rail__label">Governance &amp; Results</div>
+        <button type="button" class="pms-nav-btn" data-pdtab="risks">
+          <span>RAID &amp; Change Control</span>
+          <span class="pms-nav-btn__count">{{ (r_rows|length) + (change_rows|length if change_rows is defined else 0) }}</span>
+        </button>
+        <button type="button" class="pms-nav-btn" data-pdtab="compliance">
+          <span>QA, Compliance &amp; Portal</span>
+          <span class="pms-nav-btn__count">{{ (qa_rows|length if qa_rows is defined else 0) + (compliance_rows|length if compliance_rows is defined else 0) }}</span>
+        </button>
+        <button type="button" class="pms-nav-btn" data-pdtab="results">
+          <span>M&amp;E Results &amp; Closure</span>
+          <span class="pms-nav-btn__count">{{ ind_rows|length if ind_rows is defined else 0 }}</span>
+        </button>
+        <button type="button" class="pms-nav-btn" data-pdtab="settings">
+          <span>Project Settings</span>
+        </button>
+      </div>
+    </aside>
+
+    {# ======================= MAIN STUDIO CANVAS ======================= #}
+    <main class="pms-canvas">
+
+      {# ---- 1. EXECUTIVE SUMMARY ---- #}
+      <section class="pms-pane" data-pdpane="overview">
+        <div class="pms-sec-head">
+          <div>
+            <h2 class="pms-sec-title">Executive Summary</h2>
+            <p class="pms-sec-sub">{{ project.category|replace('_', ' ')|title }} · {{ (project.delivery_methodology or 'hybrid')|title }} delivery{% if project.client_name %} · Sponsor: {{ project.client_name }}{% endif %}{% if project.description %} — {{ project.description }}{% endif %}</p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="pd-lc-target" class="st-select" style="height:32px;font-size:12px;">
+              {% for ls in (lifecycle_states if lifecycle_states is defined else ['draft','authorized','planning','executing','handing_over','closing','closed','on_hold']) %}
+              <option value="{{ ls }}" {% if project.lifecycle_state == ls %}selected{% endif %}>Stage: {{ ls|replace('_',' ')|title }}</option>
+              {% endfor %}
+            </select>
+            <button type="button" id="pd-lc-go" class="ts-btn ts-btn--secondary ts-btn--sm">Transition</button>
+          </div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
-          <select id="pd-lc-target" class="st-select" style="height:30px;font-size:12px;flex:1;">
-            {% for ls in (lifecycle_states if lifecycle_states is defined else ['draft','authorized','planning','executing','handing_over','closing','closed','on_hold']) %}
-            <option value="{{ ls }}" {% if project.lifecycle_state == ls %}selected{% endif %}>{{ ls|replace('_',' ')|title }}</option>
-            {% endfor %}
-          </select>
-          <button type="button" id="pd-lc-go" class="ts-btn ts-btn--primary ts-btn--sm">Transition Stage</button>
+
+        <div class="pms-kpis">
+          <div class="pms-kpi">
+            <span class="pms-kpi__label">Project Health (RAG)</span>
+            <span class="pms-kpi__val" style="color:{{ '#047857' if h.rag == 'on_track' else ('#b45309' if h.rag == 'at_risk' else '#b91c1c') }};">{{ h.label }} · {{ h.score }}</span>
+            <span class="pms-kpi__sub">{{ h.open_risks }} open risk(s) · {{ project.status|replace('_',' ')|title }}</span>
+          </div>
+          <div class="pms-kpi">
+            <span class="pms-kpi__label">Budget vs Committed</span>
+            <span class="pms-kpi__val">{{ (project.currency ~ ' ' ~ ('{:,.0f}'.format(project.budget_amount))) if project.budget_amount else '—' }}</span>
+            <span class="pms-kpi__sub">Spend + Committed: {{ project.currency }} {{ '{:,.0f}'.format((financials.total_exposure|float) if (financials is defined and financials.total_exposure) else (committed_value or 0)) }}{% if budget_util_pct %} ({{ budget_util_pct }}%){% endif %}</span>
+          </div>
+          <div class="pms-kpi">
+            <span class="pms-kpi__label">Deliverables Progress</span>
+            <span class="pms-kpi__val" style="color:#047857;">{{ overall_prog.pct }}%</span>
+            <span class="pms-kpi__sub">{{ overall_prog.accepted }} / {{ overall_prog.total }} milestones accepted</span>
+          </div>
+          <div class="pms-kpi">
+            <span class="pms-kpi__label">Tasks &amp; Workstreams</span>
+            <span class="pms-kpi__val">{{ t_done }} / {{ t_rows|length }}</span>
+            <span class="pms-kpi__sub">{{ (t_rows|length) - t_done }} remaining task(s)</span>
+          </div>
+          <div class="pms-kpi">
+            <span class="pms-kpi__label">Governed TSD Contracts</span>
+            <span class="pms-kpi__val">{{ contracts|length }}</span>
+            <span class="pms-kpi__sub">{{ contracts|selectattr('contract_status', 'equalto', 'SIGNED')|list|length }} signed · {{ contracts|selectattr('contract_status', 'equalto', 'DRAFT')|list|length }} draft</span>
+          </div>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px;">
-          {% for g in (gate_rows if gate_rows is defined else []) %}
-          <div style="padding:8px;border:1px solid #e2e8f0;background:#fff;font-size:11.5px;">
-            <div style="font-weight:600;color:#0f172a;">{{ g.stage|replace('_',' ')|title }}</div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
-              <span class="st-tag {% if g.gate_state == 'approved' %}st-tag--ok{% elif g.gate_state == 'rejected' %}st-tag--bad{% else %}st-tag--info{% endif %}" style="font-size:10px;">{{ g.gate_state|replace('_',' ')|title }}</span>
-              {% if g.gate_state != 'approved' %}
-              <button type="button" class="ts-btn ts-btn--ghost ts-btn--sm pd-gate-approve" data-stage="{{ g.stage }}" style="padding:2px 6px;font-size:10.5px;">Approve</button>
-              {% endif %}
+
+        <div class="pms-card">
+          <div class="pms-card__head">
+            <div>
+              <h3 class="pms-card__title">Explainable Health Policy (v{{ h.policy_version if h.policy_version is defined else '2.0.0' }})</h3>
+              <div class="pms-card__sub">Deterministic 6-dimension evaluation — worst mandatory dimension governs overall RAG</div>
+            </div>
+            <span class="pms-pill {% if h.rag == 'on_track' %}pms-pill--ok{% elif h.rag == 'at_risk' %}pms-pill--warn{% else %}pms-pill--bad{% endif %}">{{ h.label }} · {{ h.score }}/100</span>
+          </div>
+          {% if h.dimensions is defined %}
+          <div class="pms-card__table-wrap">
+            <table class="st-table">
+              <thead><tr><th style="width:180px;">Dimension</th><th style="width:130px;">Status</th><th>Evaluation Rationale</th></tr></thead>
+              <tbody>
+                {% for dkey, dim in h.dimensions.items() %}
+                <tr>
+                  <td style="font-weight:600;">{{ dkey|replace('_',' ')|title }}</td>
+                  <td><span class="st-tag {% if dim.rag == 'on_track' %}st-tag--ok{% elif dim.rag == 'at_risk' %}st-tag--warn{% elif dim.rag == 'critical' %}st-tag--bad{% else %}st-tag--info{% endif %}">{{ dim.label }}</span></td>
+                  <td style="color:#475569;">{{ dim.reason }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endif %}
+        </div>
+      </section>
+
+      {# ---- 2. CHARTER & STAGE GATES ---- #}
+      <section class="pms-pane" data-pdpane="governance" hidden>
+        <div class="pms-sec-head">
+          <div>
+            <h2 class="pms-sec-title">Charter &amp; Stage Gates</h2>
+            <p class="pms-sec-sub">Server-enforced lifecycle governance, approval gates, and versioned charter baselines (PM-04)</p>
+          </div>
+        </div>
+
+        <div class="pms-card">
+          <div class="pms-card__head">
+            <div><h3 class="pms-card__title">Lifecycle Stage Gates (9 Stages)</h3></div>
+            <span class="pms-pill pms-pill--stage">{{ (project.lifecycle_state or 'executing')|replace('_',' ')|upper }}</span>
+          </div>
+          <div class="pms-card__body">
+            <div class="pms-gates-grid">
+              {% for g in (gate_rows if gate_rows is defined else []) %}
+              <div class="pms-gate {% if g.gate_state == 'approved' %}pms-gate--approved{% endif %}">
+                <div style="font-weight:700;font-size:12.5px;color:#0f172a;">{{ g.stage|replace('_',' ')|title }}</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span class="st-tag {% if g.gate_state == 'approved' %}st-tag--ok{% elif g.gate_state == 'rejected' %}st-tag--bad{% else %}st-tag--info{% endif %}" style="font-size:10.5px;">{{ g.gate_state|replace('_',' ')|title }}</span>
+                  {% if g.gate_state != 'approved' %}
+                  <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm pd-gate-approve" data-stage="{{ g.stage }}">Approve</button>
+                  {% endif %}
+                </div>
+              </div>
+              {% endfor %}
             </div>
           </div>
-          {% endfor %}
         </div>
-      </div>
-    </div>
 
-    <div style="border:1px solid #e2e8f0;padding:14px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <strong style="font-size:13px;color:#0f172a;">Project Charter {% if charter %}(v{{ charter.version }} · {{ charter.status|upper }}){% endif %}</strong>
-        {% if charter and charter.status == 'draft' %}
-        <button type="button" id="pd-charter-approve" data-cid="{{ charter.id }}" class="ts-btn ts-btn--primary ts-btn--sm">Approve Charter Baseline</button>
-        {% endif %}
-      </div>
-      <form id="pd-charter-form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;">
-        <div class="ts-field"><label class="ts-field__label">Objectives</label><textarea id="pd-ch-obj" class="ts-input" rows="2">{{ charter.objectives if charter else '' }}</textarea></div>
-        <div class="ts-field"><label class="ts-field__label">In Scope</label><textarea id="pd-ch-in" class="ts-input" rows="2">{{ charter.scope_in if charter else '' }}</textarea></div>
-        <div class="ts-field"><label class="ts-field__label">Out of Scope</label><textarea id="pd-ch-out" class="ts-input" rows="2">{{ charter.scope_out if charter else '' }}</textarea></div>
-        <div class="ts-field"><label class="ts-field__label">Success Criteria</label><textarea id="pd-ch-succ" class="ts-input" rows="2">{{ charter.success_criteria if charter else '' }}</textarea></div>
-        <div style="grid-column:1 / -1;"><button type="submit" class="ts-btn ts-btn--secondary ts-btn--sm">Save New Charter Version</button></div>
-      </form>
-    </div>
-  </section>
-
-  {# ---- ENTERPRISE TAB: PLAN, WBS & DEPENDENCIES (PM-06/07) ---- #}
-  <section class="st-panel" data-pdpane="wbs" hidden style="padding:16px;">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;">
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Work Breakdown Structure (WBS)</strong>
-        <form id="pd-wbs-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <input type="text" id="pd-wbs-code" class="ts-input" style="width:90px;min-height:30px;font-size:12px;" placeholder="1.1">
-          <input type="text" id="pd-wbs-title" class="ts-input" style="flex:1 1 160px;min-height:30px;font-size:12px;" placeholder="Work package title…" required>
-          <input type="number" step="0.01" id="pd-wbs-bud" class="ts-input" style="width:110px;min-height:30px;font-size:12px;" placeholder="Budget">
-          <input type="number" min="0" max="100" id="pd-wbs-wt" class="ts-input" style="width:75px;min-height:30px;font-size:12px;" placeholder="Wt %">
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Add WBS</button>
-        </form>
-        <table class="st-table">
-          <thead><tr><th>Code</th><th>Work Package</th><th>Budget</th><th>Weight</th></tr></thead>
-          <tbody>
-            {% for n in (wbs_nodes if wbs_nodes is defined else []) %}
-            <tr>
-              <td style="font-family:var(--ts-font-mono);font-weight:600;color:#002769;">{{ n.wbs_code }}</td>
-              <td style="font-weight:600;">{{ n.title }}</td>
-              <td style="font-variant-numeric:tabular-nums;">{{ project.currency }} {{ n.budget_allocation }}</td>
-              <td>{{ n.weight_pct }}%</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4" style="text-align:center;padding:18px;color:#718494;">No WBS work packages defined yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Task Schedule Dependencies (DAG Cycle-Protected)</strong>
-        <form id="pd-dep-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <select id="pd-dep-pred" class="st-select" style="height:30px;font-size:12px;flex:1;">
-            <option value="">Predecessor task…</option>
-            {% for t in t_rows %}<option value="{{ t.id }}">#{{ t.id }} · {{ t.title }}</option>{% endfor %}
-          </select>
-          <select id="pd-dep-type" class="st-select" style="height:30px;font-size:12px;width:72px;">
-            <option value="FS">FS</option><option value="SS">SS</option><option value="FF">FF</option><option value="SF">SF</option>
-          </select>
-          <select id="pd-dep-succ" class="st-select" style="height:30px;font-size:12px;flex:1;">
-            <option value="">Successor task…</option>
-            {% for t in t_rows %}<option value="{{ t.id }}">#{{ t.id }} · {{ t.title }}</option>{% endfor %}
-          </select>
-          <button type="submit" class="ts-btn ts-btn--secondary ts-btn--sm">+ Link</button>
-        </form>
-        <div id="pd-dep-err" style="font-size:12px;color:#b91c1c;margin-bottom:6px;" hidden></div>
-        <table class="st-table">
-          <thead><tr><th>Predecessor</th><th>Type</th><th>Successor</th><th>Lag</th></tr></thead>
-          <tbody>
-            {% for dep in (task_deps if task_deps is defined else []) %}
-            <tr>
-              <td>Task #{{ dep.predecessor_task_id }}</td>
-              <td><span class="st-tag st-tag--info">{{ dep.dependency_type }}</span></td>
-              <td>Task #{{ dep.successor_task_id }}</td>
-              <td>{{ dep.lag_days }}d</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4" style="text-align:center;padding:18px;color:#718494;">No task dependencies linked yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    {% if cpm_schedule is defined and cpm_schedule.activities %}
-    <div style="margin-top:16px;padding-top:14px;border-top:1px solid #ebeef2;overflow-x:auto;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <strong style="font-size:13px;color:#0f172a;">Critical Path &amp; Gantt Timeline (PM-07 · Duration: {{ cpm_schedule.project_duration_days }}d)</strong>
-        <span style="font-size:11.5px;color:#64748b;"><span style="display:inline-block;width:10px;height:10px;background:#b91c1c;margin-right:4px;"></span>Critical Path (0d float) · <span style="display:inline-block;width:10px;height:10px;background:#002769;margin-right:4px;margin-left:8px;"></span>Standard Activity</span>
-      </div>
-      {% set tot_d = cpm_schedule.project_duration_days if cpm_schedule.project_duration_days > 0 else 1 %}
-      <table class="st-table" style="font-size:12px;">
-        <thead><tr><th style="width:220px;">Activity</th><th style="width:70px;">Dur.</th><th style="width:70px;">Float</th><th>Timeline Bar (Day 0 → Day {{ tot_d }})</th></tr></thead>
-        <tbody>
-          {% for act in cpm_schedule.activities %}
-          {% set left_pct = ((act.early_start / tot_d) * 100)|round(1) %}
-          {% set width_pct = [((act.duration_days / tot_d) * 100)|round(1), 6]|max %}
-          <tr>
-            <td style="font-weight:600;">{{ act.title }} {% if act.is_critical %}<span class="st-tag st-tag--bad" style="font-size:9.5px;">CRITICAL</span>{% endif %}</td>
-            <td style="font-variant-numeric:tabular-nums;">{{ act.duration_days }}d</td>
-            <td style="font-variant-numeric:tabular-nums;">{{ act.total_float }}d</td>
-            <td>
-              <div style="position:relative;height:16px;background:#f1f5f9;border-radius:2px;min-width:240px;">
-                <div style="position:absolute;left:{{ left_pct }}%;width:{{ width_pct }}%;top:2px;bottom:2px;background:{{ '#b91c1c' if act.is_critical else '#002769' }};border-radius:2px;" title="ES: Day {{ act.early_start }}, EF: Day {{ act.early_finish }}, Float: {{ act.total_float }}d"></div>
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% endif %}
-  </section>
-
-  {# ---- ENTERPRISE TAB: RESOURCES & TIMESHEETS (PM-12/13) ---- #}
-  <section class="st-panel" data-pdpane="resources" hidden style="padding:16px;">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;">
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Resource Allocations &amp; Capacity (PM-12)</strong>
-        <form id="pd-alloc-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <select id="pd-al-user" class="st-select" style="height:30px;font-size:12px;flex:1;">
-            <option value="">Named user (optional)</option>
-            {% for u in (org_users if org_users is defined else []) %}<option value="{{ u.id }}">{{ u.username }} ({{ u.email }})</option>{% endfor %}
-          </select>
-          <input type="text" id="pd-al-role" class="ts-input" style="width:120px;min-height:30px;font-size:12px;" placeholder="Role title" value="Engineer">
-          <input type="number" min="1" max="100" id="pd-al-pct" class="ts-input" style="width:72px;min-height:30px;font-size:12px;" placeholder="%" value="50">
-          <input type="number" step="0.01" id="pd-al-rate" class="ts-input" style="width:85px;min-height:30px;font-size:12px;" placeholder="Rate/hr">
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Allocate</button>
-        </form>
-        <div id="pd-alloc-err" style="font-size:12px;color:#b91c1c;margin-bottom:6px;" hidden></div>
-        <table class="st-table">
-          <thead><tr><th>Resource</th><th>Role</th><th>FTE %</th><th>Status</th></tr></thead>
-          <tbody>
-            {% for a in (alloc_rows if alloc_rows is defined else []) %}
-            <tr>
-              <td style="font-weight:600;">{{ a.resource_name }}</td>
-              <td>{{ a.role_title }}</td>
-              <td style="font-variant-numeric:tabular-nums;">{{ a.allocation_pct }}%</td>
-              <td><span class="st-tag st-tag--ok">{{ a.status|title }}</span></td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4" style="text-align:center;padding:18px;color:#718494;">No resources allocated yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Timesheets &amp; Effort Accounting (PM-13)</strong>
-        <form id="pd-ts-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <input type="date" id="pd-ts-date" class="ts-input" style="width:130px;min-height:30px;font-size:12px;">
-          <input type="number" step="0.25" min="0.25" max="24" id="pd-ts-hrs" class="ts-input" style="width:80px;min-height:30px;font-size:12px;" placeholder="Hours" required>
-          <input type="text" id="pd-ts-notes" class="ts-input" style="flex:1 1 140px;min-height:30px;font-size:12px;" placeholder="Work log notes…">
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Log Time</button>
-        </form>
-        <table class="st-table">
-          <thead><tr><th>Date</th><th>Hours</th><th>Status</th><th style="text-align:right;">Action</th></tr></thead>
-          <tbody>
-            {% for te in (time_rows if time_rows is defined else []) %}
-            <tr>
-              <td style="font-variant-numeric:tabular-nums;">{{ te.work_date }}</td>
-              <td style="font-variant-numeric:tabular-nums;font-weight:600;">{{ te.hours }}h</td>
-              <td><span class="st-tag {% if te.status == 'approved' %}st-tag--ok{% else %}st-tag--info{% endif %}">{{ te.status|title }}</span></td>
-              <td style="text-align:right;">
-                {% if te.status != 'approved' %}
-                <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm pd-ts-approve" data-teid="{{ te.id }}">Approve &amp; Post Cost</button>
-                {% else %}
-                <span style="font-size:11px;color:#17633a;">Posted</span>
-                {% endif %}
-              </td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4" style="text-align:center;padding:18px;color:#718494;">No timesheet entries logged yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  {# ---- DEDICATED PROJECT TIMESHEETS TAB (v2.1 PM-13.04) ---- #}
-  <section class="st-panel" data-pdpane="timesheets" hidden style="padding:16px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #ebeef2;">
-      <div>
-        <strong style="font-size:13.5px;color:#0f172a;">Project Timesheets &amp; Effort Accounting (PM-13 v2.1)</strong>
-        <div style="font-size:11.5px;color:#64748b;">Immutable approved entries · linked adjustment/reversal ledger postings · closure-gated</div>
-      </div>
-      <a class="ts-btn ts-btn--secondary ts-btn--sm" href="/api/projects/{{ project.id }}/timesheets/export.csv">↓ Export Timesheets CSV</a>
-    </div>
-    <table class="st-table">
-      <thead>
-        <tr><th>Date</th><th>Hours</th><th>Billable</th><th>Notes</th><th>Status</th><th style="text-align:right;">Workflow</th></tr>
-      </thead>
-      <tbody>
-        {% for te in (time_rows if time_rows is defined else []) %}
-        <tr>
-          <td style="font-variant-numeric:tabular-nums;">{{ te.work_date }}</td>
-          <td style="font-variant-numeric:tabular-nums;font-weight:600;">{{ te.hours }}h</td>
-          <td>{{ 'Billable' if te.billable else 'Non-billable' }}</td>
-          <td style="color:#475569;">{{ te.notes or '—' }}{% if te.return_reason %}<div style="font-size:11px;color:#b91c1c;">Returned: {{ te.return_reason }}</div>{% endif %}</td>
-          <td><span class="st-tag {% if te.status == 'approved' %}st-tag--ok{% elif te.status == 'returned' %}st-tag--bad{% else %}st-tag--info{% endif %}">{{ te.status|title }}</span></td>
-          <td style="text-align:right;white-space:nowrap;">
-            {% if te.status in ('draft', 'returned') %}
-              <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm pd-ts-submit" data-teid="{{ te.id }}">Submit</button>
-            {% elif te.status == 'submitted' %}
-              <button type="button" class="ts-btn ts-btn--primary ts-btn--sm pd-ts-approve" data-teid="{{ te.id }}">Approve</button>
-              <button type="button" class="ts-btn ts-btn--ghost ts-btn--sm pd-ts-return" data-teid="{{ te.id }}">Return</button>
-            {% else %}
-              <span style="font-size:11px;color:#17633a;">Approved &amp; Posted</span>
+        <div class="pms-card">
+          <div class="pms-card__head">
+            <div>
+              <h3 class="pms-card__title">Project Charter {% if charter %}(v{{ charter.version }} · {{ charter.status|upper }}){% endif %}</h3>
+              <div class="pms-card__sub">Scope boundaries, objectives, and success criteria</div>
+            </div>
+            {% if charter and charter.status == 'draft' %}
+            <button type="button" id="pd-charter-approve" data-cid="{{ charter.id }}" class="ts-btn ts-btn--primary ts-btn--sm">Approve Charter Baseline</button>
             {% endif %}
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="6" style="text-align:center;padding:20px;color:#718494;">No project timesheet entries yet. Log time from Resources or via /api/projects/{{ project.id }}/timesheets.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </section>
-
-  {# ---- ENTERPRISE TAB: DECIMAL FINANCE & COST LEDGER (PM-15/16) ---- #}
-  {% if show_finance is not defined or show_finance %}
-  <section class="st-panel" data-pdpane="finance" hidden style="padding:16px;">
-    {% if financials is defined %}
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px;">
-      <div style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;"><div style="font-size:11px;color:#64748b;">Approved Budget</div><strong style="font-size:15px;">{{ financials.currency }} {{ financials.approved_budget_str }}</strong></div>
-      <div style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;"><div style="font-size:11px;color:#64748b;">Posted Actuals</div><strong style="font-size:15px;">{{ financials.currency }} {{ financials.actuals_str }}</strong></div>
-      <div style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;"><div style="font-size:11px;color:#64748b;">Open Commitments</div><strong style="font-size:15px;">{{ financials.currency }} {{ financials.commitments_str }}</strong></div>
-      <div style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;"><div style="font-size:11px;color:#64748b;">Available Budget</div><strong style="font-size:15px;color:{{ '#b91c1c' if financials.available_budget < 0 else '#17633a' }};">{{ financials.currency }} {{ financials.available_budget_str }}</strong></div>
-    </div>
-    {% endif %}
-    {% if evm_metrics is defined and evm_metrics.enabled %}
-    <div style="margin-bottom:14px;padding:10px 12px;border:1px solid #d5dce6;background:#ffffff;display:flex;flex-wrap:wrap;gap:16px;align-items:center;font-size:12px;">
-      <strong style="color:#002769;">EVM Scorecard:</strong>
-      <span><strong>BAC:</strong> {{ evm_metrics.currency }} {{ evm_metrics.bac }}</span>
-      <span><strong>PV:</strong> {{ evm_metrics.pv }}</span>
-      <span><strong>EV:</strong> {{ evm_metrics.ev }}</span>
-      <span><strong>AC:</strong> {{ evm_metrics.ac }}</span>
-      <span><strong>SPI:</strong> {{ evm_metrics.spi or 'N/A' }}</span>
-      <span><strong>CPI:</strong> {{ evm_metrics.cpi or 'N/A' }}</span>
-      <span><strong>EAC:</strong> {{ evm_metrics.eac or 'N/A' }}</span>
-    </div>
-    {% endif %}
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;">
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Budget Baseline Lines (Decimal NUMERIC)</strong>
-        <form id="pd-bud-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <select id="pd-bud-cat" class="st-select" style="height:30px;font-size:12px;">
-            <option value="labor">Labor</option><option value="vendor">Vendor</option><option value="equipment">Equipment</option><option value="materials">Materials</option><option value="contingency">Contingency</option>
-          </select>
-          <input type="text" id="pd-bud-desc" class="ts-input" style="flex:1 1 150px;min-height:30px;font-size:12px;" placeholder="Line description…" required>
-          <input type="number" step="0.01" id="pd-bud-amt" class="ts-input" style="width:110px;min-height:30px;font-size:12px;" placeholder="Amount" required>
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Add Line</button>
-        </form>
-        <table class="st-table">
-          <thead><tr><th>Category</th><th>Description</th><th style="text-align:right;">Planned</th></tr></thead>
-          <tbody>
-            {% for bl in (budget_lines if budget_lines is defined else []) %}
-            <tr>
-              <td><span class="st-tag st-tag--info">{{ bl.category|upper }}</span></td>
-              <td>{{ bl.description }}</td>
-              <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600;">{{ bl.currency }} {{ bl.planned_amount }}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="3" style="text-align:center;padding:18px;color:#718494;">No budget lines itemized yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Cost Ledger (Actuals, Commitments &amp; Reversals)</strong>
-        <form id="pd-cost-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <select id="pd-cost-type" class="st-select" style="height:30px;font-size:12px;">
-            <option value="actual">Actual</option><option value="commitment">Commitment</option><option value="accrual">Accrual</option><option value="reversal">Reversal</option>
-          </select>
-          <input type="text" id="pd-cost-desc" class="ts-input" style="flex:1 1 140px;min-height:30px;font-size:12px;" placeholder="Cost description / Invoice…" required>
-          <input type="number" step="0.01" id="pd-cost-amt" class="ts-input" style="width:105px;min-height:30px;font-size:12px;" placeholder="Amount" required>
-          <input type="text" id="pd-cost-ref" class="ts-input" style="width:105px;min-height:30px;font-size:12px;" placeholder="Source ref">
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Post Cost</button>
-        </form>
-        <table class="st-table">
-          <thead><tr><th>Type</th><th>Description</th><th>Ref</th><th style="text-align:right;">Amount</th></tr></thead>
-          <tbody>
-            {% for ce in (cost_events if cost_events is defined else []) %}
-            <tr>
-              <td><span class="st-tag {% if ce.event_type == 'actual' %}st-tag--ok{% elif ce.event_type == 'reversal' %}st-tag--bad{% else %}st-tag--warn{% endif %}">{{ ce.event_type|upper }}</span></td>
-              <td>{{ ce.description }}</td>
-              <td style="font-family:var(--ts-font-mono);font-size:11px;color:#64748b;">{{ ce.source_ref or '—' }}</td>
-              <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600;">{{ ce.currency }} {{ ce.amount }}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4" style="text-align:center;padding:18px;color:#718494;">No posted cost events yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-  {% endif %}
-
-  {# ---- ENTERPRISE TAB: INTEGRATED CHANGE CONTROL & PROJECT ACCESS (PM-20/33) ---- #}
-  <section class="st-panel" data-pdpane="changes" hidden style="padding:16px;">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;">
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Integrated Change Control (PM-20)</strong>
-        <form id="pd-cr-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <input type="text" id="pd-cr-title" class="ts-input" style="flex:1 1 160px;min-height:30px;font-size:12px;" placeholder="Change request title…" required>
-          <select id="pd-cr-type" class="st-select" style="height:30px;font-size:12px;">
-            <option value="scope">Scope</option><option value="schedule">Schedule</option><option value="budget">Budget</option><option value="contract">Contract</option>
-          </select>
-          <input type="number" step="0.01" id="pd-cr-cost" class="ts-input" style="width:95px;min-height:30px;font-size:12px;" placeholder="Cost +/-">
-          <input type="number" id="pd-cr-days" class="ts-input" style="width:80px;min-height:30px;font-size:12px;" placeholder="Days +/-">
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Submit CR</button>
-        </form>
-        <table class="st-table">
-          <thead><tr><th>CR #</th><th>Title</th><th>Impact</th><th>Status</th><th style="text-align:right;">Decision</th></tr></thead>
-          <tbody>
-            {% for cr in (change_rows if change_rows is defined else []) %}
-            <tr>
-              <td style="font-family:var(--ts-font-mono);font-weight:600;color:#002769;">{{ cr.cr_number }}</td>
-              <td style="font-weight:600;">{{ cr.title }}</td>
-              <td style="font-size:11.5px;">{{ project.currency }} {{ cr.cost_impact }} · {{ cr.schedule_impact_days }}d</td>
-              <td><span class="st-tag {% if cr.status == 'approved' %}st-tag--ok{% elif cr.status == 'rejected' %}st-tag--bad{% else %}st-tag--info{% endif %}">{{ cr.status|title }}</span></td>
-              <td style="text-align:right;white-space:nowrap;">
-                {% if cr.status in ('draft', 'submitted', 'in_review') %}
-                <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm pd-cr-decide" data-crid="{{ cr.id }}" data-dec="approved">Approve</button>
-                <button type="button" class="ts-btn ts-btn--ghost ts-btn--sm pd-cr-decide" data-crid="{{ cr.id }}" data-dec="rejected">Reject</button>
-                {% endif %}
-              </td>
-            </tr>
-            {% else %}
-            <tr><td colspan="5" style="text-align:center;padding:18px;color:#718494;">No change requests logged yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Project Team &amp; Access Governance (PM-33)</strong>
-        <form id="pd-mem-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <select id="pd-mem-user" class="st-select" style="height:30px;font-size:12px;flex:1;">
-            {% for u in (org_users if org_users is defined else []) %}<option value="{{ u.id }}">{{ u.username }} ({{ u.email }})</option>{% endfor %}
-          </select>
-          <select id="pd-mem-role" class="st-select" style="height:30px;font-size:12px;">
-            {% for r in (project_roles if project_roles is defined else ['project_manager','team_lead','member','finance','viewer']) %}
-            <option value="{{ r }}">{{ r|replace('_',' ')|title }}</option>
-            {% endfor %}
-          </select>
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Grant Access</button>
-        </form>
-        <table class="st-table">
-          <thead><tr><th>Member</th><th>Project Role</th><th>Finance Access</th></tr></thead>
-          <tbody>
-            {% for m in (member_rows if member_rows is defined else []) %}
-            <tr>
-              <td style="font-weight:600;">{{ m.username }} <span style="font-size:11px;color:#64748b;">{{ m.email }}</span></td>
-              <td><span class="st-tag st-tag--info">{{ m.project_role|replace('_',' ')|title }}</span></td>
-              <td>{{ 'Yes' if m.can_view_finance else 'Restricted' }}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="3" style="text-align:center;padding:18px;color:#718494;">Project uses default organization membership until explicit members are added.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  {# ---- BATCH 2 TAB: REQUIREMENTS & AGILE DELIVERY (PM-05/09) ---- #}
-  <section class="st-panel" data-pdpane="agile" hidden style="padding:16px;">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;">
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Requirements &amp; Traceability (PM-05)</strong>
-        <form id="pd-req-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <input type="text" id="pd-req-title" class="ts-input" style="flex:1 1 180px;min-height:30px;font-size:12px;" placeholder="Requirement statement…" required>
-          <select id="pd-req-prio" class="st-select" style="height:30px;font-size:12px;">
-            <option value="must">Must</option><option value="should">Should</option><option value="could">Could</option>
-          </select>
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Add Req</button>
-        </form>
-        <table class="st-table">
-          <thead><tr><th>Code</th><th>Requirement</th><th>Priority</th><th>Status</th><th style="text-align:right;">Action</th></tr></thead>
-          <tbody>
-            {% for r in (req_rows if req_rows is defined else []) %}
-            <tr>
-              <td style="font-family:var(--ts-font-mono);font-weight:600;color:#002769;">{{ r.req_code }}</td>
-              <td style="font-weight:600;">{{ r.title }}</td>
-              <td>{{ r.priority|upper }}</td>
-              <td><span class="st-tag {% if r.status == 'approved' %}st-tag--ok{% else %}st-tag--info{% endif %}">{{ r.status|title }}</span></td>
-              <td style="text-align:right;">{% if r.status == 'draft' %}<button type="button" class="ts-btn ts-btn--secondary ts-btn--sm pd-req-app" data-rqid="{{ r.id }}">Approve</button>{% endif %}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="5" style="text-align:center;padding:16px;color:#718494;">No requirements baselined yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Agile Sprints &amp; Backlog (PM-09)</strong>
-        <form id="pd-bl-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <input type="text" id="pd-bl-title" class="ts-input" style="flex:1 1 170px;min-height:30px;font-size:12px;" placeholder="User story / epic / defect…" required>
-          <input type="number" min="1" max="40" id="pd-bl-pts" class="ts-input" style="width:72px;min-height:30px;font-size:12px;" placeholder="Pts" value="3">
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Backlog Item</button>
-        </form>
-        <table class="st-table">
-          <thead><tr><th>Type</th><th>Backlog Item</th><th>Points</th><th>Status</th></tr></thead>
-          <tbody>
-            {% for b in (backlog_rows if backlog_rows is defined else []) %}
-            <tr>
-              <td><span class="st-tag st-tag--info">{{ b.item_type|upper }}</span></td>
-              <td style="font-weight:600;">{{ b.title }}</td>
-              <td style="font-variant-numeric:tabular-nums;">{{ b.story_points }} pts</td>
-              <td><span class="st-tag {% if b.status == 'done' %}st-tag--ok{% else %}st-tag--info{% endif %}">{{ b.status|replace('_',' ')|title }}</span></td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4" style="text-align:center;padding:16px;color:#718494;">No agile backlog items yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  {# ---- BATCH 2 TAB: PROCUREMENT & EQUIPMENT LOGISTICS (PM-17/14) ---- #}
-  <section class="st-panel" data-pdpane="procurement" hidden style="padding:16px;">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;">
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Procurement &amp; Supplier Awards (PM-17)</strong>
-        <form id="pd-pr-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <input type="text" id="pd-pr-title" class="ts-input" style="flex:1 1 160px;min-height:30px;font-size:12px;" placeholder="Requisition item / RFQ…" required>
-          <input type="text" id="pd-pr-sup" class="ts-input" style="width:130px;min-height:30px;font-size:12px;" placeholder="Supplier">
-          <input type="number" step="0.01" id="pd-pr-amt" class="ts-input" style="width:105px;min-height:30px;font-size:12px;" placeholder="Est. Amount">
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Requisition</button>
-        </form>
-        <table class="st-table">
-          <thead><tr><th>PR #</th><th>Title &amp; Supplier</th><th>Amount</th><th>Status</th><th style="text-align:right;">Action</th></tr></thead>
-          <tbody>
-            {% for pr in (proc_rows if proc_rows is defined else []) %}
-            <tr>
-              <td style="font-family:var(--ts-font-mono);font-weight:600;color:#002769;">{{ pr.req_number }}</td>
-              <td><strong>{{ pr.title }}</strong>{% if pr.supplier_name %}<div style="font-size:11px;color:#64748b;">{{ pr.supplier_name }}</div>{% endif %}</td>
-              <td style="font-variant-numeric:tabular-nums;">{{ pr.currency }} {{ pr.awarded_amount or pr.estimated_amount }}</td>
-              <td><span class="st-tag {% if pr.status == 'awarded' %}st-tag--ok{% else %}st-tag--info{% endif %}">{{ pr.status|title }}</span></td>
-              <td style="text-align:right;">{% if pr.status != 'awarded' %}<button type="button" class="ts-btn ts-btn--secondary ts-btn--sm pd-pr-award" data-prid="{{ pr.id }}">Award &amp; Commit</button>{% endif %}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="5" style="text-align:center;padding:16px;color:#718494;">No procurement requisitions logged yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Equipment &amp; Asset Bookings (PM-14)</strong>
-        <form id="pd-as-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <input type="text" id="pd-as-name" class="ts-input" style="flex:1 1 150px;min-height:30px;font-size:12px;" placeholder="Equipment / Vehicle…" required>
-          <input type="date" id="pd-as-sd" class="ts-input" style="width:125px;min-height:30px;font-size:12px;" required>
-          <input type="date" id="pd-as-ed" class="ts-input" style="width:125px;min-height:30px;font-size:12px;" required>
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Book Asset</button>
-        </form>
-        <table class="st-table">
-          <thead><tr><th>Asset</th><th>Dates</th><th>Qty</th><th>Status</th></tr></thead>
-          <tbody>
-            {% for a in (asset_rows if asset_rows is defined else []) %}
-            <tr>
-              <td style="font-weight:600;">{{ a.asset_name }}</td>
-              <td style="font-size:11.5px;">{{ a.start_date }} → {{ a.end_date }}</td>
-              <td>{{ a.quantity }} {{ a.unit }}</td>
-              <td><span class="st-tag st-tag--ok">{{ a.status|title }}</span></td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4" style="text-align:center;padding:16px;color:#718494;">No equipment or logistics bookings yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  {# ---- BATCH 2 TAB: QUALITY ASSURANCE & STAKEHOLDERS (PM-21/22/24) ---- #}
-  <section class="st-panel" data-pdpane="quality" hidden style="padding:16px;">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;">
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Quality Inspections, Tests &amp; CAPA (PM-21)</strong>
-        <form id="pd-qa-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <select id="pd-qa-type" class="st-select" style="height:30px;font-size:12px;">
-            <option value="inspection">Inspection</option><option value="test">Test</option><option value="defect">Defect</option><option value="capa">CAPA</option>
-          </select>
-          <input type="text" id="pd-qa-title" class="ts-input" style="flex:1 1 160px;min-height:30px;font-size:12px;" placeholder="QA check / defect title…" required>
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Log QA</button>
-        </form>
-        <table class="st-table">
-          <thead><tr><th>Type</th><th>Title</th><th>Severity</th><th>Status</th></tr></thead>
-          <tbody>
-            {% for q in (qa_rows if qa_rows is defined else []) %}
-            <tr>
-              <td><span class="st-tag st-tag--info">{{ q.record_type|upper }}</span></td>
-              <td style="font-weight:600;">{{ q.title }}</td>
-              <td>{{ q.severity|title }}</td>
-              <td><span class="st-tag {% if q.status in ('passed','verified','resolved') %}st-tag--ok{% elif q.status == 'failed' %}st-tag--bad{% else %}st-tag--warn{% endif %}">{{ q.status|title }}</span></td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4" style="text-align:center;padding:16px;color:#718494;">No quality inspections or defects logged yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Stakeholder Matrix &amp; Comms (PM-22)</strong>
-        <form id="pd-sh-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <input type="text" id="pd-sh-name" class="ts-input" style="flex:1 1 140px;min-height:30px;font-size:12px;" placeholder="Stakeholder name…" required>
-          <input type="text" id="pd-sh-role" class="ts-input" style="width:120px;min-height:30px;font-size:12px;" placeholder="Role / Org">
-          <select id="pd-sh-inf" class="st-select" style="height:30px;font-size:12px;">
-            <option value="high">High Influence</option><option value="medium" selected>Med Influence</option><option value="low">Low Influence</option>
-          </select>
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Add</button>
-        </form>
-        <table class="st-table">
-          <thead><tr><th>Stakeholder</th><th>Role</th><th>Influence</th><th>Cadence</th></tr></thead>
-          <tbody>
-            {% for s in (sh_rows if sh_rows is defined else []) %}
-            <tr>
-              <td style="font-weight:600;">{{ s.name }}</td>
-              <td>{{ s.role_title or '—' }}</td>
-              <td><span class="st-tag {% if s.influence_level == 'high' %}st-tag--warn{% else %}st-tag--info{% endif %}">{{ s.influence_level|title }}</span></td>
-              <td>{{ s.comms_cadence|title }}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4" style="text-align:center;padding:16px;color:#718494;">No stakeholders registered yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  {# ---- BATCH 2 TAB: M&E RESULTS LOGFRAME & CLOSURE/BENEFITS (PM-26/30) ---- #}
-  <section class="st-panel" data-pdpane="results" hidden style="padding:16px;">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;">
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">M&amp;E Results Framework &amp; Indicators (PM-26)</strong>
-        <form id="pd-ind-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <select id="pd-ind-lvl" class="st-select" style="height:30px;font-size:12px;">
-            <option value="output">Output</option><option value="outcome">Outcome</option><option value="impact">Impact</option>
-          </select>
-          <input type="text" id="pd-ind-title" class="ts-input" style="flex:1 1 160px;min-height:30px;font-size:12px;" placeholder="Indicator title…" required>
-          <input type="number" step="0.01" id="pd-ind-tgt" class="ts-input" style="width:90px;min-height:30px;font-size:12px;" placeholder="Target">
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Indicator</button>
-        </form>
-        <table class="st-table">
-          <thead><tr><th>Code</th><th>Level</th><th>Indicator</th><th>Target</th></tr></thead>
-          <tbody>
-            {% for ind in (ind_rows if ind_rows is defined else []) %}
-            <tr>
-              <td style="font-family:var(--ts-font-mono);font-weight:600;color:#002769;">{{ ind.indicator_code }}</td>
-              <td><span class="st-tag st-tag--info">{{ ind.level|upper }}</span></td>
-              <td style="font-weight:600;">{{ ind.title }}</td>
-              <td style="font-variant-numeric:tabular-nums;">{{ ind.target_value or '—' }} {{ ind.unit }}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4" style="text-align:center;padding:16px;color:#718494;">No M&amp;E indicators defined yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Handover, Closure Checklist &amp; Benefits (PM-30)</strong>
-        <form id="pd-cl-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <select id="pd-cl-cat" class="st-select" style="height:30px;font-size:12px;">
-            <option value="handover">Handover</option><option value="financial">Financial</option><option value="contractual">Contractual</option><option value="lessons">Lessons</option>
-          </select>
-          <input type="text" id="pd-cl-title" class="ts-input" style="flex:1 1 160px;min-height:30px;font-size:12px;" placeholder="Closure checklist item…" required>
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Checklist</button>
-        </form>
-        <table class="st-table">
-          <thead><tr><th>Category</th><th>Closure Item</th><th>Status</th></tr></thead>
-          <tbody>
-            {% for ci in (closure_rows if closure_rows is defined else []) %}
-            <tr>
-              <td><span class="st-tag st-tag--info">{{ ci.category|upper }}</span></td>
-              <td style="font-weight:600;">{{ ci.title }}</td>
-              <td><span class="st-tag {% if ci.completed %}st-tag--ok{% else %}st-tag--warn{% endif %}">{{ 'Done' if ci.completed else 'Pending' }}</span></td>
-            </tr>
-            {% else %}
-            <tr><td colspan="3" style="text-align:center;padding:16px;color:#718494;">No closure items tracked yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  {# ---- BATCH 3 TAB: COMPLIANCE, APPROVALS, EXTERNAL PORTAL, COMMENTS & CSV EXPORT (PM-23/25/28/29/32) ---- #}
-  <section class="st-panel" data-pdpane="compliance" hidden style="padding:16px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #ebeef2;">
-      <strong style="font-size:13px;color:#0f172a;">Compliance, Governed Approvals, External Portal &amp; Interoperability</strong>
-      <a class="ts-btn ts-btn--secondary ts-btn--sm" href="/api/projects/{{ project.id }}/export.csv">↓ Export Tasks CSV (Formula-Safe)</a>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;margin-bottom:16px;">
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Permits, Safeguards &amp; HSE Incidents (PM-28)</strong>
-        <form id="pd-comp-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <select id="pd-comp-type" class="st-select" style="height:30px;font-size:12px;">
-            <option value="permit">Permit</option><option value="safeguard">Safeguard</option><option value="hse_incident">HSE Incident (Restricted)</option><option value="obligation">Obligation</option>
-          </select>
-          <input type="text" id="pd-comp-title" class="ts-input" style="flex:1 1 150px;min-height:30px;font-size:12px;" placeholder="Permit / incident title…" required>
-          <input type="date" id="pd-comp-exp" class="ts-input" style="width:125px;min-height:30px;font-size:12px;">
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Record</button>
-        </form>
-        <table class="st-table">
-          <thead><tr><th>Type</th><th>Title</th><th>Expiry</th><th>Status</th></tr></thead>
-          <tbody>
-            {% for cr in (compliance_rows if compliance_rows is defined else []) %}
-            <tr>
-              <td><span class="st-tag st-tag--info">{{ cr.record_type|replace('_',' ')|upper }}</span></td>
-              <td style="font-weight:600;">{{ cr.title }}</td>
-              <td style="font-variant-numeric:tabular-nums;">{{ cr.expiry_date or '—' }}</td>
-              <td><span class="st-tag {% if cr.is_expired %}st-tag--bad{% else %}st-tag--ok{% endif %}">{{ cr.status|title }}</span></td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4" style="text-align:center;padding:14px;color:#718494;">No compliance permits or incidents logged yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">External Client / Partner Portal Grants (PM-29)</strong>
-        <form id="pd-ext-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <input type="text" id="pd-ext-name" class="ts-input" style="flex:1 1 130px;min-height:30px;font-size:12px;" placeholder="Client / Partner name…" required>
-          <input type="email" id="pd-ext-email" class="ts-input" style="flex:1 1 140px;min-height:30px;font-size:12px;" placeholder="email@partner.org" required>
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Issue Scoped Link</button>
-        </form>
-        <div id="pd-ext-out" style="font-size:11.5px;color:#17633a;margin-bottom:8px;word-break:break-all;" hidden></div>
-        <table class="st-table">
-          <thead><tr><th>Recipient</th><th>Expires</th><th>Status</th><th style="text-align:right;">Action</th></tr></thead>
-          <tbody>
-            {% for g in (grant_rows if grant_rows is defined else []) %}
-            <tr>
-              <td><strong>{{ g.recipient_name }}</strong><div style="font-size:11px;color:#64748b;">{{ g.recipient_email }}</div></td>
-              <td style="font-size:11.5px;">{{ g.expires_at }}</td>
-              <td><span class="st-tag {% if g.is_valid %}st-tag--ok{% else %}st-tag--bad{% endif %}">{{ 'Active' if g.is_valid else 'Revoked/Expired' }}</span></td>
-              <td style="text-align:right;">{% if g.is_valid %}<button type="button" class="ts-btn ts-btn--ghost ts-btn--sm pd-ext-rev" data-gid="{{ g.id }}">Revoke</button>{% endif %}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4" style="text-align:center;padding:14px;color:#718494;">No external portal grants active.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;">
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Governed Approvals (PM-25 · Hash-Bound &amp; SoD)</strong>
-        <form id="pd-ap-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <input type="text" id="pd-ap-title" class="ts-input" style="flex:1 1 180px;min-height:30px;font-size:12px;" placeholder="Approval subject…" required>
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Request Approval</button>
-        </form>
-        <table class="st-table">
-          <thead><tr><th>Subject</th><th>Hash</th><th>Status</th></tr></thead>
-          <tbody>
-            {% for a in (approval_rows if approval_rows is defined else []) %}
-            <tr>
-              <td style="font-weight:600;">{{ a.subject_title }}</td>
-              <td style="font-family:var(--ts-font-mono);font-size:11px;color:#64748b;">{{ a.subject_hash[:12] }}…</td>
-              <td><span class="st-tag {% if a.status == 'approved' %}st-tag--ok{% elif a.status == 'rejected' %}st-tag--bad{% else %}st-tag--warn{% endif %}">{{ a.status|title }}</span></td>
-            </tr>
-            {% else %}
-            <tr><td colspan="3" style="text-align:center;padding:14px;color:#718494;">No governed approval requests yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      <div>
-        <strong style="font-size:13px;display:block;margin-bottom:8px;">Project Collaboration Thread (PM-23)</strong>
-        <form id="pd-cm-form" style="display:flex;gap:6px;margin-bottom:10px;">
-          <input type="text" id="pd-cm-body" class="ts-input" style="flex:1;min-height:30px;font-size:12px;" placeholder="Post an update or note…" required>
-          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Post</button>
-        </form>
-        <div style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;">
-          {% for cm in (comment_rows if comment_rows is defined else []) %}
-          <div style="padding:8px 10px;border:1px solid #e2e8f0;background:#fafbfc;font-size:12px;">
-            <div style="display:flex;justify-content:space-between;color:#64748b;font-size:11px;margin-bottom:3px;"><strong>{{ cm.author_name }}</strong><span>{{ cm.created_at }}</span></div>
-            <div style="color:#0f172a;">{{ cm.body }}</div>
           </div>
-          {% else %}
-          <div style="text-align:center;padding:14px;color:#718494;font-size:12px;">No project comments yet.</div>
-          {% endfor %}
+          <div class="pms-card__body">
+            <form id="pd-charter-form" class="pms-grid-2">
+              <div class="ts-field"><label class="ts-field__label">Objectives</label><textarea id="pd-ch-obj" class="ts-input" rows="3">{{ charter.objectives if charter else '' }}</textarea></div>
+              <div class="ts-field"><label class="ts-field__label">In Scope</label><textarea id="pd-ch-in" class="ts-input" rows="3">{{ charter.scope_in if charter else '' }}</textarea></div>
+              <div class="ts-field"><label class="ts-field__label">Out of Scope</label><textarea id="pd-ch-out" class="ts-input" rows="3">{{ charter.scope_out if charter else '' }}</textarea></div>
+              <div class="ts-field"><label class="ts-field__label">Success Criteria</label><textarea id="pd-ch-succ" class="ts-input" rows="3">{{ charter.success_criteria if charter else '' }}</textarea></div>
+              <div style="grid-column:1 / -1;"><button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Save New Charter Version</button></div>
+            </form>
+          </div>
         </div>
-      </div>
-    </div>
-  </section>
+      </section>
+
+      {# ---- 3. PLAN, WBS & GANTT ---- #}
+      <section class="pms-pane" data-pdpane="wbs" hidden>
+        <div class="pms-sec-head">
+          <div>
+            <h2 class="pms-sec-title">Plan, WBS &amp; Critical Path Gantt</h2>
+            <p class="pms-sec-sub">Work Breakdown Structure (PM-06), DAG-protected dependencies, and deterministic CPM schedule (PM-07)</p>
+          </div>
+        </div>
+
+        <div class="pms-grid-2">
+          <div class="pms-card">
+            <div class="pms-card__head">
+              <div><h3 class="pms-card__title">Work Breakdown Structure (WBS)</h3></div>
+              <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-toggle-drawer="dr-wbs">+ Add Work Package</button>
+            </div>
+            <div class="pms-drawer" id="dr-wbs" hidden>
+              <form id="pd-wbs-form" class="pms-form-grid">
+                <input type="text" id="pd-wbs-code" class="ts-input" placeholder="Code (e.g. 1.1)">
+                <input type="text" id="pd-wbs-title" class="ts-input" placeholder="Work package title…" required>
+                <input type="number" step="0.01" id="pd-wbs-bud" class="ts-input" placeholder="Budget">
+                <input type="number" min="0" max="100" id="pd-wbs-wt" class="ts-input" placeholder="Weight %">
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Save WBS</button>
+              </form>
+            </div>
+            <div class="pms-card__table-wrap">
+              <table class="st-table">
+                <thead><tr><th>Code</th><th>Work Package</th><th>Budget</th><th>Weight</th></tr></thead>
+                <tbody>
+                  {% for n in (wbs_nodes if wbs_nodes is defined else []) %}
+                  <tr>
+                    <td style="font-family:var(--ts-font-mono);font-weight:700;color:#002769;">{{ n.wbs_code }}</td>
+                    <td style="font-weight:600;">{{ n.title }}</td>
+                    <td style="font-variant-numeric:tabular-nums;">{{ project.currency }} {{ n.budget_allocation }}</td>
+                    <td>{{ n.weight_pct }}%</td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="4" style="text-align:center;padding:24px;color:#718494;">No WBS work packages defined yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="pms-card">
+            <div class="pms-card__head">
+              <div><h3 class="pms-card__title">Schedule Dependencies (DAG Cycle-Protected)</h3></div>
+              <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-toggle-drawer="dr-dep">+ Link Tasks</button>
+            </div>
+            <div class="pms-drawer" id="dr-dep" hidden>
+              <form id="pd-dep-form" class="pms-form-grid">
+                <select id="pd-dep-pred" class="st-select"><option value="">Predecessor…</option>{% for t in t_rows %}<option value="{{ t.id }}">#{{ t.id }} · {{ t.title }}</option>{% endfor %}</select>
+                <select id="pd-dep-type" class="st-select"><option value="FS">FS</option><option value="SS">SS</option><option value="FF">FF</option><option value="SF">SF</option></select>
+                <select id="pd-dep-succ" class="st-select"><option value="">Successor…</option>{% for t in t_rows %}<option value="{{ t.id }}">#{{ t.id }} · {{ t.title }}</option>{% endfor %}</select>
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Add Link</button>
+              </form>
+              <div id="pd-dep-err" style="font-size:12px;color:#b91c1c;margin-top:6px;" hidden></div>
+            </div>
+            <div class="pms-card__table-wrap">
+              <table class="st-table">
+                <thead><tr><th>Predecessor</th><th>Type</th><th>Successor</th><th>Lag</th></tr></thead>
+                <tbody>
+                  {% for dep in (task_deps if task_deps is defined else []) %}
+                  <tr>
+                    <td>Task #{{ dep.predecessor_task_id }}</td>
+                    <td><span class="st-tag st-tag--info">{{ dep.dependency_type }}</span></td>
+                    <td>Task #{{ dep.successor_task_id }}</td>
+                    <td>{{ dep.lag_days }}d</td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="4" style="text-align:center;padding:24px;color:#718494;">No task dependencies linked yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {% if cpm_schedule is defined and cpm_schedule.activities %}
+        <div class="pms-card">
+          <div class="pms-card__head">
+            <div>
+              <h3 class="pms-card__title">Critical Path &amp; Gantt Timeline (PM-07 · Duration: {{ cpm_schedule.project_duration_days }}d)</h3>
+              <div class="pms-card__sub">Crimson bars indicate zero-float critical path activities</div>
+            </div>
+          </div>
+          {% set tot_d = cpm_schedule.project_duration_days if cpm_schedule.project_duration_days > 0 else 1 %}
+          <div class="pms-card__table-wrap">
+            <table class="st-table">
+              <thead><tr><th style="width:240px;">Activity</th><th style="width:70px;">Dur.</th><th style="width:70px;">Float</th><th>Timeline (Day 0 → Day {{ tot_d }})</th></tr></thead>
+              <tbody>
+                {% for act in cpm_schedule.activities %}
+                {% set left_pct = ((act.early_start / tot_d) * 100)|round(1) %}
+                {% set width_pct = [((act.duration_days / tot_d) * 100)|round(1), 6]|max %}
+                <tr>
+                  <td style="font-weight:600;">{{ act.title }} {% if act.is_critical %}<span class="st-tag st-tag--bad" style="font-size:10px;">CRITICAL</span>{% endif %}</td>
+                  <td style="font-variant-numeric:tabular-nums;">{{ act.duration_days }}d</td>
+                  <td style="font-variant-numeric:tabular-nums;">{{ act.total_float }}d</td>
+                  <td>
+                    <div style="position:relative;height:18px;background:#f1f5f9;border-radius:4px;min-width:260px;">
+                      <div style="position:absolute;left:{{ left_pct }}%;width:{{ width_pct }}%;top:2px;bottom:2px;background:{{ '#b91c1c' if act.is_critical else '#002769' }};border-radius:3px;" title="ES: Day {{ act.early_start }}, EF: Day {{ act.early_finish }}, Float: {{ act.total_float }}d"></div>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+      </section>
+
+      {# ---- 4. TASKS & WORKSTREAMS ---- #}
+      <section class="pms-pane" data-pdpane="tasks" hidden>
+        <div class="pms-sec-head">
+          <div>
+            <h2 class="pms-sec-title">Tasks &amp; Workstreams</h2>
+            <p class="pms-sec-sub">Identity-backed execution work items linked to WBS packages and TSD contracts (PM-08)</p>
+          </div>
+          <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-toggle-drawer="dr-task">+ New Task</button>
+        </div>
+
+        <div class="pms-card">
+          <div class="pms-drawer" id="dr-task" hidden>
+            <form id="pd-task-form" class="pms-form-grid">
+              <input type="text" id="pd-t-title" class="ts-input" placeholder="Task title…" required>
+              <input type="text" id="pd-t-assignee" class="ts-input" placeholder="Assignee name">
+              <select id="pd-t-prio" class="st-select"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="critical">Critical</option></select>
+              <input type="text" id="pd-t-phase" class="ts-input" placeholder="Workstream / Phase" value="Execution">
+              <input type="date" id="pd-t-due" class="ts-input">
+              <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Create Task</button>
+            </form>
+          </div>
+          <div class="pms-card__table-wrap">
+            <table class="st-table">
+              <thead><tr><th>Task</th><th>Phase</th><th>Assignee</th><th>Priority</th><th>Due Date</th><th>Status</th><th style="text-align:right;">Action</th></tr></thead>
+              <tbody>
+                {% for t in t_rows %}
+                <tr>
+                  <td style="font-weight:600;">{{ t.title }}</td>
+                  <td style="color:#5a6676;">{{ t.phase }}</td>
+                  <td>{{ t.assignee_name or 'Unassigned' }}</td>
+                  <td><span class="st-tag {% if t.priority in ('critical','urgent') %}st-tag--bad{% elif t.priority == 'high' %}st-tag--warn{% else %}st-tag--info{% endif %}">{{ t.priority|title }}</span></td>
+                  <td style="font-variant-numeric:tabular-nums;">{{ t.due_date or '—' }}</td>
+                  <td>
+                    <select class="st-select pd-task-st" data-tid="{{ t.id }}" style="height:28px;font-size:12px;">
+                      {% for st in ['todo','in_progress','review','done','blocked'] %}
+                      <option value="{{ st }}" {% if t.status == st %}selected{% endif %}>{{ st|replace('_',' ')|title }}</option>
+                      {% endfor %}
+                    </select>
+                  </td>
+                  <td style="text-align:right;"><button type="button" class="ts-btn ts-btn--ghost ts-btn--sm pd-task-del" data-tid="{{ t.id }}">Remove</button></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" style="text-align:center;padding:28px;color:#718494;">No tasks yet. Click <strong>+ New Task</strong> above to add one.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {# ---- 5. REQUIREMENTS & AGILE ---- #}
+      <section class="pms-pane" data-pdpane="agile" hidden>
+        <div class="pms-sec-head">
+          <div>
+            <h2 class="pms-sec-title">Requirements &amp; Agile Delivery</h2>
+            <p class="pms-sec-sub">Baselined requirements traceability (PM-05) and sprint/backlog story points (PM-09)</p>
+          </div>
+        </div>
+
+        <div class="pms-grid-2">
+          <div class="pms-card">
+            <div class="pms-card__head">
+              <div><h3 class="pms-card__title">Requirements &amp; Traceability (PM-05)</h3></div>
+              <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-toggle-drawer="dr-req">+ Add Requirement</button>
+            </div>
+            <div class="pms-drawer" id="dr-req" hidden>
+              <form id="pd-req-form" class="pms-form-grid">
+                <input type="text" id="pd-req-title" class="ts-input" placeholder="Requirement statement…" required>
+                <select id="pd-req-prio" class="st-select"><option value="must">Must</option><option value="should">Should</option><option value="could">Could</option></select>
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Save Req</button>
+              </form>
+            </div>
+            <div class="pms-card__table-wrap">
+              <table class="st-table">
+                <thead><tr><th>Code</th><th>Requirement</th><th>Priority</th><th>Status</th><th style="text-align:right;">Action</th></tr></thead>
+                <tbody>
+                  {% for r in (req_rows if req_rows is defined else []) %}
+                  <tr>
+                    <td style="font-family:var(--ts-font-mono);font-weight:700;color:#002769;">{{ r.req_code }}</td>
+                    <td style="font-weight:600;">{{ r.title }}</td>
+                    <td>{{ r.priority|upper }}</td>
+                    <td><span class="st-tag {% if r.status == 'approved' %}st-tag--ok{% else %}st-tag--info{% endif %}">{{ r.status|title }}</span></td>
+                    <td style="text-align:right;">{% if r.status == 'draft' %}<button type="button" class="ts-btn ts-btn--secondary ts-btn--sm pd-req-app" data-rqid="{{ r.id }}">Approve</button>{% endif %}</td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="5" style="text-align:center;padding:24px;color:#718494;">No requirements baselined yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="pms-card">
+            <div class="pms-card__head">
+              <div><h3 class="pms-card__title">Agile Sprints &amp; Backlog (PM-09)</h3></div>
+              <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-toggle-drawer="dr-bl">+ Add Backlog Item</button>
+            </div>
+            <div class="pms-drawer" id="dr-bl" hidden>
+              <form id="pd-bl-form" class="pms-form-grid">
+                <input type="text" id="pd-bl-title" class="ts-input" placeholder="User story / epic / defect…" required>
+                <input type="number" min="1" max="40" id="pd-bl-pts" class="ts-input" placeholder="Story points" value="3">
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Add Item</button>
+              </form>
+            </div>
+            <div class="pms-card__table-wrap">
+              <table class="st-table">
+                <thead><tr><th>Type</th><th>Backlog Item</th><th>Points</th><th>Status</th></tr></thead>
+                <tbody>
+                  {% for b in (backlog_rows if backlog_rows is defined else []) %}
+                  <tr>
+                    <td><span class="st-tag st-tag--info">{{ b.item_type|upper }}</span></td>
+                    <td style="font-weight:600;">{{ b.title }}</td>
+                    <td style="font-variant-numeric:tabular-nums;">{{ b.story_points }} pts</td>
+                    <td><span class="st-tag {% if b.status == 'done' %}st-tag--ok{% else %}st-tag--info{% endif %}">{{ b.status|replace('_',' ')|title }}</span></td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="4" style="text-align:center;padding:24px;color:#718494;">No agile backlog items yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {# ---- 6. TEAM & RESOURCE ALLOCATIONS ---- #}
+      <section class="pms-pane" data-pdpane="resources" hidden>
+        <div class="pms-sec-head">
+          <div>
+            <h2 class="pms-sec-title">Team, Allocations &amp; Access Governance</h2>
+            <p class="pms-sec-sub">Hard-limit capacity planning (PM-12) and project-scoped role permissions (PM-33)</p>
+          </div>
+        </div>
+
+        <div class="pms-grid-2">
+          <div class="pms-card">
+            <div class="pms-card__head">
+              <div><h3 class="pms-card__title">Resource Allocations &amp; Capacity (PM-12)</h3></div>
+              <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-toggle-drawer="dr-alloc">+ Allocate</button>
+            </div>
+            <div class="pms-drawer" id="dr-alloc" hidden>
+              <form id="pd-alloc-form" class="pms-form-grid">
+                <select id="pd-al-user" class="st-select"><option value="">Named user (optional)</option>{% for u in (org_users if org_users is defined else []) %}<option value="{{ u.id }}">{{ u.username }} ({{ u.email }})</option>{% endfor %}</select>
+                <input type="text" id="pd-al-role" class="ts-input" placeholder="Role title" value="Engineer">
+                <input type="number" min="1" max="100" id="pd-al-pct" class="ts-input" placeholder="FTE %" value="50">
+                <input type="number" step="0.01" id="pd-al-rate" class="ts-input" placeholder="Rate/hr">
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Save Allocation</button>
+              </form>
+              <div id="pd-alloc-err" style="font-size:12px;color:#b91c1c;margin-top:6px;" hidden></div>
+            </div>
+            <div class="pms-card__table-wrap">
+              <table class="st-table">
+                <thead><tr><th>Resource</th><th>Role</th><th>FTE %</th><th>Status</th></tr></thead>
+                <tbody>
+                  {% for a in (alloc_rows if alloc_rows is defined else []) %}
+                  <tr>
+                    <td style="font-weight:600;">{{ a.resource_name }}</td>
+                    <td>{{ a.role_title }}</td>
+                    <td style="font-variant-numeric:tabular-nums;">{{ a.allocation_pct }}%</td>
+                    <td><span class="st-tag st-tag--ok">{{ a.status|title }}</span></td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="4" style="text-align:center;padding:24px;color:#718494;">No resources allocated yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="pms-card">
+            <div class="pms-card__head">
+              <div><h3 class="pms-card__title">Project Team &amp; Access Governance (PM-33)</h3></div>
+              <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-toggle-drawer="dr-mem">+ Grant Access</button>
+            </div>
+            <div class="pms-drawer" id="dr-mem" hidden>
+              <form id="pd-mem-form" class="pms-form-grid">
+                <select id="pd-mem-user" class="st-select">{% for u in (org_users if org_users is defined else []) %}<option value="{{ u.id }}">{{ u.username }} ({{ u.email }})</option>{% endfor %}</select>
+                <select id="pd-mem-role" class="st-select">{% for r in (project_roles if project_roles is defined else ['project_manager','team_lead','member','finance','viewer']) %}<option value="{{ r }}">{{ r|replace('_',' ')|title }}</option>{% endfor %}</select>
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Add Member</button>
+              </form>
+            </div>
+            <div class="pms-card__table-wrap">
+              <table class="st-table">
+                <thead><tr><th>Member</th><th>Project Role</th><th>Finance Access</th></tr></thead>
+                <tbody>
+                  {% for m in (member_rows if member_rows is defined else []) %}
+                  <tr>
+                    <td style="font-weight:600;">{{ m.username }} <span style="font-size:11.5px;color:#64748b;">{{ m.email }}</span></td>
+                    <td><span class="st-tag st-tag--info">{{ m.project_role|replace('_',' ')|title }}</span></td>
+                    <td>{{ 'Yes' if m.can_view_finance else 'Restricted' }}</td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="3" style="text-align:center;padding:24px;color:#718494;">Uses default organization access until explicit members are added.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {# ---- 7. DEDICATED TIMESHEETS TAB (PM-13 v2.1) ---- #}
+      <section class="pms-pane" data-pdpane="timesheets" hidden>
+        <div class="pms-sec-head">
+          <div>
+            <h2 class="pms-sec-title">Project Timesheets &amp; Effort Accounting (PM-13 v2.1)</h2>
+            <p class="pms-sec-sub">Immutable approved entries, linked adjustment/reversal ledger postings, and closure gating</p>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <a class="ts-btn ts-btn--secondary ts-btn--sm" href="/api/projects/{{ project.id }}/timesheets/export.csv">↓ Export Timesheets CSV</a>
+            <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-toggle-drawer="dr-ts">+ Log Time</button>
+          </div>
+        </div>
+
+        <div class="pms-card">
+          <div class="pms-drawer" id="dr-ts" hidden>
+            <form id="pd-ts-form" class="pms-form-grid">
+              <input type="date" id="pd-ts-date" class="ts-input" required>
+              <input type="number" step="0.25" min="0.25" max="24" id="pd-ts-hrs" class="ts-input" placeholder="Hours (max 24)" required>
+              <input type="text" id="pd-ts-notes" class="ts-input" placeholder="Activity / deliverable notes…">
+              <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Log &amp; Submit</button>
+            </form>
+          </div>
+          <div class="pms-card__table-wrap">
+            <table class="st-table">
+              <thead><tr><th>Date</th><th>Hours</th><th>Billable</th><th>Notes</th><th>Status</th><th style="text-align:right;">Workflow</th></tr></thead>
+              <tbody>
+                {% for te in (time_rows if time_rows is defined else []) %}
+                <tr>
+                  <td style="font-variant-numeric:tabular-nums;">{{ te.work_date }}</td>
+                  <td style="font-variant-numeric:tabular-nums;font-weight:700;">{{ te.hours }}h</td>
+                  <td>{{ 'Billable' if te.billable else 'Non-billable' }}</td>
+                  <td style="color:#475569;">{{ te.notes or '—' }}{% if te.return_reason %}<div style="font-size:11px;color:#b91c1c;">Returned: {{ te.return_reason }}</div>{% endif %}</td>
+                  <td><span class="st-tag {% if te.status == 'approved' %}st-tag--ok{% elif te.status == 'returned' %}st-tag--bad{% else %}st-tag--info{% endif %}">{{ te.status|title }}</span></td>
+                  <td style="text-align:right;white-space:nowrap;">
+                    {% if te.status in ('draft', 'returned') %}
+                      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm pd-ts-submit" data-teid="{{ te.id }}">Submit</button>
+                    {% elif te.status == 'submitted' %}
+                      <button type="button" class="ts-btn ts-btn--primary ts-btn--sm pd-ts-approve" data-teid="{{ te.id }}">Approve</button>
+                      <button type="button" class="ts-btn ts-btn--ghost ts-btn--sm pd-ts-return" data-teid="{{ te.id }}">Return</button>
+                    {% else %}
+                      <span style="font-size:11.5px;color:#047857;font-weight:600;">Approved &amp; Posted</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" style="text-align:center;padding:28px;color:#718494;">No timesheet entries yet. Click <strong>+ Log Time</strong> above or log from <strong>My Timesheet</strong>.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {# ---- 8. FINANCE, BUDGET & EVM ---- #}
+      {% if show_finance is not defined or show_finance %}
+      <section class="pms-pane" data-pdpane="finance" hidden>
+        <div class="pms-sec-head">
+          <div>
+            <h2 class="pms-sec-title">Finance, Decimal Budget &amp; EVM</h2>
+            <p class="pms-sec-sub">PostgreSQL NUMERIC(18,2) budget baselines, idempotent cost ledger, and Earned Value analytics (PM-15/16)</p>
+          </div>
+        </div>
+
+        {% if financials is defined %}
+        <div class="pms-kpis">
+          <div class="pms-kpi"><span class="pms-kpi__label">Approved Budget</span><span class="pms-kpi__val">{{ financials.currency }} {{ financials.approved_budget_str }}</span></div>
+          <div class="pms-kpi"><span class="pms-kpi__label">Posted Actuals</span><span class="pms-kpi__val">{{ financials.currency }} {{ financials.actuals_str }}</span></div>
+          <div class="pms-kpi"><span class="pms-kpi__label">Open Commitments</span><span class="pms-kpi__val">{{ financials.currency }} {{ financials.commitments_str }}</span></div>
+          <div class="pms-kpi"><span class="pms-kpi__label">Available Budget</span><span class="pms-kpi__val" style="color:{{ '#b91c1c' if financials.available_budget < 0 else '#047857' }};">{{ financials.currency }} {{ financials.available_budget_str }}</span></div>
+        </div>
+        {% endif %}
+
+        {% if evm_metrics is defined and evm_metrics.enabled %}
+        <div class="pms-card">
+          <div class="pms-card__body" style="display:flex;flex-wrap:wrap;gap:18px;align-items:center;font-size:13px;">
+            <strong style="color:#002769;">EVM Scorecard:</strong>
+            <span><strong>BAC:</strong> {{ evm_metrics.currency }} {{ evm_metrics.bac }}</span>
+            <span><strong>PV:</strong> {{ evm_metrics.pv }}</span>
+            <span><strong>EV:</strong> {{ evm_metrics.ev }}</span>
+            <span><strong>AC:</strong> {{ evm_metrics.ac }}</span>
+            <span><strong>SPI:</strong> {{ evm_metrics.spi or 'N/A' }}</span>
+            <span><strong>CPI:</strong> {{ evm_metrics.cpi or 'N/A' }}</span>
+            <span><strong>EAC:</strong> {{ evm_metrics.eac or 'N/A' }}</span>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="pms-grid-2">
+          <div class="pms-card">
+            <div class="pms-card__head">
+              <div><h3 class="pms-card__title">Budget Baseline Lines</h3></div>
+              <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-toggle-drawer="dr-bud">+ Add Line</button>
+            </div>
+            <div class="pms-drawer" id="dr-bud" hidden>
+              <form id="pd-bud-form" class="pms-form-grid">
+                <select id="pd-bud-cat" class="st-select"><option value="labor">Labor</option><option value="vendor">Vendor</option><option value="equipment">Equipment</option><option value="materials">Materials</option><option value="contingency">Contingency</option></select>
+                <input type="text" id="pd-bud-desc" class="ts-input" placeholder="Description…" required>
+                <input type="number" step="0.01" id="pd-bud-amt" class="ts-input" placeholder="Amount" required>
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Save Line</button>
+              </form>
+            </div>
+            <div class="pms-card__table-wrap">
+              <table class="st-table">
+                <thead><tr><th>Category</th><th>Description</th><th style="text-align:right;">Planned</th></tr></thead>
+                <tbody>
+                  {% for bl in (budget_lines if budget_lines is defined else []) %}
+                  <tr>
+                    <td><span class="st-tag st-tag--info">{{ bl.category|upper }}</span></td>
+                    <td>{{ bl.description }}</td>
+                    <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:700;">{{ bl.currency }} {{ bl.planned_amount }}</td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="3" style="text-align:center;padding:24px;color:#718494;">No budget lines itemized yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="pms-card">
+            <div class="pms-card__head">
+              <div><h3 class="pms-card__title">Cost Ledger (Actuals, Commitments &amp; Reversals)</h3></div>
+              <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-toggle-drawer="dr-cost">+ Post Cost</button>
+            </div>
+            <div class="pms-drawer" id="dr-cost" hidden>
+              <form id="pd-cost-form" class="pms-form-grid">
+                <select id="pd-cost-type" class="st-select"><option value="actual">Actual</option><option value="commitment">Commitment</option><option value="accrual">Accrual</option><option value="reversal">Reversal</option></select>
+                <input type="text" id="pd-cost-desc" class="ts-input" placeholder="Invoice / PO description…" required>
+                <input type="number" step="0.01" id="pd-cost-amt" class="ts-input" placeholder="Amount" required>
+                <input type="text" id="pd-cost-ref" class="ts-input" placeholder="Source ref">
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Post Event</button>
+              </form>
+            </div>
+            <div class="pms-card__table-wrap">
+              <table class="st-table">
+                <thead><tr><th>Type</th><th>Description</th><th>Ref</th><th style="text-align:right;">Amount</th></tr></thead>
+                <tbody>
+                  {% for ce in (cost_events if cost_events is defined else []) %}
+                  <tr>
+                    <td><span class="st-tag {% if ce.event_type == 'actual' %}st-tag--ok{% elif ce.event_type == 'reversal' %}st-tag--bad{% else %}st-tag--warn{% endif %}">{{ ce.event_type|upper }}</span></td>
+                    <td>{{ ce.description }}</td>
+                    <td style="font-family:var(--ts-font-mono);font-size:11px;color:#64748b;">{{ ce.source_ref or '—' }}</td>
+                    <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap;">{{ ce.currency }} {{ ce.amount }}</td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="4" style="text-align:center;padding:24px;color:#718494;">No posted cost events yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+      {% endif %}
+
+      {# ---- 9. TSD CONTRACTS, DELIVERABLES & PROBATION ---- #}
+      <section class="pms-pane" data-pdpane="contracts" hidden>
+        <div class="pms-sec-head">
+          <div>
+            <h2 class="pms-sec-title">TSD Contracts, Deliverables &amp; Key Terms</h2>
+            <p class="pms-sec-sub">Governed legal agreements, milestone acceptance rollup, and probation cohorts (PM-10/18)</p>
+          </div>
+          {% if available_contracts %}
+          <div style="display:flex;gap:6px;align-items:center;">
+            <select id="pd-link-sel" class="st-select" style="height:32px;font-size:12px;min-width:240px;">
+              {% for ac in available_contracts %}<option value="{{ ac.document_id }}">{{ ac.contract_number }} — {{ ac.title }}</option>{% endfor %}
+            </select>
+            <button type="button" id="pd-link-btn" class="ts-btn ts-btn--secondary ts-btn--sm">+ Link Contract</button>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="pms-card">
+          <div class="pms-card__head"><h3 class="pms-card__title">Linked TSD Contracts ({{ contracts|length }})</h3></div>
+          <div class="pms-card__table-wrap">
+            <table class="st-table">
+              <thead><tr><th>Ref #</th><th>Contract Title</th><th>Type</th><th>Counterparty</th><th>Status</th><th>Deliverables</th><th>Value</th></tr></thead>
+              <tbody>
+                {% for c in contracts %}
+                <tr>
+                  <td style="font-family:var(--ts-font-mono);font-size:12px;color:#002769;font-weight:600;">{{ c.contract_number }}</td>
+                  <td style="font-weight:600;"><a href="{{ c.url }}" style="color:#0f172a;text-decoration:none;">{{ c.title }}</a></td>
+                  <td>{{ c.contract_type|replace('_', ' ')|upper }}</td>
+                  <td>{{ c.counterparty_name }}</td>
+                  <td><span class="st-tag {% if c.contract_status == 'SIGNED' %}st-tag--ok{% elif c.contract_status == 'SUSPENDED' %}st-tag--warn{% elif c.contract_status == 'TERMINATED' %}st-tag--bad{% else %}st-tag--info{% endif %}">{{ c.contract_status }}</span></td>
+                  <td style="font-variant-numeric:tabular-nums;">{{ c.deliverables_pct }}% ({{ c.deliverables_total }})</td>
+                  <td>{{ c.deal_value }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" style="text-align:center;padding:24px;color:#718494;">No contracts linked yet. Projects may operate contract-free or click <strong>+ New Contract</strong> above.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pms-grid-2">
+          <div class="pms-card">
+            <div class="pms-card__head"><h3 class="pms-card__title">Deliverables Rollup ({{ deliverable_rows|length }})</h3></div>
+            <div class="pms-card__table-wrap">
+              <table class="st-table">
+                <thead><tr><th>Milestone</th><th>Contract</th><th>Due</th><th>Weight</th><th>Status</th></tr></thead>
+                <tbody>
+                  {% for dl in deliverable_rows %}
+                  <tr>
+                    <td style="font-weight:600;">{{ dl.title }}</td>
+                    <td><a href="{{ dl.url }}" style="font-family:var(--ts-font-mono);font-size:11.5px;color:#002769;">{{ dl.contract_number }}</a></td>
+                    <td style="font-variant-numeric:tabular-nums;">{{ dl.due_date or '—' }}</td>
+                    <td>{{ dl.weight_pct }}%</td>
+                    <td><span class="st-tag {% if dl.status == 'accepted' %}st-tag--ok{% elif dl.status == 'suspended' %}st-tag--warn{% else %}st-tag--info{% endif %}">{{ dl.status|replace('_',' ')|title }}</span></td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="5" style="text-align:center;padding:20px;color:#718494;">No deliverables tracked yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="pms-card">
+            <div class="pms-card__head"><h3 class="pms-card__title">Key Terms &amp; Probation ({{ key_term_rows|length }})</h3></div>
+            <div class="pms-card__table-wrap">
+              <table class="st-table">
+                <thead><tr><th>Category</th><th>Term</th><th>Value</th><th>Status</th></tr></thead>
+                <tbody>
+                  {% for kt in key_term_rows %}
+                  <tr>
+                    <td><span class="st-tag st-tag--info">{{ kt.category|upper }}</span></td>
+                    <td style="font-weight:600;">{{ kt.label }}</td>
+                    <td>{{ kt.value or '—' }}</td>
+                    <td><span class="st-tag st-tag--ok">{{ kt.status|title }}</span></td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="4" style="text-align:center;padding:20px;color:#718494;">No key terms or probations tracked yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {# ---- 10. PROCUREMENT & ASSETS ---- #}
+      <section class="pms-pane" data-pdpane="procurement" hidden>
+        <div class="pms-sec-head">
+          <div>
+            <h2 class="pms-sec-title">Procurement &amp; Equipment Logistics</h2>
+            <p class="pms-sec-sub">Supplier awards with SoD &amp; ledger commitments (PM-17) and exclusive asset custody bookings (PM-14)</p>
+          </div>
+        </div>
+
+        <div class="pms-grid-2">
+          <div class="pms-card">
+            <div class="pms-card__head">
+              <div><h3 class="pms-card__title">Procurement &amp; Supplier Awards (PM-17)</h3></div>
+              <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-toggle-drawer="dr-pr">+ Requisition</button>
+            </div>
+            <div class="pms-drawer" id="dr-pr" hidden>
+              <form id="pd-pr-form" class="pms-form-grid">
+                <input type="text" id="pd-pr-title" class="ts-input" placeholder="Requisition item / RFQ…" required>
+                <input type="text" id="pd-pr-sup" class="ts-input" placeholder="Supplier">
+                <input type="number" step="0.01" id="pd-pr-amt" class="ts-input" placeholder="Est. Amount">
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Create PR</button>
+              </form>
+            </div>
+            <div class="pms-card__table-wrap">
+              <table class="st-table">
+                <thead><tr><th>PR #</th><th>Item &amp; Supplier</th><th>Amount</th><th>Status</th><th style="text-align:right;">Action</th></tr></thead>
+                <tbody>
+                  {% for pr in (proc_rows if proc_rows is defined else []) %}
+                  <tr>
+                    <td style="font-family:var(--ts-font-mono);font-weight:700;color:#002769;">{{ pr.req_number }}</td>
+                    <td><strong>{{ pr.title }}</strong>{% if pr.supplier_name %}<div style="font-size:11.5px;color:#64748b;">{{ pr.supplier_name }}</div>{% endif %}</td>
+                    <td style="font-variant-numeric:tabular-nums;">{{ pr.currency }} {{ pr.awarded_amount or pr.estimated_amount }}</td>
+                    <td><span class="st-tag {% if pr.status == 'awarded' %}st-tag--ok{% else %}st-tag--info{% endif %}">{{ pr.status|title }}</span></td>
+                    <td style="text-align:right;">{% if pr.status != 'awarded' %}<button type="button" class="ts-btn ts-btn--secondary ts-btn--sm pd-pr-award" data-prid="{{ pr.id }}">Award &amp; Commit</button>{% endif %}</td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="5" style="text-align:center;padding:24px;color:#718494;">No procurement requisitions logged yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="pms-card">
+            <div class="pms-card__head">
+              <div><h3 class="pms-card__title">Equipment &amp; Asset Bookings (PM-14)</h3></div>
+              <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-toggle-drawer="dr-as">+ Book Asset</button>
+            </div>
+            <div class="pms-drawer" id="dr-as" hidden>
+              <form id="pd-as-form" class="pms-form-grid">
+                <input type="text" id="pd-as-name" class="ts-input" placeholder="Equipment / Vehicle…" required>
+                <input type="date" id="pd-as-sd" class="ts-input" required>
+                <input type="date" id="pd-as-ed" class="ts-input" required>
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Book</button>
+              </form>
+            </div>
+            <div class="pms-card__table-wrap">
+              <table class="st-table">
+                <thead><tr><th>Asset</th><th>Dates</th><th>Qty</th><th>Status</th></tr></thead>
+                <tbody>
+                  {% for a in (asset_rows if asset_rows is defined else []) %}
+                  <tr>
+                    <td style="font-weight:600;">{{ a.asset_name }}</td>
+                    <td style="font-size:12px;">{{ a.start_date }} → {{ a.end_date }}</td>
+                    <td>{{ a.quantity }} {{ a.unit }}</td>
+                    <td><span class="st-tag st-tag--ok">{{ a.status|title }}</span></td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="4" style="text-align:center;padding:24px;color:#718494;">No equipment or logistics bookings yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {# ---- 11. RAID & INTEGRATED CHANGE CONTROL ---- #}
+      <section class="pms-pane" data-pdpane="risks" hidden>
+        <div class="pms-sec-head">
+          <div>
+            <h2 class="pms-sec-title">Risks &amp; Issues (RAID) &amp; Change Control</h2>
+            <p class="pms-sec-sub">Structured RAID exposure register (PM-19) and baseline change control approvals (PM-20)</p>
+          </div>
+        </div>
+
+        <div class="pms-card">
+          <div class="pms-card__head">
+            <div><h3 class="pms-card__title">Risks &amp; Issues Register ({{ r_rows|length }})</h3></div>
+            <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-toggle-drawer="dr-risk">+ Log RAID Item</button>
+          </div>
+          <div class="pms-drawer" id="dr-risk" hidden>
+            <form id="pd-risk-form" class="pms-form-grid">
+              <input type="text" id="pd-r-title" class="ts-input" placeholder="Risk / issue title…" required>
+              <select id="pd-r-cat" class="st-select"><option value="contractual">Contractual</option><option value="financial">Financial</option><option value="schedule">Schedule</option><option value="compliance">Compliance</option><option value="operational">Operational</option></select>
+              <select id="pd-r-sev" class="st-select"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="critical">Critical</option></select>
+              <input type="text" id="pd-r-owner" class="ts-input" placeholder="Owner">
+              <input type="text" id="pd-r-mit" class="ts-input" placeholder="Mitigation plan">
+              <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Save Risk</button>
+            </form>
+          </div>
+          <div class="pms-card__table-wrap">
+            <table class="st-table">
+              <thead><tr><th>Title &amp; Mitigation</th><th>Category</th><th>Severity</th><th>Owner</th><th>Status</th><th style="text-align:right;">Action</th></tr></thead>
+              <tbody>
+                {% for r in r_rows %}
+                <tr>
+                  <td><strong>{{ r.title }}</strong>{% if r.mitigation_plan %}<div style="font-size:11.5px;color:#64748b;">{{ r.mitigation_plan }}</div>{% endif %}</td>
+                  <td>{{ r.category|title }}</td>
+                  <td><span class="st-tag {% if r.severity == 'critical' %}st-tag--bad{% elif r.severity == 'high' %}st-tag--warn{% else %}st-tag--info{% endif %}">{{ r.severity|title }}</span></td>
+                  <td>{{ r.owner_name or '—' }}</td>
+                  <td>
+                    <select class="st-select pd-risk-st" data-rid="{{ r.id }}" style="height:28px;font-size:12px;">
+                      {% for st in ['open','mitigating','mitigated','closed'] %}<option value="{{ st }}" {% if r.status == st %}selected{% endif %}>{{ st|title }}</option>{% endfor %}
+                    </select>
+                  </td>
+                  <td style="text-align:right;"><button type="button" class="ts-btn ts-btn--ghost ts-btn--sm pd-risk-del" data-rid="{{ r.id }}">Remove</button></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" style="text-align:center;padding:24px;color:#718494;">No risks or issues logged yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pms-card">
+          <div class="pms-card__head">
+            <div><h3 class="pms-card__title">Integrated Change Control (PM-20)</h3></div>
+            <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-toggle-drawer="dr-cr">+ Submit Change Request</button>
+          </div>
+          <div class="pms-drawer" id="dr-cr" hidden>
+            <form id="pd-cr-form" class="pms-form-grid">
+              <input type="text" id="pd-cr-title" class="ts-input" placeholder="Change request title…" required>
+              <select id="pd-cr-type" class="st-select"><option value="scope">Scope</option><option value="schedule">Schedule</option><option value="budget">Budget</option><option value="contract">Contract</option></select>
+              <input type="number" step="0.01" id="pd-cr-cost" class="ts-input" placeholder="Cost impact">
+              <input type="number" id="pd-cr-days" class="ts-input" placeholder="Schedule days">
+              <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Submit CR</button>
+            </form>
+          </div>
+          <div class="pms-card__table-wrap">
+            <table class="st-table">
+              <thead><tr><th>CR #</th><th>Title</th><th>Impact</th><th>Status</th><th style="text-align:right;">Decision</th></tr></thead>
+              <tbody>
+                {% for cr in (change_rows if change_rows is defined else []) %}
+                <tr>
+                  <td style="font-family:var(--ts-font-mono);font-weight:700;color:#002769;">{{ cr.cr_number }}</td>
+                  <td style="font-weight:600;">{{ cr.title }}</td>
+                  <td>{{ project.currency }} {{ cr.cost_impact }} · {{ cr.schedule_impact_days }}d</td>
+                  <td><span class="st-tag {% if cr.status == 'approved' %}st-tag--ok{% elif cr.status == 'rejected' %}st-tag--bad{% else %}st-tag--info{% endif %}">{{ cr.status|title }}</span></td>
+                  <td style="text-align:right;white-space:nowrap;">
+                    {% if cr.status in ('draft', 'submitted', 'in_review') %}
+                    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm pd-cr-decide" data-crid="{{ cr.id }}" data-dec="approved">Approve</button>
+                    <button type="button" class="ts-btn ts-btn--ghost ts-btn--sm pd-cr-decide" data-crid="{{ cr.id }}" data-dec="rejected">Reject</button>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" style="text-align:center;padding:24px;color:#718494;">No change requests logged yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {# ---- 12. QA, COMPLIANCE, PORTAL & COLLABORATION ---- #}
+      <section class="pms-pane" data-pdpane="compliance" hidden>
+        <div class="pms-sec-head">
+          <div>
+            <h2 class="pms-sec-title">Quality, Compliance, External Portal &amp; Comms</h2>
+            <p class="pms-sec-sub">QA/CAPA (PM-21), Stakeholders (PM-22), Permits/HSE (PM-28), Scoped Portal (PM-29) &amp; Approvals (PM-25)</p>
+          </div>
+        </div>
+
+        <div class="pms-grid-2">
+          <div class="pms-card">
+            <div class="pms-card__head">
+              <div><h3 class="pms-card__title">Permits, Safeguards &amp; HSE Incidents (PM-28)</h3></div>
+              <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-toggle-drawer="dr-comp">+ Record</button>
+            </div>
+            <div class="pms-drawer" id="dr-comp" hidden>
+              <form id="pd-comp-form" class="pms-form-grid">
+                <select id="pd-comp-type" class="st-select"><option value="permit">Permit</option><option value="safeguard">Safeguard</option><option value="hse_incident">HSE Incident</option><option value="obligation">Obligation</option></select>
+                <input type="text" id="pd-comp-title" class="ts-input" placeholder="Title…" required>
+                <input type="date" id="pd-comp-exp" class="ts-input">
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Save</button>
+              </form>
+            </div>
+            <div class="pms-card__table-wrap">
+              <table class="st-table">
+                <thead><tr><th>Type</th><th>Title</th><th>Expiry</th><th>Status</th></tr></thead>
+                <tbody>
+                  {% for cr in (compliance_rows if compliance_rows is defined else []) %}
+                  <tr>
+                    <td><span class="st-tag st-tag--info">{{ cr.record_type|replace('_',' ')|upper }}</span></td>
+                    <td style="font-weight:600;">{{ cr.title }}</td>
+                    <td style="font-variant-numeric:tabular-nums;">{{ cr.expiry_date or '—' }}</td>
+                    <td><span class="st-tag {% if cr.is_expired %}st-tag--bad{% else %}st-tag--ok{% endif %}">{{ cr.status|title }}</span></td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="4" style="text-align:center;padding:20px;color:#718494;">No permits or HSE records yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="pms-card">
+            <div class="pms-card__head">
+              <div><h3 class="pms-card__title">External Client / Partner Portal Grants (PM-29)</h3></div>
+              <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-toggle-drawer="dr-ext">+ Issue Link</button>
+            </div>
+            <div class="pms-drawer" id="dr-ext" hidden>
+              <form id="pd-ext-form" class="pms-form-grid">
+                <input type="text" id="pd-ext-name" class="ts-input" placeholder="Recipient name…" required>
+                <input type="email" id="pd-ext-email" class="ts-input" placeholder="email@partner.org" required>
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Issue Scoped Link</button>
+              </form>
+              <div id="pd-ext-out" style="font-size:12px;color:#047857;margin-top:8px;word-break:break-all;" hidden></div>
+            </div>
+            <div class="pms-card__table-wrap">
+              <table class="st-table">
+                <thead><tr><th>Recipient</th><th>Expires</th><th>Status</th><th style="text-align:right;">Action</th></tr></thead>
+                <tbody>
+                  {% for g in (grant_rows if grant_rows is defined else []) %}
+                  <tr>
+                    <td><strong>{{ g.recipient_name }}</strong><div style="font-size:11px;color:#64748b;">{{ g.recipient_email }}</div></td>
+                    <td style="font-size:11.5px;">{{ g.expires_at }}</td>
+                    <td><span class="st-tag {% if g.is_valid %}st-tag--ok{% else %}st-tag--bad{% endif %}">{{ 'Active' if g.is_valid else 'Revoked' }}</span></td>
+                    <td style="text-align:right;">{% if g.is_valid %}<button type="button" class="ts-btn ts-btn--ghost ts-btn--sm pd-ext-rev" data-gid="{{ g.id }}">Revoke</button>{% endif %}</td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="4" style="text-align:center;padding:20px;color:#718494;">No external portal grants active.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="pms-grid-2">
+          <div class="pms-card">
+            <div class="pms-card__head">
+              <div><h3 class="pms-card__title">Quality Inspections, Tests &amp; CAPA (PM-21)</h3></div>
+              <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-toggle-drawer="dr-qa">+ Log QA</button>
+            </div>
+            <div class="pms-drawer" id="dr-qa" hidden>
+              <form id="pd-qa-form" class="pms-form-grid">
+                <select id="pd-qa-type" class="st-select"><option value="inspection">Inspection</option><option value="test">Test</option><option value="defect">Defect</option><option value="capa">CAPA</option></select>
+                <input type="text" id="pd-qa-title" class="ts-input" placeholder="QA title…" required>
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Save</button>
+              </form>
+            </div>
+            <div class="pms-card__table-wrap">
+              <table class="st-table">
+                <thead><tr><th>Type</th><th>Title</th><th>Status</th></tr></thead>
+                <tbody>
+                  {% for q in (qa_rows if qa_rows is defined else []) %}
+                  <tr><td><span class="st-tag st-tag--info">{{ q.record_type|upper }}</span></td><td style="font-weight:600;">{{ q.title }}</td><td><span class="st-tag st-tag--ok">{{ q.status|title }}</span></td></tr>
+                  {% else %}
+                  <tr><td colspan="3" style="text-align:center;padding:20px;color:#718494;">No QA records yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="pms-card">
+            <div class="pms-card__head">
+              <div><h3 class="pms-card__title">Stakeholders &amp; Governed Approvals (PM-22/25)</h3></div>
+              <div style="display:flex;gap:6px;">
+                <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-toggle-drawer="dr-sh">+ Stakeholder</button>
+                <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-toggle-drawer="dr-ap">+ Approval</button>
+              </div>
+            </div>
+            <div class="pms-drawer" id="dr-sh" hidden>
+              <form id="pd-sh-form" class="pms-form-grid">
+                <input type="text" id="pd-sh-name" class="ts-input" placeholder="Stakeholder name…" required>
+                <input type="text" id="pd-sh-role" class="ts-input" placeholder="Role / Org">
+                <select id="pd-sh-inf" class="st-select"><option value="high">High Influence</option><option value="medium" selected>Med Influence</option><option value="low">Low Influence</option></select>
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Add</button>
+              </form>
+            </div>
+            <div class="pms-drawer" id="dr-ap" hidden>
+              <form id="pd-ap-form" class="pms-form-grid">
+                <input type="text" id="pd-ap-title" class="ts-input" placeholder="Hash-bound approval subject…" required>
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Request Approval</button>
+              </form>
+            </div>
+            <div class="pms-card__body" style="display:flex;flex-direction:column;gap:12px;">
+              <form id="pd-cm-form" style="display:flex;gap:8px;">
+                <input type="text" id="pd-cm-body" class="ts-input" style="flex:1;" placeholder="Post a project collaboration comment (PM-23)…" required>
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Post</button>
+              </form>
+              {% for cm in (comment_rows if comment_rows is defined else []) %}
+              <div style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;font-size:12.5px;">
+                <div style="display:flex;justify-content:space-between;color:#64748b;font-size:11px;margin-bottom:3px;"><strong>{{ cm.author_name }}</strong><span>{{ cm.created_at }}</span></div>
+                <div>{{ cm.body }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {# ---- 13. M&E RESULTS & CLOSURE ---- #}
+      <section class="pms-pane" data-pdpane="results" hidden>
+        <div class="pms-sec-head">
+          <div>
+            <h2 class="pms-sec-title">M&amp;E Results Framework &amp; Closure</h2>
+            <p class="pms-sec-sub">Logframe indicators &amp; validated observations (PM-26) plus handover checklist &amp; benefits (PM-30)</p>
+          </div>
+        </div>
+
+        <div class="pms-grid-2">
+          <div class="pms-card">
+            <div class="pms-card__head">
+              <div><h3 class="pms-card__title">Results Framework &amp; Indicators (PM-26)</h3></div>
+              <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-toggle-drawer="dr-ind">+ Indicator</button>
+            </div>
+            <div class="pms-drawer" id="dr-ind" hidden>
+              <form id="pd-ind-form" class="pms-form-grid">
+                <select id="pd-ind-lvl" class="st-select"><option value="output">Output</option><option value="outcome">Outcome</option><option value="impact">Impact</option></select>
+                <input type="text" id="pd-ind-title" class="ts-input" placeholder="Indicator title…" required>
+                <input type="number" step="0.01" id="pd-ind-tgt" class="ts-input" placeholder="Target">
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Save</button>
+              </form>
+            </div>
+            <div class="pms-card__table-wrap">
+              <table class="st-table">
+                <thead><tr><th>Code</th><th>Level</th><th>Indicator</th><th>Target</th></tr></thead>
+                <tbody>
+                  {% for ind in (ind_rows if ind_rows is defined else []) %}
+                  <tr>
+                    <td style="font-family:var(--ts-font-mono);font-weight:700;color:#002769;">{{ ind.indicator_code }}</td>
+                    <td><span class="st-tag st-tag--info">{{ ind.level|upper }}</span></td>
+                    <td style="font-weight:600;">{{ ind.title }}</td>
+                    <td style="font-variant-numeric:tabular-nums;">{{ ind.target_value or '—' }} {{ ind.unit }}</td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="4" style="text-align:center;padding:24px;color:#718494;">No M&amp;E indicators defined yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="pms-card">
+            <div class="pms-card__head">
+              <div><h3 class="pms-card__title">Handover &amp; Closure Checklist (PM-30)</h3></div>
+              <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-toggle-drawer="dr-cl">+ Checklist Item</button>
+            </div>
+            <div class="pms-drawer" id="dr-cl" hidden>
+              <form id="pd-cl-form" class="pms-form-grid">
+                <select id="pd-cl-cat" class="st-select"><option value="handover">Handover</option><option value="financial">Financial</option><option value="contractual">Contractual</option><option value="lessons">Lessons</option></select>
+                <input type="text" id="pd-cl-title" class="ts-input" placeholder="Closure item…" required>
+                <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Add</button>
+              </form>
+            </div>
+            <div class="pms-card__table-wrap">
+              <table class="st-table">
+                <thead><tr><th>Category</th><th>Closure Item</th><th>Status</th></tr></thead>
+                <tbody>
+                  {% for ci in (closure_rows if closure_rows is defined else []) %}
+                  <tr>
+                    <td><span class="st-tag st-tag--info">{{ ci.category|upper }}</span></td>
+                    <td style="font-weight:600;">{{ ci.title }}</td>
+                    <td><span class="st-tag {% if ci.completed %}st-tag--ok{% else %}st-tag--warn{% endif %}">{{ 'Done' if ci.completed else 'Pending' }}</span></td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="3" style="text-align:center;padding:24px;color:#718494;">No closure items tracked yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {# ---- 14. PROJECT SETTINGS ---- #}
+      <section class="pms-pane" data-pdpane="settings" hidden>
+        <div class="pms-sec-head">
+          <div>
+            <h2 class="pms-sec-title">Project Settings</h2>
+            <p class="pms-sec-sub">Update project metadata, sponsor, dates, and baseline budget</p>
+          </div>
+        </div>
+
+        <div class="pms-card">
+          <div class="pms-card__body">
+            <form id="pd-settings-form" class="ts-stack" style="max-width:740px;">
+              <div class="ts-form-row ts-form-row--split">
+                <div class="ts-field"><label class="ts-field__label">Project Name</label><input type="text" id="pd-set-name" class="ts-input" value="{{ project.name }}"></div>
+                <div class="ts-field"><label class="ts-field__label">Client / Sponsor</label><input type="text" id="pd-set-client" class="ts-input" value="{{ project.client_name }}"></div>
+              </div>
+              <div class="ts-form-row ts-form-row--split">
+                <div class="ts-field">
+                  <label class="ts-field__label">Status</label>
+                  <select id="pd-set-status" class="ts-select">
+                    {% for st in ['active','on_hold','completed','archived'] %}<option value="{{ st }}" {% if project.status == st %}selected{% endif %}>{{ st|replace('_',' ')|title }}</option>{% endfor %}
+                  </select>
+                </div>
+                <div class="ts-field">
+                  <label class="ts-field__label">Category</label>
+                  <select id="pd-set-cat" class="ts-select">
+                    {% for key, lbl in categories %}<option value="{{ key }}" {% if project.category == key %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
+                  </select>
+                </div>
+              </div>
+              <div class="ts-form-row ts-form-row--split">
+                <div class="ts-field"><label class="ts-field__label">Budget Amount</label><input type="number" step="0.01" id="pd-set-budget" class="ts-input" value="{{ project.budget_amount or '' }}"></div>
+                <div class="ts-field"><label class="ts-field__label">Currency</label><input type="text" id="pd-set-curr" class="ts-input" value="{{ project.currency }}"></div>
+              </div>
+              <div class="ts-form-row ts-form-row--split">
+                <div class="ts-field"><label class="ts-field__label">Start Date</label><input type="date" id="pd-set-start" class="ts-input" value="{{ project.start_date }}"></div>
+                <div class="ts-field"><label class="ts-field__label">End Date</label><input type="date" id="pd-set-end" class="ts-input" value="{{ project.end_date }}"></div>
+              </div>
+              <div class="ts-field"><label class="ts-field__label">Description &amp; Mandate</label><input type="text" id="pd-set-desc" class="ts-input" value="{{ project.description }}"></div>
+              <div><button type="submit" class="ts-btn ts-btn--primary">Save Project Settings</button></div>
+            </form>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
 </div>
 
 <!-- Instantiate Contract inside this Project -->
@@ -1135,24 +1230,13 @@
       <div class="ts-field">
         <label class="ts-field__label" for="pd-tpl">Contract Template</label>
         <select id="pd-tpl" class="ts-select">
-          {% for t in templates %}
-          <option value="{{ t.id }}">{{ t.name }} ({{ t.default_key_terms|length }} terms · {{ t.default_deliverables|length }} milestones)</option>
-          {% endfor %}
+          {% for t in templates %}<option value="{{ t.id }}">{{ t.name }} ({{ t.default_key_terms|length }} terms · {{ t.default_deliverables|length }} milestones)</option>{% endfor %}
         </select>
       </div>
-      <div class="ts-field">
-        <label class="ts-field__label" for="pd-title">Contract Title</label>
-        <input type="text" id="pd-title" class="ts-input" placeholder="e.g. Phase 1 SOW — Acme Corp">
-      </div>
+      <div class="ts-field"><label class="ts-field__label" for="pd-title">Contract Title</label><input type="text" id="pd-title" class="ts-input" placeholder="e.g. Phase 1 SOW — Acme Corp"></div>
       <div class="ts-form-row ts-form-row--split">
-        <div class="ts-field">
-          <label class="ts-field__label" for="pd-party">Counterparty / Employee</label>
-          <input type="text" id="pd-party" class="ts-input" placeholder="Acme Holdings Ltd">
-        </div>
-        <div class="ts-field">
-          <label class="ts-field__label" for="pd-val">Deal Value</label>
-          <input type="text" id="pd-val" class="ts-input" placeholder="125,000">
-        </div>
+        <div class="ts-field"><label class="ts-field__label" for="pd-party">Counterparty / Employee</label><input type="text" id="pd-party" class="ts-input" placeholder="Acme Holdings Ltd"></div>
+        <div class="ts-field"><label class="ts-field__label" for="pd-val">Deal Value</label><input type="text" id="pd-val" class="ts-input" placeholder="125,000"></div>
       </div>
     </div>
     <div class="ts-modal__actions">
@@ -1164,18 +1248,33 @@
 
 <script>
 (function () {
+  // Studio Left-Rail Navigation (persisted in URL hash for deep-linking)
+  function activatePane(target) {
+    document.querySelectorAll('[data-pdtab]').forEach(function (b) {
+      b.classList.toggle('is-active', b.dataset.pdtab === target);
+    });
+    document.querySelectorAll('[data-pdpane]').forEach(function (p) {
+      p.hidden = p.dataset.pdpane !== target;
+    });
+    try { window.history.replaceState(null, '', '#' + target); } catch (e) {}
+  }
   document.querySelectorAll('[data-pdtab]').forEach(function (btn) {
+    btn.addEventListener('click', function () { activatePane(btn.dataset.pdtab); });
+  });
+  var initHash = (window.location.hash || '').replace('#', '');
+  if (initHash && document.querySelector('[data-pdpane="' + initHash + '"]')) {
+    activatePane(initHash);
+  }
+
+  // Collapsible Action Drawers (zero form clutter until clicked)
+  document.querySelectorAll('[data-toggle-drawer]').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      var target = btn.dataset.pdtab;
-      document.querySelectorAll('[data-pdtab]').forEach(function (b) {
-        b.className = 'ts-btn ts-btn--sm ' + (b.dataset.pdtab === target ? 'ts-btn--primary' : 'ts-btn--secondary');
-      });
-      document.querySelectorAll('[data-pdpane]').forEach(function (p) {
-        p.hidden = p.dataset.pdpane !== target;
-      });
+      var dr = document.getElementById(btn.dataset.toggleDrawer);
+      if (dr) dr.hidden = !dr.hidden;
     });
   });
 
+  // Contract Instantiation Modal
   var modal = document.getElementById('pd-modal');
   document.getElementById('pd-open-new').addEventListener('click', function () { modal.hidden = false; });
   document.getElementById('pd-cancel').addEventListener('click', function () { modal.hidden = true; });
@@ -1184,356 +1283,17 @@
     var tplId = document.getElementById('pd-tpl').value;
     if (!tplId) return;
     fetch('/api/contract-templates/' + tplId + '/instantiate', {
-      method: 'POST',
-      credentials: 'same-origin',
+      method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
       body: JSON.stringify({
         project_id: {{ project.id }},
         title: document.getElementById('pd-title').value.trim(),
-        variables: {
-          counterparty_name: document.getElementById('pd-party').value.trim() || 'Counterparty',
-          deal_value: document.getElementById('pd-val').value.trim(),
-        },
+        variables: { counterparty_name: document.getElementById('pd-party').value.trim() || 'Counterparty', deal_value: document.getElementById('pd-val').value.trim() },
       }),
-    }).then(function (r) { return r.json(); }).then(function (d) {
-      if (d.ok && d.url) window.location.href = d.url;
-    });
+    }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok && d.url) window.location.href = d.url; });
   });
 
-  // Link existing TSD Contract
-  var linkBtn = document.getElementById('pd-link-btn');
-  if (linkBtn) {
-    linkBtn.addEventListener('click', function () {
-      var sel = document.getElementById('pd-link-sel');
-      if (!sel || !sel.value) return;
-      fetch('/api/projects/{{ project.id }}/link-contract', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({ document_id: Number(sel.value) }),
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  }
-
-  // Project Tasks CRUD
-  var taskForm = document.getElementById('pd-task-form');
-  if (taskForm) {
-    taskForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var title = document.getElementById('pd-t-title').value.trim();
-      if (!title) return;
-      fetch('/api/projects/{{ project.id }}/tasks', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({
-          title: title,
-          assignee_name: document.getElementById('pd-t-assignee').value.trim(),
-          priority: document.getElementById('pd-t-prio').value,
-          phase: document.getElementById('pd-t-phase').value.trim() || 'Execution',
-          due_date: document.getElementById('pd-t-due').value,
-        }),
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  }
-  document.querySelectorAll('.pd-task-st').forEach(function (sel) {
-    sel.addEventListener('change', function () {
-      fetch('/api/projects/{{ project.id }}/tasks/' + sel.dataset.tid, {
-        method: 'PATCH', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({ status: sel.value }),
-      }).then(function () { window.location.reload(); });
-    });
-  });
-  document.querySelectorAll('.pd-task-del').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      fetch('/api/projects/{{ project.id }}/tasks/' + btn.dataset.tid, {
-        method: 'DELETE', credentials: 'same-origin',
-        headers: { 'X-Requested-With': 'fetch' },
-      }).then(function () { window.location.reload(); });
-    });
-  });
-
-  // Project Risks CRUD
-  var riskForm = document.getElementById('pd-risk-form');
-  if (riskForm) {
-    riskForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var title = document.getElementById('pd-r-title').value.trim();
-      if (!title) return;
-      fetch('/api/projects/{{ project.id }}/risks', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({
-          title: title,
-          category: document.getElementById('pd-r-cat').value,
-          severity: document.getElementById('pd-r-sev').value,
-          mitigation_plan: document.getElementById('pd-r-mit').value.trim(),
-          owner_name: document.getElementById('pd-r-owner').value.trim(),
-        }),
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  }
-  document.querySelectorAll('.pd-risk-st').forEach(function (sel) {
-    sel.addEventListener('change', function () {
-      fetch('/api/projects/{{ project.id }}/risks/' + sel.dataset.rid, {
-        method: 'PATCH', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({ status: sel.value }),
-      }).then(function () { window.location.reload(); });
-    });
-  });
-  document.querySelectorAll('.pd-risk-del').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      fetch('/api/projects/{{ project.id }}/risks/' + btn.dataset.rid, {
-        method: 'DELETE', credentials: 'same-origin',
-        headers: { 'X-Requested-With': 'fetch' },
-      }).then(function () { window.location.reload(); });
-    });
-  });
-
-  // Project Settings PATCH
-  var setForm = document.getElementById('pd-settings-form');
-  if (setForm) {
-    setForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      fetch('/api/projects/{{ project.id }}', {
-        method: 'PATCH', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({
-          name: document.getElementById('pd-set-name').value.trim(),
-          client_name: document.getElementById('pd-set-client').value.trim(),
-          status: document.getElementById('pd-set-status').value,
-          category: document.getElementById('pd-set-cat').value,
-          budget_amount: document.getElementById('pd-set-budget').value || null,
-          currency: document.getElementById('pd-set-curr').value.trim() || 'USD',
-          start_date: document.getElementById('pd-set-start').value,
-          end_date: document.getElementById('pd-set-end').value,
-          description: document.getElementById('pd-set-desc').value.trim(),
-        }),
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  }
-
-  // Enterprise PM v2.0 interactive handlers (Governance, WBS, Dependencies, Allocations, Timesheets, Finance, Changes, Members)
-  var lcBtn = document.getElementById('pd-lc-go');
-  if (lcBtn) {
-    lcBtn.addEventListener('click', function () {
-      fetch('/api/projects/{{ project.id }}/transition', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({ lifecycle_state: document.getElementById('pd-lc-target').value }),
-      }).then(function (r) { return r.json(); }).then(function (d) {
-        if (d.ok) window.location.reload();
-        else if (d.error) alert(d.error);
-      });
-    });
-  }
-  document.querySelectorAll('.pd-gate-approve').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      fetch('/api/projects/{{ project.id }}/gates/' + btn.dataset.stage + '/decide', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({ gate_state: 'approved', decision_note: 'Approved via Governance Workspace' }),
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  });
-  var chForm = document.getElementById('pd-charter-form');
-  if (chForm) {
-    chForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      fetch('/api/projects/{{ project.id }}/charter', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({
-          objectives: document.getElementById('pd-ch-obj').value.trim(),
-          scope_in: document.getElementById('pd-ch-in').value.trim(),
-          scope_out: document.getElementById('pd-ch-out').value.trim(),
-          success_criteria: document.getElementById('pd-ch-succ').value.trim(),
-        }),
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  }
-  var chApp = document.getElementById('pd-charter-approve');
-  if (chApp) {
-    chApp.addEventListener('click', function () {
-      fetch('/api/projects/{{ project.id }}/charter/' + chApp.dataset.cid + '/approve', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  }
-  var wbsForm = document.getElementById('pd-wbs-form');
-  if (wbsForm) {
-    wbsForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      fetch('/api/projects/{{ project.id }}/wbs', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({
-          wbs_code: document.getElementById('pd-wbs-code').value.trim(),
-          title: document.getElementById('pd-wbs-title').value.trim(),
-          budget_allocation: document.getElementById('pd-wbs-bud').value || 0,
-          weight_pct: Number(document.getElementById('pd-wbs-wt').value || 0),
-        }),
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  }
-  var depForm = document.getElementById('pd-dep-form');
-  if (depForm) {
-    depForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var errEl = document.getElementById('pd-dep-err');
-      fetch('/api/projects/{{ project.id }}/dependencies', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({
-          predecessor_task_id: document.getElementById('pd-dep-pred').value,
-          successor_task_id: document.getElementById('pd-dep-succ').value,
-          dependency_type: document.getElementById('pd-dep-type').value,
-        }),
-      }).then(function (r) { return r.json(); }).then(function (d) {
-        if (d.ok) window.location.reload();
-        else if (errEl) { errEl.textContent = d.error || 'Could not link dependency'; errEl.hidden = false; }
-      });
-    });
-  }
-  var allocForm = document.getElementById('pd-alloc-form');
-  if (allocForm) {
-    allocForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var errEl = document.getElementById('pd-alloc-err');
-      var uid = document.getElementById('pd-al-user').value;
-      fetch('/api/projects/{{ project.id }}/allocations', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({
-          user_id: uid || null,
-          resource_name: uid ? '' : document.getElementById('pd-al-role').value.trim(),
-          role_title: document.getElementById('pd-al-role').value.trim(),
-          allocation_pct: Number(document.getElementById('pd-al-pct').value || 50),
-          hourly_cost_rate: document.getElementById('pd-al-rate').value || null,
-        }),
-      }).then(function (r) { return r.json(); }).then(function (d) {
-        if (d.ok) window.location.reload();
-        else if (errEl) { errEl.textContent = d.error || 'Allocation rejected'; errEl.hidden = false; }
-      });
-    });
-  }
-  var tsForm = document.getElementById('pd-ts-form');
-  if (tsForm) {
-    tsForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      fetch('/api/projects/{{ project.id }}/timesheets', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({
-          work_date: document.getElementById('pd-ts-date').value,
-          hours: document.getElementById('pd-ts-hrs').value,
-          notes: document.getElementById('pd-ts-notes').value.trim(),
-          submit: true,
-        }),
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  }
-  document.querySelectorAll('.pd-ts-approve').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      fetch('/api/projects/{{ project.id }}/timesheets/' + btn.dataset.teid + '/approve', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({}),
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  });
-  document.querySelectorAll('.pd-ts-submit').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      fetch('/api/projects/{{ project.id }}/timesheets/' + btn.dataset.teid + '/submit', {
-        method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' },
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  });
-  document.querySelectorAll('.pd-ts-return').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var reason = window.prompt('Return reason (required):', 'Please clarify task notes');
-      if (!reason) return;
-      fetch('/api/projects/{{ project.id }}/timesheets/' + btn.dataset.teid + '/return', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({ reason: reason }),
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  });
-  var budForm = document.getElementById('pd-bud-form');
-  if (budForm) {
-    budForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      fetch('/api/projects/{{ project.id }}/budget', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({
-          category: document.getElementById('pd-bud-cat').value,
-          description: document.getElementById('pd-bud-desc').value.trim(),
-          planned_amount: document.getElementById('pd-bud-amt').value,
-        }),
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  }
-  var costForm = document.getElementById('pd-cost-form');
-  if (costForm) {
-    costForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      fetch('/api/projects/{{ project.id }}/costs', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({
-          event_type: document.getElementById('pd-cost-type').value,
-          description: document.getElementById('pd-cost-desc').value.trim(),
-          amount: document.getElementById('pd-cost-amt').value,
-          source_ref: document.getElementById('pd-cost-ref').value.trim() || null,
-        }),
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  }
-  var crForm = document.getElementById('pd-cr-form');
-  if (crForm) {
-    crForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      fetch('/api/projects/{{ project.id }}/changes', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({
-          title: document.getElementById('pd-cr-title').value.trim(),
-          change_type: document.getElementById('pd-cr-type').value,
-          cost_impact: document.getElementById('pd-cr-cost').value || 0,
-          schedule_impact_days: Number(document.getElementById('pd-cr-days').value || 0),
-        }),
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  }
-  document.querySelectorAll('.pd-cr-decide').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      fetch('/api/projects/{{ project.id }}/changes/' + btn.dataset.crid + '/decide', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({ decision: btn.dataset.dec }),
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  });
-  var memForm = document.getElementById('pd-mem-form');
-  if (memForm) {
-    memForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      fetch('/api/projects/{{ project.id }}/members', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({
-          user_id: Number(document.getElementById('pd-mem-user').value),
-          project_role: document.getElementById('pd-mem-role').value,
-        }),
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  }
-
-  // Batch 2 handlers (Requirements, Backlog, Procurement, Assets, QA, Stakeholders, M&E, Closure)
-  function _bindPost(formId, url, buildBody) {
+  function _bindPost(formId, url, buildBody, errId) {
     var f = document.getElementById(formId);
     if (!f) return;
     f.addEventListener('submit', function (e) {
@@ -1544,35 +1304,98 @@
         body: JSON.stringify(buildBody()),
       }).then(function (r) { return r.json(); }).then(function (d) {
         if (d.ok) window.location.reload();
+        else if (errId && document.getElementById(errId)) { var el = document.getElementById(errId); el.textContent = d.error || 'Action failed'; el.hidden = false; }
         else if (d.error) alert(d.error);
       });
     });
   }
-  _bindPost('pd-req-form', '/api/projects/{{ project.id }}/requirements', function () {
-    return { title: document.getElementById('pd-req-title').value.trim(), priority: document.getElementById('pd-req-prio').value };
-  });
-  document.querySelectorAll('.pd-req-app').forEach(function (b) {
+
+  var linkBtn = document.getElementById('pd-link-btn');
+  if (linkBtn) {
+    linkBtn.addEventListener('click', function () {
+      var sel = document.getElementById('pd-link-sel');
+      if (!sel || !sel.value) return;
+      fetch('/api/projects/{{ project.id }}/link-contract', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({ document_id: Number(sel.value) }),
+      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
+    });
+  }
+
+  var lcBtn = document.getElementById('pd-lc-go');
+  if (lcBtn) {
+    lcBtn.addEventListener('click', function () {
+      fetch('/api/projects/{{ project.id }}/transition', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({ lifecycle_state: document.getElementById('pd-lc-target').value }),
+      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); else if (d.error) alert(d.error); });
+    });
+  }
+  document.querySelectorAll('.pd-gate-approve').forEach(function (b) {
     b.addEventListener('click', function () {
-      fetch('/api/projects/{{ project.id }}/requirements/' + b.dataset.rqid + '/approve', {
+      fetch('/api/projects/{{ project.id }}/gates/' + b.dataset.stage + '/decide', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({ gate_state: 'approved' }),
+      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
+    });
+  });
+  var chApp = document.getElementById('pd-charter-approve');
+  if (chApp) {
+    chApp.addEventListener('click', function () {
+      fetch('/api/projects/{{ project.id }}/charter/' + chApp.dataset.cid + '/approve', {
         method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' },
       }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
     });
+  }
+
+  _bindPost('pd-charter-form', '/api/projects/{{ project.id }}/charter', function () {
+    return { objectives: document.getElementById('pd-ch-obj').value.trim(), scope_in: document.getElementById('pd-ch-in').value.trim(), scope_out: document.getElementById('pd-ch-out').value.trim(), success_criteria: document.getElementById('pd-ch-succ').value.trim() };
+  });
+  _bindPost('pd-wbs-form', '/api/projects/{{ project.id }}/wbs', function () {
+    return { wbs_code: document.getElementById('pd-wbs-code').value.trim(), title: document.getElementById('pd-wbs-title').value.trim(), budget_allocation: document.getElementById('pd-wbs-bud').value || 0, weight_pct: Number(document.getElementById('pd-wbs-wt').value || 0) };
+  });
+  _bindPost('pd-dep-form', '/api/projects/{{ project.id }}/dependencies', function () {
+    return { predecessor_task_id: document.getElementById('pd-dep-pred').value, successor_task_id: document.getElementById('pd-dep-succ').value, dependency_type: document.getElementById('pd-dep-type').value };
+  }, 'pd-dep-err');
+  _bindPost('pd-task-form', '/api/projects/{{ project.id }}/tasks', function () {
+    return { title: document.getElementById('pd-t-title').value.trim(), assignee_name: document.getElementById('pd-t-assignee').value.trim(), priority: document.getElementById('pd-t-prio').value, phase: document.getElementById('pd-t-phase').value.trim() || 'Execution', due_date: document.getElementById('pd-t-due').value };
+  });
+  _bindPost('pd-req-form', '/api/projects/{{ project.id }}/requirements', function () {
+    return { title: document.getElementById('pd-req-title').value.trim(), priority: document.getElementById('pd-req-prio').value };
   });
   _bindPost('pd-bl-form', '/api/projects/{{ project.id }}/backlog', function () {
     return { title: document.getElementById('pd-bl-title').value.trim(), story_points: Number(document.getElementById('pd-bl-pts').value || 3) };
   });
+  _bindPost('pd-alloc-form', '/api/projects/{{ project.id }}/allocations', function () {
+    var uid = document.getElementById('pd-al-user').value;
+    return { user_id: uid || null, resource_name: uid ? '' : document.getElementById('pd-al-role').value.trim(), role_title: document.getElementById('pd-al-role').value.trim(), allocation_pct: Number(document.getElementById('pd-al-pct').value || 50), hourly_cost_rate: document.getElementById('pd-al-rate').value || null };
+  }, 'pd-alloc-err');
+  _bindPost('pd-mem-form', '/api/projects/{{ project.id }}/members', function () {
+    return { user_id: Number(document.getElementById('pd-mem-user').value), project_role: document.getElementById('pd-mem-role').value };
+  });
+  _bindPost('pd-ts-form', '/api/projects/{{ project.id }}/timesheets', function () {
+    return { work_date: document.getElementById('pd-ts-date').value, hours: document.getElementById('pd-ts-hrs').value, notes: document.getElementById('pd-ts-notes').value.trim(), submit: true };
+  });
+  _bindPost('pd-bud-form', '/api/projects/{{ project.id }}/budget', function () {
+    return { category: document.getElementById('pd-bud-cat').value, description: document.getElementById('pd-bud-desc').value.trim(), planned_amount: document.getElementById('pd-bud-amt').value };
+  });
+  _bindPost('pd-cost-form', '/api/projects/{{ project.id }}/costs', function () {
+    return { event_type: document.getElementById('pd-cost-type').value, description: document.getElementById('pd-cost-desc').value.trim(), amount: document.getElementById('pd-cost-amt').value, source_ref: document.getElementById('pd-cost-ref').value.trim() || null };
+  });
   _bindPost('pd-pr-form', '/api/projects/{{ project.id }}/procurement', function () {
     return { title: document.getElementById('pd-pr-title').value.trim(), supplier_name: document.getElementById('pd-pr-sup').value.trim(), estimated_amount: document.getElementById('pd-pr-amt').value || 0 };
   });
-  document.querySelectorAll('.pd-pr-award').forEach(function (b) {
-    b.addEventListener('click', function () {
-      fetch('/api/projects/{{ project.id }}/procurement/' + b.dataset.prid + '/award', {
-        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, body: JSON.stringify({}),
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
-    });
-  });
   _bindPost('pd-as-form', '/api/projects/{{ project.id }}/assets', function () {
     return { asset_name: document.getElementById('pd-as-name').value.trim(), start_date: document.getElementById('pd-as-sd').value, end_date: document.getElementById('pd-as-ed').value };
+  });
+  _bindPost('pd-risk-form', '/api/projects/{{ project.id }}/risks', function () {
+    return { title: document.getElementById('pd-r-title').value.trim(), category: document.getElementById('pd-r-cat').value, severity: document.getElementById('pd-r-sev').value, owner_name: document.getElementById('pd-r-owner').value.trim(), mitigation_plan: document.getElementById('pd-r-mit').value.trim() };
+  });
+  _bindPost('pd-cr-form', '/api/projects/{{ project.id }}/changes', function () {
+    return { title: document.getElementById('pd-cr-title').value.trim(), change_type: document.getElementById('pd-cr-type').value, cost_impact: document.getElementById('pd-cr-cost').value || 0, schedule_impact_days: Number(document.getElementById('pd-cr-days').value || 0) };
+  });
+  _bindPost('pd-comp-form', '/api/projects/{{ project.id }}/compliance', function () {
+    return { record_type: document.getElementById('pd-comp-type').value, title: document.getElementById('pd-comp-title').value.trim(), expiry_date: document.getElementById('pd-comp-exp').value || null };
   });
   _bindPost('pd-qa-form', '/api/projects/{{ project.id }}/quality', function () {
     return { record_type: document.getElementById('pd-qa-type').value, title: document.getElementById('pd-qa-title').value.trim() };
@@ -1580,45 +1403,97 @@
   _bindPost('pd-sh-form', '/api/projects/{{ project.id }}/stakeholders', function () {
     return { name: document.getElementById('pd-sh-name').value.trim(), role_title: document.getElementById('pd-sh-role').value.trim(), influence_level: document.getElementById('pd-sh-inf').value };
   });
-  _bindPost('pd-ind-form', '/api/projects/{{ project.id }}/indicators', function () {
-    return { level: document.getElementById('pd-ind-lvl').value, title: document.getElementById('pd-ind-title').value.trim(), target_value: document.getElementById('pd-ind-tgt').value || null };
-  });
-  _bindPost('pd-cl-form', '/api/projects/{{ project.id }}/closure', function () {
-    return { category: document.getElementById('pd-cl-cat').value, title: document.getElementById('pd-cl-title').value.trim() };
-  });
-  _bindPost('pd-comp-form', '/api/projects/{{ project.id }}/compliance', function () {
-    return { record_type: document.getElementById('pd-comp-type').value, title: document.getElementById('pd-comp-title').value.trim(), expiry_date: document.getElementById('pd-comp-exp').value || null };
-  });
   _bindPost('pd-ap-form', '/api/projects/{{ project.id }}/approvals', function () {
     return { subject_title: document.getElementById('pd-ap-title').value.trim() };
   });
   _bindPost('pd-cm-form', '/api/projects/{{ project.id }}/comments', function () {
     return { body: document.getElementById('pd-cm-body').value.trim() };
   });
+  _bindPost('pd-ind-form', '/api/projects/{{ project.id }}/indicators', function () {
+    return { level: document.getElementById('pd-ind-lvl').value, title: document.getElementById('pd-ind-title').value.trim(), target_value: document.getElementById('pd-ind-tgt').value || null };
+  });
+  _bindPost('pd-cl-form', '/api/projects/{{ project.id }}/closure', function () {
+    return { category: document.getElementById('pd-cl-cat').value, title: document.getElementById('pd-cl-title').value.trim() };
+  });
+
+  // Inline row actions
+  document.querySelectorAll('.pd-task-st').forEach(function (s) {
+    s.addEventListener('change', function () {
+      fetch('/api/projects/{{ project.id }}/tasks/' + s.dataset.tid, { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, body: JSON.stringify({ status: s.value }) }).then(function () { window.location.reload(); });
+    });
+  });
+  document.querySelectorAll('.pd-task-del').forEach(function (b) {
+    b.addEventListener('click', function () {
+      fetch('/api/projects/{{ project.id }}/tasks/' + b.dataset.tid, { method: 'DELETE', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } }).then(function () { window.location.reload(); });
+    });
+  });
+  document.querySelectorAll('.pd-risk-st').forEach(function (s) {
+    s.addEventListener('change', function () {
+      fetch('/api/projects/{{ project.id }}/risks/' + s.dataset.rid, { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, body: JSON.stringify({ status: s.value }) }).then(function () { window.location.reload(); });
+    });
+  });
+  document.querySelectorAll('.pd-risk-del').forEach(function (b) {
+    b.addEventListener('click', function () {
+      fetch('/api/projects/{{ project.id }}/risks/' + b.dataset.rid, { method: 'DELETE', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } }).then(function () { window.location.reload(); });
+    });
+  });
+  document.querySelectorAll('.pd-req-app').forEach(function (b) {
+    b.addEventListener('click', function () {
+      fetch('/api/projects/{{ project.id }}/requirements/' + b.dataset.rqid + '/approve', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } }).then(function () { window.location.reload(); });
+    });
+  });
+  document.querySelectorAll('.pd-pr-award').forEach(function (b) {
+    b.addEventListener('click', function () {
+      fetch('/api/projects/{{ project.id }}/procurement/' + b.dataset.prid + '/award', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, body: JSON.stringify({}) }).then(function () { window.location.reload(); });
+    });
+  });
+  document.querySelectorAll('.pd-cr-decide').forEach(function (b) {
+    b.addEventListener('click', function () {
+      fetch('/api/projects/{{ project.id }}/changes/' + b.dataset.crid + '/decide', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, body: JSON.stringify({ decision: b.dataset.dec }) }).then(function () { window.location.reload(); });
+    });
+  });
+  document.querySelectorAll('.pd-ts-approve').forEach(function (b) {
+    b.addEventListener('click', function () {
+      fetch('/api/projects/{{ project.id }}/timesheets/' + b.dataset.teid + '/approve', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, body: JSON.stringify({}) }).then(function () { window.location.reload(); });
+    });
+  });
+  document.querySelectorAll('.pd-ts-submit').forEach(function (b) {
+    b.addEventListener('click', function () {
+      fetch('/api/projects/{{ project.id }}/timesheets/' + b.dataset.teid + '/submit', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } }).then(function () { window.location.reload(); });
+    });
+  });
+  document.querySelectorAll('.pd-ts-return').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var reason = window.prompt('Return reason (required):', 'Please clarify task notes');
+      if (!reason) return;
+      fetch('/api/projects/{{ project.id }}/timesheets/' + b.dataset.teid + '/return', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, body: JSON.stringify({ reason: reason }) }).then(function () { window.location.reload(); });
+    });
+  });
   var extForm = document.getElementById('pd-ext-form');
   if (extForm) {
     extForm.addEventListener('submit', function (e) {
       e.preventDefault();
-      fetch('/api/projects/{{ project.id }}/external-grants', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-        body: JSON.stringify({ recipient_name: document.getElementById('pd-ext-name').value.trim(), recipient_email: document.getElementById('pd-ext-email').value.trim() }),
-      }).then(function (r) { return r.json(); }).then(function (d) {
-        if (d.ok) {
-          var out = document.getElementById('pd-ext-out');
-          if (out) { out.textContent = 'Scoped Portal URL: ' + window.location.origin + d.portal_url; out.hidden = false; }
-          setTimeout(function () { window.location.reload(); }, 600);
-        }
-      });
+      fetch('/api/projects/{{ project.id }}/external-grants', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, body: JSON.stringify({ recipient_name: document.getElementById('pd-ext-name').value.trim(), recipient_email: document.getElementById('pd-ext-email').value.trim() }) })
+        .then(function (r) { return r.json(); }).then(function (d) {
+          if (d.ok) { var out = document.getElementById('pd-ext-out'); if (out) { out.textContent = 'Scoped Portal URL: ' + window.location.origin + d.portal_url; out.hidden = false; } setTimeout(function () { window.location.reload(); }, 600); }
+        });
     });
   }
   document.querySelectorAll('.pd-ext-rev').forEach(function (b) {
     b.addEventListener('click', function () {
-      fetch('/api/projects/{{ project.id }}/external-grants/' + b.dataset.gid + '/revoke', {
-        method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' },
-      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
+      fetch('/api/projects/{{ project.id }}/external-grants/' + b.dataset.gid + '/revoke', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } }).then(function () { window.location.reload(); });
     });
   });
+  var setForm = document.getElementById('pd-settings-form');
+  if (setForm) {
+    setForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      fetch('/api/projects/{{ project.id }}', {
+        method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({ name: document.getElementById('pd-set-name').value.trim(), client_name: document.getElementById('pd-set-client').value.trim(), status: document.getElementById('pd-set-status').value, category: document.getElementById('pd-set-cat').value, budget_amount: document.getElementById('pd-set-budget').value || null, currency: document.getElementById('pd-set-curr').value.trim() || 'USD', start_date: document.getElementById('pd-set-start').value, end_date: document.getElementById('pd-set-end').value, description: document.getElementById('pd-set-desc').value.trim() }),
+      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
+    });
+  }
 })();
 </script>
 {% endblock %}

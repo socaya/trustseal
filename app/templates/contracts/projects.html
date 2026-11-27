@@ -9,50 +9,53 @@
   </p>
 {% endblock %}
 {% block page_actions %}
-  <a class="ts-btn ts-btn--secondary" href="{{ url_for('workspace_assets_views.templates_hub_page') }}">TS Template Gallery</a>
+  <a class="ts-btn ts-btn--secondary" href="{{ url_for('contracts_views.my_work_page') }}">My Work &amp; Timesheets</a>
   <a class="ts-btn ts-btn--secondary" href="{{ url_for('workspace_assets_views.signed_contracts_page') }}">All Contracts</a>
   <button type="button" class="ts-btn ts-btn--primary" id="prj-open-new">+ New Project</button>
 {% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pm_studio.css') }}">
 <div class="st-flat">
   {% include "stamps/_flat_ui.html" %}
 
-  {# ======================= PORTFOLIO EXECUTIVE KPI STRIP (5 CARDS) ======================= #}
-  <section class="st-metrics" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));" aria-label="Project portfolio KPIs">
-    <div class="st-metric">
-      <span class="st-metric__label">Active Projects</span>
-      <span class="st-metric__value">{{ projects|length }}</span>
-      <span class="st-metric__sub">Each project governs 1–N TSD contracts</span>
+  {# ======================= PORTFOLIO EXECUTIVE KPI STRIP ======================= #}
+  <section class="pms-kpis" style="margin-bottom:18px;" aria-label="Project portfolio KPIs">
+    <div class="pms-kpi">
+      <span class="pms-kpi__label">Active Projects</span>
+      <span class="pms-kpi__val">{{ projects|length }}</span>
+      <span class="pms-kpi__sub">Contract-free or governing 1–N TSD contracts</span>
     </div>
-    <div class="st-metric">
-      <span class="st-metric__label">Governed TSD Contracts</span>
-      <span class="st-metric__value">{{ projects|sum(attribute='contracts_total') }}</span>
-      <span class="st-metric__sub">{{ projects|sum(attribute='contracts_signed') }} signed · {{ projects|sum(attribute='contracts_draft') }} draft · {{ projects|sum(attribute='contracts_suspended') }} suspended</span>
+    <div class="pms-kpi">
+      <span class="pms-kpi__label">Governed TSD Contracts</span>
+      <span class="pms-kpi__val">{{ projects|sum(attribute='contracts_total') }}</span>
+      <span class="pms-kpi__sub">{{ projects|sum(attribute='contracts_signed') }} signed · {{ projects|sum(attribute='contracts_draft') }} draft · {{ projects|sum(attribute='contracts_suspended') }} suspended</span>
     </div>
-    <div class="st-metric">
-      <span class="st-metric__label">Portfolio Deliverables</span>
-      <span class="st-metric__value" style="color:#17633a;">{{ portfolio.deliverables_pct if portfolio is defined else 0 }}%</span>
-      <span class="st-metric__sub">{{ portfolio.deliverables_accepted if portfolio is defined else 0 }} / {{ portfolio.deliverables_total if portfolio is defined else 0 }} milestones accepted</span>
+    <div class="pms-kpi">
+      <span class="pms-kpi__label">Portfolio Deliverables</span>
+      <span class="pms-kpi__val" style="color:#047857;">{{ portfolio.deliverables_pct if portfolio is defined else 0 }}%</span>
+      <span class="pms-kpi__sub">{{ portfolio.deliverables_accepted if portfolio is defined else 0 }} / {{ portfolio.deliverables_total if portfolio is defined else 0 }} milestones accepted</span>
     </div>
-    <div class="st-metric">
-      <span class="st-metric__label">Tasks &amp; Risks (RAID)</span>
-      <span class="st-metric__value" style="color:#002769;">{{ portfolio.open_tasks if portfolio is defined else 0 }}</span>
-      <span class="st-metric__sub">open task(s) · {{ portfolio.open_risks if portfolio is defined else 0 }} open risk(s)</span>
+    <div class="pms-kpi">
+      <span class="pms-kpi__label">Tasks &amp; Risks (RAID)</span>
+      <span class="pms-kpi__val" style="color:#002769;">{{ portfolio.open_tasks if portfolio is defined else 0 }}</span>
+      <span class="pms-kpi__sub">open task(s) · {{ portfolio.open_risks if portfolio is defined else 0 }} open risk(s)</span>
     </div>
-    <div class="st-metric">
-      <span class="st-metric__label">Portfolio Budget</span>
-      <span class="st-metric__value">{{ ('USD {:,.0f}'.format(portfolio.total_budget)) if (portfolio is defined and portfolio.total_budget) else '—' }}</span>
-      <span class="st-metric__sub">Committed: USD {{ '{:,.0f}'.format(portfolio.total_committed or 0) if portfolio is defined else '0' }} · {{ portfolio.probations_active if portfolio is defined else 0 }} probation(s)</span>
+    <div class="pms-kpi">
+      <span class="pms-kpi__label">Portfolio Budget</span>
+      <span class="pms-kpi__val">{{ ('USD {:,.0f}'.format(portfolio.total_budget)) if (portfolio is defined and portfolio.total_budget) else '—' }}</span>
+      <span class="pms-kpi__sub">Committed: USD {{ '{:,.0f}'.format(portfolio.total_committed or 0) if portfolio is defined else '0' }} · {{ portfolio.probations_active if portfolio is defined else 0 }} probation(s)</span>
     </div>
   </section>
 
-  {# ======================= ENTERPRISE PPM WORKSPACE SUBNAV ======================= #}
-  <nav style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;border-bottom:1px solid #ebeef2;padding-bottom:10px;" role="tablist" aria-label="Enterprise PM sections">
-    <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-pmsec="projects">Projects ({{ projects|length }})</button>
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pmsec="portfolios">Portfolios &amp; Programmes ({{ (portfolios|length if portfolios is defined else 0) + (programmes|length if programmes is defined else 0) }})</button>
-    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pmsec="intake">Demand &amp; Intake Queue ({{ intakes|length if intakes is defined else 0 }})</button>
-  </nav>
+  {# ======================= SEGMENTED STUDIO SUBNAV ======================= #}
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+    <nav class="pms-seg" role="tablist" aria-label="Enterprise PM sections">
+      <button type="button" class="pms-seg__btn is-active" data-pmsec="projects">Projects ({{ projects|length }})</button>
+      <button type="button" class="pms-seg__btn" data-pmsec="portfolios">Portfolios &amp; Programmes ({{ (portfolios|length if portfolios is defined else 0) + (programmes|length if programmes is defined else 0) }})</button>
+      <button type="button" class="pms-seg__btn" data-pmsec="intake">Demand &amp; Intake ({{ intakes|length if intakes is defined else 0 }})</button>
+    </nav>
+  </div>
 
   <div data-pmpane="projects">
   {# ======================= FILTER & VIEW BAR ======================= #}
@@ -139,8 +142,7 @@
             {{ (p.currency ~ ' ' ~ ('{:,.0f}'.format(p.budget_amount))) if p.budget_amount else '—' }}
           </td>
           <td style="text-align:right;white-space:nowrap;">
-            <a class="ts-btn ts-btn--secondary ts-btn--sm" href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}">Dossier →</a>
-            <a class="ts-btn ts-btn--ghost ts-btn--sm" href="{{ url_for('workspace_assets_views.signed_contracts_page') }}?project={{ p.id }}">Contracts</a>
+            <a class="ts-btn ts-btn--primary ts-btn--sm" href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}">Open PM Studio →</a>
           </td>
         </tr>
         {% endfor %}
@@ -453,7 +455,7 @@
     btn.addEventListener('click', function () {
       var target = btn.dataset.pmsec;
       document.querySelectorAll('[data-pmsec]').forEach(function (b) {
-        b.className = 'ts-btn ts-btn--sm ' + (b.dataset.pmsec === target ? 'ts-btn--primary' : 'ts-btn--secondary');
+        b.classList.toggle('is-active', b.dataset.pmsec === target);
       });
       document.querySelectorAll('[data-pmpane]').forEach(function (p) {
         p.hidden = p.dataset.pmpane !== target;
