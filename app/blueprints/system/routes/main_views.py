@@ -215,7 +215,7 @@ PUBLIC_MODULES = [
             "and regulatory policy packs — all customizable and ready for eIDAS 2.0 signing."
         ),
         "cta_label": "Browse Templates Hub",
-        "cta_href": "/workspace/templates",
+        "cta_href": "/templates",
         "capabilities": [
             ("1,080+ Business & Executive Documents", "Boardroom business plans, HR handbooks, SOPs, resolutions, procurement guides, and operational playbooks ready to instantiate in .tsd format."),
             ("1,050+ Full-Length Commercial Contracts", "Structured MSAs, SOWs, NDAs, vendor agreements, employment contracts, leases, and financial agreements with dynamic placeholders."),

@@ -488,90 +488,124 @@
   font-size: 13px;
 }
 
-/* ---------- 1. Application bar ---------- */
+/* ---------- 1. Application bar (Executive TrustSeal Navy) ---------- */
 .ts-ed__appbar {
-  height: 38px; flex: 0 0 auto;
+  height: 48px; flex: 0 0 auto;
   width: 100%; max-width: 100%; min-width: 0;
   box-sizing: border-box;
   overflow: hidden;
-  background: #fff;
-  border-bottom: 1px solid var(--ed-line);
-  display: flex; align-items: center; gap: 7px;
-  padding: 0 10px;
+  background: linear-gradient(110deg, #00163d 0%, #002769 62%, #013688 100%);
+  border-bottom: 2.5px solid #02982e;
+  color: #ffffff;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 18px;
 }
 .ts-ed__brand {
-  display: inline-flex; align-items: baseline; gap: 5px;
-  color: var(--ed-brand);
+  display: inline-flex; align-items: baseline; gap: 6px;
+  color: #ffffff;
   white-space: nowrap; flex: 0 0 auto;
 }
-.ts-ed__brand strong { font-size: 12.5px; font-weight: 800; letter-spacing: -0.2px; }
-.ts-ed__brand small  { font-size: 9.5px; color: var(--ed-muted); font-weight: 600; }
-.ts-ed__divider { width: 1px; height: 17px; background: var(--ed-line); flex: 0 0 auto; }
+.ts-ed__brand strong { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; color: #ffffff; }
+.ts-ed__brand small  { font-size: 11px; color: #7ee29a; font-weight: 700; letter-spacing: 0.05em; }
+.ts-ed__divider { width: 1px; height: 18px; background: rgba(255, 255, 255, 0.24); flex: 0 0 auto; }
 .ts-ed__filename {
-  flex: 1 1 140px; min-width: 80px; max-width: 240px;
-  font-size: 12px; font-weight: 600;
-  background: transparent; border: 1px solid transparent;
-  padding: 3px 6px;
-  color: var(--ed-ink); outline: none;
-  border-radius: var(--ts-radius-sm);
+  flex: 1 1 180px; min-width: 120px; max-width: 300px;
+  font-size: 13.5px; font-weight: 600;
+  background: rgba(255, 255, 255, 0.09); border: 1px solid rgba(255, 255, 255, 0.24);
+  padding: 5px 10px;
+  color: #ffffff; outline: none;
+  border-radius: 5px;
 }
-.ts-ed__filename:hover { border-color: var(--ed-line); }
-.ts-ed__filename:focus { border-color: var(--ed-brand); box-shadow: 0 0 0 2px rgba(55,120,212,.15); }
+.ts-ed__filename::placeholder { color: rgba(219, 231, 255, 0.65); }
+.ts-ed__filename:hover { border-color: rgba(255, 255, 255, 0.48); background: rgba(255, 255, 255, 0.14); }
+.ts-ed__filename:focus { border-color: #7ee29a; background: rgba(255, 255, 255, 0.16); box-shadow: 0 0 0 2px rgba(126, 226, 154, 0.2); }
 .ts-ed__savestate {
-  font-size: 10px; color: var(--ed-muted); white-space: nowrap;
-  max-width: 190px; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto;
+  font-size: 12px; font-weight: 600; color: #7ee29a; white-space: nowrap;
+  max-width: 200px; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto;
 }
 .ts-ed__spacer { flex: 1 1 8px; min-width: 4px; }
 .ts-ed__class-mark {
-  font-size: 10px; color: var(--ed-muted);
+  font-size: 11px; color: var(--ed-muted);
   border-left: 1px solid var(--ed-line);
   padding-left: 10px;
   white-space: nowrap;
 }
-.ts-ed__class-mark b { color: var(--ed-brand); }
+.ts-ed__class-mark b { color: #002769; }
 .ts-ed__btn {
-  background: #fff; border: 1px solid var(--ed-line);
-  padding: 4px 10px; height: 26px;
-  font-size: 11px; color: var(--ed-ink);
-  border-radius: var(--ts-radius-sm);
+  background: #fff; border: 1px solid #cbd5e1;
+  padding: 5px 11px; height: 28px;
+  font-size: 12.5px; font-weight: 600; color: #1e293b;
+  border-radius: 5px;
   cursor: pointer; text-decoration: none;
   display: inline-flex; align-items: center; gap: 6px;
   white-space: nowrap;
 }
-.ts-ed__btn:hover { background: var(--ed-subline); border-color: var(--ts-border-strong); color: var(--ed-ink); text-decoration: none; }
+.ts-ed__btn:hover { background: #f4f7fc; border-color: #002769; color: #002769; text-decoration: none; }
 .ts-ed__btn--ghost { background: transparent; border-color: transparent; }
-.ts-ed__btn--ghost:hover { background: var(--ed-subline); border-color: var(--ed-line); }
-.ts-ed__btn--primary { background: var(--ed-brand); color: #fff; border-color: var(--ed-brand); }
-.ts-ed__btn--primary:hover { background: var(--ts-brand-primary-hover); border-color: var(--ts-brand-primary-hover); color: #fff; }
+.ts-ed__btn--ghost:hover { background: #f4f7fc; border-color: #dbe4f2; }
+.ts-ed__btn--primary { background: #002769; color: #fff; border-color: #002769; }
+.ts-ed__btn--primary:hover { background: #001c52; border-color: #001c52; color: #fff; }
+.ts-ed__appbar .ts-ed__btn {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.32);
+  color: #ffffff;
+  height: 30px;
+}
+.ts-ed__appbar .ts-ed__btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.58);
+  color: #ffffff;
+}
+.ts-ed__appbar .ts-ed__btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: rgba(235, 242, 255, 0.92);
+}
+.ts-ed__appbar .ts-ed__btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}
+.ts-ed__appbar .ts-ed__btn--primary {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #002769;
+  font-weight: 700;
+}
+.ts-ed__appbar .ts-ed__btn--primary:hover {
+  background: #eef4ff;
+  border-color: #eef4ff;
+  color: #001a4d;
+}
 
-/* ---------- 2. Ribbon tabs ---------- */
+/* ---------- 2. Ribbon tabs (TrustSeal Slate) ---------- */
 .ts-ed__tabs {
-  flex: 0 0 auto; height: 30px;
-  background: #fff;
-  border-bottom: 1px solid var(--ed-line);
+  flex: 0 0 auto; height: 36px;
+  background: #f4f7fc;
+  border-bottom: 1px solid #dbe4f2;
   display: flex; align-items: stretch;
-  padding: 0 10px;
+  padding: 0 14px;
 }
 .ts-ed__tab {
   background: transparent; border: 0;
-  padding: 6px 12px 5px;
-  font-size: 11.5px; color: var(--ed-muted);
+  padding: 8px 14px;
+  font-size: 13px; font-weight: 500; color: #334155;
   cursor: pointer; position: relative;
 }
-.ts-ed__tab:hover { color: var(--ed-ink); }
-.ts-ed__tab.ts-is-active { font-weight: 700; color: var(--ed-brand); }
+.ts-ed__tab:hover { color: #002769; }
+.ts-ed__tab.ts-is-active { font-weight: 700; color: #002769; }
 .ts-ed__tab.ts-is-active::after {
   position: absolute; content: '';
   left: 10px; right: 10px; bottom: 0;
-  height: 2px; background: var(--ed-brand);
+  height: 2.5px; background: #002769;
 }
 
 /* ---------- 3. Ribbon body ---------- */
 .ts-ed__ribbon {
-  flex: 0 0 auto; height: 70px;
-  background: #fff;
-  border-bottom: 1px solid #cdd6df;
-  padding: 4px 10px 3px;
+  flex: 0 0 auto; height: 74px;
+  background: #ffffff;
+  border-bottom: 1px solid #dbe4f2;
+  padding: 5px 12px 3px;
   display: flex; align-items: stretch;
   overflow-x: auto; overflow-y: hidden;
   white-space: nowrap;
@@ -579,17 +613,18 @@
 }
 .ts-ed__grp {
   display: flex; align-items: center; gap: 3px;
-  padding: 0 10px 13px;
-  border-right: 1px solid #e2e7ed;
+  padding: 0 12px 14px;
+  border-right: 1px solid #dbe4f2;
   position: relative;
   min-width: max-content;
 }
 .ts-ed__grp:last-child { border-right: 0; }
 .ts-ed__grp-label {
-  position: absolute; bottom: 0; left: 0; right: 0;
+  position: absolute; bottom: 1px; left: 0; right: 0;
   text-align: center;
-  font-size: 9px;
-  color: var(--ed-subtle);
+  font-size: 10px;
+  font-weight: 600;
+  color: #475569;
   letter-spacing: 0.02em;
 }
 .ts-ed__tool {

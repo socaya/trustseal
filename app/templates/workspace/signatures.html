@@ -1,41 +1,155 @@
 {% extends "layouts/app.html" %}
 {% set active_nav_item = 'signatures' %}
 
-{% block title %}Authorized Signatories · TRUSTSEAL{% endblock %}
-{% block page_title %}Authorized Signatories{% endblock %}
+{% block title %}Signature Engine &amp; Authorized Signatories · TRUSTSEAL{% endblock %}
+{% block page_header %}{% endblock %}
+{% block page_title %}{% endblock %}
 {% block page_description %}{% endblock %}
-{% block page_actions %}
-  <button type="button" class="ts-btn ts-btn--primary" id="sig-reg-toggle">+ Register signatory</button>
+{% block page_actions %}{% endblock %}
+{% block breadcrumbs %}{% endblock %}
+
+{% block extra_head %}
+<style>.ts-page { padding: 0 !important; max-width: none !important; }</style>
 {% endblock %}
 
 {% block content %}
 {% set pending_otp_cnt = usage_logs|selectattr('status', 'equalto', 'otp_pending')|list|length %}
-<div class="st-flat ts-sig-vault" id="ts-sig-vault" data-viewer="{{ current_user_email }}">
+{% set approved_sig_cnt = registered_signatures|selectattr('approval_status', 'equalto', 'approved')|list|length %}
+<div class="ts-ed st-flat ts-sig-vault" id="ts-sig-vault" data-viewer="{{ current_user_email }}">
   {% include "stamps/_flat_ui.html" %}
 
-  <!-- Security Notice Banner -->
-  <div class="sig-sec-banner">
-    <strong>Platform-verified signature vault:</strong> Signature graphics are never exposed on this page. Only <strong>Approved</strong> signatures can be applied after <strong>Owner OTP Approval</strong>; TrustSeal then validates a tenant-keyed attestation automatically whenever the document is saved.
+  {# ======================= 1. TRUSTSEAL SIGNATURE ENGINE STUDIO BAR ======================= #}
+  <header class="ts-ed__appbar">
+    <div class="ts-ed__brand">
+      <strong>TRUSTSEAL</strong><small>SIGNATURE ENGINE</small>
+    </div>
+    <span class="ts-ed__divider" aria-hidden="true"></span>
+    <span class="ts-ed__savestate ts-ed__savestate--saved">● {{ approved_sig_cnt }} Approved</span>
+    <span class="ts-ed__savestate">· {{ registered_signatures|length }} Registered{% if pending_otp_cnt %} · {{ pending_otp_cnt }} Pending OTP{% endif %}</span>
+    <div class="ts-ed__spacer"></div>
+    <a class="ts-ed__btn ts-ed__btn--ghost" href="/esignatures/send">Send for eSignature</a>
+    <a class="ts-ed__btn ts-ed__btn--ghost" href="/trust">eIDAS 2.0 Standards</a>
+    <a class="ts-ed__btn" href="/verify">Verify</a>
+    <button type="button" class="ts-ed__btn ts-ed__btn--primary" id="sig-reg-toggle">+ Register Signatory</button>
+  </header>
+
+  {# ======================= 2. SIGNATURE ENGINE RIBBON TABS ======================= #}
+  <nav class="ts-ed__tabs" role="tablist" aria-label="Signature Engine ribbon tabs">
+    <button type="button" role="tab" class="ts-ed__tab ts-is-active" data-sig-rtab="vault" aria-selected="true">Vault &amp; Registry</button>
+    <button type="button" role="tab" class="ts-ed__tab" data-sig-rtab="capture" aria-selected="false">Capture Studio</button>
+    <button type="button" role="tab" class="ts-ed__tab" data-sig-rtab="eidas" aria-selected="false">eIDAS 2.0 &amp; Send</button>
+    <button type="button" role="tab" class="ts-ed__tab" data-sig-rtab="security" aria-selected="false">Security &amp; OTP Audit</button>
+  </nav>
+
+  {# ======================= 3. SIGNATURE ENGINE CONTEXTUAL RIBBON ======================= #}
+  <div class="sig-ribbon" role="toolbar" aria-label="Signature Engine commands">
+    <!-- Ribbon Pane 1: Vault & Registry -->
+    <div class="sig-rpane" data-sig-rpane="vault">
+      <div class="sig-rgrp">
+        <button type="button" class="sig-rbtn is-active" data-sig-view="registry">
+          Authorized Signatories <span>({{ registered_signatures|length }})</span>
+        </button>
+        <button type="button" class="sig-rbtn" data-sig-view="audit">
+          Usage &amp; OTP Approvals <span>({{ usage_logs|length }})</span>
+        </button>
+        <span class="sig-rgrp__lbl">Views</span>
+      </div>
+      <div class="sig-rgrp">
+        <button type="button" class="sig-rbtn sig-rbtn--navy" data-sig-open-cap="stylus_pen">+ New Signatory</button>
+        <button type="button" class="sig-rbtn" data-sig-open-cap="ts_hq_engine">Vector Calligraphy</button>
+        <button type="button" class="sig-rbtn" data-sig-open-cap="uploaded">Upload Scanned</button>
+        <span class="sig-rgrp__lbl">Enrollment</span>
+      </div>
+      <div class="sig-rgrp sig-rgrp--grow">
+        <div class="st-search" style="min-width:260px;height:32px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+            <path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <input type="search" id="sig-search" aria-label="Search signatories or audit logs" placeholder="Search signatories, titles, or OTP logs…">
+        </div>
+        <span class="sig-rgrp__lbl">Filter</span>
+      </div>
+    </div>
+
+    <!-- Ribbon Pane 2: Capture Studio -->
+    <div class="sig-rpane" data-sig-rpane="capture" hidden>
+      <div class="sig-rgrp">
+        <button type="button" class="sig-rbtn" data-sig-open-cap="stylus_pen">Stylus / Pressure Pad</button>
+        <button type="button" class="sig-rbtn" data-sig-open-cap="device_pad">USB / HID Signature Pad</button>
+        <button type="button" class="sig-rbtn" data-sig-open-cap="ts_hq_engine">TS Vector Calligraphy</button>
+        <button type="button" class="sig-rbtn" data-sig-open-cap="uploaded">Scanned Auto-Clean</button>
+        <span class="sig-rgrp__lbl">Capture Engines</span>
+      </div>
+      <div class="sig-rgrp">
+        <button type="button" class="sig-rbtn" data-sig-quick-ink="#002769"><i class="sig-ink-dot" style="background:#002769;"></i>TrustSeal Navy</button>
+        <button type="button" class="sig-rbtn" data-sig-quick-ink="#0038A8"><i class="sig-ink-dot" style="background:#0038A8;"></i>Royal Blue</button>
+        <button type="button" class="sig-rbtn" data-sig-quick-ink="#0F172A"><i class="sig-ink-dot" style="background:#0F172A;"></i>Legal Black</button>
+        <button type="button" class="sig-rbtn" data-sig-quick-ink="#065F46"><i class="sig-ink-dot" style="background:#065F46;"></i>Audit Emerald</button>
+        <span class="sig-rgrp__lbl">Official Ink</span>
+      </div>
+    </div>
+
+    <!-- Ribbon Pane 3: eIDAS 2.0 & Send -->
+    <div class="sig-rpane" data-sig-rpane="eidas" hidden>
+      <div class="sig-rgrp">
+        <a class="sig-rbtn sig-rbtn--navy" href="/esignatures/send">Send Document (SES / AES / QES)</a>
+        <a class="sig-rbtn" href="/esignatures/send">Bulk Invite (CSV)</a>
+        <span class="sig-rgrp__lbl">Dispatch</span>
+      </div>
+      <div class="sig-rgrp">
+        <a class="sig-rbtn" href="/esignatures/send">QTSP &amp; CSC API v2 Config</a>
+        <a class="sig-rbtn" href="/trust">eIDAS 2.0 &amp; EUDI Wallet Standards</a>
+        <a class="sig-rbtn" href="/verify">Public Verifier</a>
+        <span class="sig-rgrp__lbl">Trust &amp; Conformance</span>
+      </div>
+    </div>
+
+    <!-- Ribbon Pane 4: Security & OTP Audit -->
+    <div class="sig-rpane" data-sig-rpane="security" hidden>
+      <div class="sig-rgrp">
+        <button type="button" class="sig-rbtn" data-sig-view="audit">OTP Approval Queue ({{ pending_otp_cnt }} pending)</button>
+        <button type="button" class="sig-rbtn" data-sig-view="registry">Vault Governance Registry</button>
+        <span class="sig-rgrp__lbl">Custody &amp; Audit</span>
+      </div>
+      <div class="sig-rgrp">
+        <a class="sig-rbtn" href="/trust">Cryptographic Attestation Policy</a>
+        <a class="sig-rbtn" href="/verify">Verify Sealed Evidence</a>
+        <span class="sig-rgrp__lbl">Assurance</span>
+      </div>
+    </div>
   </div>
 
-  <!-- Tab bar: Authorized Signatories | Usage & OTP Audit Log -->
-  <section class="sig-tabs-bar">
-    <div class="sig-tabs" role="tablist">
-      <button type="button" class="sig-tab is-active" data-sig-view="registry">
-        Authorized Signatories <span class="sig-tab__n">{{ registered_signatures|length }}</span>
-      </button>
-      <button type="button" class="sig-tab" data-sig-view="audit">
-        Usage &amp; OTP Approvals <span class="sig-tab__n">{{ usage_logs|length }}{% if pending_otp_cnt %} · {{ pending_otp_cnt }} pending{% endif %}</span>
-      </button>
+  {# ======================= 4. FULL-SCREEN WORKSPACE BODY ======================= #}
+  <div class="sig-workspace">
+    <!-- Unified Hairline-Divided TrustSeal KPI Strip -->
+    <section class="st-metrics" aria-label="Signature Engine summary">
+      <div class="st-metric">
+        <span class="st-metric__label">Registered Signatories</span>
+        <span class="st-metric__value">{{ registered_signatures|length }}</span>
+        <span class="st-metric__sub">Sealed tenant-keyed vault</span>
+      </div>
+      <div class="st-metric">
+        <span class="st-metric__label">Approved &amp; Active</span>
+        <span class="st-metric__value" style="color:#027f26;">{{ approved_sig_cnt }}</span>
+        <span class="st-metric__sub">Ready for OTP-gated signing</span>
+      </div>
+      <div class="st-metric">
+        <span class="st-metric__label">Pending OTP Approvals</span>
+        <span class="st-metric__value">{{ pending_otp_cnt }}</span>
+        <span class="st-metric__sub">Owner sole-control authorization</span>
+      </div>
+      <div class="st-metric">
+        <span class="st-metric__label">Total Usage Events</span>
+        <span class="st-metric__value">{{ usage_logs|length }}</span>
+        <span class="st-metric__sub">Hash-chained audit entries</span>
+      </div>
+    </section>
+
+    <!-- Security Notice Banner -->
+    <div class="sig-sec-banner">
+      <strong>Platform-verified signature vault:</strong> Signature graphics are sealed inside the tenant vault and never exposed publicly. Only <strong>Approved</strong> signatures can be applied after <strong>Owner OTP Approval</strong>, automatically generating a tenant-keyed forensic attestation.
     </div>
-    <div class="st-search" style="min-width:250px;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
-        <path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-      <input type="search" id="sig-search" aria-label="Search signatories or audit logs" placeholder="Search signatories or audit logs…">
-    </div>
-  </section>
 
   <!-- Inline Register Signatory Panel (Connected Device / Stylus Pen / TS HQ Engine / Upload) -->
   <section id="sig-reg-panel" class="st-panel" style="padding:18px 20px;margin-bottom:18px;" hidden>
@@ -335,12 +449,93 @@
     </section>
     {% endif %}
   </section>
+  </div>
 </div>
 
 <style>
+.sig-ribbon {
+  background: #ffffff;
+  border-bottom: 1px solid #dbe4f2;
+  padding: 6px 18px 4px;
+  min-height: 68px;
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+}
+.sig-rpane {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+}
+.sig-rpane[hidden] { display: none !important; }
+.sig-rgrp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 16px 16px;
+  border-right: 1px solid #dbe4f2;
+  position: relative;
+  flex-shrink: 0;
+}
+.sig-rgrp:first-child { padding-left: 0; }
+.sig-rgrp:last-child { border-right: 0; }
+.sig-rgrp--grow { margin-left: auto; border-right: 0; padding-right: 0; }
+.sig-rgrp__lbl {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: 0.03em;
+}
+.sig-rbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid #dbe4f2;
+  background: #f8fafd;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.sig-rbtn:hover { background: #eaf1fb; border-color: #002769; color: #002769; text-decoration: none; }
+.sig-rbtn.is-active,
+.sig-rbtn--navy { background: #002769; border-color: #002769; color: #ffffff; }
+.sig-rbtn--navy:hover,
+.sig-rbtn.is-active:hover { background: #001c52; color: #ffffff; }
+.sig-ink-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+.sig-workspace {
+  padding: 22px 28px 40px;
+  background: #ffffff;
+  flex: 1 1 auto;
+}
 .sig-sec-banner {
-  background: #edf2fa; border-left: 3px solid #002769; color: #1d3648;
-  padding: 9px 14px; font-size: 12px; margin-bottom: 14px;
+  background: #f4f7fc; border-left: 3px solid #002769; color: #1e293b;
+  padding: 11px 16px; font-size: 13.5px; margin-bottom: 18px;
+}
+.sig-workspace .st-table th {
+  background: #f4f7fc;
+  color: #002769;
+  font-size: 12px;
+  font-weight: 700;
+  border-bottom: 1.5px solid #002769;
+  padding: 11px 14px;
+}
+.sig-workspace .st-table td {
+  font-size: 14px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e6edf7;
 }
 .sig-tabs-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
@@ -405,11 +600,47 @@
   document.getElementById('sig-reg-close').addEventListener('click', function () { regPanel.hidden = true; });
   document.getElementById('sig-reg-cancel').addEventListener('click', function () { regPanel.hidden = true; });
 
+  // Signature Engine Ribbon Tabs
+  document.querySelectorAll('[data-sig-rtab]').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      var k = tab.getAttribute('data-sig-rtab');
+      document.querySelectorAll('[data-sig-rtab]').forEach(function (t) {
+        var active = (t === tab);
+        t.classList.toggle('ts-is-active', active);
+        t.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      document.querySelectorAll('[data-sig-rpane]').forEach(function (p) {
+        p.hidden = (p.getAttribute('data-sig-rpane') !== k);
+      });
+    });
+  });
+
+  // Ribbon quick-launch into Capture Engine modes
+  document.querySelectorAll('[data-sig-open-cap]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      regPanel.hidden = false;
+      var mode = btn.getAttribute('data-sig-open-cap');
+      var target = document.querySelector('[data-cap-mode="' + mode + '"]');
+      if (target) target.click();
+      regPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  });
+
+  // Ribbon quick ink selector
+  document.querySelectorAll('[data-sig-quick-ink]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      regPanel.hidden = false;
+      var c = btn.getAttribute('data-sig-quick-ink');
+      var sw = document.querySelector('#sig-ink-swatches [data-ink="' + c + '"]');
+      if (sw) sw.click();
+    });
+  });
+
   // View tabs
   document.querySelectorAll('[data-sig-view]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var v = btn.getAttribute('data-sig-view');
-      document.querySelectorAll('[data-sig-view]').forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+      document.querySelectorAll('[data-sig-view]').forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-sig-view') === v); });
       document.getElementById('sig-view-registry').hidden = (v !== 'registry');
       document.getElementById('sig-view-audit').hidden = (v !== 'audit');
     });
