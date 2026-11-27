@@ -202,8 +202,35 @@ PUBLIC_MODULES = [
         ],
     },
     {
-        "slug": "documents",
+        "slug": "templates",
         "num": "04",
+        "category": "Ready-to-Use Enterprise Blueprints",
+        "name": "3,325+ Templates Library",
+        "short": "1,080+ Business Documents, 1,050+ Full-Length Contracts, 1,000+ Stamps & 100+ Letterheads",
+        "spec": "1,080+ Docs · 1,050+ Contracts · 1,000+ Stamps",
+        "summary": (
+            "Launch faster without drafting from scratch. TRUSTSEAL includes more than 3,325 "
+            "production-ready enterprise templates spanning full-length legal contracts, "
+            "business-in-a-box documents, corporate stamp designs, official letterheads, "
+            "and regulatory policy packs — all customizable and ready for eIDAS 2.0 signing."
+        ),
+        "cta_label": "Browse Templates Hub",
+        "cta_href": "/workspace/templates",
+        "capabilities": [
+            ("1,080+ Business & Executive Documents", "Boardroom business plans, HR handbooks, SOPs, resolutions, procurement guides, and operational playbooks ready to instantiate in .tsd format."),
+            ("1,050+ Full-Length Commercial Contracts", "Structured MSAs, SOWs, NDAs, vendor agreements, employment contracts, leases, and financial agreements with dynamic placeholders."),
+            ("1,000+ Official Corporate Stamp Designs", "Pre-engineered round, oval, dated, executive approval, confidential, and departmental stamp templates customizable in Stamp Studio."),
+            ("100+ Letterheads & Regulatory Policy Packs", "Executive stationery presets alongside AML/KYC/CFT, banking/FinTech, SACCO governance, and statutory corporate registry filings."),
+        ],
+        "connections": [
+            ("Contracts Lifecycle (CLM)", "/platform/contracts", "Instantiate any contract blueprint directly into CLM redlines, obligations, and spend tracking."),
+            ("eIDAS 2.0 Send for eSignature", "/platform/esignature", "Send templated agreements to single recipients or 250-row CSV bulk invite batches in seconds."),
+            ("Corporate Stamps & Brand", "/platform/stamps", "Customize any of the 1,000+ stamp designs and 100+ letterheads with your organization identity."),
+        ],
+    },
+    {
+        "slug": "documents",
+        "num": "05",
         "category": "Encrypted Authoring & Storage",
         "name": "TSD Encrypted Document Vault",
         "short": "Fernet-encrypted .tsd containers, revision snapshots & export enforcement",
@@ -229,7 +256,7 @@ PUBLIC_MODULES = [
     },
     {
         "slug": "stamps",
-        "num": "05",
+        "num": "06",
         "category": "Corporate Identity & Forensics",
         "name": "Corporate Stamps & Brand Studio",
         "short": "Custodian-gated corporate e-stamps, official letterheads & forensic receipts",
@@ -255,7 +282,7 @@ PUBLIC_MODULES = [
     },
     {
         "slug": "governance",
-        "num": "06",
+        "num": "07",
         "category": "Security, Compliance & Mobility",
         "name": "Governance, Audit & Mobile App",
         "short": "PostgreSQL RLS, SAML 2.0 SSO, SCIM, 7-year retention & Flutter Mobile App",
@@ -299,7 +326,7 @@ def platform_module(slug: str):
     idx = next(i for i, m in enumerate(PUBLIC_MODULES) if m["slug"] == slug)
     prev_mod = PUBLIC_MODULES[idx - 1] if idx > 0 else None
     next_mod = PUBLIC_MODULES[idx + 1] if idx + 1 < len(PUBLIC_MODULES) else None
-    active = "esignature" if slug == "esignature" else "platform"
+    active = "esignature" if slug == "esignature" else ("templates" if slug == "templates" else "platform")
     return render_template(
         "public/module_detail.html",
         module=mod,

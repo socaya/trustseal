@@ -7,10 +7,17 @@
 <style>
   .ts-public { background: #ffffff; }
 
-  /* 1. FULL-BLEED EXECUTIVE NAVY HERO */
+  /* 1. FULL-BLEED EXECUTIVE NAVY HERO WITH REAL TRUSTSEAL MODULE UI BACKGROUND */
   .ts-lp-hero {
     width: 100%;
-    background: linear-gradient(115deg, #00163d 0%, #002769 58%, #013688 100%);
+    position: relative;
+    background-color: #001c52;
+    background-image:
+      linear-gradient(108deg, rgba(0, 18, 52, 0.94) 0%, rgba(0, 35, 96, 0.87) 48%, rgba(0, 39, 105, 0.72) 100%),
+      url("{{ url_for('static', filename='img/trustseal-workspace-hero-bg.png') }}");
+    background-size: cover;
+    background-position: right top;
+    background-repeat: no-repeat;
     color: #ffffff;
     border-bottom: 3px solid #02982e;
     padding: 76px 56px 72px;
@@ -73,8 +80,11 @@
 
   /* Clickable Editorial Architecture Ledger */
   .ts-lp-ledger {
+    background: rgba(0, 20, 58, 0.72);
+    backdrop-filter: blur(8px);
+    padding: 4px 22px 6px;
     border-top: 2px solid #02982e;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
+    border-bottom: 1px solid rgba(255,255,255,0.22);
   }
   .ts-lp-ledger__head {
     display: flex;
@@ -227,11 +237,11 @@
       <div class="ts-lp-eyebrow">TRUSTSEAL · Verified Integrity Platform</div>
       <h1 id="hero-heading">One trusted platform for projects, contracts, eIDAS 2.0 signing, and verification.</h1>
       <p class="ts-lp-hero__lede">
-        Run enterprise project delivery, contract obligations and burn rates, encrypted document authoring, corporate e-stamps, and native SES / AES / QES electronic signatures — anchored into one verifiable SHA-256 audit chain.
+        Run enterprise project delivery, contract obligations and burn rates, 3,325+ ready-to-use document, contract &amp; stamp templates, encrypted authoring, and native SES / AES / QES electronic signatures — anchored into one verifiable SHA-256 audit chain.
       </p>
       <div class="ts-lp-hero__actions">
         <a class="ts-lp-btn ts-lp-btn--white" href="/auth/register">Create Workspace →</a>
-        <a class="ts-lp-btn ts-lp-btn--emerald" href="/auth/login">Sign In</a>
+        <a class="ts-lp-btn ts-lp-btn--emerald" href="/platform/templates">Explore 3,325+ Templates</a>
         <a class="ts-lp-btn ts-lp-btn--outline-light" href="/verify">Verify a Document</a>
       </div>
     </div>
@@ -239,8 +249,12 @@
     <nav class="ts-lp-ledger" aria-label="Explore TRUSTSEAL modules">
       <div class="ts-lp-ledger__head">
         <strong>Platform Modules</strong>
-        <a href="/platform">All 6 Modules →</a>
+        <a href="/platform">All 7 Modules →</a>
       </div>
+      <a class="ts-lp-ledger__row" href="/platform/templates">
+        <span class="ts-lp-ledger__name"><i class="ts-lp-ledger__dot"></i>3,325+ Templates Library</span>
+        <span class="ts-lp-ledger__meta">Docs · Contracts · Stamps →</span>
+      </a>
       <a class="ts-lp-ledger__row" href="/platform/projects">
         <span class="ts-lp-ledger__name"><i class="ts-lp-ledger__dot"></i>Project Studio (PME)</span>
         <span class="ts-lp-ledger__meta">WBS · CPM Gantt · EVM →</span>
@@ -259,11 +273,7 @@
       </a>
       <a class="ts-lp-ledger__row" href="/platform/stamps">
         <span class="ts-lp-ledger__name"><i class="ts-lp-ledger__dot"></i>Corporate Stamps &amp; Brand</span>
-        <span class="ts-lp-ledger__meta">Forensics · Letterheads →</span>
-      </a>
-      <a class="ts-lp-ledger__row" href="/platform/governance">
-        <span class="ts-lp-ledger__name"><i class="ts-lp-ledger__dot"></i>Governance &amp; Mobile App</span>
-        <span class="ts-lp-ledger__meta">RLS · Audit · Flutter →</span>
+        <span class="ts-lp-ledger__meta">1,000+ Seals · Forensics →</span>
       </a>
     </nav>
   </div>
@@ -271,24 +281,24 @@
 
 <section class="ts-lp-strip" aria-label="Platform highlights">
   <div class="ts-lp-strip__cell">
-    <div class="ts-lp-strip__val">6 Modules</div>
-    <div class="ts-lp-strip__lbl">Unified tenant workspace &amp; live audit ledger</div>
+    <div class="ts-lp-strip__val ts-lp-strip__val--em">3,325+ Templates</div>
+    <div class="ts-lp-strip__lbl">1,080+ Docs · 1,050+ Contracts · 1,000+ Stamps · 100+ Letterheads</div>
   </div>
   <div class="ts-lp-strip__cell">
-    <div class="ts-lp-strip__val ts-lp-strip__val--em">SES · AES · QES</div>
-    <div class="ts-lp-strip__lbl">Native eIDAS 2.0, CSC v2 &amp; EUDI Wallet</div>
+    <div class="ts-lp-strip__val">SES · AES · QES</div>
+    <div class="ts-lp-strip__lbl">Native eIDAS 2.0, CSC v2 &amp; EUDI Wallet signing</div>
   </div>
   <div class="ts-lp-strip__cell">
     <div class="ts-lp-strip__val">PAdES-B-LTA</div>
     <div class="ts-lp-strip__lbl">RFC 3161 timestamps + embedded OCSP/CRL</div>
   </div>
   <div class="ts-lp-strip__cell">
-    <div class="ts-lp-strip__val">3,325+</div>
-    <div class="ts-lp-strip__lbl">Contract, policy, and operational blueprints</div>
+    <div class="ts-lp-strip__val">7 Modules</div>
+    <div class="ts-lp-strip__lbl">Unified tenant workspace &amp; SHA-256 audit chain</div>
   </div>
   <div class="ts-lp-strip__cell">
     <div class="ts-lp-strip__val">Zero-Trust /verify</div>
-    <div class="ts-lp-strip__lbl">Independent public PDF &amp; audit verification</div>
+    <div class="ts-lp-strip__lbl">Independent public PDF &amp; stamp verification</div>
   </div>
 </section>
 
@@ -302,13 +312,13 @@
   </div>
 
   <div class="ts-lp-dir__grid">
-    <a class="ts-lp-dir__item" href="/platform">
+    <a class="ts-lp-dir__item" href="/platform/templates">
       <div>
-        <div class="ts-lp-dir__eyebrow">Platform Suite</div>
-        <h3 class="ts-lp-dir__title">Six Integrated Operational Modules</h3>
-        <p class="ts-lp-dir__desc">Explore Project Studio, Contracts Lifecycle, eIDAS 2.0 eSignature, TSD Vault, Corporate Stamps, and Governance on their dedicated pages.</p>
+        <div class="ts-lp-dir__eyebrow">Built-In Blueprint Library</div>
+        <h3 class="ts-lp-dir__title">3,325+ Ready-to-Use Documents, Contracts &amp; Stamps</h3>
+        <p class="ts-lp-dir__desc">Start immediately with 1,080+ business documents, 1,050+ full-length contracts, 1,000+ corporate stamp designs, 100+ letterheads, and regulatory policy packs.</p>
       </div>
-      <span class="ts-lp-dir__link">Open Platform Suite →</span>
+      <span class="ts-lp-dir__link">Explore Templates Library →</span>
     </a>
 
     <a class="ts-lp-dir__item" href="/platform/esignature">
@@ -320,22 +330,22 @@
       <span class="ts-lp-dir__link">Explore eIDAS 2.0 Signing →</span>
     </a>
 
+    <a class="ts-lp-dir__item" href="/platform">
+      <div>
+        <div class="ts-lp-dir__eyebrow">Platform Suite</div>
+        <h3 class="ts-lp-dir__title">Seven Integrated Operational Modules</h3>
+        <p class="ts-lp-dir__desc">Explore Project Studio, Contracts Lifecycle, eIDAS 2.0 Signing, 3,325+ Templates, TSD Vault, Corporate Stamps, and Governance on their dedicated pages.</p>
+      </div>
+      <span class="ts-lp-dir__link">Open Platform Suite →</span>
+    </a>
+
     <a class="ts-lp-dir__item" href="/how-it-works">
       <div>
         <div class="ts-lp-dir__eyebrow">Connected Architecture</div>
         <h3 class="ts-lp-dir__title">How Every Module Works Together</h3>
-        <p class="ts-lp-dir__desc">Trace the 5-stage operational lifecycle from project intake and contract drafting to PAdES-B-LTA sealing, burn-rate tracking, and audit preservation.</p>
+        <p class="ts-lp-dir__desc">Trace the 5-stage operational lifecycle from project intake and template drafting to PAdES-B-LTA sealing, burn-rate tracking, and public verification.</p>
       </div>
       <span class="ts-lp-dir__link">View Connected Lifecycle →</span>
-    </a>
-
-    <a class="ts-lp-dir__item" href="/trust">
-      <div>
-        <div class="ts-lp-dir__eyebrow">Compliance &amp; Cryptography</div>
-        <h3 class="ts-lp-dir__title">Trust, Security &amp; eIDAS 2.0 Standards</h3>
-        <p class="ts-lp-dir__desc">Review Regulation (EU) 2024/1183 assurance tiers, ETSI EN 319 142 PAdES profiles, RFC 3161 timestamps, OCSP/CRL retention, and public verification.</p>
-      </div>
-      <span class="ts-lp-dir__link">Read Trust &amp; Standards →</span>
     </a>
   </div>
 </section>
