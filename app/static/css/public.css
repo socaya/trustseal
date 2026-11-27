@@ -23,14 +23,15 @@
   border-bottom: 1px solid rgba(15, 23, 42, 0.07);
 }
 .ts-public-nav__inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  height: 64px;
-  padding: 0 24px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  height: 72px;
+  padding: 0 56px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 24px;
 }
 .ts-public-nav__brand {
   display: inline-flex;
@@ -43,13 +44,13 @@
 .ts-public-nav__links {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
 }
 .ts-public-nav__links a {
-  padding: 6px 12px;
-  border-radius: 8px;
-  color: #475569;
-  font-size: 13.5px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  color: #1e293b;
+  font-size: 15px;
   font-weight: 500;
   text-decoration: none;
   transition: background 130ms ease, color 130ms ease;
@@ -63,29 +64,29 @@
 .ts-public-nav__cta {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
-/* Modern Soft Public Buttons */
+/* Crisp Executive Public Buttons */
 .ts-pub-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 36px;
-  padding: 0 16px;
-  border-radius: 9px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 6px;
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
   border: 1px solid transparent;
   white-space: nowrap;
-  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
 }
-.ts-pub-btn--lg { height: 44px; padding: 0 22px; font-size: 14.5px; border-radius: 10px; }
+.ts-pub-btn--lg { height: 48px; padding: 0 26px; font-size: 15.5px; border-radius: 7px; }
 .ts-pub-btn--primary {
   background: #002769;
   border-color: #002769;
@@ -129,8 +130,9 @@
   margin: 0 auto;
   padding: 40px 24px 64px;
 }
-.ts-public-main--narrow { max-width: 740px; }
-.ts-public-main--wide { max-width: 1200px; padding: 0 24px 72px; }
+.ts-public-main--narrow { max-width: 960px; }
+.ts-public-main--wide { max-width: none; margin: 0; padding: 0; }
+.ts-public-main--full { max-width: none; margin: 0; padding: 0; }
 
 /* Signer shell — lightweight, no sidebar. */
 .ts-signer-shell {
@@ -166,19 +168,20 @@
 
 /* Public footer */
 .ts-public-footer {
-  border-top: 1px solid rgba(15, 23, 42, 0.07);
+  border-top: 1px solid #dbe4f2;
   background: #ffffff;
-  color: #64748b;
-  font-size: 12.5px;
+  color: #475569;
+  font-size: 14px;
 }
 .ts-public-footer__inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 22px 24px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 26px 56px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
   flex-wrap: wrap;
 }
 .ts-public-footer__links {
