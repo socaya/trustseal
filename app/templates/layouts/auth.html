@@ -1,6 +1,7 @@
 {#
-  TRUSTSEAL auth shell (login, register, password reset, MFA, invitations).
-  Centered card, stacked tagline lockup overhead.
+  TRUSTSEAL auth shell (register, password reset, MFA, invitations).
+  Modern calm elevated card, stacked tagline lockup overhead.
+  Login uses a full-bleed split-screen layout via block auth_body.
 #}
 <!doctype html>
 <html lang="en" class="ts-html">
@@ -17,7 +18,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/public.css') }}">
   {% block extra_head %}{% endblock %}
 </head>
-<body class="ts-auth-shell">
+<body class="{% block body_class %}ts-auth-shell{% endblock %}">
+  {% block auth_body %}
   <main class="ts-auth-card" id="ts-main" tabindex="-1">
     <div class="ts-auth-card__brand">
       <img src="{{ url_for('static', filename='brand/trustseal/trustseal-stacked-tagline.png') }}"
@@ -26,8 +28,9 @@
     <h1 class="ts-auth-card__title">{% block page_title %}Sign in{% endblock %}</h1>
     {% block content %}{% endblock %}
     <div class="ts-auth-card__meta">
-      <a href="/trust">Trust &amp; security</a> · <a href="/pricing">Pricing</a>
+      <a href="/">Home</a> · <a href="/verify">Verify</a> · <a href="/trust">Trust &amp; security</a> · <a href="/pricing">Pricing</a>
     </div>
   </main>
+  {% endblock %}
 </body>
 </html>

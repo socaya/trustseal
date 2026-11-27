@@ -1,72 +1,190 @@
 {% extends "layouts/auth.html" %}
 
 {% block title %}Sign in · TRUSTSEAL{% endblock %}
-{% block page_title %}Sign in to your workspace{% endblock %}
+{% block body_class %}ts-auth-split-body{% endblock %}
 
-{% block content %}
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      <div class="ts-stack" style="margin-bottom: var(--ts-space-4);">
-        {% for category, text in messages %}
-          <div class="ts-inline ts-inline--{{ 'danger' if category == 'danger' else ('success' if category == 'success' else 'info') }}"
-               role="alert" aria-live="polite">
-            <div class="ts-inline__body">{{ text }}</div>
-          </div>
-        {% endfor %}
-      </div>
-    {% endif %}
-  {% endwith %}
-
-  <form method="POST" action="{{ url_for('auth_views.login') }}" class="ts-stack" novalidate>
-    {{ form.hidden_tag() }}
-    {% if request.args.get('next') %}
-      <input type="hidden" name="next" value="{{ request.args.get('next') }}">
-    {% endif %}
-
-    <div class="ts-field">
-      <label class="ts-field__label" data-required="true" for="identifier">
-        {{ form.identifier.label.text }}
-      </label>
-      {{ form.identifier(class="ts-input", id="identifier", autocomplete="username",
-                         placeholder="you@example.com") }}
-      {% if form.identifier.errors %}
-        {% for error in form.identifier.errors %}
-          <span class="ts-field__error" role="alert">{{ error }}</span>
-        {% endfor %}
-      {% endif %}
-    </div>
-
-    <div class="ts-field">
-      <label class="ts-field__label" data-required="true" for="password">
-        {{ form.password.label.text }}
-      </label>
-      {{ form.password(class="ts-input", id="password", autocomplete="current-password",
-                       placeholder="Enter your password") }}
-      {% if form.password.errors %}
-        {% for error in form.password.errors %}
-          <span class="ts-field__error" role="alert">{{ error }}</span>
-        {% endfor %}
-      {% endif %}
-    </div>
-
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      {% if 'auth_views.reset_password' in url_map_endpoints %}
-      <a class="ts-btn ts-btn--text ts-btn--sm" href="{{ url_for('auth_views.reset_password') }}">
-        Forgot password?
+{% block auth_body %}
+<div class="ts-auth-split">
+  <!-- LEFT BRAND SHOWCASE PANEL -->
+  <aside class="ts-auth-aside" aria-label="TRUSTSEAL Platform Highlights">
+    <div class="ts-auth-aside__logo">
+      <a href="/" aria-label="TRUSTSEAL Home">
+        <img src="{{ url_for('static', filename='brand/trustseal/trustseal-horizontal-mono-white-on-navy.png') }}"
+             alt="TRUSTSEAL — Verified Integrity">
       </a>
-      {% else %}
-      <span></span>
-      {% endif %}
-      <span class="ts-panel__meta">We never disclose whether an account exists.</span>
     </div>
 
-    <button type="submit" class="ts-btn ts-btn--primary ts-btn--lg" style="width: 100%;">
-      Sign in
-    </button>
-  </form>
+    <div>
+      <span class="ts-auth-aside__eyebrow"><i></i> Verified Integrity Platform</span>
+      <h2 class="ts-auth-aside__title">
+        One workspace for projects, contracts, documents, and proof.
+      </h2>
+      <p class="ts-auth-aside__lede">
+        Plan delivery, execute agreements, apply corporate e-stamps, and anchor every
+        record to a tamper-evident cryptographic audit chain.
+      </p>
 
-  <p style="text-align: center; margin-top: var(--ts-space-4); color: var(--ts-text-muted); font-size: var(--ts-fs-label);">
-    New to TRUSTSEAL?
-    <a href="{{ url_for('auth_views.register') }}">Create an account</a>
-  </p>
+      <div class="ts-auth-pillars">
+        <div class="ts-auth-pillar">
+          <span class="ts-auth-pillar__ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          </span>
+          <div>
+            <strong>Project Management Studio</strong>
+            <span>Portfolios, WBS &amp; Gantt, resources, timesheets, budgets &amp; EVM</span>
+          </div>
+        </div>
+        <div class="ts-auth-pillar">
+          <span class="ts-auth-pillar__ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </span>
+          <div>
+            <strong>Contracts, Obligations &amp; Spend Burn</strong>
+            <span>Templates, addendums &amp; NCEs, deliverable acceptance &amp; burn rates</span>
+          </div>
+        </div>
+        <div class="ts-auth-pillar">
+          <span class="ts-auth-pillar__ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+          </span>
+          <div>
+            <strong>TSD Documents, Letterheads &amp; Stamps</strong>
+            <span>Encrypted .tsd vault, corporate e-stamps &amp; OTP signatory vault</span>
+          </div>
+        </div>
+        <div class="ts-auth-pillar">
+          <span class="ts-auth-pillar__ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 3v6c0 5-3.4 8.9-8 11-4.6-2.1-8-6-8-11V5l8-3z"/><path d="m9 12 2 2 4-4"/></svg>
+          </span>
+          <div>
+            <strong>AWS KMS PAdES Sealing &amp; Public Verify</strong>
+            <span>7-year evidence vault, covert stamp forensics &amp; zero-trust /verify</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ts-auth-aside__foot">
+      <span>AWS KMS PAdES</span>
+      <span>·</span>
+      <span>SHA-256 Audit Chain</span>
+      <span>·</span>
+      <span>SAML 2.0 SSO &amp; SCIM</span>
+      <span>·</span>
+      <span>Multi-Tenant RBAC</span>
+    </div>
+  </aside>
+
+  <!-- RIGHT PRODUCTION SIGN-IN STUDIO -->
+  <main class="ts-auth-main" id="ts-main" tabindex="-1">
+    <div class="ts-auth-topbar">
+      <a class="ts-auth-topbar__mobile-logo" href="/" aria-label="TRUSTSEAL Home">
+        <img src="{{ url_for('static', filename='brand/trustseal/trustseal-horizontal.png') }}" alt="TRUSTSEAL">
+      </a>
+      <div class="ts-auth-topbar__links">
+        <a href="/">← Back to overview</a>
+        <a href="/verify">Verify a document</a>
+      </div>
+    </div>
+
+    <div class="ts-auth-form-wrap">
+      <h1>Welcome back</h1>
+      <p class="ts-auth-form-wrap__sub">Sign in to your TRUSTSEAL organization workspace.</p>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, text in messages %}
+            <div class="ts-auth-alert ts-auth-alert--{{ 'danger' if category == 'danger' else ('success' if category == 'success' else 'info') }}"
+                 role="alert" aria-live="polite">
+              {{ text }}
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <form method="POST" action="{{ url_for('auth_views.login') }}" novalidate>
+        {{ form.hidden_tag() }}
+        {% if request.args.get('next') %}
+          <input type="hidden" name="next" value="{{ request.args.get('next') }}">
+        {% endif %}
+
+        <div class="ts-auth-field">
+          <div class="ts-auth-field__head">
+            <label for="identifier">{{ form.identifier.label.text }}</label>
+          </div>
+          <div class="ts-auth-input-wrap">
+            <span class="ts-auth-input-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+            </span>
+            {{ form.identifier(class="ts-auth-input", id="identifier", autocomplete="username",
+                               placeholder="name@organization.com") }}
+          </div>
+          {% if form.identifier.errors %}
+            {% for error in form.identifier.errors %}
+              <span class="ts-field__error" role="alert" style="display:block;margin-top:5px;">{{ error }}</span>
+            {% endfor %}
+          {% endif %}
+        </div>
+
+        <div class="ts-auth-field">
+          <div class="ts-auth-field__head">
+            <label for="password">{{ form.password.label.text }}</label>
+            {% if 'auth_views.reset_password' in url_map_endpoints %}
+            <a class="ts-auth-forgot" href="{{ url_for('auth_views.reset_password') }}">Forgot password?</a>
+            {% endif %}
+          </div>
+          <div class="ts-auth-input-wrap">
+            <span class="ts-auth-input-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+            </span>
+            {{ form.password(class="ts-auth-input ts-auth-input--pw", id="password", autocomplete="current-password",
+                             placeholder="Enter your password") }}
+            <button type="button" class="ts-auth-pw-toggle" id="ts-pw-toggle" aria-label="Show password" title="Show / hide password">
+              <svg id="ts-pw-eye" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.5"/></svg>
+            </button>
+          </div>
+          {% if form.password.errors %}
+            {% for error in form.password.errors %}
+              <span class="ts-field__error" role="alert" style="display:block;margin-top:5px;">{{ error }}</span>
+            {% endfor %}
+          {% endif %}
+        </div>
+
+        <button type="submit" class="ts-auth-submit">Sign in</button>
+      </form>
+
+      <div class="ts-auth-sso-note">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 3v6c0 5-3.4 8.9-8 11-4.6-2.1-8-6-8-11V5l8-3z"/></svg>
+        <span>Protected by encrypted sessions and tenant RBAC. We never disclose whether an account exists.</span>
+      </div>
+
+      <p class="ts-auth-create">
+        New to TRUSTSEAL?
+        <a href="{{ url_for('auth_views.register') }}">Create an organization account</a>
+      </p>
+    </div>
+
+    <footer class="ts-auth-bottom">
+      <span>© {{ now.year if now else 2026 }} Vitalworks Limited</span>
+      <span style="display:inline-flex;gap:14px;">
+        <a href="/trust">Trust &amp; security</a>
+        <a href="/pricing">Pricing</a>
+      </span>
+    </footer>
+  </main>
+</div>
+
+<script>
+(function () {
+  var btn = document.getElementById('ts-pw-toggle');
+  var inp = document.getElementById('password');
+  if (btn && inp) {
+    btn.addEventListener('click', function () {
+      var show = inp.type === 'password';
+      inp.type = show ? 'text' : 'password';
+      btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    });
+  }
+})();
+</script>
 {% endblock %}

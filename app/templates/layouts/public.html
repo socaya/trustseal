@@ -1,6 +1,6 @@
 {#
   TRUSTSEAL public shell (landing, verify, trust/security info).
-  No internal navigation; tagline lockup used for the brand.
+  Calm modern SaaS header & footer.
 #}
 <!doctype html>
 <html lang="en" class="ts-html">
@@ -19,18 +19,22 @@
 </head>
 <body class="ts-public">
   <nav class="ts-public-nav" aria-label="TRUSTSEAL">
-    <a class="ts-public-nav__brand" href="/" aria-label="TRUSTSEAL · Verified Integrity">
-      <img src="{{ url_for('static', filename='brand/trustseal/trustseal-horizontal-tagline.png') }}"
-           alt="TRUSTSEAL — Verified Integrity" width="196" height="36">
-    </a>
-    <div class="ts-public-nav__links">
-      <a href="/verify">Verify a document</a>
-      <a href="/trust">Trust &amp; security</a>
-      <a href="/pricing">Pricing</a>
-    </div>
-    <div class="ts-public-nav__cta">
-      <a class="ts-btn ts-btn--secondary ts-btn--sm" href="/auth/login">Sign in</a>
-      <a class="ts-btn ts-btn--primary ts-btn--sm" href="/auth/register">Get started</a>
+    <div class="ts-public-nav__inner">
+      <a class="ts-public-nav__brand" href="/" aria-label="TRUSTSEAL · Verified Integrity">
+        <img src="{{ url_for('static', filename='brand/trustseal/trustseal-horizontal-tagline.png') }}"
+             alt="TRUSTSEAL — Verified Integrity" width="184" height="36">
+      </a>
+      <div class="ts-public-nav__links">
+        <a href="/#modules">Platform</a>
+        <a href="/#how-it-works">How it works</a>
+        <a href="/verify">Verify a document</a>
+        <a href="/trust">Trust &amp; security</a>
+        <a href="/pricing">Pricing</a>
+      </div>
+      <div class="ts-public-nav__cta">
+        <a class="ts-pub-btn ts-pub-btn--ghost" href="/auth/login">Sign in</a>
+        <a class="ts-pub-btn ts-pub-btn--primary" href="/auth/register">Get started</a>
+      </div>
     </div>
   </nav>
 
@@ -39,12 +43,16 @@
   </main>
 
   <footer class="ts-public-footer">
-    <span>© {{ now.year if now else 2026 }} Vitalworks Limited. All rights reserved.</span>
-    <span>
-      <a href="/trust">Trust &amp; security</a>
-      &nbsp;·&nbsp;
-      <a href="/pricing">Pricing</a>
-    </span>
+    <div class="ts-public-footer__inner">
+      <span>© {{ now.year if now else 2026 }} Vitalworks Limited · TRUSTSEAL. All rights reserved.</span>
+      <span class="ts-public-footer__links">
+        <a href="/#modules">Platform</a>
+        <a href="/verify">Verify</a>
+        <a href="/trust">Trust &amp; security</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/auth/login">Sign in</a>
+      </span>
+    </div>
   </footer>
 
   {% block extra_body %}{% endblock %}
