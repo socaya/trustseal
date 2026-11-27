@@ -1045,6 +1045,24 @@ def my_work_page():
         .all()
     ]
 
+    from app.models.project_management import ProjectCostEvent
+
+    exp_raw = (
+        ProjectCostEvent.query.filter_by(organization_id=org_id, created_by_id=actor.id)
+        .filter(ProjectCostEvent.category.in_(("expense", "travel", "supplies", "other")))
+        .order_by(ProjectCostEvent.id.desc())
+        .limit(50)
+        .all()
+    )
+    my_expenses = [
+        {
+            **e.to_dict(),
+            "project_name": proj_map[e.project_id].name if e.project_id in proj_map else f"Project #{e.project_id}",
+            "project_code": proj_map[e.project_id].project_code if e.project_id in proj_map else "—",
+        }
+        for e in exp_raw
+    ]
+
     return render_template(
         "contracts/my_work.html",
         my_projects=[p.to_dict() for p in projs],
@@ -1055,4 +1073,5 @@ def my_work_page():
         today_iso=today.isoformat(),
         my_tasks=my_tasks,
         pending_approvals=pending_approvals,
+        my_expenses=my_expenses,
     )
