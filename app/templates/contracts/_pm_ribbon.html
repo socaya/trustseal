@@ -1,5 +1,5 @@
-{# TrustSeal Project Management Studio — Exact TSD Docs AppBar (38px) + 8-Tab Workspace Ribbon #}
-{# Architectural Rule: Every top-level ribbon sub-menu opens its OWN dedicated workspace page. #}
+{# TrustSeal Project Studio — Slim Calm Modern 2-Row Header + Cmd+K Command Palette #}
+{# Architectural Rule: Every top-level sub-menu opens its OWN dedicated workspace page. #}
 {# Zero project-detail sidebar items are duplicated in the top ribbon. #}
 {% set _ctx = pm_ribbon_ctx if pm_ribbon_ctx is defined else 'projects' %}
 {% set _rtab = pm_ribbon_tab if pm_ribbon_tab is defined else 'Home' %}
@@ -8,10 +8,13 @@
 {% set _mview = active_view if active_view is defined else 'work' %}
 
 <div class="pme-top">
-  {# ======================= 1. APPLICATION BAR (38px — exact TSD Docs style) ======================= #}
+  {# ======================= 1. CALM WORKSPACE CONTEXT BAR (44px) ======================= #}
   <header class="ts-ed__appbar">
     <div class="ts-ed__brand">
-      <strong>TRUSTSEAL</strong><small>PROJECTS</small>
+      <span class="pme-brand-badge" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      </span>
+      <strong>Project Studio</strong>
     </div>
     <span class="ts-ed__divider" aria-hidden="true"></span>
 
@@ -25,248 +28,228 @@
         {% endfor %}
       </select>
       {% else %}
-      <strong style="font-size:12px;color:#121a26;">{{ project.name }}</strong>
+      <strong style="font-size:13px;font-weight:600;color:#0f172a;">{{ project.name }}</strong>
       {% endif %}
       <span class="pme-appbar-meta">{{ (project.lifecycle_state or 'executing')|replace('_',' ')|title }}</span>
       <span class="pme-appbar-meta {% if _h.rag == 'on_track' %}pme-appbar-meta--ok{% elif _h.rag == 'at_risk' %}pme-appbar-meta--warn{% else %}pme-appbar-meta--bad{% endif %}">{{ _h.label }} · {{ _h.score }}</span>
       <div class="ts-ed__spacer"></div>
+      <button type="button" class="pme-cmdk-trigger" id="pme-open-cmdk" aria-label="Quick jump">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <span>Quick jump…</span>
+        <kbd>⌘K</kbd>
+      </button>
       <a class="ts-ed__btn ts-ed__btn--ghost" href="{{ url_for('contracts_views.projects_page') }}">← Projects</a>
-      <a class="ts-ed__btn ts-ed__btn--ghost" href="{{ url_for('contracts_views.my_work_page', view='timesheet') }}">My Timesheet</a>
       <a class="ts-ed__btn" href="/api/projects/{{ project.id }}/export.csv">Export CSV</a>
       <button type="button" class="ts-ed__btn ts-ed__btn--primary" id="pd-open-new">+ New Contract</button>
 
     {% elif _ctx == 'projects' %}
-      <strong style="font-size:12px;color:#121a26;">{{ pm_crumb_label if pm_crumb_label is defined else 'Projects' }}</strong>
-      <span class="ts-ed__savestate">● {{ all_projects_count|default(projects|length) }} project(s)</span>
+      <strong style="font-size:13px;font-weight:600;color:#0f172a;">{{ pm_crumb_label if pm_crumb_label is defined else 'Projects' }}</strong>
+      <span class="ts-ed__savestate">{{ all_projects_count|default(projects|length) }} project(s)</span>
       <div class="ts-ed__spacer"></div>
-      <a class="ts-ed__btn ts-ed__btn--ghost" href="{{ url_for('contracts_views.projects_page', section='contracts') }}">Contract Overview</a>
+      <button type="button" class="pme-cmdk-trigger" id="pme-open-cmdk" aria-label="Quick jump">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <span>Quick jump…</span>
+        <kbd>⌘K</kbd>
+      </button>
+      <a class="ts-ed__btn ts-ed__btn--ghost" href="{{ url_for('contracts_views.projects_page', section='contracts') }}">Contracts</a>
       <a class="ts-ed__btn ts-ed__btn--ghost" href="{{ url_for('contracts_views.projects_page', section='spend') }}">Spend &amp; Burn</a>
-      <a class="ts-ed__btn ts-ed__btn--ghost" href="{{ url_for('contracts_views.projects_page', section='obligations') }}">Obligations ({{ global_obligations|length if global_obligations is defined else 0 }})</a>
       <button type="button" class="ts-ed__btn ts-ed__btn--primary" id="prj-open-new">+ New Project</button>
 
     {% else %}
-      <strong style="font-size:12px;color:#121a26;">{{ pm_crumb_label if pm_crumb_label is defined else 'My Work' }}</strong>
-      <span class="ts-ed__savestate">● {{ week_total_hours|default('0.00') }}h this week</span>
+      <strong style="font-size:13px;font-weight:600;color:#0f172a;">{{ pm_crumb_label if pm_crumb_label is defined else 'My Work' }}</strong>
+      <span class="ts-ed__savestate">{{ week_total_hours|default('0.00') }}h this week</span>
       <div class="ts-ed__spacer"></div>
+      <button type="button" class="pme-cmdk-trigger" id="pme-open-cmdk" aria-label="Quick jump">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <span>Quick jump…</span>
+        <kbd>⌘K</kbd>
+      </button>
       <a class="ts-ed__btn ts-ed__btn--ghost" href="{{ url_for('contracts_views.projects_page') }}">← Projects</a>
     {% endif %}
   </header>
 
-  {# ======================= 2. RIBBON TABS (30px — exact TSD Docs style) ======================= #}
-  <nav class="ts-ed__tabs" role="tablist" aria-label="Project command tabs">
-    {% for tab_name in ['File','Home','Plan','Work','Resources','Contracts','Review','View'] %}
-    <button type="button" role="tab" class="ts-ed__tab {% if tab_name == _rtab %}ts-is-active{% endif %}" data-rtab="{{ tab_name }}" aria-selected="{{ 'true' if tab_name == _rtab else 'false' }}">{{ tab_name }}</button>
-    {% endfor %}
-    <div style="margin-left:auto;display:inline-flex;align-items:center;gap:8px;">
-      {% if _is_proj %}
-      <span style="font-size:10.5px;color:#5a6676;">{{ project.category|replace('_',' ')|title }} · {{ (project.delivery_methodology or 'hybrid')|title }}</span>
-      {% endif %}
-      <button type="button" class="pm-ribbon-toggle" id="pm-ribbon-toggle" aria-label="Collapse or expand ribbon" aria-expanded="true" title="Collapse / Expand ribbon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="13" height="13"><path d="m6 9 6 6 6-6"/></svg>
-      </button>
-    </div>
-  </nav>
+  {# ======================= 2. SLIM UNIFIED RIBBON BAR (42px — Segmented Tabs + Horizontal Sub-Menu Pills) ======================= #}
+  <div class="pme-subbar ts-ed__ribbon" role="toolbar" aria-label="Project workspace navigation">
+    <nav class="pme-tabs-seg" role="tablist" aria-label="Workspace categories">
+      {% for tab_name in ['File','Home','Plan','Work','Resources','Contracts','Review','View'] %}
+      <button type="button" role="tab" class="ts-ed__tab {% if tab_name == _rtab %}ts-is-active{% endif %}" data-rtab="{{ tab_name }}" aria-selected="{{ 'true' if tab_name == _rtab else 'false' }}">{{ tab_name }}</button>
+      {% endfor %}
+    </nav>
 
-  {# ======================= 3. RIBBON BODY (66px — Each Sub-Menu Opens Its Own Dedicated Page) ======================= #}
-  <div class="ts-ed__ribbon" id="pm-ribbon-panel" role="toolbar" aria-label="Project commands">
+    <span class="pme-subbar-sep" aria-hidden="true"></span>
 
-    {# --- FILE: Create, Templates & Data Export --- #}
+    {# --- FILE --- #}
     <div class="pme-rpane" data-rpane="File" {% if _rtab != 'File' %}hidden{% endif %}>
-      <div class="ts-ed__grp">
-        {% if _is_proj %}
-        <button type="button" class="pme-rtool" data-rcmd="new-contract">
-          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-          <span>New Contract</span>
-        </button>
-        {% else %}
-        <button type="button" class="pme-rtool" data-rcmd="new-project">
-          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-          <span>New Project</span>
-        </button>
-        {% endif %}
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'templates' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='templates') }}">
-          <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16M8 3v6m8 0v6m-6 0v6"/></svg>
-          <span>Templates</span>
-        </a>
-        <span class="ts-ed__grp-label">Administration</span>
-      </div>
-      <div class="ts-ed__grp">
-        {% if _is_proj %}
-        <a class="pme-rtool" href="/api/projects/{{ project.id }}/export.csv">
-          <svg viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg>
-          <span>Export CSV</span>
-        </a>
-        {% else %}
-        <button type="button" class="pme-rtool" data-rcmd="export-csv">
-          <svg viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg>
-          <span>Export Table</span>
-        </button>
-        {% endif %}
-        <span class="ts-ed__grp-label">Data</span>
-      </div>
-    </div>
-
-    {# --- HOME: Workspace Home & Projects Register --- #}
-    <div class="pme-rpane" data-rpane="Home" {% if _rtab != 'Home' %}hidden{% endif %}>
-      <div class="ts-ed__grp">
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'home' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='home') }}">
-          <svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10H3z"/><path d="M10 20v-6h4v6"/></svg>
-          <span>Workspace Home</span>
-        </a>
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'projects' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page') }}">
-          <svg viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v12H3z"/></svg>
-          <span>Projects</span>
-        </a>
-        <span class="ts-ed__grp-label">Workspace</span>
-      </div>
-    </div>
-
-    {# --- PLAN: Portfolios, Programmes, Intake (Dedicated Workspace Pages) --- #}
-    <div class="pme-rpane" data-rpane="Plan" {% if _rtab != 'Plan' %}hidden{% endif %}>
-      <div class="ts-ed__grp">
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'portfolios' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='portfolios') }}">
-          <svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg>
-          <span>Portfolios</span>
-        </a>
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'programmes' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='programmes') }}">
-          <svg viewBox="0 0 24 24"><path d="M8 3h8v6H8zM2 16h7v5H2zm13 0h7v5h-7zM12 9v4m-7 3v-3h14v3"/></svg>
-          <span>Programmes</span>
-        </a>
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'intake' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='intake') }}">
-          <svg viewBox="0 0 24 24"><path d="M3 13l3-8h12l3 8v6H3zM3 13h5l2 3h4l2-3h5"/></svg>
-          <span>Intake</span>
-        </a>
-        <span class="ts-ed__grp-label">Portfolio &amp; Demand</span>
-      </div>
-    </div>
-
-    {# --- WORK: Personal Pages (My Work, My Timesheet, My Expenses — Each Its Own Page) --- #}
-    <div class="pme-rpane" data-rpane="Work" {% if _rtab != 'Work' %}hidden{% endif %}>
-      <div class="ts-ed__grp">
-        <a class="pme-rtool {% if _ctx == 'my_work' and _mview == 'work' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.my_work_page') }}">
-          <svg viewBox="0 0 24 24"><path d="M3 13l3-8h12l3 8v6H3zM3 13h5l2 3h4l2-3h5"/></svg>
-          <span>My Work</span>
-        </a>
-        <a class="pme-rtool {% if _ctx == 'my_work' and _mview == 'timesheet' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.my_work_page', view='timesheet') }}">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-          <span>My Timesheet</span>
-        </a>
-        <a class="pme-rtool {% if _ctx == 'my_work' and _mview == 'expenses' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.my_work_page', view='expenses') }}">
-          <svg viewBox="0 0 24 24"><path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18"/></svg>
-          <span>My Expenses</span>
-        </a>
-        <span class="ts-ed__grp-label">Personal</span>
-      </div>
-    </div>
-
-    {# --- RESOURCES: Resource Directory, Capacity, Equipment, Team Timesheets (Each Its Own Dedicated Org Page) --- #}
-    <div class="pme-rpane" data-rpane="Resources" {% if _rtab != 'Resources' %}hidden{% endif %}>
-      <div class="ts-ed__grp">
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'resources' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='resources') }}">
-          <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2m2-15a3 3 0 0 1 0 6m1 3a4 4 0 0 1 3 4v2"/></svg>
-          <span>Resource Directory</span>
-        </a>
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'capacity' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='capacity') }}">
-          <svg viewBox="0 0 24 24"><path d="M4 3v17h17M8 16v-4m5 4V8m5 8V5"/></svg>
-          <span>Capacity</span>
-        </a>
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'equipment' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='equipment') }}">
-          <svg viewBox="0 0 24 24"><path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18m-11-1h4v3h-4z"/></svg>
-          <span>Equipment</span>
-        </a>
-        <span class="ts-ed__grp-label">Team &amp; Logistics</span>
-      </div>
-      <div class="ts-ed__grp">
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'timesheets' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='timesheets') }}">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-          <span>Team Timesheets</span>
-        </a>
-        <span class="ts-ed__grp-label">Team Time</span>
-      </div>
-    </div>
-
-    {# --- CONTRACTS: Contract Overview, Obligations | Procurement, Budgets, Spend & Burn (Each Its Own Dedicated Org Page) --- #}
-    <div class="pme-rpane" data-rpane="Contracts" {% if _rtab != 'Contracts' %}hidden{% endif %}>
-      <div class="ts-ed__grp">
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'contracts' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='contracts') }}">
-          <svg viewBox="0 0 24 24"><path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18"/></svg>
-          <span>Contract Overview</span>
-        </a>
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'obligations' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='obligations') }}">
-          <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          <span>Obligations</span>
-        </a>
-        <span class="ts-ed__grp-label">Contract Tracking</span>
-      </div>
-      <div class="ts-ed__grp">
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'procurement' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='procurement') }}">
-          <svg viewBox="0 0 24 24"><path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18m-11-1h4v3h-4z"/></svg>
-          <span>Procurement</span>
-        </a>
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'budgets' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='budgets') }}">
-          <svg viewBox="0 0 24 24"><path d="M4 3v17h17M8 16v-4m5 4V8m5 8V5"/></svg>
-          <span>Budgets</span>
-        </a>
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'spend' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='spend') }}">
-          <svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          <span>Spend &amp; Burn</span>
-        </a>
-        <span class="ts-ed__grp-label">Commercial</span>
-      </div>
-    </div>
-
-    {# --- REVIEW: Approvals, RAID Register | Compliance & HSE, Executive Reports (Each Its Own Dedicated Org Page) --- #}
-    <div class="pme-rpane" data-rpane="Review" {% if _rtab != 'Review' %}hidden{% endif %}>
-      <div class="ts-ed__grp">
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'approvals' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='approvals') }}">
-          <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg>
-          <span>Approvals</span>
-        </a>
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'raid' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='raid') }}">
-          <svg viewBox="0 0 24 24"><path d="M12 4 3 20h18zM12 10v4m0 3v1"/></svg>
-          <span>RAID Register</span>
-        </a>
-        <span class="ts-ed__grp-label">Decisions</span>
-      </div>
-      <div class="ts-ed__grp">
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'compliance' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='compliance') }}">
-          <svg viewBox="0 0 24 24"><path d="M12 2 21 6v5c0 5-3.4 8.9-9 11-5.6-2.1-9-6-9-11V6z"/><path d="m8 12 3 3 5-6"/></svg>
-          <span>Compliance &amp; HSE</span>
-        </a>
-        <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'reports' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='reports') }}">
-          <svg viewBox="0 0 24 24"><path d="M4 3v17h17M8 16v-4m5 4V8m5 8V5"/></svg>
-          <span>Executive Reports</span>
-        </a>
-        <span class="ts-ed__grp-label">Assurance</span>
-      </div>
-    </div>
-
-    {# --- VIEW: Row Density | Table Tools (Find, Filters, Columns) --- #}
-    <div class="pme-rpane" data-rpane="View" {% if _rtab != 'View' %}hidden{% endif %}>
-      <div class="ts-ed__grp">
-        <button type="button" class="pme-rtool" data-rcmd="toggle-density">
-          <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-          <span>Row Density</span>
-        </button>
-        <span class="ts-ed__grp-label">Display</span>
-      </div>
-      {% if _ctx == 'projects' and _sec == 'projects' %}
-      <div class="ts-ed__grp">
-        <button type="button" class="pme-rtool" data-rcmd="focus-search">
-          <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg>
-          <span>Find</span>
-        </button>
-        <button type="button" class="pme-rtool" data-rcmd="open-filters">
-          <svg viewBox="0 0 24 24"><path d="M3 6h18M6 12h12m-9 6h6"/></svg>
-          <span>Filters</span>
-        </button>
-        <button type="button" class="pme-rtool" data-rcmd="open-columns">
-          <svg viewBox="0 0 24 24"><path d="M3 5h18v14H3zm6 0v14m6-14v14"/></svg>
-          <span>Columns</span>
-        </button>
-        <span class="ts-ed__grp-label">Table Tools</span>
-      </div>
+      {% if _is_proj %}
+      <button type="button" class="pme-rtool" data-rcmd="new-contract">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>New Contract</span>
+      </button>
+      {% else %}
+      <button type="button" class="pme-rtool" data-rcmd="new-project">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>New Project</span>
+      </button>
       {% endif %}
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'templates' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='templates') }}">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16M8 3v6m8 0v6m-6 0v6"/></svg><span>Templates</span>
+      </a>
+      <span class="pme-rgrp-sep" aria-hidden="true"></span>
+      {% if _is_proj %}
+      <a class="pme-rtool" href="/api/projects/{{ project.id }}/export.csv">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg><span>Export CSV</span>
+      </a>
+      {% else %}
+      <button type="button" class="pme-rtool" data-rcmd="export-csv">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg><span>Export Table</span>
+      </button>
+      {% endif %}
+    </div>
+
+    {# --- HOME --- #}
+    <div class="pme-rpane" data-rpane="Home" {% if _rtab != 'Home' %}hidden{% endif %}>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'home' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='home') }}">
+        <svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10H3z"/><path d="M10 20v-6h4v6"/></svg><span>Workspace Home</span>
+      </a>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'projects' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page') }}">
+        <svg viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v12H3z"/></svg><span>Projects</span>
+      </a>
+    </div>
+
+    {# --- PLAN --- #}
+    <div class="pme-rpane" data-rpane="Plan" {% if _rtab != 'Plan' %}hidden{% endif %}>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'portfolios' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='portfolios') }}">
+        <svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg><span>Portfolios</span>
+      </a>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'programmes' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='programmes') }}">
+        <svg viewBox="0 0 24 24"><path d="M8 3h8v6H8zM2 16h7v5H2zm13 0h7v5h-7zM12 9v4m-7 3v-3h14v3"/></svg><span>Programmes</span>
+      </a>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'intake' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='intake') }}">
+        <svg viewBox="0 0 24 24"><path d="M3 13l3-8h12l3 8v6H3zM3 13h5l2 3h4l2-3h5"/></svg><span>Intake</span>
+      </a>
+    </div>
+
+    {# --- WORK --- #}
+    <div class="pme-rpane" data-rpane="Work" {% if _rtab != 'Work' %}hidden{% endif %}>
+      <a class="pme-rtool {% if _ctx == 'my_work' and _mview == 'work' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.my_work_page') }}">
+        <svg viewBox="0 0 24 24"><path d="M3 13l3-8h12l3 8v6H3zM3 13h5l2 3h4l2-3h5"/></svg><span>My Work</span>
+      </a>
+      <a class="pme-rtool {% if _ctx == 'my_work' and _mview == 'timesheet' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.my_work_page', view='timesheet') }}">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>My Timesheet</span>
+      </a>
+      <a class="pme-rtool {% if _ctx == 'my_work' and _mview == 'expenses' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.my_work_page', view='expenses') }}">
+        <svg viewBox="0 0 24 24"><path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18"/></svg><span>My Expenses</span>
+      </a>
+    </div>
+
+    {# --- RESOURCES --- #}
+    <div class="pme-rpane" data-rpane="Resources" {% if _rtab != 'Resources' %}hidden{% endif %}>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'resources' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='resources') }}">
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2m2-15a3 3 0 0 1 0 6m1 3a4 4 0 0 1 3 4v2"/></svg><span>Resource Directory</span>
+      </a>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'capacity' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='capacity') }}">
+        <svg viewBox="0 0 24 24"><path d="M4 3v17h17M8 16v-4m5 4V8m5 8V5"/></svg><span>Capacity</span>
+      </a>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'equipment' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='equipment') }}">
+        <svg viewBox="0 0 24 24"><path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18m-11-1h4v3h-4z"/></svg><span>Equipment</span>
+      </a>
+      <span class="pme-rgrp-sep" aria-hidden="true"></span>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'timesheets' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='timesheets') }}">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Team Timesheets</span>
+      </a>
+    </div>
+
+    {# --- CONTRACTS --- #}
+    <div class="pme-rpane" data-rpane="Contracts" {% if _rtab != 'Contracts' %}hidden{% endif %}>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'contracts' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='contracts') }}">
+        <svg viewBox="0 0 24 24"><path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18"/></svg><span>Contract Overview</span>
+      </a>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'obligations' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='obligations') }}">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Obligations</span>
+      </a>
+      <span class="pme-rgrp-sep" aria-hidden="true"></span>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'procurement' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='procurement') }}">
+        <svg viewBox="0 0 24 24"><path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18m-11-1h4v3h-4z"/></svg><span>Procurement</span>
+      </a>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'budgets' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='budgets') }}">
+        <svg viewBox="0 0 24 24"><path d="M4 3v17h17M8 16v-4m5 4V8m5 8V5"/></svg><span>Budgets</span>
+      </a>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'spend' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='spend') }}">
+        <svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>Spend &amp; Burn</span>
+      </a>
+    </div>
+
+    {# --- REVIEW --- #}
+    <div class="pme-rpane" data-rpane="Review" {% if _rtab != 'Review' %}hidden{% endif %}>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'approvals' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='approvals') }}">
+        <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg><span>Approvals</span>
+      </a>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'raid' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='raid') }}">
+        <svg viewBox="0 0 24 24"><path d="M12 4 3 20h18zM12 10v4m0 3v1"/></svg><span>RAID Register</span>
+      </a>
+      <span class="pme-rgrp-sep" aria-hidden="true"></span>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'compliance' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='compliance') }}">
+        <svg viewBox="0 0 24 24"><path d="M12 2 21 6v5c0 5-3.4 8.9-9 11-5.6-2.1-9-6-9-11V6z"/><path d="m8 12 3 3 5-6"/></svg><span>Compliance &amp; HSE</span>
+      </a>
+      <a class="pme-rtool {% if _ctx == 'projects' and _sec == 'reports' %}ts-is-active{% endif %}" href="{{ url_for('contracts_views.projects_page', section='reports') }}">
+        <svg viewBox="0 0 24 24"><path d="M4 3v17h17M8 16v-4m5 4V8m5 8V5"/></svg><span>Executive Reports</span>
+      </a>
+    </div>
+
+    {# --- VIEW --- #}
+    <div class="pme-rpane" data-rpane="View" {% if _rtab != 'View' %}hidden{% endif %}>
+      <button type="button" class="pme-rtool" data-rcmd="toggle-density">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span>Row Density</span>
+      </button>
+      {% if _ctx == 'projects' and _sec == 'projects' %}
+      <span class="pme-rgrp-sep" aria-hidden="true"></span>
+      <button type="button" class="pme-rtool" data-rcmd="focus-search">
+        <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><span>Find</span>
+      </button>
+      <button type="button" class="pme-rtool" data-rcmd="open-filters">
+        <svg viewBox="0 0 24 24"><path d="M3 6h18M6 12h12m-9 6h6"/></svg><span>Filters</span>
+      </button>
+      <button type="button" class="pme-rtool" data-rcmd="open-columns">
+        <svg viewBox="0 0 24 24"><path d="M3 5h18v14H3zm6 0v14m6-14v14"/></svg><span>Columns</span>
+      </button>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# ======================= LINEAR / ATTIO STYLE COMMAND PALETTE (Cmd+K) ======================= #}
+<div id="pme-cmdk-overlay" class="pme-cmdk-overlay" hidden role="dialog" aria-modal="true" aria-label="Quick jump command palette">
+  <div class="pme-cmdk-box">
+    <div class="pme-cmdk-head">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="search" id="pme-cmdk-input" placeholder="Jump to workspace page, register, or action…" autocomplete="off">
+      <kbd style="font-family:var(--ts-font-mono);font-size:10px;padding:2px 6px;border-radius:5px;border:1px solid rgba(15,23,42,0.12);color:#64748b;">ESC</kbd>
+    </div>
+    <div class="pme-cmdk-list" id="pme-cmdk-list">
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page') }}"><span>Projects Register</span><small>Home</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='home') }}"><span>Workspace Home</span><small>Home</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='portfolios') }}"><span>Portfolios</span><small>Plan</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='programmes') }}"><span>Programmes</span><small>Plan</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='intake') }}"><span>Demand &amp; Intake</span><small>Plan</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.my_work_page') }}"><span>My Work</span><small>Work</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.my_work_page', view='timesheet') }}"><span>My Timesheet</span><small>Work</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.my_work_page', view='expenses') }}"><span>My Expenses</span><small>Work</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='resources') }}"><span>Resource Directory</span><small>Resources</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='capacity') }}"><span>Capacity &amp; Utilization</span><small>Resources</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='equipment') }}"><span>Equipment &amp; Assets</span><small>Resources</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='timesheets') }}"><span>Team Timesheets</span><small>Resources</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='contracts') }}"><span>Contract Overview</span><small>Contracts</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='obligations') }}"><span>Contract Obligations</span><small>Contracts</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='procurement') }}"><span>Procurement &amp; Awards</span><small>Contracts</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='budgets') }}"><span>Budgets &amp; Commitments</span><small>Contracts</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='spend') }}"><span>Contract Spend &amp; Burn</span><small>Contracts</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='approvals') }}"><span>Approvals &amp; Change Requests</span><small>Review</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='raid') }}"><span>RAID Register</span><small>Review</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='compliance') }}"><span>Compliance &amp; HSE</span><small>Review</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='reports') }}"><span>Executive Reports</span><small>Review</small></a>
+      <a class="pme-cmdk-item" href="{{ url_for('contracts_views.projects_page', section='templates') }}"><span>Project Templates</span><small>File</small></a>
+    </div>
+    <div class="pme-cmdk-foot">
+      <span>Type to filter pages</span>
+      <span>TrustSeal Project Studio</span>
     </div>
   </div>
 </div>
@@ -275,17 +258,8 @@
 (function () {
   var tabs = Array.from(document.querySelectorAll('[data-rtab]'));
   var panes = Array.from(document.querySelectorAll('[data-rpane]'));
-  var panel = document.getElementById('pm-ribbon-panel');
-  var tog = document.getElementById('pm-ribbon-toggle');
 
-  function setCollapsed(val) {
-    if (!panel || !tog) return;
-    panel.hidden = !!val;
-    tog.setAttribute('aria-expanded', String(!val));
-    try { localStorage.setItem('ts_pme_ribbon_collapsed', val ? '1' : '0'); } catch (e) {}
-  }
   try {
-    if (localStorage.getItem('ts_pme_ribbon_collapsed') === '1') setCollapsed(true);
     if (localStorage.getItem('ts_pme_density') === 'comfortable') document.body.classList.add('pm-density-comfortable');
   } catch (e) {}
 
@@ -297,7 +271,6 @@
         x.classList.toggle('ts-is-active', x === t);
       });
       panes.forEach(function (p) { p.hidden = p.dataset.rpane !== target; });
-      if (panel && panel.hidden) setCollapsed(false);
     });
     t.addEventListener('keydown', function (ev) {
       if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(ev.key)) return;
@@ -308,7 +281,46 @@
     });
   });
 
-  if (tog) tog.addEventListener('click', function () { setCollapsed(!panel.hidden); });
+  // Command Palette (Cmd+K / Ctrl+K)
+  var cmdOverlay = document.getElementById('pme-cmdk-overlay');
+  var cmdInput = document.getElementById('pme-cmdk-input');
+  var cmdBtn = document.getElementById('pme-open-cmdk');
+  var cmdItems = Array.from(document.querySelectorAll('.pme-cmdk-item'));
+
+  function openCmdk() {
+    if (!cmdOverlay) return;
+    cmdOverlay.hidden = false;
+    if (cmdInput) { cmdInput.value = ''; cmdInput.focus(); filterCmdk(''); }
+  }
+  function closeCmdk() { if (cmdOverlay) cmdOverlay.hidden = true; }
+  function filterCmdk(q) {
+    var ql = (q || '').trim().toLowerCase();
+    cmdItems.forEach(function (a) {
+      a.hidden = ql && a.textContent.toLowerCase().indexOf(ql) === -1;
+    });
+  }
+  if (cmdBtn) cmdBtn.addEventListener('click', openCmdk);
+  if (cmdOverlay) {
+    cmdOverlay.addEventListener('click', function (ev) { if (ev.target === cmdOverlay) closeCmdk(); });
+  }
+  if (cmdInput) {
+    cmdInput.addEventListener('input', function () { filterCmdk(cmdInput.value); });
+    cmdInput.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') closeCmdk();
+      if (ev.key === 'Enter') {
+        var first = cmdItems.find(function (a) { return !a.hidden; });
+        if (first) window.location.href = first.href;
+      }
+    });
+  }
+  document.addEventListener('keydown', function (ev) {
+    if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'k') {
+      ev.preventDefault();
+      if (cmdOverlay && cmdOverlay.hidden) openCmdk(); else closeCmdk();
+    } else if (ev.key === 'Escape' && cmdOverlay && !cmdOverlay.hidden) {
+      closeCmdk();
+    }
+  });
 
   document.querySelectorAll('[data-rcmd]').forEach(function (btn) {
     btn.addEventListener('click', function () {

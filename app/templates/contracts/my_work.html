@@ -6,8 +6,8 @@
 {% block page_header %}{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pm_studio.css') }}">
 {% include "stamps/_flat_ui.html" %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pm_studio.css') }}">
 
 {% set _mv = active_view if active_view is defined else 'work' %}
 {% set _mv_titles = {'work': 'My Work', 'timesheet': 'My Timesheet', 'expenses': 'My Expenses'} %}

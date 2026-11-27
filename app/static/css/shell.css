@@ -31,12 +31,13 @@
   position: sticky;
   top: 0;
   z-index: var(--ts-z-topbar);
-  background: var(--ts-surface);
-  border-bottom: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+  box-shadow: none;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   padding: 0 20px;
   height: var(--ts-topbar-h);
 }
@@ -48,20 +49,20 @@
   text-decoration: none;
   color: var(--ts-text);
   flex: 0 0 auto;
-  margin-right: 4px;
+  margin-right: 6px;
 }
 .ts-topbar__brand:hover { text-decoration: none; }
 .ts-topbar__brand img {
-  height: 32px;
+  height: 30px;
   width: auto;
   display: block;
 }
 
-/* ---- Executive Topbar Primary Navigation ---- */
+/* ---- Executive Topbar Primary Navigation (Calm Modern SaaS) ---- */
 .ts-topnav {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
 }
 .ts-topnav__link,
@@ -69,15 +70,15 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 34px;
+  height: 32px;
   padding: 0 11px;
-  border-radius: 7px;
+  border-radius: 8px;
   border: 1px solid transparent;
   background: transparent;
-  color: #334155;
+  color: #475569;
   font-family: inherit;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
@@ -87,14 +88,15 @@
 .ts-topnav__trigger:hover,
 .ts-topnav__drop[data-open="true"] .ts-topnav__trigger {
   background: #f1f5f9;
-  color: #002769;
+  color: #0f172a;
   text-decoration: none;
 }
 .ts-topnav__link.is-active,
 .ts-topnav__trigger.is-active {
-  background: #edf2fa;
+  background: #eff4fb;
   color: #002769;
-  border-color: rgba(0, 39, 105, 0.14);
+  font-weight: 600;
+  border-color: rgba(0, 39, 105, 0.10);
 }
 .ts-topnav__chev {
   opacity: 0.65;

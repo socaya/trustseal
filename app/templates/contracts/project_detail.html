@@ -6,8 +6,8 @@
 {% block page_header %}{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pm_studio.css') }}">
 {% include "stamps/_flat_ui.html" %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pm_studio.css') }}">
 
 {% set h = health if health is defined else {'rag': 'on_track', 'label': 'On Track', 'score': 100, 'open_risks': 0} %}
 {% set t_rows = task_rows if task_rows is defined else [] %}

@@ -33,8 +33,8 @@
 {% block page_header %}{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pm_studio.css') }}">
 {% include "stamps/_flat_ui.html" %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pm_studio.css') }}">
 
 {% set pm_ribbon_ctx = 'projects' %}
 {% set pm_ribbon_tab = 'Contracts' if sec in ('contracts','obligations','procurement','budgets','spend') else ('Resources' if sec in ('resources','capacity','equipment','timesheets') else ('Review' if sec in ('approvals','raid','compliance','reports') else ('Plan' if sec in ('portfolios','programmes','intake') else ('File' if sec == 'templates' else 'Home')))) %}
@@ -121,9 +121,9 @@
       </div>
     </div>
 
-    {# ======================= SECTION: PROJECTS REGISTER (DEFAULT — COMPACT, ZERO REDUNDANT BLOCKS) ======================= #}
+    {# ======================= SECTION: PROJECTS REGISTER ======================= #}
     {% elif sec == 'projects' %}
-    <section class="pms-panel" aria-label="Projects register">
+    <section class="pms-panel" aria-label="Project Portfolio">
       {# Contextual Ribbon Toolbar (Search + Quick Facets + Advanced Filters Drawer + Columns + Export + View Switch) #}
       <form method="GET" action="{{ url_for('contracts_views.projects_page') }}" id="prj-filter-form" class="pms-tools">
         <input type="hidden" name="view" value="{{ flt.view }}">
@@ -235,8 +235,13 @@
             {% set h = p.health if p.health is defined else {'rag': 'on_track', 'label': 'On Track', 'score': 100} %}
             <tr data-row-json='{{ {"id": p.id, "code": p.project_code, "name": p.name, "category": p.category, "client": p.client_name or "Internal", "status": p.status, "health": h.label ~ " (" ~ h.score ~ ")", "progress": p.deliverables_pct ~ "%", "contracts": p.contracts_total, "tasks": p.tasks_done ~ "/" ~ p.tasks_total, "budget": ((p.currency ~ " " ~ "{:,.0f}".format(p.budget_amount)) if p.budget_amount else "—")}|tojson }}'>
               <td data-col="name">
-                <a class="pms-row-name" href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}">{{ p.name }}</a>
-                <span class="pms-row-meta">{{ p.project_code }} · {{ p.contracts_total }} contract(s)</span>
+                <div class="pme-row-ident">
+                  <span class="pme-avatar" aria-hidden="true">{{ (p.name[:2])|upper }}</span>
+                  <div>
+                    <a class="pms-row-name" href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}">{{ p.name }}</a>
+                    <span class="pms-row-meta">{{ p.project_code }} · {{ p.contracts_total }} contract(s)</span>
+                  </div>
+                </div>
               </td>
               <td data-col="category">
                 <span>{{ p.category|replace('_',' ')|title }}</span>

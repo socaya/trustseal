@@ -16,33 +16,24 @@
   },
   {
     "id": "projects_hub",
-    "label": "Projects",
+    "label": "Project",
     "tier": "all",
+    "direct_endpoint": "contracts_views.projects_page",
     "keys": ["projects", "my_work"],
-    "items": [
-      {"endpoint": "contracts_views.projects_page",               "label": "Project Portfolio",     "desc": "Portfolios, programmes, intake & studio","key": "projects"},
-      {"endpoint": "contracts_views.my_work_page",                "label": "My Work & Timesheets",  "desc": "Weekly timesheet grid, timer & inbox",   "key": "my_work"}
-    ]
+    "items": []
   },
   {
     "id": "assets",
     "label": "Brand & Assets",
     "tier": "all",
-    "keys": ["stamps", "letterheads", "signatures", "media"],
+    "keys": ["stamps", "letterheads", "signatures", "media", "templates"],
     "items": [
       {"endpoint": "tsd_stamps_views.library",                    "label": "Stamps",         "desc": "Sealed corporate & dated stamps",    "key": "stamps"},
       {"endpoint": "workspace_assets_views.letterheads_page",     "label": "Letterheads",    "desc": "Official organization stationery",   "key": "letterheads"},
       {"endpoint": "workspace_assets_views.signatures_hub_page",  "label": "Signatures",     "desc": "OTP-protected signatory vault",      "key": "signatures"},
+      {"endpoint": "workspace_assets_views.templates_hub_page",   "label": "Templates",      "desc": "Reusable document & contract kits",  "key": "templates"},
       {"endpoint": "workspace_assets_views.media_page",           "label": "Media Library",  "desc": "Logos, seals & image assets",        "key": "media"}
     ]
-  },
-  {
-    "id": "templates",
-    "label": "Templates",
-    "tier": "all",
-    "direct_endpoint": "workspace_assets_views.templates_hub_page",
-    "keys": ["templates"],
-    "items": []
   },
   {
     "id": "trust",
