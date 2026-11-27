@@ -1,0 +1,143 @@
+{% extends "layouts/public.html" %}
+
+{% block title %}How TRUSTSEAL Works · Connected Lifecycle{% endblock %}
+{% block main_modifier %}ts-public-main--full{% endblock %}
+
+{% block extra_head %}
+<style>
+  .ts-public { background: #ffffff; }
+  .hw-hero {
+    width: 100%;
+    background: linear-gradient(115deg, #00163d 0%, #002769 60%, #013688 100%);
+    color: #fff;
+    padding: 60px 56px 56px;
+    border-bottom: 3px solid #02982e;
+  }
+  .hw-eyebrow { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #7ee29a; margin-bottom: 12px; }
+  .hw-hero h1 { margin: 0 0 14px; font-size: 44px; font-weight: 700; letter-spacing: -0.03em; color: #fff; }
+  .hw-hero p { margin: 0; font-size: 18px; line-height: 1.6; color: rgba(235,242,255,0.92); max-width: 66ch; }
+
+  .hw-steps {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    background: #f4f7fc;
+    border-bottom: 1px solid #dbe4f2;
+  }
+  .hw-step {
+    padding: 36px 28px;
+    border-right: 1px solid #dbe4f2;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 14px;
+  }
+  .hw-step:last-child { border-right: none; }
+  .hw-step__num { font-family: ui-monospace, monospace; font-size: 13.5px; font-weight: 700; color: #027f26; margin-bottom: 8px; }
+  .hw-step h2 { margin: 0 0 6px; font-size: 20px; font-weight: 700; color: #002769; }
+  .hw-step p { margin: 0; font-size: 15px; line-height: 1.6; color: #1e293b; }
+  .hw-step a { font-size: 14.5px; font-weight: 700; color: #002769; text-decoration: none; }
+  .hw-step a:hover { text-decoration: underline; }
+
+  .hw-band { width: 100%; padding: 68px 56px; }
+  .hw-h2 { margin: 0 0 24px; font-size: 30px; font-weight: 700; color: #002769; }
+  .hw-table { width: 100%; border-collapse: collapse; font-size: 15.5px; }
+  .hw-table th {
+    text-align: left; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    color: #002769; padding: 14px 16px; border-top: 2px solid #002769; border-bottom: 1.5px solid #002769; background: #f4f7fc;
+  }
+  .hw-table td { padding: 20px 16px; border-bottom: 1px solid #e2e8f0; vertical-align: top; line-height: 1.58; color: #1e293b; }
+  .hw-table a { color: #002769; font-weight: 700; text-decoration: none; }
+  .hw-table a:hover { text-decoration: underline; }
+
+  @media (max-width: 1120px) {
+    .hw-steps { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 767px) {
+    .hw-hero, .hw-band { padding: 40px 20px; }
+    .hw-hero h1 { font-size: 32px; }
+    .hw-steps { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<header class="hw-hero">
+  <div class="hw-eyebrow">Connected Enterprise Lifecycle</div>
+  <h1>How every TRUSTSEAL module works together without silos.</h1>
+  <p>Data flows automatically from demand intake and contract drafting to eIDAS 2.0 sealing, delivery burn-rate tracking, and zero-trust public verification.</p>
+</header>
+
+<section class="hw-steps" aria-label="Five operational stages">
+  <article class="hw-step">
+    <div>
+      <div class="hw-step__num">STAGE 01</div>
+      <h2>Intake &amp; Plan</h2>
+      <p>Score demand intake proposals, approve project charters, build WBS packages, assign resources, and lock budget baselines.</p>
+    </div>
+    <a href="/platform/projects">Project Studio →</a>
+  </article>
+  <article class="hw-step">
+    <div>
+      <div class="hw-step__num">STAGE 02</div>
+      <h2>Draft &amp; Brand</h2>
+      <p>Instantiate MSAs, SOWs, and policies from 3,325+ blueprints inside encrypted .tsd containers on official organization letterhead.</p>
+    </div>
+    <a href="/platform/documents">TSD Vault →</a>
+  </article>
+  <article class="hw-step">
+    <div>
+      <div class="hw-step__num">STAGE 03</div>
+      <h2>Stamp &amp; Sign</h2>
+      <p>Apply custodian-gated corporate stamps, route sequential or CSV bulk invites, and seal under SES, AES, or QES with PAdES-B-LTA.</p>
+    </div>
+    <a href="/platform/esignature">eIDAS 2.0 Signing →</a>
+  </article>
+  <article class="hw-step">
+    <div>
+      <div class="hw-step__num">STAGE 04</div>
+      <h2>Execute &amp; Track</h2>
+      <p>Deliver tasks and sprints, post approved timesheets and expenses to the cost ledger, and monitor live contract burn rates.</p>
+    </div>
+    <a href="/platform/contracts">Contracts &amp; Spend →</a>
+  </article>
+  <article class="hw-step">
+    <div>
+      <div class="hw-step__num">STAGE 05</div>
+      <h2>Preserve &amp; Verify</h2>
+      <p>Retain signed validation dossiers for 7+ years under hash-chained audit logs and let any counterparty verify independently.</p>
+    </div>
+    <a href="/verify">Public Verifier →</a>
+  </article>
+</section>
+
+<section class="hw-band" aria-labelledby="bridges-heading">
+  <h2 class="hw-h2" id="bridges-heading">Cross-Module Data Bridges</h2>
+  <table class="hw-table">
+    <thead>
+      <tr>
+        <th>Workflow Bridge</th>
+        <th>Automated Integration Inside TRUSTSEAL</th>
+        <th>Module Page</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Projects ↔ Contracts &amp; Burn</strong></td>
+        <td>Linking a contract to a project automatically rolls its obligations, deliverables, addendums/NCEs, and real spend into the project's budget and RAG health score.</td>
+        <td><a href="/platform/contracts">Open CLM →</a></td>
+      </tr>
+      <tr>
+        <td><strong>Documents ↔ Brand &amp; eIDAS 2.0 Signing</strong></td>
+        <td>Official letterheads, corporate e-stamps, and native SES / AES / QES signature workflows apply directly inside TRUSTSEAL with zero export/re-upload cycles.</td>
+        <td><a href="/platform/esignature">Open eSignature →</a></td>
+      </tr>
+      <tr>
+        <td><strong>Delivery ↔ Audit Chain &amp; Mobile</strong></td>
+        <td>Timesheet approvals, stage gates, change requests, and PAdES-sealed PDFs write into the same SHA-256 audit chain and sync directly to TRUSTSEAL Flutter Mobile.</td>
+        <td><a href="/platform/governance">Open Governance →</a></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+{% endblock %}

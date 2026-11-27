@@ -1,0 +1,67 @@
+{% extends "layouts/public.html" %}
+
+{% block title %}Platform Suite · TRUSTSEAL{% endblock %}
+{% block main_modifier %}ts-public-main--full{% endblock %}
+
+{% block extra_head %}
+<style>
+  .ts-public { background: #ffffff; }
+  .pl-hero {
+    width: 100%;
+    background: linear-gradient(115deg, #00163d 0%, #002769 62%, #013688 100%);
+    color: #fff;
+    padding: 60px 56px 56px;
+    border-bottom: 3px solid #02982e;
+  }
+  .pl-eyebrow { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #7ee29a; margin-bottom: 12px; }
+  .pl-hero h1 { margin: 0 0 14px; font-size: 44px; font-weight: 700; letter-spacing: -0.03em; color: #fff; }
+  .pl-hero p { margin: 0; font-size: 18px; line-height: 1.6; color: rgba(235,242,255,0.9); max-width: 68ch; }
+
+  .pl-list { width: 100%; padding: 20px 56px 76px; }
+  .pl-row {
+    display: grid;
+    grid-template-columns: 72px minmax(260px, 0.9fr) minmax(0, 1.4fr) auto;
+    gap: 28px;
+    align-items: center;
+    padding: 34px 12px;
+    border-bottom: 1px solid #dbe4f2;
+    text-decoration: none;
+    transition: background 120ms ease;
+  }
+  .pl-row:hover { background: #f8fafd; text-decoration: none; }
+  .pl-row:hover .pl-open { text-decoration: underline; }
+  .pl-num { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 16px; font-weight: 700; color: #027f26; }
+  .pl-cat { font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; margin-bottom: 4px; }
+  .pl-name { font-size: 22px; font-weight: 700; color: #002769; margin: 0; }
+  .pl-desc { font-size: 15.5px; line-height: 1.6; color: #334155; margin: 0; }
+  .pl-open { font-size: 15px; font-weight: 700; color: #002769; white-space: nowrap; }
+
+  @media (max-width: 960px) {
+    .pl-hero, .pl-list { padding-left: 20px; padding-right: 20px; }
+    .pl-hero h1 { font-size: 32px; }
+    .pl-row { grid-template-columns: 1fr; gap: 10px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<header class="pl-hero">
+  <div class="pl-eyebrow">TRUSTSEAL Platform Suite</div>
+  <h1>Six enterprise modules. One cryptographic backbone.</h1>
+  <p>Select any module below to open its full architecture, capabilities, standards conformance, and cross-module workflows.</p>
+</header>
+
+<section class="pl-list" aria-label="TRUSTSEAL Modules">
+  {% for m in modules %}
+  <a class="pl-row" href="/platform/{{ m.slug }}">
+    <span class="pl-num">{{ m.num }}</span>
+    <div>
+      <div class="pl-cat">{{ m.category }}</div>
+      <h2 class="pl-name">{{ m.name }}</h2>
+    </div>
+    <p class="pl-desc">{{ m.summary }}</p>
+    <span class="pl-open">Open Module →</span>
+  </a>
+  {% endfor %}
+</section>
+{% endblock %}

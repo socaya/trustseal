@@ -25,11 +25,12 @@
              alt="TRUSTSEAL — Verified Integrity" width="184" height="36">
       </a>
       <div class="ts-public-nav__links">
-        <a href="/#modules">Platform</a>
-        <a href="/#how-it-works">How it works</a>
-        <a href="/verify">Verify a document</a>
-        <a href="/trust">Trust &amp; security</a>
-        <a href="/pricing">Pricing</a>
+        <a href="/platform" class="{% if public_nav == 'platform' %}is-active{% endif %}">Platform</a>
+        <a href="/platform/esignature" class="{% if public_nav == 'esignature' %}is-active{% endif %}">eIDAS 2.0 Signing</a>
+        <a href="/how-it-works" class="{% if public_nav == 'how_it_works' %}is-active{% endif %}">How it works</a>
+        <a href="/verify" class="{% if request.path.startswith('/verify') %}is-active{% endif %}">Verify</a>
+        <a href="/trust" class="{% if public_nav == 'trust' %}is-active{% endif %}">Trust &amp; security</a>
+        <a href="/pricing" class="{% if public_nav == 'pricing' %}is-active{% endif %}">Pricing</a>
       </div>
       <div class="ts-public-nav__cta">
         <a class="ts-pub-btn ts-pub-btn--ghost" href="/auth/login">Sign in</a>
@@ -46,7 +47,9 @@
     <div class="ts-public-footer__inner">
       <span>© {{ now.year if now else 2026 }} Vitalworks Limited · TRUSTSEAL. All rights reserved.</span>
       <span class="ts-public-footer__links">
-        <a href="/#modules">Platform</a>
+        <a href="/platform">Platform</a>
+        <a href="/platform/esignature">eIDAS 2.0 Signing</a>
+        <a href="/how-it-works">How it works</a>
         <a href="/verify">Verify</a>
         <a href="/trust">Trust &amp; security</a>
         <a href="/pricing">Pricing</a>

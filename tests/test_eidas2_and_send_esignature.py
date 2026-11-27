@@ -54,6 +54,9 @@ def app_client(pg_app):
 
 def test_trust_page_removes_old_disclaimer_and_documents_eidas2(app_client):
     _app, client, _headers = app_client
+    for path in ("/welcome", "/platform", "/platform/projects", "/platform/contracts", "/platform/esignature", "/platform/documents", "/platform/stamps", "/platform/governance", "/how-it-works", "/trust", "/pricing"):
+        r = client.get(path)
+        assert r.status_code == 200, f"Public route {path} returned {r.status_code}"
     resp = client.get("/trust")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)

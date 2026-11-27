@@ -7,7 +7,7 @@
 <style>
   .ts-public { background: #ffffff; }
 
-  /* ============ 1. FULL-BLEED EXECUTIVE NAVY HERO ============ */
+  /* 1. FULL-BLEED EXECUTIVE NAVY HERO */
   .ts-lp-hero {
     width: 100%;
     background: linear-gradient(115deg, #00163d 0%, #002769 58%, #013688 100%);
@@ -70,12 +70,8 @@
   .ts-lp-btn--emerald:hover { background: #027f26; color: #ffffff; text-decoration: none; }
   .ts-lp-btn--outline-light { background: transparent; color: #ffffff; border-color: rgba(255,255,255,0.42); }
   .ts-lp-btn--outline-light:hover { background: rgba(255,255,255,0.1); color: #ffffff; text-decoration: none; }
-  .ts-lp-btn--navy { background: #002769; color: #ffffff; }
-  .ts-lp-btn--navy:hover { background: #001c4d; color: #ffffff; text-decoration: none; }
-  .ts-lp-btn--outline-navy { background: transparent; color: #002769; border-color: #002769; }
-  .ts-lp-btn--outline-navy:hover { background: #f4f7fc; color: #001c4d; text-decoration: none; }
 
-  /* Right Editorial Architecture Ledger (No floating card, sharp hairline rows) */
+  /* Clickable Editorial Architecture Ledger */
   .ts-lp-ledger {
     border-top: 2px solid #02982e;
     border-bottom: 1px solid rgba(255,255,255,0.2);
@@ -88,45 +84,39 @@
     border-bottom: 1px solid rgba(255,255,255,0.2);
   }
   .ts-lp-ledger__head strong {
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #ffffff;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #ffffff;
   }
-  .ts-lp-ledger__head span {
-    font-size: 13.5px;
-    color: #7ee29a;
-    font-weight: 600;
+  .ts-lp-ledger__head a {
+    font-size: 13.5px; color: #7ee29a; font-weight: 600; text-decoration: none;
   }
+  .ts-lp-ledger__head a:hover { text-decoration: underline; }
   .ts-lp-ledger__row {
     display: grid;
     grid-template-columns: 1fr auto;
     gap: 16px;
     align-items: center;
-    padding: 15px 0;
+    padding: 15px 6px;
     border-bottom: 1px solid rgba(255,255,255,0.12);
+    text-decoration: none;
+    transition: background 120ms ease;
   }
+  .ts-lp-ledger__row:hover { background: rgba(255,255,255,0.06); text-decoration: none; }
   .ts-lp-ledger__row:last-child { border-bottom: none; }
   .ts-lp-ledger__name {
-    font-size: 16px;
-    font-weight: 600;
-    color: #ffffff;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    font-size: 16px; font-weight: 600; color: #ffffff;
+    display: flex; align-items: center; gap: 10px;
   }
   .ts-lp-ledger__dot {
     width: 7px; height: 7px; border-radius: 50%; background: #02982e; flex-shrink: 0;
   }
   .ts-lp-ledger__meta {
     font-size: 13.5px;
-    color: rgba(219, 231, 255, 0.85);
+    color: rgba(219, 231, 255, 0.88);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     text-align: right;
   }
 
-  /* ============ 2. FULL-BLEED ARCHITECTURAL PROOF STRIP ============ */
+  /* 2. FULL-BLEED ARCHITECTURAL PROOF STRIP */
   .ts-lp-strip {
     width: 100%;
     display: grid;
@@ -140,292 +130,104 @@
   }
   .ts-lp-strip__cell:last-child { border-right: none; }
   .ts-lp-strip__val {
-    font-size: 26px;
-    font-weight: 700;
-    color: #002769;
-    letter-spacing: -0.02em;
-    line-height: 1.15;
-    margin-bottom: 6px;
+    font-size: 26px; font-weight: 700; color: #002769; letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 6px;
   }
   .ts-lp-strip__val--em { color: #027f26; }
-  .ts-lp-strip__lbl {
-    font-size: 14.5px;
-    color: #334155;
-    line-height: 1.4;
-  }
+  .ts-lp-strip__lbl { font-size: 14.5px; color: #334155; line-height: 1.4; }
 
-  /* ============ 3. INTERACTIVE PLATFORM SUITE (FULL-WIDTH SPLIT, ZERO BENTO CARDS) ============ */
-  .ts-lp-band {
+  /* 3. CLEAN MULTI-PAGE DIRECTORY BAND */
+  .ts-lp-dir {
     width: 100%;
-    padding: 80px 56px;
+    padding: 72px 56px;
     background: #ffffff;
-    border-bottom: 1px solid #e2e8f0;
-    scroll-margin-top: 72px;
   }
-  .ts-lp-band--tint { background: #f4f7fc; }
+  .ts-lp-dir__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 24px;
+    flex-wrap: wrap;
+    padding-bottom: 24px;
+    border-bottom: 2px solid #002769;
+  }
   .ts-lp-kicker {
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: #027f26;
-    margin-bottom: 10px;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #027f26; margin-bottom: 8px;
   }
   .ts-lp-h2 {
-    margin: 0 0 14px;
-    font-size: 36px;
-    font-weight: 700;
-    letter-spacing: -0.025em;
-    line-height: 1.18;
-    color: #002769;
-    max-width: 30ch;
+    margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -0.025em; color: #002769;
   }
-  .ts-lp-sub {
-    margin: 0 0 44px;
-    font-size: 17px;
-    line-height: 1.6;
-    color: #334155;
-    max-width: 66ch;
-  }
-
-  .ts-lp-suite {
-    display: grid;
-    grid-template-columns: minmax(300px, 0.85fr) minmax(0, 1.45fr);
-    gap: 56px;
-    align-items: start;
-    border-top: 2px solid #002769;
-  }
-  .ts-lp-navlist {
-    display: flex;
-    flex-direction: column;
-    border-right: 1px solid #dbe4f2;
-  }
-  .ts-lp-navitem {
-    appearance: none;
-    background: transparent;
-    border: none;
-    border-bottom: 1px solid #e2e8f0;
-    border-left: 4px solid transparent;
-    text-align: left;
-    padding: 20px 22px;
-    cursor: pointer;
-    display: grid;
-    grid-template-columns: 36px 1fr;
-    gap: 10px;
-    align-items: baseline;
-    transition: background 120ms ease, border-left-color 120ms ease;
-  }
-  .ts-lp-navitem:hover { background: #f8fafd; }
-  .ts-lp-navitem.is-active {
-    background: #f4f7fc;
-    border-left-color: #002769;
-  }
-  .ts-lp-navitem__num {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 14px;
-    font-weight: 700;
-    color: #027f26;
-  }
-  .ts-lp-navitem__title {
-    font-size: 17px;
-    font-weight: 700;
-    color: #0f172a;
-    display: block;
-    margin-bottom: 3px;
-  }
-  .ts-lp-navitem.is-active .ts-lp-navitem__title { color: #002769; }
-  .ts-lp-navitem__tag {
-    font-size: 14px;
-    color: #475569;
-    display: block;
-  }
-
-  .ts-lp-detail {
-    padding: 28px 0 12px;
-    display: none;
-  }
-  .ts-lp-detail.is-active { display: block; }
-  .ts-lp-detail__cat {
-    font-size: 13px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #027f26;
-    margin-bottom: 8px;
-  }
-  .ts-lp-detail h3 {
-    margin: 0 0 14px;
-    font-size: 30px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    color: #002769;
-  }
-  .ts-lp-detail__desc {
-    margin: 0 0 30px;
-    font-size: 17px;
-    line-height: 1.65;
-    color: #1e293b;
-    max-width: 64ch;
-  }
-  .ts-lp-caps {
+  .ts-lp-dir__grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    border-top: 1px solid #dbe4f2;
   }
-  .ts-lp-cap {
-    padding: 22px 24px 22px 0;
-    border-bottom: 1px solid #e2e8f0;
-  }
-  .ts-lp-cap:nth-child(even) {
-    padding-left: 28px;
-    padding-right: 0;
-    border-left: 1px solid #e2e8f0;
-  }
-  .ts-lp-cap strong {
-    display: block;
-    font-size: 16px;
-    font-weight: 700;
-    color: #0f172a;
-    margin-bottom: 6px;
-  }
-  .ts-lp-cap p {
-    margin: 0;
-    font-size: 15px;
-    line-height: 1.55;
-    color: #475569;
-  }
-
-  /* ============ 4. FULL-BLEED 5-STAGE CONNECTED LIFECYCLE ============ */
-  .ts-lp-steps {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    border-top: 2px solid #002769;
+  .ts-lp-dir__item {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 32px 36px 32px 0;
     border-bottom: 1px solid #dbe4f2;
-    background: #ffffff;
+    text-decoration: none;
+    transition: background 120ms ease;
   }
-  .ts-lp-step {
-    padding: 32px 28px;
-    border-right: 1px solid #dbe4f2;
+  .ts-lp-dir__item:nth-child(even) {
+    padding-left: 44px;
+    padding-right: 0;
+    border-left: 1px solid #dbe4f2;
   }
-  .ts-lp-step:last-child { border-right: none; }
-  .ts-lp-step__num {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 14px;
-    font-weight: 700;
-    color: #027f26;
-    margin-bottom: 12px;
+  .ts-lp-dir__item:hover { background: #f8fafd; text-decoration: none; }
+  .ts-lp-dir__item:hover .ts-lp-dir__link { text-decoration: underline; }
+  .ts-lp-dir__eyebrow {
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #027f26;
   }
-  .ts-lp-step h3 {
-    margin: 0 0 6px;
-    font-size: 19px;
-    font-weight: 700;
-    color: #002769;
+  .ts-lp-dir__title {
+    margin: 4px 0 8px; font-size: 22px; font-weight: 700; color: #002769; letter-spacing: -0.015em;
   }
-  .ts-lp-step__mod {
-    font-size: 13.5px;
-    font-weight: 600;
-    color: #475569;
-    margin-bottom: 12px;
+  .ts-lp-dir__desc {
+    margin: 0; font-size: 15.5px; line-height: 1.6; color: #334155;
   }
-  .ts-lp-step p {
-    margin: 0;
-    font-size: 15px;
-    line-height: 1.58;
-    color: #1e293b;
+  .ts-lp-dir__link {
+    font-size: 15px; font-weight: 600; color: #002769;
   }
 
-  /* ============ 5. eIDAS 2.0 & VERIFICATION STANDARDS BAND ============ */
-  .ts-lp-eidas {
-    display: grid;
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.3fr);
-    gap: 64px;
-    align-items: start;
-  }
-  .ts-lp-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 15px;
-  }
-  .ts-lp-table th {
-    text-align: left;
-    font-size: 13px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #002769;
-    padding: 14px 16px;
-    border-top: 2px solid #002769;
-    border-bottom: 1.5px solid #002769;
-    background: #f4f7fc;
-  }
-  .ts-lp-table td {
-    padding: 18px 16px;
-    border-bottom: 1px solid #e2e8f0;
-    vertical-align: top;
-    color: #0f172a;
-    line-height: 1.55;
-  }
-  .ts-lp-dot {
-    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-    background: #02982e; margin-right: 8px; vertical-align: middle;
-  }
-
-  /* ============ 6. FULL-BLEED CLOSING NAVY BAND ============ */
+  /* 4. FULL-BLEED CLOSING NAVY BAND */
   .ts-lp-cta {
     width: 100%;
     background: linear-gradient(115deg, #00163d 0%, #002769 65%, #013688 100%);
     color: #ffffff;
     border-top: 3px solid #02982e;
-    padding: 68px 56px;
+    padding: 64px 56px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 36px;
     flex-wrap: wrap;
   }
-  .ts-lp-cta h2 {
-    margin: 0 0 10px;
-    font-size: 34px;
-    font-weight: 700;
-    letter-spacing: -0.025em;
-    color: #ffffff;
-  }
-  .ts-lp-cta p {
-    margin: 0;
-    font-size: 17px;
-    color: rgba(235, 242, 255, 0.88);
-  }
-  .ts-lp-cta__actions {
-    display: flex;
-    gap: 14px;
-    flex-wrap: wrap;
-  }
+  .ts-lp-cta h2 { margin: 0 0 10px; font-size: 32px; font-weight: 700; letter-spacing: -0.025em; color: #ffffff; }
+  .ts-lp-cta p { margin: 0; font-size: 17px; color: rgba(235, 242, 255, 0.88); }
+  .ts-lp-cta__actions { display: flex; gap: 14px; flex-wrap: wrap; }
 
   @media (max-width: 1180px) {
-    .ts-lp-hero__grid, .ts-lp-suite, .ts-lp-eidas { grid-template-columns: 1fr; gap: 36px; }
-    .ts-lp-navlist { border-right: none; }
+    .ts-lp-hero__grid { grid-template-columns: 1fr; gap: 36px; }
     .ts-lp-strip { grid-template-columns: repeat(2, 1fr); }
-    .ts-lp-steps { grid-template-columns: repeat(2, 1fr); }
   }
   @media (max-width: 767px) {
-    .ts-lp-hero, .ts-lp-band, .ts-lp-cta { padding: 44px 20px; }
+    .ts-lp-hero, .ts-lp-dir, .ts-lp-cta { padding: 44px 20px; }
     .ts-lp-hero h1 { font-size: 34px; }
-    .ts-lp-h2 { font-size: 28px; }
-    .ts-lp-strip, .ts-lp-steps, .ts-lp-caps { grid-template-columns: 1fr; }
-    .ts-lp-cap:nth-child(even) { padding-left: 0; border-left: none; }
+    .ts-lp-strip, .ts-lp-dir__grid { grid-template-columns: 1fr; }
+    .ts-lp-dir__item:nth-child(even) { padding-left: 0; border-left: none; }
   }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- ======================= 1. FULL-BLEED EXECUTIVE HERO ======================= -->
 <section class="ts-lp-hero" aria-labelledby="hero-heading">
   <div class="ts-lp-hero__grid">
     <div>
       <div class="ts-lp-eyebrow">TRUSTSEAL · Verified Integrity Platform</div>
       <h1 id="hero-heading">One trusted platform for projects, contracts, eIDAS 2.0 signing, and verification.</h1>
       <p class="ts-lp-hero__lede">
-        Manage enterprise project delivery, contract obligations and burn rates, encrypted document authoring, corporate e-stamps, and SES / AES / QES electronic signatures — anchored into one verifiable SHA-256 audit chain.
+        Run enterprise project delivery, contract obligations and burn rates, encrypted document authoring, corporate e-stamps, and native SES / AES / QES electronic signatures — anchored into one verifiable SHA-256 audit chain.
       </p>
       <div class="ts-lp-hero__actions">
         <a class="ts-lp-btn ts-lp-btn--white" href="/auth/register">Create Workspace →</a>
@@ -434,48 +236,47 @@
       </div>
     </div>
 
-    <div class="ts-lp-ledger" aria-label="TRUSTSEAL Platform Architecture">
+    <nav class="ts-lp-ledger" aria-label="Explore TRUSTSEAL modules">
       <div class="ts-lp-ledger__head">
-        <strong>Unified Architecture</strong>
-        <span>6 Modules · 1 Audit Chain</span>
+        <strong>Platform Modules</strong>
+        <a href="/platform">All 6 Modules →</a>
       </div>
-      <div class="ts-lp-ledger__row">
+      <a class="ts-lp-ledger__row" href="/platform/projects">
         <span class="ts-lp-ledger__name"><i class="ts-lp-ledger__dot"></i>Project Studio (PME)</span>
-        <span class="ts-lp-ledger__meta">WBS · CPM Gantt · Timesheets · EVM</span>
-      </div>
-      <div class="ts-lp-ledger__row">
+        <span class="ts-lp-ledger__meta">WBS · CPM Gantt · EVM →</span>
+      </a>
+      <a class="ts-lp-ledger__row" href="/platform/contracts">
         <span class="ts-lp-ledger__name"><i class="ts-lp-ledger__dot"></i>Contracts Lifecycle (CLM)</span>
-        <span class="ts-lp-ledger__meta">Addendums · NCEs · Spend · Burn</span>
-      </div>
-      <div class="ts-lp-ledger__row">
+        <span class="ts-lp-ledger__meta">Addendums · NCE · Burn →</span>
+      </a>
+      <a class="ts-lp-ledger__row" href="/platform/esignature">
         <span class="ts-lp-ledger__name"><i class="ts-lp-ledger__dot"></i>eIDAS 2.0 eSignature</span>
-        <span class="ts-lp-ledger__meta">SES · AES · QES · CSC v2 · EUDI Wallet</span>
-      </div>
-      <div class="ts-lp-ledger__row">
+        <span class="ts-lp-ledger__meta">SES · AES · QES · EUDI →</span>
+      </a>
+      <a class="ts-lp-ledger__row" href="/platform/documents">
         <span class="ts-lp-ledger__name"><i class="ts-lp-ledger__dot"></i>TSD Encrypted Vault</span>
-        <span class="ts-lp-ledger__meta">Fernet .tsd · Versioning · Export Rules</span>
-      </div>
-      <div class="ts-lp-ledger__row">
-        <span class="ts-lp-ledger__name"><i class="ts-lp-ledger__dot"></i>Stamps &amp; Public Verify</span>
-        <span class="ts-lp-ledger__meta">PAdES-B-LTA · RFC 3161 · /verify</span>
-      </div>
-      <div class="ts-lp-ledger__row">
-        <span class="ts-lp-ledger__name"><i class="ts-lp-ledger__dot"></i>TRUSTSEAL Mobile</span>
-        <span class="ts-lp-ledger__meta">Native Flutter · iOS &amp; Android</span>
-      </div>
-    </div>
+        <span class="ts-lp-ledger__meta">Fernet .tsd · Versioning →</span>
+      </a>
+      <a class="ts-lp-ledger__row" href="/platform/stamps">
+        <span class="ts-lp-ledger__name"><i class="ts-lp-ledger__dot"></i>Corporate Stamps &amp; Brand</span>
+        <span class="ts-lp-ledger__meta">Forensics · Letterheads →</span>
+      </a>
+      <a class="ts-lp-ledger__row" href="/platform/governance">
+        <span class="ts-lp-ledger__name"><i class="ts-lp-ledger__dot"></i>Governance &amp; Mobile App</span>
+        <span class="ts-lp-ledger__meta">RLS · Audit · Flutter →</span>
+      </a>
+    </nav>
   </div>
 </section>
 
-<!-- ======================= 2. FULL-BLEED ARCHITECTURAL PROOF STRIP ======================= -->
-<section class="ts-lp-strip" aria-label="Platform standards">
+<section class="ts-lp-strip" aria-label="Platform highlights">
   <div class="ts-lp-strip__cell">
     <div class="ts-lp-strip__val">6 Modules</div>
-    <div class="ts-lp-strip__lbl">Shared tenant RBAC, templates, and live ledger</div>
+    <div class="ts-lp-strip__lbl">Unified tenant workspace &amp; live audit ledger</div>
   </div>
   <div class="ts-lp-strip__cell">
     <div class="ts-lp-strip__val ts-lp-strip__val--em">SES · AES · QES</div>
-    <div class="ts-lp-strip__lbl">Native eIDAS 2.0 &amp; EUDI Wallet signing</div>
+    <div class="ts-lp-strip__lbl">Native eIDAS 2.0, CSC v2 &amp; EUDI Wallet</div>
   </div>
   <div class="ts-lp-strip__cell">
     <div class="ts-lp-strip__val">PAdES-B-LTA</div>
@@ -491,313 +292,58 @@
   </div>
 </section>
 
-<!-- ======================= 3. INTERACTIVE PLATFORM SUITE ======================= -->
-<section class="ts-lp-band" id="modules" aria-labelledby="modules-heading">
-  <div class="ts-lp-kicker">Complete Enterprise Platform</div>
-  <h2 class="ts-lp-h2" id="modules-heading">Six integrated operational modules without data silos.</h2>
-  <p class="ts-lp-sub">
-    Select any module below to inspect how TRUSTSEAL replaces disconnected project tools, contract folders, and external signing vendors inside one governed system.
-  </p>
-
-  <div class="ts-lp-suite">
-    <div class="ts-lp-navlist" role="tablist" aria-label="TRUSTSEAL modules">
-      <button type="button" class="ts-lp-navitem is-active" role="tab" aria-selected="true" data-mod="pme">
-        <span class="ts-lp-navitem__num">01</span>
-        <span>
-          <span class="ts-lp-navitem__title">Project Management Studio</span>
-          <span class="ts-lp-navitem__tag">Portfolios, WBS, Gantt, Timesheets &amp; EVM</span>
-        </span>
-      </button>
-      <button type="button" class="ts-lp-navitem" role="tab" aria-selected="false" data-mod="clm">
-        <span class="ts-lp-navitem__num">02</span>
-        <span>
-          <span class="ts-lp-navitem__title">Contracts Lifecycle (CLM)</span>
-          <span class="ts-lp-navitem__tag">Templates, Addendums, NCEs &amp; Burn Rate</span>
-        </span>
-      </button>
-      <button type="button" class="ts-lp-navitem" role="tab" aria-selected="false" data-mod="esign">
-        <span class="ts-lp-navitem__num">03</span>
-        <span>
-          <span class="ts-lp-navitem__title">eIDAS 2.0 Send for eSignature</span>
-          <span class="ts-lp-navitem__tag">Routing, CSV Bulk Invites, SES / AES / QES</span>
-        </span>
-      </button>
-      <button type="button" class="ts-lp-navitem" role="tab" aria-selected="false" data-mod="tsd">
-        <span class="ts-lp-navitem__num">04</span>
-        <span>
-          <span class="ts-lp-navitem__title">TSD Encrypted Document Vault</span>
-          <span class="ts-lp-navitem__tag">Authoring, Revisions &amp; Export Enforcement</span>
-        </span>
-      </button>
-      <button type="button" class="ts-lp-navitem" role="tab" aria-selected="false" data-mod="brand">
-        <span class="ts-lp-navitem__num">05</span>
-        <span>
-          <span class="ts-lp-navitem__title">Corporate Stamps &amp; Brand Studio</span>
-          <span class="ts-lp-navitem__tag">Custodian Seals, Letterheads &amp; Forensics</span>
-        </span>
-      </button>
-      <button type="button" class="ts-lp-navitem" role="tab" aria-selected="false" data-mod="gov">
-        <span class="ts-lp-navitem__num">06</span>
-        <span>
-          <span class="ts-lp-navitem__title">Governance, Audit &amp; Mobile App</span>
-          <span class="ts-lp-navitem__tag">RLS, SAML SSO, 7-Year Vault &amp; Flutter App</span>
-        </span>
-      </button>
-    </div>
-
+<section class="ts-lp-dir" aria-labelledby="explore-heading">
+  <div class="ts-lp-dir__head">
     <div>
-      <article class="ts-lp-detail is-active" id="mod-pme">
-        <div class="ts-lp-detail__cat">01 · Delivery &amp; Portfolio Management</div>
-        <h3>Project Management Studio</h3>
-        <p class="ts-lp-detail__desc">
-          Govern portfolios, programmes, and scored demand intake from charter approval to closure with explainable 6-dimension RAG health scoring and live contract financial rollups.
-        </p>
-        <div class="ts-lp-caps">
-          <div class="ts-lp-cap">
-            <strong>WBS, DAG Dependencies &amp; CPM Gantt</strong>
-            <p>Cycle-protected dependency scheduling with deterministic critical path calculation and baseline variance.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>Resources, Capacity &amp; Equipment</strong>
-            <p>Allocate team capacity, book project assets, and manage sprint backlogs and kanban boards.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>Weekly Timesheets &amp; Expenses</strong>
-            <p>Enforce separation of duties on approvals and post directly into the live project cost ledger and EVM.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>Procurement, RAID &amp; Compliance</strong>
-            <p>Track tenders, risks, change requests, HSE incidents, M&amp;E indicators, and external client portals.</p>
-          </div>
-        </div>
-      </article>
-
-      <article class="ts-lp-detail" id="mod-clm">
-        <div class="ts-lp-detail__cat">02 · Commercial &amp; Legal Control</div>
-        <h3>Contracts Lifecycle (CLM)</h3>
-        <p class="ts-lp-detail__desc">
-          Draft, negotiate, sign, and govern commercial agreements from one authoritative register — linking primary contracts directly to addendums, No-Cost Extensions (NCEs), and project budgets.
-        </p>
-        <div class="ts-lp-caps">
-          <div class="ts-lp-cap">
-            <strong>3,325+ Clause &amp; Contract Blueprints</strong>
-            <p>Instantiate full-length MSAs, SOWs, NDAs, and policies with automated redline diff comparison.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>Parent-Child Addendums &amp; NCEs</strong>
-            <p>Group amendments and extensions under each master agreement with full version lineage.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>Obligations &amp; Deliverable Sign-Off</strong>
-            <p>Monitor milestones, probation periods, renewal notices, and counterparty deliverable acceptance.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>Live Contract Spend &amp; Burn Rate</strong>
-            <p>Real-time commitment tracking and monthly burn calculations synced directly into Project Studio.</p>
-          </div>
-        </div>
-      </article>
-
-      <article class="ts-lp-detail" id="mod-esign">
-        <div class="ts-lp-detail__cat">03 · Native Electronic Signatures</div>
-        <h3>eIDAS 2.0 Send for eSignature</h3>
-        <p class="ts-lp-detail__desc">
-          Built completely inside TRUSTSEAL with zero third-party signing lock-in. Dispatch single documents, shareable kiosk links, or 250-recipient CSV bulk invite batches under SES, AES, or QES assurance.
-        </p>
-        <div class="ts-lp-caps">
-          <div class="ts-lp-cap">
-            <strong>Sequential, Parallel &amp; Quorum Routing</strong>
-            <p>Assign Signer, Approver, Witness, and CC roles with per-recipient eIDAS levels and fillable fields.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>CSV Bulk Invites &amp; Automated Reminders</strong>
-            <p>Send individualized trackable envelopes at scale with 1–180 day expiration windows and automated follow-ups.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>Remote QSCD (CSC v2) &amp; EUDI Wallet</strong>
-            <p>Execute Qualified Electronic Signatures via SCAL2 SAD authorization or OpenID4VP LoA High wallet presentation.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>Certificate of Completion &amp; PAdES-B-LTA</strong>
-            <p>Automatic cryptographic sealing with RFC 3161 timestamps, OCSP/CRL snapshots, and hash-chained audit logs.</p>
-          </div>
-        </div>
-      </article>
-
-      <article class="ts-lp-detail" id="mod-tsd">
-        <div class="ts-lp-detail__cat">04 · Encrypted Authoring &amp; Storage</div>
-        <h3>TSD Encrypted Document Vault</h3>
-        <p class="ts-lp-detail__desc">
-          Author formal policies, board packs, and agreements inside a studio editor backed by tenant-encrypted <code>.tsd</code> containers, optimistic version locking, and strict export controls.
-        </p>
-        <div class="ts-lp-caps">
-          <div class="ts-lp-cap">
-            <strong>Per-Tenant Encrypted .tsd Containers</strong>
-            <p>Fernet authenticated encryption keeps plaintext off generic storage with verifiable SHA-256 checksums.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>Granular Export Policy Enforcement</strong>
-            <p>Restrict sensitive records to <code>Encrypted Only</code> or enable controlled PDF export for signing.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>Multi-Format Document Ingestion</strong>
-            <p>Import existing DOCX, PDF, XLSX, HTML, and Markdown files cleanly into structured workspace records.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>Token-Scoped External Sharing</strong>
-            <p>Share review copies with external stakeholders using revocable time-bound links and full view logs.</p>
-          </div>
-        </div>
-      </article>
-
-      <article class="ts-lp-detail" id="mod-brand">
-        <div class="ts-lp-detail__cat">05 · Corporate Identity &amp; Forensics</div>
-        <h3>Corporate Stamps &amp; Brand Studio</h3>
-        <p class="ts-lp-detail__desc">
-          Standardize every official outbound document with custodian-controlled corporate e-stamps, verified letterheads, and covert forensic stamp receipts verifiable without signing in.
-        </p>
-        <div class="ts-lp-caps">
-          <div class="ts-lp-cap">
-            <strong>Custodian-Gated Stamp Studio</strong>
-            <p>Issue round, dated, and executive approval seals strictly under authorized custodian governance.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>Official Letterhead &amp; Media Vault</strong>
-            <p>Apply approved corporate stationery across documents and contracts in one click.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>Covert Forensic Stamp Receipts</strong>
-            <p>Embed cryptographic receipt nonces and QR verification links to detect unauthorized stamp reuse.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>OTP-Protected Signatory Vault</strong>
-            <p>Require owner-approved 6-digit OTP verification before any registered executive signature is applied.</p>
-          </div>
-        </div>
-      </article>
-
-      <article class="ts-lp-detail" id="mod-gov">
-        <div class="ts-lp-detail__cat">06 · Security, Compliance &amp; Mobility</div>
-        <h3>Governance, Audit &amp; Mobile App</h3>
-        <p class="ts-lp-detail__desc">
-          Engineered for regulated enterprises, financial institutions, and distributed teams with database-level tenant isolation, 7-year evidence retention, and a native Flutter mobile client.
-        </p>
-        <div class="ts-lp-caps">
-          <div class="ts-lp-cap">
-            <strong>PostgreSQL RLS, SAML 2.0 &amp; SCIM</strong>
-            <p>Enforce multi-tenant isolation at the database layer alongside enterprise SSO and directory provisioning.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>Immutable Hash-Chained Audit Ledger</strong>
-            <p>Every approval, gate decision, stamp, and signature chains cryptographically to detect tampering.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>7-Year Retention &amp; Legal Holds</strong>
-            <p>Preserve validation dossiers, RFC 3161 tokens, and revocation evidence for long-term regulatory audits.</p>
-          </div>
-          <div class="ts-lp-cap">
-            <strong>Native Flutter Mobile App</strong>
-            <p>Approve timesheets, track projects, dispatch eIDAS 2.0 signatures, and verify evidence on iOS &amp; Android.</p>
-          </div>
-        </div>
-      </article>
+      <div class="ts-lp-kicker">Explore TRUSTSEAL</div>
+      <h2 class="ts-lp-h2" id="explore-heading">Dedicated workspaces for every stage of trust and delivery.</h2>
     </div>
+    <a href="/platform" style="font-size:15.5px; font-weight:700; color:#002769; text-decoration:none;">Browse full platform →</a>
   </div>
-</section>
 
-<!-- ======================= 4. FULL-BLEED 5-STAGE CONNECTED LIFECYCLE ======================= -->
-<section class="ts-lp-band ts-lp-band--tint" id="how-it-works" aria-labelledby="flow-heading">
-  <div class="ts-lp-kicker">End-to-End Connected Workflow</div>
-  <h2 class="ts-lp-h2" id="flow-heading">From project intake to cryptographic verification — zero manual handoffs.</h2>
-  <p class="ts-lp-sub">
-    Every record created upstream flows automatically into downstream contracts, signatures, budgets, and compliance audits.
-  </p>
-
-  <div class="ts-lp-steps">
-    <div class="ts-lp-step">
-      <div class="ts-lp-step__num">STAGE 01</div>
-      <h3>Intake &amp; Plan</h3>
-      <div class="ts-lp-step__mod">Project Studio</div>
-      <p>Score proposals, authorize the charter, build WBS packages, assign resources, and lock the budget baseline.</p>
-    </div>
-    <div class="ts-lp-step">
-      <div class="ts-lp-step__num">STAGE 02</div>
-      <h3>Draft &amp; Brand</h3>
-      <div class="ts-lp-step__mod">TSD Vault · Brand Studio</div>
-      <p>Generate SOWs, MSAs, and policies from templates directly on approved corporate letterhead.</p>
-    </div>
-    <div class="ts-lp-step">
-      <div class="ts-lp-step__num">STAGE 03</div>
-      <h3>Route &amp; Sign</h3>
-      <div class="ts-lp-step__mod">eIDAS 2.0 eSignature</div>
-      <p>Apply corporate stamps, route sequential or bulk invites, and seal under SES, AES, or QES with PAdES-B-LTA.</p>
-    </div>
-    <div class="ts-lp-step">
-      <div class="ts-lp-step__num">STAGE 04</div>
-      <h3>Deliver &amp; Track</h3>
-      <div class="ts-lp-step__mod">Projects · Contracts</div>
-      <p>Post approved timesheets, expenses, and procurement to monitor live contract burn rates and RAG health.</p>
-    </div>
-    <div class="ts-lp-step">
-      <div class="ts-lp-step__num">STAGE 05</div>
-      <h3>Preserve &amp; Verify</h3>
-      <div class="ts-lp-step__mod">Audit Chain · /verify</div>
-      <p>Retain signed dossiers for 7+ years and let any external party verify authenticity independently at /verify.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ======================= 5. eIDAS 2.0 & ETSI STANDARDS BAND ======================= -->
-<section class="ts-lp-band" aria-labelledby="eidas-heading">
-  <div class="ts-lp-eidas">
-    <div>
-      <div class="ts-lp-kicker">eIDAS 2.0 · ETSI EN 319 142 · CSC API v2</div>
-      <h2 class="ts-lp-h2" id="eidas-heading">Engineered for global electronic signature compliance.</h2>
-      <p style="font-size:16.5px; line-height:1.65; color:#334155; margin:0 0 28px;">
-        Choose the exact legal assurance tier required for every recipient and agreement — from instant Simple Electronic Signatures to EU Qualified Electronic Signatures via Remote QSCD or EUDI Wallet, sealed for multi-decade archival verification.
-      </p>
-      <div style="display:flex; gap:12px; flex-wrap:wrap;">
-        <a class="ts-lp-btn ts-lp-btn--navy" href="/trust">Explore Trust &amp; eIDAS 2.0 Standards</a>
-        <a class="ts-lp-btn ts-lp-btn--outline-navy" href="/verify">Open Public Verifier</a>
+  <div class="ts-lp-dir__grid">
+    <a class="ts-lp-dir__item" href="/platform">
+      <div>
+        <div class="ts-lp-dir__eyebrow">Platform Suite</div>
+        <h3 class="ts-lp-dir__title">Six Integrated Operational Modules</h3>
+        <p class="ts-lp-dir__desc">Explore Project Studio, Contracts Lifecycle, eIDAS 2.0 eSignature, TSD Vault, Corporate Stamps, and Governance on their dedicated pages.</p>
       </div>
-    </div>
+      <span class="ts-lp-dir__link">Open Platform Suite →</span>
+    </a>
 
-    <div>
-      <table class="ts-lp-table">
-        <thead>
-          <tr>
-            <th>Assurance Tier</th>
-            <th>Standard</th>
-            <th>Verification &amp; Sealing</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong><span class="ts-lp-dot"></span>SES</strong><br><span style="color:#475569; font-size:13.5px;">Simple Electronic Signature</span></td>
-            <td>eIDAS 2.0 Art. 3(10)<br>ESIGN / UETA</td>
-            <td>Email binding, explicit consent digest, SHA-256 audit chain, and platform PAdES seal.</td>
-          </tr>
-          <tr>
-            <td><strong><span class="ts-lp-dot"></span>AES</strong><br><span style="color:#475569; font-size:13.5px;">Advanced Electronic Signature</span></td>
-            <td>eIDAS 2.0 Art. 26<br>ETSI EN 319 142-1</td>
-            <td>2-factor sole-control OTP / MFA verification, X.509 binding, RFC 3161 TSA, and PAdES-B-LT DSS.</td>
-          </tr>
-          <tr>
-            <td><strong><span class="ts-lp-dot"></span>QES</strong><br><span style="color:#475569; font-size:13.5px;">Qualified Electronic Signature</span></td>
-            <td>eIDAS 2.0 (EU) 2024/1183<br>Art. 25(2) · Annex II</td>
-            <td>EU LOTL QTSP Qualified Certificate + Remote QSCD (CSC v2 SCAL2) or EUDI Wallet LoA High + PAdES-B-LTA.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <a class="ts-lp-dir__item" href="/platform/esignature">
+      <div>
+        <div class="ts-lp-dir__eyebrow">Native Electronic Signatures</div>
+        <h3 class="ts-lp-dir__title">eIDAS 2.0 Send for eSignature</h3>
+        <p class="ts-lp-dir__desc">Sequential and parallel routing, CSV bulk invites, shareable signing links, Remote QSCD (CSC API v2), and EUDI Wallet QES built natively in TRUSTSEAL.</p>
+      </div>
+      <span class="ts-lp-dir__link">Explore eIDAS 2.0 Signing →</span>
+    </a>
+
+    <a class="ts-lp-dir__item" href="/how-it-works">
+      <div>
+        <div class="ts-lp-dir__eyebrow">Connected Architecture</div>
+        <h3 class="ts-lp-dir__title">How Every Module Works Together</h3>
+        <p class="ts-lp-dir__desc">Trace the 5-stage operational lifecycle from project intake and contract drafting to PAdES-B-LTA sealing, burn-rate tracking, and audit preservation.</p>
+      </div>
+      <span class="ts-lp-dir__link">View Connected Lifecycle →</span>
+    </a>
+
+    <a class="ts-lp-dir__item" href="/trust">
+      <div>
+        <div class="ts-lp-dir__eyebrow">Compliance &amp; Cryptography</div>
+        <h3 class="ts-lp-dir__title">Trust, Security &amp; eIDAS 2.0 Standards</h3>
+        <p class="ts-lp-dir__desc">Review Regulation (EU) 2024/1183 assurance tiers, ETSI EN 319 142 PAdES profiles, RFC 3161 timestamps, OCSP/CRL retention, and public verification.</p>
+      </div>
+      <span class="ts-lp-dir__link">Read Trust &amp; Standards →</span>
+    </a>
   </div>
 </section>
 
-<!-- ======================= 6. FULL-BLEED CLOSING NAVY BAND ======================= -->
 <section class="ts-lp-cta" aria-label="Launch TRUSTSEAL">
   <div>
     <h2>Ready to unify projects, contracts, and verified signatures?</h2>
-    <p>Deploy your TRUSTSEAL workspace in minutes or verify an existing sealed document right now.</p>
+    <p>Create your organization workspace in minutes or independently verify a sealed document.</p>
   </div>
   <div class="ts-lp-cta__actions">
     <a class="ts-lp-btn ts-lp-btn--white" href="/auth/register">Create Workspace →</a>
@@ -805,25 +351,4 @@
     <a class="ts-lp-btn ts-lp-btn--outline-light" href="/verify">Verify a Document</a>
   </div>
 </section>
-{% endblock %}
-
-{% block extra_body %}
-<script>
-(function () {
-  var tabs = document.querySelectorAll('[data-mod]');
-  tabs.forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var key = btn.getAttribute('data-mod');
-      tabs.forEach(function (b) {
-        var active = b === btn;
-        b.classList.toggle('is-active', active);
-        b.setAttribute('aria-selected', active ? 'true' : 'false');
-      });
-      document.querySelectorAll('.ts-lp-detail').forEach(function (panel) {
-        panel.classList.toggle('is-active', panel.id === 'mod-' + key);
-      });
-    });
-  });
-})();
-</script>
 {% endblock %}

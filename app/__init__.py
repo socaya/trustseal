@@ -167,6 +167,9 @@ def create_app(config_class=None):
             # The endpoint is nested under the parent 'system' blueprint.
             'system.main_views.home',
             'system.main_views.welcome',
+            'system.main_views.platform',
+            'system.main_views.platform_module',
+            'system.main_views.how_it_works',
             'system.main_views.trust',
             'system.main_views.pricing',
             'design_gallery_bp.gallery',

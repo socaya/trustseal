@@ -1,0 +1,165 @@
+{% extends "layouts/public.html" %}
+
+{% block title %}{{ module.name }} · TRUSTSEAL Platform{% endblock %}
+{% block main_modifier %}ts-public-main--full{% endblock %}
+
+{% block extra_head %}
+<style>
+  .ts-public { background: #ffffff; }
+  .md-hero {
+    width: 100%;
+    background: linear-gradient(115deg, #00163d 0%, #002769 60%, #013688 100%);
+    color: #fff;
+    padding: 48px 56px 56px;
+    border-bottom: 3px solid #02982e;
+  }
+  .md-crumb {
+    font-size: 13.5px; color: rgba(219,231,255,0.8); margin-bottom: 18px;
+  }
+  .md-crumb a { color: #7ee29a; text-decoration: none; font-weight: 600; }
+  .md-crumb a:hover { text-decoration: underline; }
+  .md-eyebrow { font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #7ee29a; margin-bottom: 10px; }
+  .md-hero h1 { margin: 0 0 14px; font-size: 44px; font-weight: 700; letter-spacing: -0.03em; color: #fff; }
+  .md-hero p { margin: 0 0 28px; font-size: 18px; line-height: 1.62; color: rgba(235,242,255,0.92); max-width: 68ch; }
+  .md-actions { display: flex; gap: 14px; flex-wrap: wrap; }
+  .md-btn {
+    display: inline-flex; align-items: center; height: 46px; padding: 0 24px; border-radius: 6px;
+    font-size: 15px; font-weight: 600; text-decoration: none; border: 1.5px solid transparent;
+  }
+  .md-btn--white { background: #fff; color: #002769; }
+  .md-btn--white:hover { background: #eef4ff; text-decoration: none; }
+  .md-btn--outline { background: transparent; color: #fff; border-color: rgba(255,255,255,0.42); }
+  .md-btn--outline:hover { background: rgba(255,255,255,0.1); text-decoration: none; }
+
+  .md-layout {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    min-height: 520px;
+  }
+  .md-rail {
+    background: #f4f7fc;
+    border-right: 1px solid #dbe4f2;
+    padding: 32px 0;
+  }
+  .md-rail__title {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: #475569; padding: 0 24px 12px; border-bottom: 1px solid #dbe4f2;
+  }
+  .md-rail__link {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 14px 24px; border-left: 4px solid transparent; border-bottom: 1px solid #e6edf7;
+    text-decoration: none; font-size: 14.5px; font-weight: 600; color: #1e293b;
+  }
+  .md-rail__link:hover { background: #eaf0fa; color: #002769; text-decoration: none; }
+  .md-rail__link.is-active { background: #fff; color: #002769; border-left-color: #002769; }
+  .md-rail__num { font-family: ui-monospace, monospace; font-size: 12.5px; color: #027f26; font-weight: 700; }
+
+  .md-body { padding: 48px 56px 68px; }
+  .md-h2 {
+    margin: 0 0 22px; font-size: 24px; font-weight: 700; color: #002769;
+    padding-bottom: 12px; border-bottom: 2px solid #002769;
+  }
+  .md-caps {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 48px;
+  }
+  .md-cap {
+    padding: 24px 28px 24px 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .md-cap:nth-child(even) { padding-left: 32px; padding-right: 0; border-left: 1px solid #e2e8f0; }
+  .md-cap h3 { margin: 0 0 8px; font-size: 17px; font-weight: 700; color: #0f172a; }
+  .md-cap p { margin: 0; font-size: 15.5px; line-height: 1.6; color: #334155; }
+
+  .md-conn-row {
+    display: grid; grid-template-columns: 240px 1fr auto; gap: 20px; align-items: center;
+    padding: 18px 8px; border-bottom: 1px solid #e2e8f0; text-decoration: none;
+  }
+  .md-conn-row:hover { background: #f8fafd; text-decoration: none; }
+  .md-conn-name { font-size: 16px; font-weight: 700; color: #002769; }
+  .md-conn-desc { font-size: 15px; color: #334155; }
+  .md-conn-go { font-size: 14.5px; font-weight: 700; color: #027f26; white-space: nowrap; }
+
+  .md-pager {
+    display: flex; justify-content: space-between; align-items: center; gap: 16px;
+    margin-top: 44px; padding-top: 24px; border-top: 1px solid #dbe4f2;
+  }
+  .md-pager a { font-size: 15.5px; font-weight: 700; color: #002769; text-decoration: none; }
+  .md-pager a:hover { text-decoration: underline; }
+
+  @media (max-width: 980px) {
+    .md-layout { grid-template-columns: 1fr; }
+    .md-rail { border-right: none; border-bottom: 1px solid #dbe4f2; }
+    .md-hero, .md-body { padding: 36px 20px; }
+    .md-caps, .md-conn-row { grid-template-columns: 1fr; }
+    .md-cap:nth-child(even) { padding-left: 0; border-left: none; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<header class="md-hero">
+  <div class="md-crumb">
+    <a href="/welcome">Home</a> / <a href="/platform">Platform</a> / {{ module.name }}
+  </div>
+  <div class="md-eyebrow">{{ module.num }} · {{ module.category }}</div>
+  <h1>{{ module.name }}</h1>
+  <p>{{ module.summary }}</p>
+  <div class="md-actions">
+    <a class="md-btn md-btn--white" href="{{ module.cta_href }}">{{ module.cta_label }} →</a>
+    <a class="md-btn md-btn--outline" href="/auth/register">Create Workspace</a>
+    <a class="md-btn md-btn--outline" href="/how-it-works">How Modules Connect</a>
+  </div>
+</header>
+
+<div class="md-layout">
+  <aside class="md-rail" aria-label="Platform modules">
+    <div class="md-rail__title">Platform Modules</div>
+    {% for m in modules %}
+    <a class="md-rail__link{% if m.slug == module.slug %} is-active{% endif %}" href="/platform/{{ m.slug }}">
+      <span class="md-rail__num">{{ m.num }}</span>
+      <span>{{ m.name }}</span>
+    </a>
+    {% endfor %}
+  </aside>
+
+  <section class="md-body">
+    <h2 class="md-h2">Core Capabilities</h2>
+    <div class="md-caps">
+      {% for title, desc in module.capabilities %}
+      <div class="md-cap">
+        <h3>{{ title }}</h3>
+        <p>{{ desc }}</p>
+      </div>
+      {% endfor %}
+    </div>
+
+    <h2 class="md-h2" style="border-bottom-color:#02982e;">Connected Across TRUSTSEAL</h2>
+    {% for name, href, desc in module.connections %}
+    <a class="md-conn-row" href="{{ href }}">
+      <span class="md-conn-name">{{ name }}</span>
+      <span class="md-conn-desc">{{ desc }}</span>
+      <span class="md-conn-go">Open →</span>
+    </a>
+    {% endfor %}
+
+    <nav class="md-pager" aria-label="Module navigation">
+      <div>
+        {% if prev_mod %}
+        <a href="/platform/{{ prev_mod.slug }}">← {{ prev_mod.num }} {{ prev_mod.name }}</a>
+        {% else %}
+        <a href="/platform">← All Platform Modules</a>
+        {% endif %}
+      </div>
+      <div>
+        {% if next_mod %}
+        <a href="/platform/{{ next_mod.slug }}">{{ next_mod.num }} {{ next_mod.name }} →</a>
+        {% else %}
+        <a href="/how-it-works">Next: How It Works →</a>
+        {% endif %}
+      </div>
+    </nav>
+  </section>
+</div>
+{% endblock %}
