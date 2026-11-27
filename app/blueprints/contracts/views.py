@@ -141,11 +141,39 @@ def projects_page():
             "health": health,
         })
 
+    from app.models.project_management import (
+        ProjectIntake,
+        ProjectPortfolio,
+        ProjectProgramme,
+    )
+
+    portfolios_list = [
+        pf.to_dict()
+        for pf in ProjectPortfolio.query.filter_by(organization_id=org_id)
+        .order_by(ProjectPortfolio.id.desc())
+        .all()
+    ]
+    programmes_list = [
+        pg.to_dict()
+        for pg in ProjectProgramme.query.filter_by(organization_id=org_id)
+        .order_by(ProjectProgramme.id.desc())
+        .all()
+    ]
+    intakes_list = [
+        it.to_dict()
+        for it in ProjectIntake.query.filter_by(organization_id=org_id)
+        .order_by(ProjectIntake.weighted_score.desc(), ProjectIntake.id.desc())
+        .all()
+    ]
+
     portfolio_prog = compute_deliverable_progress(all_delivs)
     return render_template(
         "contracts/projects.html",
         projects=project_cards,
         categories=PROJECT_CATEGORIES,
+        portfolios=portfolios_list,
+        programmes=programmes_list,
+        intakes=intakes_list,
         portfolio={
             "total_budget": total_budget,
             "total_committed": total_committed,
@@ -155,6 +183,9 @@ def projects_page():
             "probations_active": total_probations,
             "open_tasks": total_open_tasks,
             "open_risks": total_open_risks,
+            "intakes_pending": sum(1 for i in intakes_list if i["status"] in ("submitted", "assessing")),
+            "portfolios_count": len(portfolios_list),
+            "programmes_count": len(programmes_list),
         },
     )
 
@@ -300,6 +331,134 @@ def project_detail_page(project_id: int):
         if other_docs.get(w.document_id) and not other_docs.get(w.document_id).deleted_at
     ]
 
+    from app.models.project_management import (
+        GATE_STAGES,
+        LIFECYCLE_STATES,
+        PROJECT_ROLES,
+        ProjectBudgetLine,
+        ProjectChangeRequest,
+        ProjectCharter,
+        ProjectCostEvent,
+        ProjectGate,
+        ProjectMembership,
+        ProjectResourceAllocation,
+        ProjectTaskDependency,
+        ProjectTimeEntry,
+        ProjectWBSNode,
+    )
+    from app.models.user import User
+    from app.blueprints.projects.permissions import can_view_project_finance
+    from app.blueprints.projects.services import (
+        compute_project_financials,
+        count_overallocated_resources,
+    )
+
+    show_finance = can_view_project_finance(proj, actor)
+    charters = ProjectCharter.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectCharter.version.desc()).all()
+    gates_raw = ProjectGate.query.filter_by(organization_id=org_id, project_id=proj.id).all()
+    gates_by_stage = {g.stage: g.to_dict() for g in gates_raw}
+    gate_rows = [
+        gates_by_stage.get(st, {"stage": st, "gate_state": "not_ready", "decision_note": ""})
+        for st in GATE_STAGES
+    ]
+    wbs_nodes = [
+        n.to_dict()
+        for n in ProjectWBSNode.query.filter_by(organization_id=org_id, project_id=proj.id)
+        .order_by(ProjectWBSNode.sort_order.asc(), ProjectWBSNode.id.asc())
+        .all()
+    ]
+    task_deps = [
+        d.to_dict()
+        for d in ProjectTaskDependency.query.filter_by(organization_id=org_id, project_id=proj.id).all()
+    ]
+    alloc_rows = [
+        a.to_dict(include_rates=show_finance)
+        for a in ProjectResourceAllocation.query.filter_by(organization_id=org_id, project_id=proj.id)
+        .order_by(ProjectResourceAllocation.id.desc())
+        .all()
+    ]
+    time_rows = [
+        te.to_dict(include_rates=show_finance)
+        for te in ProjectTimeEntry.query.filter_by(organization_id=org_id, project_id=proj.id)
+        .order_by(ProjectTimeEntry.work_date.desc(), ProjectTimeEntry.id.desc())
+        .all()
+    ]
+    budget_lines = ProjectBudgetLine.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectBudgetLine.id.asc()).all()
+    cost_events = ProjectCostEvent.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectCostEvent.id.desc()).all()
+    financials = compute_project_financials(proj, budget_lines=budget_lines, cost_events=cost_events)
+    change_rows = [
+        c.to_dict()
+        for c in ProjectChangeRequest.query.filter_by(organization_id=org_id, project_id=proj.id)
+        .order_by(ProjectChangeRequest.id.desc())
+        .all()
+    ]
+    org_users = User.query.filter_by(organization_id=org_id, is_active=True).order_by(User.username.asc()).all()
+    user_map = {u.id: u for u in org_users}
+    member_rows = [
+        {
+            **m.to_dict(),
+            "username": user_map[m.user_id].username if m.user_id in user_map else f"User #{m.user_id}",
+            "email": user_map[m.user_id].email if m.user_id in user_map else "",
+        }
+        for m in ProjectMembership.query.filter_by(organization_id=org_id, project_id=proj.id, is_active=True).all()
+    ]
+    overalloc = count_overallocated_resources(org_id, proj.id)
+    eff_util = financials["budget_util_pct"] if financials["approved_budget"] > 0 else util_pct
+    health = compute_project_health(
+        budget_util_pct=eff_util,
+        suspended_contracts=susp_cnt,
+        tasks=proj_tasks,
+        risks=proj_risks,
+        available_budget=financials["available_budget"],
+        approved_budget=financials["approved_budget"],
+        overallocated_resources=overalloc,
+    )
+
+    from app.models.project_enterprise_ext import (
+        ProjectAssetBooking,
+        ProjectBacklogItem,
+        ProjectBenefit,
+        ProjectClosureItem,
+        ProjectDocumentLink,
+        ProjectIndicator,
+        ProjectIndicatorObservation,
+        ProjectProcurement,
+        ProjectQualityRecord,
+        ProjectRequirement,
+        ProjectSprint,
+        ProjectStakeholder,
+    )
+
+    req_rows = [r.to_dict() for r in ProjectRequirement.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectRequirement.id.desc()).all()]
+    sprint_rows = [s.to_dict() for s in ProjectSprint.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectSprint.id.desc()).all()]
+    backlog_rows = [b.to_dict() for b in ProjectBacklogItem.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectBacklogItem.id.desc()).all()]
+    asset_rows = [a.to_dict() for a in ProjectAssetBooking.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectAssetBooking.id.desc()).all()]
+    proc_rows = [pr.to_dict() for pr in ProjectProcurement.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectProcurement.id.desc()).all()]
+    qa_rows = [q.to_dict() for q in ProjectQualityRecord.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectQualityRecord.id.desc()).all()]
+    sh_rows = [sh.to_dict() for sh in ProjectStakeholder.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectStakeholder.id.desc()).all()]
+    doc_link_rows = [dl.to_dict() for dl in ProjectDocumentLink.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectDocumentLink.id.desc()).all()]
+    ind_rows = [i.to_dict() for i in ProjectIndicator.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectIndicator.id.asc()).all()]
+    obs_rows = [o.to_dict() for o in ProjectIndicatorObservation.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectIndicatorObservation.id.desc()).all()]
+    closure_rows = [ci.to_dict() for ci in ProjectClosureItem.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectClosureItem.id.asc()).all()]
+    benefit_rows = [bn.to_dict() for bn in ProjectBenefit.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectBenefit.id.asc()).all()]
+
+    from app.models.project_enterprise_batch3 import (
+        ProjectApprovalRequest,
+        ProjectComment,
+        ProjectComplianceRecord,
+        ProjectExternalGrant,
+    )
+    from app.blueprints.projects.permissions import can_approve_project_governance
+
+    can_see_hse = can_approve_project_governance(proj, actor)
+    comp_q = ProjectComplianceRecord.query.filter_by(organization_id=org_id, project_id=proj.id)
+    if not can_see_hse:
+        comp_q = comp_q.filter(ProjectComplianceRecord.is_restricted.is_(False))
+    compliance_rows = [c.to_dict() for c in comp_q.order_by(ProjectComplianceRecord.id.desc()).all()]
+    approval_rows = [a.to_dict() for a in ProjectApprovalRequest.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectApprovalRequest.id.desc()).all()]
+    comment_rows = [cm.to_dict() for cm in ProjectComment.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectComment.id.desc()).all()]
+    grant_rows = [g.to_dict() for g in ProjectExternalGrant.query.filter_by(organization_id=org_id, project_id=proj.id).order_by(ProjectExternalGrant.id.desc()).all()]
+
     overall_prog = compute_deliverable_progress(all_proj_delivs)
     templates = ensure_default_templates(org_id, actor)
     return render_template(
@@ -311,12 +470,43 @@ def project_detail_page(project_id: int):
         task_rows=task_rows,
         risk_rows=risk_rows,
         health=health,
-        budget_util_pct=util_pct,
+        budget_util_pct=eff_util,
         available_contracts=available_contracts,
         categories=PROJECT_CATEGORIES,
         committed_value=committed_value,
         overall_prog=overall_prog,
         templates=[t.to_dict() for t in templates if t.state == "published"],
+        charter=charters[0].to_dict() if charters else None,
+        gate_rows=gate_rows,
+        lifecycle_states=LIFECYCLE_STATES,
+        wbs_nodes=wbs_nodes,
+        task_deps=task_deps,
+        alloc_rows=alloc_rows,
+        time_rows=time_rows,
+        budget_lines=[b.to_dict() for b in budget_lines],
+        cost_events=[e.to_dict() for e in cost_events],
+        financials=financials,
+        change_rows=change_rows,
+        member_rows=member_rows,
+        org_users=[{"id": u.id, "username": u.username, "email": u.email} for u in org_users],
+        project_roles=PROJECT_ROLES,
+        show_finance=show_finance,
+        req_rows=req_rows,
+        sprint_rows=sprint_rows,
+        backlog_rows=backlog_rows,
+        asset_rows=asset_rows,
+        proc_rows=proc_rows,
+        qa_rows=qa_rows,
+        sh_rows=sh_rows,
+        doc_link_rows=doc_link_rows,
+        ind_rows=ind_rows,
+        obs_rows=obs_rows,
+        closure_rows=closure_rows,
+        benefit_rows=benefit_rows,
+        compliance_rows=compliance_rows,
+        approval_rows=approval_rows,
+        comment_rows=comment_rows,
+        grant_rows=grant_rows,
     )
 
 

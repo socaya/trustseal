@@ -407,6 +407,24 @@ def create_app(config_class=None):
         projects_api,
     )
     blueprints.extend([contracts_api, projects_api, contract_templates_api, contracts_views])
+    from .blueprints.projects import (
+        portfolios_api,
+        programmes_api,
+        project_intakes_api,
+        project_portal_api,
+        project_templates_api,
+        project_timesheets_v21_api,
+        projects_batch2_api,
+        projects_batch3_api,
+        projects_v2_api,
+        resources_api,
+        timesheets_v21_api,
+    )
+    blueprints.extend([
+        portfolios_api, programmes_api, project_intakes_api, projects_v2_api,
+        resources_api, projects_batch2_api, project_templates_api, project_portal_api,
+        projects_batch3_api, timesheets_v21_api, project_timesheets_v21_api,
+    ])
     from .blueprints.documents.api.document_label_api import (
         document_label_api,
     )

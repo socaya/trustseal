@@ -139,14 +139,30 @@ def create_project():
     if not name:
         return jsonify({"error": "Project name is required"}), 400
 
+    from app.models.project_management import (
+        DELIVERY_METHODOLOGIES,
+        LIFECYCLE_STATES,
+        ProjectMembership,
+        parse_iso_date,
+        to_decimal,
+    )
+    from app.blueprints.projects.services import emit_project_event
+
     existing_cnt = Project.query.filter_by(organization_id=org_id).count()
     code = str(data.get("project_code") or f"PRJ-{datetime.utcnow().year}-{existing_cnt + 1:03d}").strip()[:40]
     budget = None
+    budget_num = None
     if data.get("budget_amount") not in (None, ""):
-        try:
-            budget = float(data["budget_amount"])
-        except (TypeError, ValueError):
-            pass
+        budget_num = to_decimal(data["budget_amount"])
+        budget = float(budget_num)
+    meth = str(data.get("delivery_methodology") or "hybrid").strip().lower()
+    if meth not in DELIVERY_METHODOLOGIES:
+        meth = "hybrid"
+    lc = str(data.get("lifecycle_state") or "executing").strip().lower()
+    if lc not in LIFECYCLE_STATES:
+        lc = "executing"
+    sd_str = str(data.get("start_date") or "").strip()[:32] or None
+    ed_str = str(data.get("end_date") or "").strip()[:32] or None
 
     proj = Project(
         organization_id=org_id,
@@ -156,20 +172,42 @@ def create_project():
         category=str(data.get("category") or "client_delivery").strip()[:48],
         client_name=str(data.get("client_name") or "").strip()[:200] or None,
         owner_user_id=actor.id,
+        sponsor_user_id=int(data["sponsor_user_id"]) if str(data.get("sponsor_user_id") or "").isdigit() else actor.id,
+        portfolio_id=int(data["portfolio_id"]) if str(data.get("portfolio_id") or "").isdigit() else None,
+        programme_id=int(data["programme_id"]) if str(data.get("programme_id") or "").isdigit() else None,
         status=str(data.get("status") or "active").strip()[:24],
+        lifecycle_state=lc,
+        delivery_methodology=meth,
+        confidentiality=str(data.get("confidentiality") or "internal").strip()[:24],
         budget_amount=budget,
+        budget_numeric=budget_num,
         currency=str(data.get("currency") or "USD").strip()[:12],
-        start_date=str(data.get("start_date") or "").strip()[:32] or None,
-        end_date=str(data.get("end_date") or "").strip()[:32] or None,
+        start_date=sd_str,
+        end_date=ed_str,
+        start_date_typed=parse_iso_date(sd_str),
+        end_date_typed=parse_iso_date(ed_str),
         is_default=False,
     )
     db.session.add(proj)
     db.session.flush()
-    emit_contract_security_event(
+    db.session.add(
+        ProjectMembership(
+            organization_id=org_id,
+            project_id=proj.id,
+            user_id=actor.id,
+            project_role="project_manager",
+            can_view_finance=True,
+            is_active=True,
+            granted_by_id=actor.id,
+        )
+    )
+    emit_project_event(
         organization_id=org_id,
         actor_id=actor.id,
-        action="project.created",
-        document_id=proj.id,
+        event_type="project.created",
+        aggregate_type="project",
+        aggregate_id=proj.id,
+        payload={"project_code": proj.project_code, "lifecycle_state": proj.lifecycle_state},
     )
     db.session.commit()
     return jsonify({"ok": True, "project": proj.to_dict()}), 201
@@ -244,7 +282,10 @@ def link_contract_to_project(project_id: int):
         return jsonify({"error": "document_id is required"}), 400
     wf = ContractWorkflow.query.filter_by(document_id=int(doc_id), organization_id=org_id).first()
     if wf is None:
-        return jsonify({"error": "Contract not found in organization"}), 404
+        doc = TSDocument.query.filter_by(id=int(doc_id), organization_id=org_id).filter(TSDocument.deleted_at.is_(None)).first()
+        if doc is None:
+            return jsonify({"error": "Contract not found in organization"}), 404
+        wf = get_or_create_workflow(doc, actor)
     wf.project_id = proj.id
     emit_contract_security_event(
         organization_id=org_id,
@@ -263,15 +304,15 @@ def project_tasks_collection(project_id: int):
         ProjectTask,
         TASK_PRIORITIES,
         TASK_STATUSES,
-        ensure_project_management_tables,
+        parse_iso_date,
+        to_decimal,
     )
+    from app.blueprints.projects.permissions import assert_project_mutable, load_authorized_project
+    from app.blueprints.projects.services import emit_project_event
 
-    ensure_project_management_tables()
     actor = _actor()
     org_id = actor.organization_id
-    proj = Project.query.filter_by(id=project_id, organization_id=org_id).first()
-    if proj is None:
-        abort(404)
+    proj = load_authorized_project(project_id, actor, require_write=(request.method == "POST"))
 
     if request.method == "GET":
         rows = (
@@ -281,6 +322,7 @@ def project_tasks_collection(project_id: int):
         )
         return jsonify({"ok": True, "tasks": [r.to_dict() for r in rows]})
 
+    assert_project_mutable(proj)
     data = request.get_json(silent=True) or {}
     title = str(data.get("title") or "").strip()[:220]
     if not title:
@@ -291,23 +333,54 @@ def project_tasks_collection(project_id: int):
     status = str(data.get("status") or "todo").strip().lower()
     if status not in TASK_STATUSES:
         status = "todo"
-    cid = data.get("contract_id")
-    contract_id = int(cid) if str(cid or "").isdigit() else None
+    cid = data.get("contract_id") or data.get("linked_document_id")
+    contract_id = None
+    if str(cid or "").isdigit():
+        # Support either ContractWorkflow.id or TSDocument.id cleanly
+        wf_c = ContractWorkflow.query.filter_by(id=int(cid), organization_id=org_id).first()
+        if wf_c is None:
+            wf_c = ContractWorkflow.query.filter_by(document_id=int(cid), organization_id=org_id).first()
+        if wf_c is not None:
+            contract_id = wf_c.id
+    assignee_uid = int(data["assignee_user_id"]) if str(data.get("assignee_user_id") or "").isdigit() else None
+    assignee_name = str(data.get("assignee_name") or "").strip()[:120] or None
+    if assignee_uid and not assignee_name:
+        au = User.query.filter_by(id=assignee_uid, organization_id=org_id).first()
+        if au:
+            assignee_name = getattr(au, "full_name", None) or au.username or au.email
+    due_str = str(data.get("due_date") or "").strip()[:32] or None
+    wbs_id = int(data["wbs_node_id"]) if str(data.get("wbs_node_id") or "").isdigit() else None
     t = ProjectTask(
         organization_id=org_id,
         project_id=proj.id,
+        wbs_node_id=wbs_id,
         contract_id=contract_id,
         title=title,
         description=str(data.get("description") or "").strip() or None,
-        phase=str(data.get("phase") or "Execution").strip()[:64],
-        assignee_name=str(data.get("assignee_name") or "").strip()[:120] or None,
+        phase=str(data.get("phase") or data.get("workstream") or "Execution").strip()[:64],
+        assignee_user_id=assignee_uid,
+        assignee_name=assignee_name,
         priority=priority,
         status=status,
-        due_date=str(data.get("due_date") or "").strip()[:32] or None,
+        start_date_typed=parse_iso_date(data.get("start_date")),
+        due_date=due_str,
+        due_date_typed=parse_iso_date(due_str),
+        planned_hours=to_decimal(data.get("planned_hours")),
+        remaining_hours=to_decimal(data.get("remaining_hours") if data.get("remaining_hours") not in (None, "") else data.get("planned_hours")),
+        is_milestone=bool(data.get("is_milestone", False)),
         progress_pct=100 if status == "done" else int(data.get("progress_pct") or 0),
         created_by_id=actor.id,
     )
     db.session.add(t)
+    db.session.flush()
+    emit_project_event(
+        organization_id=org_id,
+        actor_id=actor.id,
+        event_type="task.created",
+        aggregate_type="project_task",
+        aggregate_id=t.id,
+        payload={"project_id": proj.id, "status": t.status},
+    )
     db.session.commit()
     return jsonify({"ok": True, "task": t.to_dict()}), 201
 
@@ -369,18 +442,19 @@ def project_task_item(project_id: int, task_id: int):
 def project_risks_collection(project_id: int):
     from app.models.project_management import (
         ProjectRisk,
+        RAID_ITEM_TYPES,
         RISK_CATEGORIES,
         RISK_SEVERITIES,
         RISK_STATUSES,
-        ensure_project_management_tables,
+        parse_iso_date,
+        to_decimal,
     )
+    from app.blueprints.projects.permissions import assert_project_mutable, load_authorized_project
+    from app.blueprints.projects.services import emit_project_event
 
-    ensure_project_management_tables()
     actor = _actor()
     org_id = actor.organization_id
-    proj = Project.query.filter_by(id=project_id, organization_id=org_id).first()
-    if proj is None:
-        abort(404)
+    proj = load_authorized_project(project_id, actor, require_write=(request.method == "POST"))
 
     if request.method == "GET":
         rows = (
@@ -390,10 +464,14 @@ def project_risks_collection(project_id: int):
         )
         return jsonify({"ok": True, "risks": [r.to_dict() for r in rows]})
 
+    assert_project_mutable(proj)
     data = request.get_json(silent=True) or {}
     title = str(data.get("title") or "").strip()[:220]
     if not title:
         return jsonify({"error": "Risk title is required"}), 400
+    itype = str(data.get("item_type") or "risk").strip().lower()
+    if itype not in RAID_ITEM_TYPES:
+        itype = "risk"
     cat = str(data.get("category") or "contractual").strip().lower()
     if cat not in RISK_CATEGORIES:
         cat = "contractual"
@@ -406,22 +484,53 @@ def project_risks_collection(project_id: int):
     st = str(data.get("status") or "open").strip().lower()
     if st not in RISK_STATUSES:
         st = "open"
-    cid = data.get("contract_id")
-    contract_id = int(cid) if str(cid or "").isdigit() else None
+    cid = data.get("contract_id") or data.get("linked_document_id")
+    contract_id = None
+    if str(cid or "").isdigit():
+        wf_c = ContractWorkflow.query.filter_by(id=int(cid), organization_id=org_id).first()
+        if wf_c is None:
+            wf_c = ContractWorkflow.query.filter_by(document_id=int(cid), organization_id=org_id).first()
+        if wf_c is not None:
+            contract_id = wf_c.id
+    owner_uid = int(data["owner_user_id"]) if str(data.get("owner_user_id") or "").isdigit() else None
+    owner_name = str(data.get("owner_name") or "").strip()[:120] or None
+    if owner_uid and not owner_name:
+        ou = User.query.filter_by(id=owner_uid, organization_id=org_id).first()
+        if ou:
+            owner_name = getattr(ou, "full_name", None) or ou.username or ou.email
+    prob = max(1, min(5, int(data.get("probability_score") or (4 if lik == "high" else (2 if lik == "low" else 3)))))
+    imp = max(1, min(5, int(data.get("impact_score") or (5 if sev == "critical" else (4 if sev == "high" else (2 if sev == "low" else 3))))))
+    exp_amt = to_decimal(data.get("exposure_amount")) if data.get("exposure_amount") not in (None, "") else None
     r = ProjectRisk(
         organization_id=org_id,
         project_id=proj.id,
         contract_id=contract_id,
+        item_type=itype,
         title=title,
         category=cat,
         severity=sev,
         likelihood=lik,
+        probability_score=prob,
+        impact_score=imp,
+        exposure_amount=exp_amt,
         mitigation_plan=str(data.get("mitigation_plan") or "").strip() or None,
-        owner_name=str(data.get("owner_name") or "").strip()[:120] or None,
+        owner_user_id=owner_uid,
+        owner_name=owner_name,
+        due_date_typed=parse_iso_date(data.get("due_date")),
         status=st,
         created_by_id=actor.id,
     )
     db.session.add(r)
+    db.session.flush()
+    if sev == "critical" or r.rating_score() >= 20:
+        emit_project_event(
+            organization_id=org_id,
+            actor_id=actor.id,
+            event_type="risk.escalated",
+            aggregate_type="project_risk",
+            aggregate_id=r.id,
+            payload={"project_id": proj.id, "severity": sev, "rating_score": r.rating_score()},
+        )
     db.session.commit()
     return jsonify({"ok": True, "risk": r.to_dict()}), 201
 

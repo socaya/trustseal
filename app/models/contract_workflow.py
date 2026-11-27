@@ -88,17 +88,36 @@ class Project(db.Model):
     client_name = db.Column(db.String(200), nullable=True)
     owner_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     status = db.Column(db.String(24), nullable=False, default="active")
+    lifecycle_state = db.Column(db.String(32), nullable=False, default="executing", index=True)
+    delivery_methodology = db.Column(db.String(24), nullable=False, default="hybrid")
+    portfolio_id = db.Column(db.Integer, db.ForeignKey("project_portfolios.id"), nullable=True, index=True)
+    programme_id = db.Column(db.Integer, db.ForeignKey("project_programmes.id"), nullable=True, index=True)
+    sponsor_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    confidentiality = db.Column(db.String(24), nullable=False, default="internal")
     budget_amount = db.Column(db.Float, nullable=True)
+    budget_numeric = db.Column(db.Numeric(18, 2), nullable=True)
     currency = db.Column(db.String(12), nullable=False, default="USD")
     start_date = db.Column(db.String(32), nullable=True)
     end_date = db.Column(db.String(32), nullable=True)
+    start_date_typed = db.Column(db.Date, nullable=True)
+    end_date_typed = db.Column(db.Date, nullable=True)
+    version = db.Column(db.Integer, nullable=False, default=1)
     is_default = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(
         db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
+    def effective_budget_decimal(self):
+        from decimal import Decimal
+        if self.budget_numeric is not None:
+            return Decimal(self.budget_numeric)
+        if self.budget_amount is not None:
+            return Decimal(str(self.budget_amount)).quantize(Decimal("0.01"))
+        return Decimal("0.00")
+
     def to_dict(self) -> dict:
+        eff_budget = self.effective_budget_decimal()
         return {
             "id": self.id,
             "project_code": self.project_code,
@@ -107,11 +126,19 @@ class Project(db.Model):
             "category": self.category or "client_delivery",
             "client_name": self.client_name or "",
             "owner_user_id": self.owner_user_id,
+            "sponsor_user_id": self.sponsor_user_id,
+            "portfolio_id": self.portfolio_id,
+            "programme_id": self.programme_id,
             "status": self.status or "active",
-            "budget_amount": self.budget_amount,
+            "lifecycle_state": self.lifecycle_state or "executing",
+            "delivery_methodology": self.delivery_methodology or "hybrid",
+            "confidentiality": self.confidentiality or "internal",
+            "budget_amount": float(eff_budget) if (self.budget_numeric is not None or self.budget_amount is not None) else None,
+            "budget_numeric": str(eff_budget) if (self.budget_numeric is not None or self.budget_amount is not None) else None,
             "currency": self.currency or "USD",
-            "start_date": self.start_date or "",
-            "end_date": self.end_date or "",
+            "start_date": self.start_date_typed.isoformat() if self.start_date_typed else (self.start_date or ""),
+            "end_date": self.end_date_typed.isoformat() if self.end_date_typed else (self.end_date or ""),
+            "version": int(self.version or 1),
             "is_default": bool(self.is_default),
             "created_at": self.created_at.strftime("%Y-%m-%d") if self.created_at else "",
         }

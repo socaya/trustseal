@@ -47,6 +47,14 @@
     </div>
   </section>
 
+  {# ======================= ENTERPRISE PPM WORKSPACE SUBNAV ======================= #}
+  <nav style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;border-bottom:1px solid #ebeef2;padding-bottom:10px;" role="tablist" aria-label="Enterprise PM sections">
+    <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-pmsec="projects">Projects ({{ projects|length }})</button>
+    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pmsec="portfolios">Portfolios &amp; Programmes ({{ (portfolios|length if portfolios is defined else 0) + (programmes|length if programmes is defined else 0) }})</button>
+    <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pmsec="intake">Demand &amp; Intake Queue ({{ intakes|length if intakes is defined else 0 }})</button>
+  </nav>
+
+  <div data-pmpane="projects">
   {# ======================= FILTER & VIEW BAR ======================= #}
   <section class="st-panel" style="padding:10px 14px;margin-bottom:14px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;">
     <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1 1 320px;">
@@ -199,6 +207,120 @@
     </div>
     {% endfor %}
   </section>
+  </div>
+
+  {# ======================= SECTION 2: PORTFOLIOS & PROGRAMMES (PM-02/03) ======================= #}
+  <div data-pmpane="portfolios" hidden>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px;">
+      <section class="st-panel" style="padding:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <strong style="font-size:13px;color:#0f172a;">Strategic Portfolios (PM-02)</strong>
+        </div>
+        <form id="pf-create-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
+          <input type="text" id="pf-name" class="ts-input" style="min-height:30px;font-size:12px;flex:1 1 160px;" placeholder="New portfolio name…" required>
+          <input type="text" id="pf-obj" class="ts-input" style="min-height:30px;font-size:12px;flex:1 1 160px;" placeholder="Strategic objective">
+          <input type="number" step="0.01" id="pf-ceil" class="ts-input" style="min-height:30px;font-size:12px;width:120px;" placeholder="Budget ceiling">
+          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Add Portfolio</button>
+        </form>
+        <table class="st-table">
+          <thead><tr><th>Code</th><th>Portfolio</th><th>Strategic Objective</th><th>Ceiling</th></tr></thead>
+          <tbody>
+            {% for pf in (portfolios if portfolios is defined else []) %}
+            <tr>
+              <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#002769;font-weight:600;">{{ pf.code }}</td>
+              <td style="font-weight:600;">{{ pf.name }}</td>
+              <td style="color:#5a6676;font-size:12px;">{{ pf.strategic_objective or '—' }}</td>
+              <td style="font-variant-numeric:tabular-nums;">{{ (pf.currency ~ ' ' ~ pf.budget_ceiling) if pf.budget_ceiling else '—' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" style="text-align:center;padding:18px;color:#718494;">No portfolios configured yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+
+      <section class="st-panel" style="padding:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <strong style="font-size:13px;color:#0f172a;">Programmes (PM-03)</strong>
+        </div>
+        <form id="prg-create-form" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
+          <input type="text" id="prg-name" class="ts-input" style="min-height:30px;font-size:12px;flex:1 1 160px;" placeholder="New programme name…" required>
+          <select id="prg-pf" class="st-select" style="height:30px;font-size:12px;">
+            <option value="">Standalone programme</option>
+            {% for pf in (portfolios if portfolios is defined else []) %}
+            <option value="{{ pf.id }}">{{ pf.code }} · {{ pf.name }}</option>
+            {% endfor %}
+          </select>
+          <input type="date" id="prg-end" class="ts-input" style="min-height:30px;font-size:12px;width:130px;">
+          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Add Programme</button>
+        </form>
+        <table class="st-table">
+          <thead><tr><th>Code</th><th>Programme</th><th>Target End</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for pg in (programmes if programmes is defined else []) %}
+            <tr>
+              <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#002769;font-weight:600;">{{ pg.code }}</td>
+              <td style="font-weight:600;">{{ pg.name }}</td>
+              <td style="font-variant-numeric:tabular-nums;color:#5a6676;">{{ pg.target_end_date or '—' }}</td>
+              <td><span class="st-tag st-tag--ok">{{ pg.status|title }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" style="text-align:center;padding:18px;color:#718494;">No programmes configured yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    </div>
+  </div>
+
+  {# ======================= SECTION 3: DEMAND & INTAKE QUEUE (PM-01) ======================= #}
+  <div data-pmpane="intake" hidden>
+    <section class="st-panel" style="padding:14px;">
+      <form id="int-create-form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #ebeef2;">
+        <input type="text" id="int-title" class="ts-input" style="min-height:32px;font-size:12px;" placeholder="Initiative / Intake Title…" required>
+        <input type="text" id="int-prob" class="ts-input" style="min-height:32px;font-size:12px;" placeholder="Problem statement &amp; business case">
+        <input type="number" step="0.01" id="int-budget" class="ts-input" style="min-height:32px;font-size:12px;" placeholder="Estimated budget (USD)">
+        <select id="int-val" class="st-select" style="height:32px;font-size:12px;" title="Value score (1-5)">
+          <option value="5">Value: 5 (Critical)</option><option value="4" selected>Value: 4 (High)</option><option value="3">Value: 3 (Med)</option><option value="2">Value: 2</option><option value="1">Value: 1</option>
+        </select>
+        <select id="int-urg" class="st-select" style="height:32px;font-size:12px;" title="Urgency score (1-5)">
+          <option value="5">Urgency: 5</option><option value="4">Urgency: 4</option><option value="3" selected>Urgency: 3</option><option value="2">Urgency: 2</option><option value="1">Urgency: 1</option>
+        </select>
+        <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">+ Submit Intake Request</button>
+      </form>
+      <table class="st-table">
+        <thead>
+          <tr><th>Code</th><th>Initiative</th><th>Est. Budget</th><th>Weighted Score</th><th>Status</th><th style="text-align:right;">Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for it in (intakes if intakes is defined else []) %}
+          <tr>
+            <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#002769;font-weight:600;">{{ it.intake_code }}</td>
+            <td>
+              <div style="font-weight:600;">{{ it.title }}</div>
+              {% if it.problem_statement %}<div style="font-size:11.5px;color:#5a6676;">{{ it.problem_statement }}</div>{% endif %}
+            </td>
+            <td style="font-variant-numeric:tabular-nums;">{{ (it.currency ~ ' ' ~ it.estimated_budget) if it.estimated_budget else '—' }}</td>
+            <td><strong>{{ it.weighted_score }}</strong> / 5.00</td>
+            <td><span class="st-tag {% if it.status == 'approved' %}st-tag--ok{% elif it.status == 'rejected' %}st-tag--bad{% else %}st-tag--info{% endif %}">{{ it.status|title }}</span></td>
+            <td style="text-align:right;white-space:nowrap;">
+              {% if it.converted_project_id %}
+                <a class="ts-btn ts-btn--secondary ts-btn--sm" href="{{ url_for('contracts_views.project_detail_page', project_id=it.converted_project_id) }}">Open Project →</a>
+              {% elif it.status == 'approved' %}
+                <button type="button" class="ts-btn ts-btn--primary ts-btn--sm int-convert-btn" data-iid="{{ it.id }}">Convert to Project</button>
+              {% elif it.status in ('submitted', 'assessing') %}
+                <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm int-approve-btn" data-iid="{{ it.id }}">Approve</button>
+                <button type="button" class="ts-btn ts-btn--ghost ts-btn--sm int-reject-btn" data-iid="{{ it.id }}">Reject</button>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" style="text-align:center;padding:24px;color:#718494;">No intake requests yet. Submit an initiative above to triage and convert into a governed project.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </div>
 </div>
 
 <!-- Create Project Modal -->
@@ -322,6 +444,106 @@
       ['table', 'cards', 'kanban'].forEach(function (m) {
         var b = document.getElementById('prj-v-' + m);
         if (b) b.className = 'ts-btn ts-btn--sm ' + (m === mode ? 'ts-btn--primary' : 'ts-btn--secondary');
+      });
+    });
+  });
+
+  // Enterprise PM subnav (Projects / Portfolios & Programmes / Intake)
+  document.querySelectorAll('[data-pmsec]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var target = btn.dataset.pmsec;
+      document.querySelectorAll('[data-pmsec]').forEach(function (b) {
+        b.className = 'ts-btn ts-btn--sm ' + (b.dataset.pmsec === target ? 'ts-btn--primary' : 'ts-btn--secondary');
+      });
+      document.querySelectorAll('[data-pmpane]').forEach(function (p) {
+        p.hidden = p.dataset.pmpane !== target;
+      });
+    });
+  });
+
+  // Create Portfolio
+  var pfForm = document.getElementById('pf-create-form');
+  if (pfForm) {
+    pfForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = document.getElementById('pf-name').value.trim();
+      if (!name) return;
+      fetch('/api/portfolios', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({
+          name: name,
+          strategic_objective: document.getElementById('pf-obj').value.trim(),
+          budget_ceiling: document.getElementById('pf-ceil').value || null,
+        }),
+      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
+    });
+  }
+
+  // Create Programme
+  var prgForm = document.getElementById('prg-create-form');
+  if (prgForm) {
+    prgForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = document.getElementById('prg-name').value.trim();
+      if (!name) return;
+      fetch('/api/programmes', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({
+          name: name,
+          portfolio_id: document.getElementById('prg-pf').value || null,
+          target_end_date: document.getElementById('prg-end').value || null,
+        }),
+      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
+    });
+  }
+
+  // Demand & Intake CRUD + Convert
+  var intForm = document.getElementById('int-create-form');
+  if (intForm) {
+    intForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var title = document.getElementById('int-title').value.trim();
+      if (!title) return;
+      fetch('/api/project-intakes', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({
+          title: title,
+          problem_statement: document.getElementById('int-prob').value.trim(),
+          estimated_budget: document.getElementById('int-budget').value || null,
+          value_score: Number(document.getElementById('int-val').value || 3),
+          urgency_score: Number(document.getElementById('int-urg').value || 3),
+        }),
+      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
+    });
+  }
+  document.querySelectorAll('.int-approve-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      fetch('/api/project-intakes/' + btn.dataset.iid + '/decide', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({ decision: 'approved', rationale: 'Approved for project authorization' }),
+      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
+    });
+  });
+  document.querySelectorAll('.int-reject-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      fetch('/api/project-intakes/' + btn.dataset.iid + '/decide', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({ decision: 'rejected', rationale: 'Deferred / out of current investment cycle' }),
+      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
+    });
+  });
+  document.querySelectorAll('.int-convert-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      fetch('/api/project-intakes/' + btn.dataset.iid + '/convert', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d.ok && d.project) window.location.href = '/projects/' + d.project.id;
       });
     });
   });

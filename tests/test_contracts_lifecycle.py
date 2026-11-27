@@ -56,6 +56,9 @@ def contract_env(pg_app):
 
 
 def _client_for(app, user):
+    from flask import g
+    if hasattr(g, "_login_user"):
+        delattr(g, "_login_user")
     client = app.test_client()
     with client.session_transaction() as sess:
         sess["_user_id"] = str(user.id)
@@ -663,12 +666,14 @@ def test_project_management_tasks_risks_link_contract_and_health(pg_app, contrac
     assert r_link.get_json()["project_id"] == proj_id
 
     # Cross-tenant check: user_b cannot access or mutate user_a's project
+    client_b = _client_for(pg_app, user_b)
     assert client_b.get(f"/api/projects/{proj_id}/tasks").status_code == 404
     assert client_b.post(f"/api/projects/{proj_id}/tasks", headers=hdrs, json={"title": "Sneaky"}).status_code == 404
     assert client_b.get(f"/api/projects/{proj_id}/risks").status_code == 404
     assert client_b.post(f"/api/projects/{proj_id}/link-contract", headers=hdrs, json={"document_id": doc.id}).status_code == 404
 
     # 3. Tasks CRUD (linked to contract)
+    client_a = _client_for(pg_app, user_a)
     r_t1 = client_a.post(
         f"/api/projects/{proj_id}/tasks",
         headers=hdrs,

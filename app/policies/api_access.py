@@ -24,6 +24,12 @@ SESSION_AUTH_ALLOWED_PREFIXES = (
     "/api/signatures",
     "/api/contracts",
     "/api/projects",
+    "/api/portfolios",
+    "/api/programmes",
+    "/api/project-intakes",
+    "/api/resources",
+    "/api/timesheets",
+    "/api/project-templates",
     "/api/contract-templates",
 )
 
@@ -37,6 +43,7 @@ PUBLIC_ENDPOINTS = frozenset((
 PUBLIC_PREFIXES = (
     "/api/auth/verify-email/",
     "/api/auth/password-reset/",
+    "/api/project-portal/",
 )
 ADMIN_EXACT = frozenset((
     "/api/roles", "/api/permissions", "/api/settings", "/api/audit-logs",
