@@ -16,11 +16,11 @@
 
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pm_studio.css') }}">
-<div class="st-flat">
+<div class="pms-root">
   {% include "stamps/_flat_ui.html" %}
 
   {# ======================= PORTFOLIO EXECUTIVE KPI STRIP ======================= #}
-  <section class="pms-kpis" style="margin-bottom:18px;" aria-label="Project portfolio KPIs">
+  <section class="pms-kpis" aria-label="Project portfolio KPIs">
     <div class="pms-kpi">
       <span class="pms-kpi__label">Active Projects</span>
       <span class="pms-kpi__val">{{ projects|length }}</span>
@@ -33,7 +33,7 @@
     </div>
     <div class="pms-kpi">
       <span class="pms-kpi__label">Portfolio Deliverables</span>
-      <span class="pms-kpi__val" style="color:#047857;">{{ portfolio.deliverables_pct if portfolio is defined else 0 }}%</span>
+      <span class="pms-kpi__val" style="color:#15623d;">{{ portfolio.deliverables_pct if portfolio is defined else 0 }}%</span>
       <span class="pms-kpi__sub">{{ portfolio.deliverables_accepted if portfolio is defined else 0 }} / {{ portfolio.deliverables_total if portfolio is defined else 0 }} milestones accepted</span>
     </div>
     <div class="pms-kpi">
@@ -49,97 +49,110 @@
   </section>
 
   {# ======================= SEGMENTED STUDIO SUBNAV ======================= #}
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
     <nav class="pms-seg" role="tablist" aria-label="Enterprise PM sections">
       <button type="button" class="pms-seg__btn is-active" data-pmsec="projects">Projects ({{ projects|length }})</button>
       <button type="button" class="pms-seg__btn" data-pmsec="portfolios">Portfolios &amp; Programmes ({{ (portfolios|length if portfolios is defined else 0) + (programmes|length if programmes is defined else 0) }})</button>
       <button type="button" class="pms-seg__btn" data-pmsec="intake">Demand &amp; Intake ({{ intakes|length if intakes is defined else 0 }})</button>
       <button type="button" class="pms-seg__btn" data-pmsec="templates">Project Templates ({{ project_templates|length if project_templates is defined else 0 }})</button>
     </nav>
+    <div class="pms-seg" aria-label="Project view mode">
+      <button type="button" class="pms-seg__btn is-active" data-pview="table" id="prj-v-table">Table</button>
+      <button type="button" class="pms-seg__btn" data-pview="cards" id="prj-v-cards">Cards</button>
+      <button type="button" class="pms-seg__btn" data-pview="kanban" id="prj-v-kanban">Status Board</button>
+    </div>
   </div>
 
-  <div data-pmpane="projects">
-  {# ======================= FILTER & VIEW BAR ======================= #}
-  <section class="st-panel" style="padding:10px 14px;margin-bottom:14px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;">
-    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1 1 320px;">
-      <input type="search" id="prj-search" class="ts-input" style="min-height:32px;font-size:12.5px;max-width:260px;" placeholder="Search code, project, client…">
-      <select id="prj-cat-filter" class="st-select" style="height:32px;font-size:12px;padding:4px 8px;">
-        <option value="ALL">All categories</option>
-        {% for key, lbl in categories %}
-        <option value="{{ key }}">{{ lbl }}</option>
-        {% endfor %}
-      </select>
-      <select id="prj-status-filter" class="st-select" style="height:32px;font-size:12px;padding:4px 8px;">
-        <option value="ALL">All statuses</option>
-        <option value="active">Active</option>
-        <option value="on_hold">On Hold</option>
-        <option value="completed">Completed</option>
-        <option value="archived">Archived</option>
-      </select>
-      <select id="prj-health-filter" class="st-select" style="height:32px;font-size:12px;padding:4px 8px;">
-        <option value="ALL">All health</option>
-        <option value="on_track">On Track</option>
-        <option value="at_risk">At Risk</option>
-        <option value="critical">Critical</option>
-      </select>
+  <div data-pmpane="projects" style="display:flex;flex-direction:column;gap:18px;">
+  {# ======================= ADVANCED SEARCH & MULTI-FACET FILTER BAR ======================= #}
+  <section class="pms-filterbar" aria-label="Advanced project search and filters">
+    <div class="pms-filterbar__row">
+      <div class="pms-search-wrap">
+        <span class="pms-search-wrap__icon">⌕</span>
+        <input type="search" id="prj-search" class="ts-input pms-search-input" placeholder="Search projects by code, name, sponsor, or category…">
+      </div>
+      <div class="pms-filterbar__controls">
+        <select id="prj-cat-filter" class="st-select" aria-label="Filter by category">
+          <option value="ALL">Category: All</option>
+          {% for key, lbl in categories %}
+          <option value="{{ key }}">{{ lbl }}</option>
+          {% endfor %}
+        </select>
+        <select id="prj-status-filter" class="st-select" aria-label="Filter by status">
+          <option value="ALL">Status: All</option>
+          <option value="active">Active</option>
+          <option value="on_hold">On Hold</option>
+          <option value="completed">Completed</option>
+          <option value="archived">Archived</option>
+        </select>
+        <select id="prj-health-filter" class="st-select" aria-label="Filter by health">
+          <option value="ALL">Health: All</option>
+          <option value="on_track">On Track</option>
+          <option value="at_risk">At Risk</option>
+          <option value="critical">Critical</option>
+        </select>
+        <select id="prj-contract-filter" class="st-select" aria-label="Filter by contract linkage">
+          <option value="ALL">Contracts: Any</option>
+          <option value="with">With TSD Contracts</option>
+          <option value="free">Contract-Free</option>
+        </select>
+      </div>
     </div>
-    <div style="display:inline-flex;gap:4px;">
-      <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-pview="table" id="prj-v-table">☰ Table</button>
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pview="cards" id="prj-v-cards">▦ Portfolio Cards</button>
-      <button type="button" class="ts-btn ts-btn--secondary ts-btn--sm" data-pview="kanban" id="prj-v-kanban">▤ Status Board</button>
+    <div class="pms-filterbar__row">
+      <div class="pms-quick-chips">
+        <button type="button" class="pms-chip is-active" data-qchip="all">All Projects</button>
+        <button type="button" class="pms-chip" data-qchip="attention">Needs Attention</button>
+        <button type="button" class="pms-chip" data-qchip="active">Active Only</button>
+        <button type="button" class="pms-chip" data-qchip="with_contracts">With Contracts</button>
+        <button type="button" class="pms-chip" data-qchip="contract_free">Contract-Free</button>
+      </div>
+      <div class="pms-filterbar__tokens" id="prj-active-tokens">
+        <span id="prj-match-count">Showing {{ projects|length }} of {{ projects|length }} projects</span>
+      </div>
     </div>
   </section>
 
-  {# ======================= VIEW 1: PORTFOLIO TABLE ======================= #}
-  <section class="st-panel" id="prj-table-wrap" style="overflow-x:auto;">
+  {# ======================= VIEW 1: CLEAN UNCROWDED PORTFOLIO TABLE ======================= #}
+  <section class="pms-card" id="prj-table-wrap">
+    <div class="pms-card__table-wrap">
     <table class="st-table">
       <thead>
         <tr>
-          <th style="width:115px;">Code</th>
-          <th>Project Name &amp; Sponsor</th>
-          <th>Category</th>
+          <th style="width:125px;">Code</th>
+          <th>Project &amp; Sponsor</th>
           <th>Status</th>
           <th>Health</th>
-          <th>TSD Contracts</th>
-          <th>Tasks &amp; Risks</th>
-          <th>Deliverables</th>
+          <th>Delivery &amp; Work</th>
           <th>Budget</th>
-          <th style="width:150px;text-align:right;">Actions</th>
+          <th style="width:160px;text-align:right;">Workspace</th>
         </tr>
       </thead>
       <tbody id="prj-tbody">
         {% for p in projects %}
         {% set h = p.health if p.health is defined else {'rag': 'on_track', 'label': 'On Track', 'score': 100} %}
-        <tr data-prj-item="1" data-cat="{{ p.category }}" data-status="{{ p.status }}" data-health="{{ h.rag }}" data-hay="{{ (p.project_code ~ ' ' ~ p.name ~ ' ' ~ (p.client_name or ''))|lower }}">
-          <td style="font-family:var(--ts-font-mono);font-size:12px;color:var(--ts-brand-primary);font-weight:600;">
+        <tr data-prj-item="1" data-cat="{{ p.category }}" data-status="{{ p.status }}" data-health="{{ h.rag }}" data-contracts="{{ 'with' if p.contracts_total > 0 else 'free' }}" data-hay="{{ (p.project_code ~ ' ' ~ p.name ~ ' ' ~ (p.client_name or '') ~ ' ' ~ p.category)|lower }}">
+          <td style="font-family:var(--ts-font-mono);font-size:12px;color:#002769;font-weight:700;">
             <a href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}" style="color:inherit;text-decoration:none;">{{ p.project_code }}</a>
           </td>
           <td>
-            <div style="font-weight:600;">
-              <a href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}" style="color:var(--ts-text-primary);text-decoration:none;">{{ p.name }}</a>
-              {% if p.is_default %}<span class="st-tag" style="margin-left:6px;font-size:10.5px;">Default</span>{% endif %}
+            <div style="font-weight:700;font-size:13.5px;color:#0f172a;">
+              <a href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}" style="color:inherit;text-decoration:none;">{{ p.name }}</a>
+              {% if p.is_default %}<span class="st-tag" style="margin-left:6px;">Default</span>{% endif %}
             </div>
-            {% if p.client_name %}<div style="font-size:11.5px;color:var(--ts-text-subtle);">{{ p.client_name }}</div>{% endif %}
+            <div style="font-size:12px;color:#64748b;margin-top:2px;">{{ p.category|replace('_', ' ')|title }}{% if p.client_name %} · {{ p.client_name }}{% endif %} · {{ p.contracts_total }} contract(s)</div>
           </td>
-          <td style="color:var(--ts-text-secondary);">{{ p.category|replace('_', ' ')|title }}</td>
           <td><span class="st-tag {% if p.status == 'active' %}st-tag--ok{% elif p.status == 'on_hold' %}st-tag--warn{% else %}st-tag--info{% endif %}">{{ p.status|replace('_', ' ')|title }}</span></td>
           <td>
             <span class="st-tag {% if h.rag == 'on_track' %}st-tag--ok{% elif h.rag == 'at_risk' %}st-tag--warn{% else %}st-tag--bad{% endif %}">{{ h.label }} · {{ h.score }}</span>
           </td>
-          <td style="font-variant-numeric:tabular-nums;">
-            <strong>{{ p.contracts_total }}</strong>
-            <span style="color:var(--ts-text-subtle);font-size:11px;">({{ p.contracts_signed }} signed · {{ p.contracts_draft }} draft)</span>
-          </td>
-          <td style="font-size:11.5px;color:var(--ts-text-secondary);font-variant-numeric:tabular-nums;">
-            <strong>{{ p.tasks_done }}/{{ p.tasks_total }}</strong> tasks{% if p.open_risks %} · <strong style="color:#b91c1c;">{{ p.open_risks }} risk(s)</strong>{% endif %}
-          </td>
           <td>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <div style="width:68px;height:6px;background:#eef2f7;"><div style="width:{{ p.deliverables_pct }}%;height:100%;background:#02982e;"></div></div>
-              <span style="font-size:11.5px;color:var(--ts-text-secondary);">{{ p.deliverables_pct }}%</span>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:76px;height:5px;background:#eef1f5;"><div style="width:{{ p.deliverables_pct }}%;height:100%;background:#15623d;"></div></div>
+              <span style="font-size:12px;font-weight:600;color:#334155;font-variant-numeric:tabular-nums;">{{ p.deliverables_pct }}%</span>
             </div>
+            <div style="font-size:11.5px;color:#64748b;margin-top:3px;">{{ p.tasks_done }}/{{ p.tasks_total }} tasks{% if p.open_risks %} · <span style="color:#a32929;font-weight:600;">{{ p.open_risks }} risk(s)</span>{% endif %}</div>
           </td>
-          <td style="color:var(--ts-text-secondary);font-variant-numeric:tabular-nums;">
+          <td style="font-weight:600;color:#1e293b;font-variant-numeric:tabular-nums;">
             {{ (p.currency ~ ' ' ~ ('{:,.0f}'.format(p.budget_amount))) if p.budget_amount else '—' }}
           </td>
           <td style="text-align:right;white-space:nowrap;">
@@ -149,6 +162,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </section>
 
   {# ======================= VIEW 2: PORTFOLIO CARDS GRID ======================= #}
@@ -458,17 +472,61 @@
     var cat = document.getElementById('prj-cat-filter').value;
     var st = document.getElementById('prj-status-filter').value;
     var hl = (document.getElementById('prj-health-filter') || {}).value || 'ALL';
+    var ct = (document.getElementById('prj-contract-filter') || {}).value || 'ALL';
+    var totalRows = 0, visibleRows = 0;
     document.querySelectorAll('[data-prj-item]').forEach(function (el) {
+      var hlOk = (hl === 'ALL') || (hl === 'ATTENTION' ? (el.dataset.health === 'at_risk' || el.dataset.health === 'critical') : el.dataset.health === hl);
+      var ctOk = (ct === 'ALL') || ((el.dataset.contracts || 'free') === ct);
       var ok = (cat === 'ALL' || el.dataset.cat === cat)
         && (st === 'ALL' || el.dataset.status === st)
-        && (hl === 'ALL' || el.dataset.health === hl)
+        && hlOk && ctOk
         && (!q || (el.dataset.hay || '').indexOf(q) !== -1);
       el.hidden = !ok;
+      if (el.tagName === 'TR') { totalRows += 1; if (ok) visibleRows += 1; }
     });
+    var tokWrap = document.getElementById('prj-active-tokens');
+    if (tokWrap) {
+      var html = '<span>Showing ' + visibleRows + ' of ' + totalRows + ' projects</span>';
+      if (cat !== 'ALL') html += '<span class="pms-token">Category: ' + cat.replace(/_/g, ' ') + ' <button type="button" data-clr="cat">×</button></span>';
+      if (st !== 'ALL') html += '<span class="pms-token">Status: ' + st.replace(/_/g, ' ') + ' <button type="button" data-clr="st">×</button></span>';
+      if (hl !== 'ALL') html += '<span class="pms-token">Health: ' + hl.replace(/_/g, ' ') + ' <button type="button" data-clr="hl">×</button></span>';
+      if (ct !== 'ALL') html += '<span class="pms-token">Contracts: ' + ct + ' <button type="button" data-clr="ct">×</button></span>';
+      if (q) html += '<span class="pms-token">Search: "' + q.replace(/</g, '&lt;') + '" <button type="button" data-clr="q">×</button></span>';
+      if (cat !== 'ALL' || st !== 'ALL' || hl !== 'ALL' || ct !== 'ALL' || q) {
+        html += '<button type="button" class="ts-btn ts-btn--ghost ts-btn--sm" data-clr="all">Clear all</button>';
+      }
+      tokWrap.innerHTML = html;
+      tokWrap.querySelectorAll('[data-clr]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var k = b.dataset.clr;
+          if (k === 'cat' || k === 'all') document.getElementById('prj-cat-filter').value = 'ALL';
+          if (k === 'st' || k === 'all') document.getElementById('prj-status-filter').value = 'ALL';
+          if (k === 'hl' || k === 'all') document.getElementById('prj-health-filter').value = 'ALL';
+          if (k === 'ct' || k === 'all') document.getElementById('prj-contract-filter').value = 'ALL';
+          if (k === 'q' || k === 'all') document.getElementById('prj-search').value = '';
+          if (k === 'all') {
+            document.querySelectorAll('[data-qchip]').forEach(function (c) {
+              c.classList.toggle('is-active', c.dataset.qchip === 'all');
+            });
+          }
+          applyPortfolioFilter();
+        });
+      });
+    }
   }
-  ['prj-search', 'prj-cat-filter', 'prj-status-filter', 'prj-health-filter'].forEach(function (id) {
+  ['prj-search', 'prj-cat-filter', 'prj-status-filter', 'prj-health-filter', 'prj-contract-filter'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.addEventListener(id === 'prj-search' ? 'input' : 'change', applyPortfolioFilter);
+  });
+  document.querySelectorAll('[data-qchip]').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      document.querySelectorAll('[data-qchip]').forEach(function (c) { c.classList.toggle('is-active', c === chip); });
+      var qm = chip.dataset.qchip;
+      document.getElementById('prj-status-filter').value = (qm === 'active') ? 'active' : 'ALL';
+      document.getElementById('prj-health-filter').value = (qm === 'attention') ? 'at_risk' : 'ALL';
+      document.getElementById('prj-contract-filter').value = (qm === 'with_contracts') ? 'with' : ((qm === 'contract_free') ? 'free' : 'ALL');
+      applyPortfolioFilter();
+    });
   });
 
   var tblWrap = document.getElementById('prj-table-wrap');
@@ -486,7 +544,7 @@
       }
       ['table', 'cards', 'kanban'].forEach(function (m) {
         var b = document.getElementById('prj-v-' + m);
-        if (b) b.className = 'ts-btn ts-btn--sm ' + (m === mode ? 'ts-btn--primary' : 'ts-btn--secondary');
+        if (b) b.classList.toggle('is-active', m === mode);
       });
     });
   });

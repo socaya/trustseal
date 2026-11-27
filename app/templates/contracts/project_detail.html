@@ -369,6 +369,19 @@
           <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" data-toggle-drawer="dr-task">+ New Task</button>
         </div>
 
+        <div class="pms-filterbar">
+          <div class="pms-filterbar__row">
+            <div class="pms-search-wrap">
+              <span class="pms-search-wrap__icon">⌕</span>
+              <input type="search" id="pd-task-search" class="ts-input pms-search-input" placeholder="Search tasks by title, phase, or assignee…">
+            </div>
+            <div class="pms-filterbar__controls">
+              <select id="pd-task-f-status" class="st-select"><option value="ALL">Status: All</option><option value="todo">To Do</option><option value="in_progress">In Progress</option><option value="review">Review</option><option value="done">Done</option><option value="blocked">Blocked</option></select>
+              <select id="pd-task-f-prio" class="st-select"><option value="ALL">Priority: All</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+            </div>
+          </div>
+        </div>
+
         <div class="pms-card">
           <div class="pms-drawer" id="dr-task" hidden>
             <form id="pd-task-form" class="pms-form-grid">
@@ -385,7 +398,7 @@
               <thead><tr><th>Task</th><th>Phase</th><th>Assignee</th><th>Priority</th><th>Due Date</th><th>Status</th><th style="text-align:right;">Action</th></tr></thead>
               <tbody>
                 {% for t in t_rows %}
-                <tr>
+                <tr data-task-row="1" data-status="{{ t.status }}" data-prio="{{ t.priority }}" data-hay="{{ (t.title ~ ' ' ~ (t.phase or '') ~ ' ' ~ (t.assignee_name or ''))|lower }}">
                   <td style="font-weight:600;">{{ t.title }}</td>
                   <td style="color:#5a6676;">{{ t.phase }}</td>
                   <td>{{ t.assignee_name or 'Unassigned' }}</td>
@@ -647,7 +660,7 @@
         </div>
         {% endif %}
 
-        <div class="pms-grid-2">
+        <div style="display:flex;flex-direction:column;gap:22px;">
           <div class="pms-card">
             <div class="pms-card__head">
               <div><h3 class="pms-card__title">Budget Baseline Lines</h3></div>
@@ -1430,6 +1443,23 @@
   });
   _bindPost('pd-cl-form', '/api/projects/{{ project.id }}/closure', function () {
     return { category: document.getElementById('pd-cl-cat').value, title: document.getElementById('pd-cl-title').value.trim() };
+  });
+
+  // Studio Tasks Advanced Search & Filter
+  function filterStudioTasks() {
+    var q = ((document.getElementById('pd-task-search') || {}).value || '').trim().toLowerCase();
+    var st = (document.getElementById('pd-task-f-status') || {}).value || 'ALL';
+    var pr = (document.getElementById('pd-task-f-prio') || {}).value || 'ALL';
+    document.querySelectorAll('[data-task-row]').forEach(function (tr) {
+      var ok = (st === 'ALL' || tr.dataset.status === st)
+        && (pr === 'ALL' || tr.dataset.prio === pr)
+        && (!q || (tr.dataset.hay || '').indexOf(q) !== -1);
+      tr.hidden = !ok;
+    });
+  }
+  ['pd-task-search', 'pd-task-f-status', 'pd-task-f-prio'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener(id === 'pd-task-search' ? 'input' : 'change', filterStudioTasks);
   });
 
   // Inline row actions
