@@ -70,6 +70,24 @@
 .ts-ed__appbar .ts-ed__btn:hover { background: rgba(255, 255, 255, 0.2); border-color: rgba(255, 255, 255, 0.55); color: #ffffff; text-decoration: none; }
 .ts-ed__appbar .ts-ed__btn--ghost { background: transparent; border-color: transparent; color: rgba(235, 242, 255, 0.9); }
 .ts-ed__appbar .ts-ed__btn--ghost:hover { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.28); color: #ffffff; }
+.ts-ed__appbar .ts-ed__btn.is-nav-active,
+.ts-ed__appbar .ts-ed__btn--ghost.is-nav-active {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.36) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+.ts-ed__appbar select {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  color: #ffffff !important;
+  height: 30px !important;
+  padding: 0 10px !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  border-radius: 5px !important;
+}
+.ts-ed__appbar select option { color: #0f172a; background: #ffffff; }
 .ts-ed__appbar .ts-ed__btn--primary { background: #ffffff; color: #002769; border-color: #ffffff; font-weight: 700; }
 .ts-ed__appbar .ts-ed__btn--primary:hover { background: #eef4ff; border-color: #eef4ff; color: #001a4d; }
 .ts-ed__appbar .ct-pill {
