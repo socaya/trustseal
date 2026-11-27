@@ -6,110 +6,7 @@
 {% set _pid = project.id if _is_proj else (all_org_projects[0].id if (all_org_projects is defined and all_org_projects) else (projects[0].id if (projects is defined and projects) else None)) %}
 
 <div class="pme-top">
-  {# ---- 38px STUDIO APPLICATION BAR (matching TSD Docs .ts-ed__appbar) ---- #}
-  <div class="pme-appbar">
-    <div class="pme-identity">
-      <div class="pme-name">
-        <strong>TRUSTSEAL</strong><small>PME</small>
-      </div>
-      <span class="pme-appbar-div" aria-hidden="true"></span>
-
-      {# PRO Platform Menus: Apps + 3-Column Workspaces (from TrustSeal_PM_Studio_UI_PRO.html) #}
-      <div class="pme-nav-menus">
-        <details class="pme-menu" id="pme-apps-menu">
-          <summary><span>Apps</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" width="12" height="12"><path d="m6 9 6 6 6-6"/></svg></summary>
-          <div class="pme-menu-popover pme-menu-popover--apps">
-            <div>
-              <h4>TrustSeal</h4>
-              <a href="{{ url_for('contracts_views.projects_page') }}" aria-current="page">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h7l2 2h9v12H3z"/></svg>
-                <span>Projects</span>
-              </a>
-              {% if 'tsd_views.library' in url_map_endpoints %}
-              <a href="{{ url_for('tsd_views.library') }}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-                <span>Docs</span>
-              </a>
-              {% endif %}
-              {% if 'workspace_assets_views.signed_contracts_page' in url_map_endpoints %}
-              <a href="{{ url_for('workspace_assets_views.signed_contracts_page') }}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7h18v13H3zM8 7V4h8v3M3 12h18"/></svg>
-                <span>Contracts</span>
-              </a>
-              {% endif %}
-            </div>
-          </div>
-        </details>
-
-        <details class="pme-menu" id="pme-workspaces-menu">
-          <summary><span>Workspaces</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" width="12" height="12"><path d="m6 9 6 6 6-6"/></svg></summary>
-          <div class="pme-menu-popover">
-            <div>
-              <h4>Portfolio</h4>
-              <a href="{{ url_for('contracts_views.projects_page', section='home') }}" {% if _ctx=='projects' and active_section=='home' %}aria-current="page"{% endif %}><span>Home</span></a>
-              <a href="{{ url_for('contracts_views.projects_page') }}" {% if _ctx=='projects' and active_section=='projects' %}aria-current="page"{% endif %}><span>Projects</span></a>
-              <a href="{{ url_for('contracts_views.projects_page', section='portfolios') }}" {% if _ctx=='projects' and active_section=='portfolios' %}aria-current="page"{% endif %}><span>Portfolios</span></a>
-              <a href="{{ url_for('contracts_views.projects_page', section='programmes') }}" {% if _ctx=='projects' and active_section=='programmes' %}aria-current="page"{% endif %}><span>Programmes</span></a>
-              <a href="{{ url_for('contracts_views.projects_page', section='intake') }}" {% if _ctx=='projects' and active_section=='intake' %}aria-current="page"{% endif %}><span>Intake</span></a>
-            </div>
-            <div>
-              <h4>Delivery</h4>
-              <a href="{{ url_for('contracts_views.my_work_page') }}" {% if _ctx=='my_work' %}aria-current="page"{% endif %}><span>My Work</span></a>
-              <a href="{{ url_for('contracts_views.project_detail_page', project_id=_pid) ~ '#resources' if _pid else url_for('contracts_views.projects_page') }}"><span>Resources</span></a>
-              <a href="{{ url_for('contracts_views.projects_page', section='contracts') }}" {% if _ctx=='projects' and active_section=='contracts' %}aria-current="page"{% endif %}><span>Contract Overview</span></a>
-              <a href="{{ url_for('contracts_views.projects_page', section='spend') }}" {% if _ctx=='projects' and active_section=='spend' %}aria-current="page"{% endif %}><span>Spend &amp; Burn</span></a>
-              <a href="{{ url_for('contracts_views.projects_page', section='obligations') }}" {% if _ctx=='projects' and active_section=='obligations' %}aria-current="page"{% endif %}><span>Obligations</span></a>
-              {% if 'tsd_views.library' in url_map_endpoints %}
-              <a href="{{ url_for('tsd_views.library') }}"><span>Documents</span></a>
-              {% endif %}
-            </div>
-            <div>
-              <h4>Governance</h4>
-              <a href="{{ url_for('contracts_views.my_work_page') }}#approvals"><span>Approvals</span></a>
-              <a href="{{ url_for('contracts_views.project_detail_page', project_id=_pid) ~ '#results' if _pid else url_for('contracts_views.projects_page') }}"><span>Reports</span></a>
-              <a href="{{ url_for('contracts_views.projects_page', section='templates') }}" {% if _ctx=='projects' and active_section=='templates' %}aria-current="page"{% endif %}><span>Administration</span></a>
-            </div>
-          </div>
-        </details>
-      </div>
-
-      <span class="pme-appbar-div" aria-hidden="true"></span>
-      <nav class="pme-crumb" aria-label="Workspace breadcrumb">
-        <a href="{{ url_for('contracts_views.projects_page', section='home') }}">Workspace</a>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-        {% if _is_proj %}
-          <a href="{{ url_for('contracts_views.projects_page') }}">Projects</a>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-          <span aria-current="page">{{ project.project_code }}</span>
-        {% else %}
-          <span aria-current="page">{{ pm_crumb_label if pm_crumb_label is defined else 'Projects' }}</span>
-        {% endif %}
-      </nav>
-    </div>
-
-    <div class="pme-quick">
-      {% if _is_proj %}
-        {% if all_org_projects is defined and all_org_projects|length > 1 %}
-        <span class="pms-select-wrap">
-          <select id="pms-switcher" class="pms-select-btn" aria-label="Switch project" style="max-width:270px;">
-            {% for op in all_org_projects %}
-            <option value="{{ op.id }}" {% if op.id == project.id %}selected{% endif %}>{{ op.name }} ({{ op.project_code }})</option>
-            {% endfor %}
-          </select>
-        </span>
-        {% endif %}
-        <a class="pms-btn pms-btn--sm" href="{{ url_for('contracts_views.my_work_page') }}">My Timesheet</a>
-        <button type="button" class="pms-btn pms-btn--primary pms-btn--sm" id="pd-open-new">+ New Contract</button>
-      {% elif _ctx == 'projects' %}
-        <a class="pms-btn pms-btn--sm" href="{{ url_for('contracts_views.projects_page', section='obligations') }}">Obligations ({{ global_obligations|length if global_obligations is defined else 0 }})</a>
-        <button type="button" class="pms-btn pms-btn--primary pms-btn--sm" id="prj-open-new">+ New project</button>
-      {% else %}
-        <a class="pms-btn pms-btn--sm" href="{{ url_for('contracts_views.projects_page') }}">Projects register</a>
-      {% endif %}
-    </div>
-  </div>
-
-  {# ---- TSD-STYLE 8-TAB COMMAND RIBBON ---- #}
+  {# ---- TSD-STYLE 8-TAB COMMAND RIBBON (Direct below TrustSeal Topbar — zero redundant AppBar) ---- #}
   <section class="pm-ribbon" id="pm-ribbon" aria-label="Project command ribbon">
     <div class="pm-ribbon-head">
       <div class="pm-ribbon-tabs" role="tablist" aria-label="Project commands">
@@ -117,9 +14,28 @@
         <button type="button" class="pm-ribbon-tab" role="tab" data-rtab="{{ tab_name }}" aria-selected="{{ 'true' if tab_name == _rtab else 'false' }}">{{ tab_name }}</button>
         {% endfor %}
       </div>
-      <button type="button" class="pm-ribbon-toggle" id="pm-ribbon-toggle" aria-label="Collapse or expand ribbon" aria-expanded="true" title="Collapse / Expand ribbon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="14" height="14"><path d="m6 9 6 6 6-6"/></svg>
-      </button>
+      <div class="pm-ribbon-right">
+        {% if _is_proj %}
+          {% if all_org_projects is defined and all_org_projects|length > 1 %}
+          <span class="pms-select-wrap">
+            <select id="pms-switcher" class="pms-select-btn" aria-label="Switch project" style="max-width:260px;min-height:26px;height:26px;font-size:11.5px;">
+              {% for op in all_org_projects %}
+              <option value="{{ op.id }}" {% if op.id == project.id %}selected{% endif %}>{{ op.name }} ({{ op.project_code }})</option>
+              {% endfor %}
+            </select>
+          </span>
+          {% endif %}
+          <a class="pms-btn pms-btn--sm" href="{{ url_for('contracts_views.my_work_page') }}">My Timesheet</a>
+          <button type="button" class="pms-btn pms-btn--primary pms-btn--sm" id="pd-open-new">+ New Contract</button>
+        {% elif _ctx == 'projects' %}
+          <button type="button" class="pms-btn pms-btn--primary pms-btn--sm" id="prj-open-new">+ New project</button>
+        {% else %}
+          <a class="pms-btn pms-btn--sm" href="{{ url_for('contracts_views.projects_page') }}">Projects register</a>
+        {% endif %}
+        <button type="button" class="pm-ribbon-toggle" id="pm-ribbon-toggle" aria-label="Collapse or expand ribbon" aria-expanded="true" title="Collapse / Expand ribbon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="14" height="14"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
     </div>
 
     <div class="pm-ribbon-panel" id="pm-ribbon-panel">

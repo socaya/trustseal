@@ -63,9 +63,16 @@
 .pme-top {
   position: sticky;
   top: var(--ts-topbar-h, 54px);
-  z-index: 25;
+  z-index: 5;
   background: var(--pms-paper);
   border-bottom: 1px solid #d8e1ec;
+}
+.pm-ribbon-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  flex-shrink: 0;
 }
 
 /* Application Bar (38px, matching editor-shell.css .ts-ed__appbar) */
@@ -380,7 +387,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  z-index: 35;
+  z-index: 15;
 }
 .pme-popover h4 {
   font-size: 10px;

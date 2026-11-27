@@ -673,8 +673,7 @@ def test_srs_server_side_register_and_obligations(pg_app, pm_env):
     assert b"Contract Burn Rate Register" in r_det.data
     assert b"NCE-1" in r_det.data
     assert b"No-Cost Extension (NCE)" in r_det.data
-    assert b"pme-apps-menu" in r_det.data
-    assert b"pme-workspaces-menu" in r_det.data
+    assert b"pme-appbar" not in r_det.data
     assert b"pm-ribbon" in r_det.data
     assert b"pme-context" in r_det.data
     assert b"pme-lifecycle" in r_det.data
