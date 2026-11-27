@@ -27,9 +27,10 @@
     "id": "assets",
     "label": "Brand & Assets",
     "tier": "all",
-    "keys": ["stamps", "letterheads", "signatures", "media", "templates"],
+    "keys": ["brand-studio", "stamps", "letterheads", "signatures", "media", "templates"],
     "items": [
-      {"endpoint": "tsd_stamps_views.library",                    "label": "Stamps",         "desc": "Sealed corporate & dated stamps",    "key": "stamps"},
+      {"endpoint": "brand_studio_views.studio_page",              "label": "Brand Identity Studio", "desc": "Logos, brand book & merch mockups",  "key": "brand-studio"},
+      {"endpoint": "tsd_stamps_views.library",                    "label": "Stamps",                "desc": "Sealed corporate & dated stamps",    "key": "stamps"},
       {"endpoint": "workspace_assets_views.letterheads_page",     "label": "Letterheads",    "desc": "Official organization stationery",   "key": "letterheads"},
       {"endpoint": "workspace_assets_views.signatures_hub_page",  "label": "Signatures",     "desc": "OTP-protected signatory vault",      "key": "signatures"},
       {"endpoint": "workspace_assets_views.templates_hub_page",   "label": "Templates",      "desc": "Reusable document & contract kits",  "key": "templates"},

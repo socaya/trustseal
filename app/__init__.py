@@ -452,6 +452,9 @@ def create_app(config_class=None):
     from .blueprints.esignatures.eidas_api import eidas_api, send_esign_api
     from .blueprints.esignatures.send_studio_views import send_studio_views
     blueprints.extend([eidas_api, send_esign_api, send_studio_views])
+    from .blueprints.estamp.brand_studio_api import brand_studio_api
+    from .blueprints.estamp.brand_studio_views import brand_studio_views
+    blueprints.extend([brand_studio_api, brand_studio_views])
 
     for bp in blueprints:
         app.register_blueprint(bp)

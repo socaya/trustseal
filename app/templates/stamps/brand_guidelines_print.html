@@ -1,0 +1,213 @@
+{% extends "layouts/public.html" %}
+{% block title %}{{ kit.brand_name }} — Brand Guidelines Book | TRUSTSEAL{% endblock %}
+{% block main_modifier %}ts-public-main--full{% endblock %}
+
+{% block extra_head %}
+<style>
+  .bg-book {
+    width: 100%;
+    background: #ffffff;
+    color: #0f172a;
+  }
+  .bg-toolbar {
+    background: #f4f7fc;
+    border-bottom: 1px solid #d5dfee;
+    padding: 12px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .bg-cover {
+    padding: 64px 56px;
+    color: #ffffff;
+    border-bottom: 4px solid {{ kit.secondary_color }};
+    background: linear-gradient(115deg, {{ kit.dark_color }} 0%, {{ kit.primary_color }} 74%);
+  }
+  .bg-cover__kicker {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: {{ kit.secondary_color }};
+    margin-bottom: 12px;
+  }
+  .bg-cover h1 {
+    margin: 0 0 10px;
+    font-size: 42px;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    color: #ffffff;
+  }
+  .bg-cover p {
+    margin: 0;
+    font-size: 17px;
+    color: rgba(255, 255, 255, 0.86);
+  }
+  .bg-cover__logo {
+    margin-top: 32px;
+    max-width: 380px;
+  }
+  .bg-cover__logo svg { width: 100%; height: auto; display: block; }
+
+  .bg-sec {
+    padding: 44px 56px;
+    border-bottom: 1px solid #d5dfee;
+  }
+  .bg-sec h2 {
+    margin: 0 0 20px;
+    font-size: 18px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: {{ kit.primary_color }};
+  }
+  .bg-lockups {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: #d5dfee;
+    border: 1px solid #d5dfee;
+  }
+  .bg-lockup {
+    background: #ffffff;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .bg-lockup--dark { background: {{ kit.primary_color }}; color: #ffffff; }
+  .bg-lockup span { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.8; }
+  .bg-lockup svg { max-width: 100%; max-height: 92px; margin: auto; }
+
+  .bg-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .bg-table th {
+    text-align: left;
+    padding: 12px 14px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #475569;
+    background: #f4f7fc;
+    border-bottom: 2px solid {{ kit.primary_color }};
+  }
+  .bg-table td { padding: 14px; border-bottom: 1px solid #e2e8f0; }
+
+  .bg-two { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
+  .bg-list { margin: 0; padding-left: 20px; line-height: 1.8; font-size: 14.5px; color: #1e293b; }
+
+  @media print {
+    .ts-public-nav, .ts-public-footer, .bg-toolbar { display: none !important; }
+    .bg-cover, .bg-lockup--dark { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .bg-sec { break-inside: avoid; padding: 28px 32px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bg-book">
+  <div class="bg-toolbar">
+    <div>
+      <strong style="color:#002769;">{{ kit.kit_ref }}</strong> &nbsp;·&nbsp;
+      <span style="color:#475569;">{{ kit.brand_name }} Brand Identity Guidelines</span>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <a href="/brand-studio" class="ts-pub-btn ts-pub-btn--ghost">Back to Brand Studio</a>
+      <a href="/api/brand-studio/kits/{{ kit.id }}/export/primary" class="ts-pub-btn ts-pub-btn--ghost">Download Primary SVG</a>
+      <button type="button" class="ts-pub-btn ts-pub-btn--primary" onclick="window.print()">Print / Save PDF</button>
+    </div>
+  </div>
+
+  <section class="bg-cover">
+    <div class="bg-cover__kicker">OFFICIAL BRAND IDENTITY GUIDELINES · VERSION {{ guidelines.version or '1.0' }} · {{ kit.kit_ref }}</div>
+    <h1>{{ kit.brand_name }}</h1>
+    <p>{{ kit.tagline or 'Verified Integrity' }} &nbsp;·&nbsp; {{ kit.industry }}</p>
+    <div class="bg-cover__logo">{{ kit.mono_light_svg | safe }}</div>
+  </section>
+
+  <section class="bg-sec">
+    <h2>01 · Approved Vector Logo Lockups</h2>
+    <div class="bg-lockups">
+      <div class="bg-lockup"><span>Primary Full Color</span>{{ kit.primary_svg | safe }}</div>
+      <div class="bg-lockup bg-lockup--dark"><span>Reversed White</span>{{ kit.mono_light_svg | safe }}</div>
+      <div class="bg-lockup"><span>Dark Monochrome</span>{{ kit.mono_dark_svg | safe }}</div>
+      <div class="bg-lockup"><span>Square Brand Mark</span>{{ kit.icon_only_svg | safe }}</div>
+    </div>
+  </section>
+
+  <section class="bg-sec">
+    <h2>02 · Clear Space &amp; Minimum Sizing</h2>
+    <p style="font-size:15px;line-height:1.7;color:#334155;max-width:780px;margin:0;">
+      {{ guidelines.clear_space.rule }}
+      Minimum digital width: <strong>{{ guidelines.clear_space.min_digital_px }}px</strong> ·
+      Minimum print width: <strong>{{ guidelines.clear_space.min_print_mm }}mm</strong> ·
+      Minimum icon size: <strong>{{ guidelines.clear_space.min_icon_px }}px × {{ guidelines.clear_space.min_icon_px }}px</strong>.
+    </p>
+  </section>
+
+  <section class="bg-sec">
+    <h2>03 · Official Color System (HEX · RGB · CMYK)</h2>
+    <table class="bg-table">
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>HEX</th>
+          <th>RGB</th>
+          <th>CMYK</th>
+          <th>Application</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in guidelines.colors %}
+        <tr>
+          <td>
+            <span style="display:inline-block;width:24px;height:24px;border-radius:4px;background:{{ c.hex }};border:1px solid rgba(15,23,42,0.18);vertical-align:middle;margin-right:10px;"></span>
+            <strong>{{ c.name }}</strong>
+          </td>
+          <td style="font-family:var(--ts-font-mono);font-weight:700;">{{ c.hex }}</td>
+          <td style="font-family:var(--ts-font-mono);">{{ c.rgb }}</td>
+          <td style="font-family:var(--ts-font-mono);">{{ c.cmyk }}</td>
+          <td style="color:#475569;">{{ c.role }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="bg-sec">
+    <h2>04 · Typography System</h2>
+    <table class="bg-table">
+      <thead>
+        <tr><th>Tier</th><th>Size</th><th>Weight</th><th>Tracking</th></tr>
+      </thead>
+      <tbody>
+        {% for t in guidelines.typography.scale %}
+        <tr>
+          <td><strong>{{ t.role }}</strong></td>
+          <td>{{ t.size }}</td>
+          <td>{{ t.weight }}</td>
+          <td style="font-family:var(--ts-font-mono);">{{ t.tracking }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="bg-sec" style="border-bottom:0;">
+    <h2>05 · Brand Governance — Do's &amp; Don'ts</h2>
+    <div class="bg-two">
+      <div>
+        <strong style="display:block;color:#02982e;margin-bottom:10px;text-transform:uppercase;font-size:13px;">Approved Usage (Do)</strong>
+        <ul class="bg-list">
+          {% for item in guidelines.dos %}<li>{{ item }}</li>{% endfor %}
+        </ul>
+      </div>
+      <div>
+        <strong style="display:block;color:#b91c1c;margin-bottom:10px;text-transform:uppercase;font-size:13px;">Prohibited Alterations (Don't)</strong>
+        <ul class="bg-list">
+          {% for item in guidelines.donts %}<li>{{ item }}</li>{% endfor %}
+        </ul>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

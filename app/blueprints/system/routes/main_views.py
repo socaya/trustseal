@@ -306,6 +306,33 @@ PUBLIC_MODULES = [
             ("Pricing", "/pricing", "Explore enterprise deployment, dedicated QTSP configuration, and support options."),
         ],
     },
+    {
+        "slug": "brand-studio",
+        "num": "08",
+        "category": "Corporate Identity & Merchandising",
+        "name": "Brand Identity Studio",
+        "short": "Vector logo generator, 10 real-world merch mockups & printable Brand Guidelines Book",
+        "spec": "Vector SVG · 10 Merch Mockups · Brand Book",
+        "summary": (
+            "Design executive corporate logos from scratch or generate 12 bespoke concepts "
+            "in seconds, preview your identity live across pens, polo shirts, caps, fleet "
+            "vehicles, billboards, and reception signage, export print-ready Brand Guidelines, "
+            "and publish straight into TRUSTSEAL Media Library."
+        ),
+        "cta_label": "Open Brand Identity Studio",
+        "cta_href": "/brand-studio",
+        "capabilities": [
+            ("Smashing-Logo-Style Concept Generator", "Generate 12 industry-aligned vector brand identities across 24 bespoke geometric marks, 5 lockup layouts, and 12 curated executive color systems."),
+            ("10 Live Physical & Digital Merch Mockups", "Inspect your customized logo in real time on engraved pens, polo shirts, caps, fleet vehicles, outdoor billboards, business cards, mugs, totes, 3D wall signage, and app icons."),
+            ("Printable Brand Guidelines Book", "Automatically compile clear-space rules, minimum sizing, HEX/RGB/CMYK print specs, typography hierarchy, and Brand Do's & Don'ts into a printable brand book."),
+            ("One-Click Media Library Publishing", "Publish primary, monochrome, or icon SVGs directly into TRUSTSEAL Media Library for instant use in Letterhead Studio, Stamp Studio, and TS Docs."),
+        ],
+        "connections": [
+            ("Corporate Stamps & Brand", "/platform/stamps", "Pair your published brand logo directly with official corporate letterheads and custodian seals."),
+            ("3,325+ Templates Library", "/platform/templates", "Apply your verified brand identity across 1,000+ stamp designs and 100+ letterhead templates."),
+            ("TSD Document Vault", "/platform/documents", "Insert published SVG brand marks cleanly into boardroom policies, proposals, and contracts."),
+        ],
+    },
 ]
 PUBLIC_MODULES_BY_SLUG = {m["slug"]: m for m in PUBLIC_MODULES}
 

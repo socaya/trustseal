@@ -1,0 +1,1972 @@
+{% extends "layouts/app.html" %}
+{% block title %}Brand Identity Studio — TRUSTSEAL{% endblock %}
+{% block page_header %}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/editor-shell.css') }}">
+<style>
+  .ts-page { padding: 0 !important; max-width: none !important; }
+
+  .bs-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - var(--ts-topbar-h));
+    background: #f4f7fc;
+    color: #0f172a;
+    font-family: var(--ts-font-sans);
+  }
+
+  /* Contextual Ribbon Bar */
+  .bs-ribbon {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: #ffffff;
+    border-bottom: 1px solid #d5dfee;
+    padding: 7px 14px;
+    overflow-x: auto;
+    min-height: 48px;
+  }
+  .bs-rgrp {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 10px;
+    border-right: 1px solid #e2e8f0;
+    white-space: nowrap;
+  }
+  .bs-rgrp:first-child { padding-left: 0; }
+  .bs-rgrp:last-child { border-right: 0; padding-right: 0; }
+  .bs-rgrp__lbl {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    margin-right: 2px;
+  }
+  .bs-rbtn {
+    height: 28px;
+    padding: 0 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1e293b;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  }
+  .bs-rbtn:hover { background: #eef4ff; border-color: #002769; color: #002769; }
+  .bs-rbtn.is-active {
+    background: #002769;
+    border-color: #002769;
+    color: #ffffff;
+  }
+  .bs-rbtn--emerald {
+    background: #02982e;
+    border-color: #02982e;
+    color: #ffffff;
+  }
+  .bs-rbtn--emerald:hover { background: #027c26; border-color: #027c26; color: #ffffff; }
+
+  .bs-swatch-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid rgba(15, 23, 42, 0.22);
+    display: inline-block;
+    flex: 0 0 auto;
+  }
+
+  /* Panels */
+  .bs-panel { display: none; flex: 1 1 auto; }
+  .bs-panel.is-active { display: flex; flex-direction: column; }
+
+  /* ---------- TAB 1: LOGO STUDIO ---------- */
+  .bs-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 410px;
+    flex: 1 1 auto;
+    min-height: calc(100vh - var(--ts-topbar-h) - 140px);
+  }
+  .bs-stage-col {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #d5dfee;
+    background: #f4f7fc;
+  }
+  .bs-canvas-hero {
+    flex: 1 1 auto;
+    min-height: 360px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 36px 40px;
+    position: relative;
+    border-bottom: 1px solid #d5dfee;
+    background: #ffffff;
+    transition: background 0.18s ease;
+  }
+  .bs-canvas-hero.stage-dark { background: #0b162d; }
+  .bs-canvas-hero.stage-grid {
+    background-color: #f8fafc;
+    background-image:
+      linear-gradient(to right, rgba(0, 39, 105, 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0, 39, 105, 0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .bs-canvas-hero__frame {
+    width: 100%;
+    max-width: 620px;
+    min-height: 210px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .bs-canvas-hero__frame svg {
+    width: 100%;
+    height: auto;
+    max-height: 280px;
+    display: block;
+  }
+  .bs-canvas-meta {
+    position: absolute;
+    top: 14px;
+    left: 20px;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #64748b;
+  }
+  .bs-canvas-hero.stage-dark .bs-canvas-meta { color: #94a3b8; }
+
+  /* 3 Lockup Strip below primary stage */
+  .bs-variants-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    background: #ffffff;
+  }
+  .bs-variant-cell {
+    padding: 18px 22px;
+    border-right: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .bs-variant-cell:last-child { border-right: 0; }
+  .bs-variant-cell__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: 700;
+    color: #334155;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .bs-variant-cell__box {
+    height: 112px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+  }
+  .bs-variant-cell__box--dark { background: #002769; border-color: #001a4d; }
+  .bs-variant-cell__box svg { max-width: 100%; max-height: 82px; height: auto; }
+  .bs-link-act {
+    font-size: 12px;
+    font-weight: 600;
+    color: #002769;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .bs-link-act:hover { color: #02982e; }
+
+  /* Right Inspector */
+  .bs-inspector {
+    background: #ffffff;
+    overflow-y: auto;
+    max-height: calc(100vh - var(--ts-topbar-h) - 140px);
+    display: flex;
+    flex-direction: column;
+  }
+  .bs-sec {
+    padding: 16px 20px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .bs-sec__title {
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #002769;
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .bs-field { margin-bottom: 11px; }
+  .bs-field:last-child { margin-bottom: 0; }
+  .bs-field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 4px;
+  }
+  .bs-input, .bs-select {
+    width: 100%;
+    height: 36px;
+    padding: 0 10px;
+    font-size: 13.5px;
+    color: #0f172a;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+  }
+  .bs-input:focus, .bs-select:focus {
+    outline: none;
+    border-color: #002769;
+    box-shadow: 0 0 0 2px rgba(0, 39, 105, 0.12);
+  }
+
+  /* 24-Icon Picker Grid */
+  .bs-icon-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+  }
+  .bs-icon-btn {
+    aspect-ratio: 1;
+    padding: 7px;
+    background: #f8fafc;
+    border: 1px solid #dbe4f2;
+    border-radius: 5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.12s ease, background 0.12s ease;
+  }
+  .bs-icon-btn:hover { background: #eef4ff; border-color: #002769; }
+  .bs-icon-btn.is-active {
+    background: #eef4ff;
+    border: 2px solid #002769;
+  }
+  .bs-icon-btn svg { width: 100%; height: 100%; display: block; }
+
+  /* Palettes Grid */
+  .bs-palette-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .bs-pal-btn {
+    border: 1px solid #dbe4f2;
+    border-radius: 5px;
+    padding: 6px;
+    background: #ffffff;
+    cursor: pointer;
+    text-align: left;
+  }
+  .bs-pal-btn:hover { border-color: #002769; }
+  .bs-pal-btn.is-active { border: 2px solid #002769; background: #f4f7fc; }
+  .bs-pal-bars {
+    display: flex;
+    height: 16px;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 4px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+  }
+  .bs-pal-bars span { flex: 1 1 0; }
+  .bs-pal-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: #334155;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bs-color-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+  }
+  .bs-color-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+    color: #475569;
+    font-weight: 600;
+  }
+  .bs-color-cell input[type="color"] {
+    width: 100%;
+    height: 30px;
+    padding: 2px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: #ffffff;
+    cursor: pointer;
+  }
+
+  /* ---------- TAB 2: CONCEPT GENERATOR (SMASHING LOGO STYLE) ---------- */
+  .bs-gen-bar {
+    background: #ffffff;
+    border-bottom: 1px solid #d5dfee;
+    padding: 18px 28px;
+    display: grid;
+    grid-template-columns: 1.3fr 1.5fr 1.1fr 0.9fr auto;
+    gap: 14px;
+    align-items: end;
+  }
+  .bs-concepts-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-top: 0;
+    background: #e2e8f0;
+    gap: 1px;
+  }
+  .bs-concept-cell {
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+  }
+  .bs-concept-preview {
+    height: 196px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 28px;
+    border-bottom: 1px solid #eef2f7;
+    background: #ffffff;
+  }
+  .bs-concept-preview.is-dark { background: #0b162d; }
+  .bs-concept-preview svg { max-width: 100%; max-height: 142px; height: auto; }
+  .bs-concept-foot {
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: #f8fafc;
+  }
+  .bs-concept-meta strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  .bs-concept-meta span {
+    font-size: 11.5px;
+    color: #64748b;
+  }
+  .bs-concept-acts { display: flex; gap: 6px; }
+
+  /* ---------- TAB 3: BRANDED MERCHANDISE & MOCKUPS (10 ITEMS) ---------- */
+  .bs-mockups-header {
+    background: #ffffff;
+    border-bottom: 1px solid #d5dfee;
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .bs-mockups-header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #002769;
+  }
+  .bs-mockups-header p {
+    margin: 3px 0 0;
+    font-size: 13.5px;
+    color: #475569;
+  }
+  .bs-mockups-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    background: #d5dfee;
+  }
+  .bs-mockup-tile {
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+  }
+  .bs-mockup-tile__head {
+    padding: 13px 22px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f8fafc;
+  }
+  .bs-mockup-tile__title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  .bs-mockup-tile__cat {
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #002769;
+    margin-right: 10px;
+  }
+  .bs-mockup-tile__stage {
+    padding: 18px 22px;
+    background: #f4f7fc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 290px;
+  }
+  .bs-mockup-tile__stage svg {
+    width: 100%;
+    max-width: 600px;
+    height: auto;
+    display: block;
+    box-shadow: 0 8px 24px rgba(0, 39, 105, 0.08);
+    border-radius: 6px;
+    background: #ffffff;
+  }
+
+  /* ---------- TAB 4: BRAND GUIDELINES BOOK ---------- */
+  .bs-guide-wrap {
+    background: #ffffff;
+    flex: 1 1 auto;
+  }
+  .bs-guide-cover {
+    padding: 36px 40px;
+    color: #ffffff;
+    border-bottom: 3px solid #02982e;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .bs-guide-cover h2 {
+    margin: 0 0 6px;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+  }
+  .bs-guide-cover p {
+    margin: 0;
+    font-size: 14.5px;
+    color: rgba(255, 255, 255, 0.85);
+  }
+  .bs-guide-band {
+    padding: 28px 40px;
+    border-bottom: 1px solid #d5dfee;
+  }
+  .bs-guide-band h3 {
+    margin: 0 0 14px;
+    font-size: 16px;
+    font-weight: 800;
+    color: #002769;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .bs-guide-lockups {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: #d5dfee;
+    border: 1px solid #d5dfee;
+  }
+  .bs-guide-lockup {
+    background: #ffffff;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .bs-guide-lockup--dark { background: #002769; color: #ffffff; }
+  .bs-guide-lockup svg { max-width: 100%; max-height: 80px; margin: auto; }
+  .bs-guide-lockup span { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.8; }
+
+  .bs-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  .bs-table th {
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #475569;
+    padding: 10px 14px;
+    border-bottom: 2px solid #002769;
+    background: #f4f7fc;
+  }
+  .bs-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+  }
+  .bs-dos-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+  }
+  .bs-dos-list {
+    margin: 0;
+    padding-left: 18px;
+    line-height: 1.7;
+    font-size: 14px;
+    color: #1e293b;
+  }
+
+  /* Clear space construction diagram */
+  .bs-clearspace-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 36px 52px;
+    border: 1.5px dashed #02982e;
+    background: #f4f7fc;
+    position: relative;
+  }
+  .bs-clearspace-inner {
+    border: 1px solid #002769;
+    background: #ffffff;
+    padding: 12px 18px;
+    width: 340px;
+  }
+  .bs-clearspace-inner svg { width: 100%; height: auto; display: block; }
+  .bs-clearspace-tag {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #02982e;
+    font-family: var(--ts-font-mono);
+  }
+
+  /* Toast notification */
+  .bs-toast {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 3000;
+    background: #002769;
+    color: #ffffff;
+    border-left: 4px solid #02982e;
+    padding: 12px 18px;
+    font-size: 13.5px;
+    font-weight: 600;
+    box-shadow: 0 12px 30px rgba(0, 39, 105, 0.25);
+    border-radius: 5px;
+    display: none;
+  }
+  .bs-toast.is-show { display: block; }
+
+  @media (max-width: 1120px) {
+    .bs-workspace { grid-template-columns: 1fr; }
+    .bs-inspector { max-height: none; }
+    .bs-concepts-grid { grid-template-columns: repeat(2, 1fr); }
+    .bs-mockups-grid { grid-template-columns: 1fr; }
+    .bs-gen-bar { grid-template-columns: 1fr 1fr; }
+    .bs-guide-lockups { grid-template-columns: repeat(2, 1fr); }
+    .bs-dos-grid { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bs-shell" id="brandStudioApp">
+
+  <!-- ROW 1: EXECUTIVE TRUSTSEAL NAVY STUDIO APPBAR -->
+  <header class="ts-ed__appbar">
+    <div class="ts-ed__brand">
+      <strong>Brand Identity Studio</strong>
+      <small>LOGOS · GUIDELINES · MERCH</small>
+    </div>
+    <span class="ts-ed__divider"></span>
+    <input type="text" id="appbarBrandName" class="ts-ed__filename"
+           value="{{ default_brand_name }}" aria-label="Brand Name"
+           placeholder="Enter company or brand name">
+    <span id="kitRefLabel" class="ts-ed__savestate">Unsaved Draft</span>
+    <span class="ts-ed__spacer"></span>
+    <button type="button" class="ts-ed__btn" id="btnPublishMedia" title="Publish current logo SVG into TRUSTSEAL Media Library">
+      Publish to Media Library
+    </button>
+    <button type="button" class="ts-ed__btn" id="btnPrintBook" title="Open printable Executive Brand Guidelines Book">
+      Print Brand Book
+    </button>
+    <button type="button" class="ts-ed__btn ts-ed__btn--primary" id="btnSaveKit">
+      Save Brand Kit
+    </button>
+  </header>
+
+  <!-- ROW 2: STUDIO RIBBON TABS -->
+  <div class="ts-ed__tabs" role="tablist" aria-label="Brand Studio views">
+    <button type="button" class="ts-ed__tab ts-is-active" role="tab" data-bs-tab="studio">Logo Studio</button>
+    <button type="button" class="ts-ed__tab" role="tab" data-bs-tab="generator">Concept Generator (12 Concepts)</button>
+    <button type="button" class="ts-ed__tab" role="tab" data-bs-tab="mockups">Branded Merchandise &amp; Mockups (10)</button>
+    <button type="button" class="ts-ed__tab" role="tab" data-bs-tab="guidelines">Brand Guidelines Book</button>
+    <button type="button" class="ts-ed__tab" role="tab" data-bs-tab="kits">Saved Kits (<span id="savedKitsCount">{{ saved_kits|length }}</span>)</button>
+  </div>
+
+  <!-- ROW 3: CONTEXTUAL RIBBON BAR -->
+  <div class="bs-ribbon" id="bsRibbon">
+    <div class="bs-rgrp">
+      <span class="bs-rgrp__lbl">Layout</span>
+      <button type="button" class="bs-rbtn is-active" data-layout="horizontal">Horizontal</button>
+      <button type="button" class="bs-rbtn" data-layout="stacked">Stacked</button>
+      <button type="button" class="bs-rbtn" data-layout="emblem">Emblem</button>
+      <button type="button" class="bs-rbtn" data-layout="monogram">Monogram</button>
+      <button type="button" class="bs-rbtn" data-layout="wordmark">Wordmark</button>
+    </div>
+    <div class="bs-rgrp">
+      <span class="bs-rgrp__lbl">Stage</span>
+      <button type="button" class="bs-rbtn is-active" data-stage="light">White</button>
+      <button type="button" class="bs-rbtn" data-stage="dark">Dark Navy</button>
+      <button type="button" class="bs-rbtn" data-stage="grid">Blueprint Grid</button>
+    </div>
+    <div class="bs-rgrp">
+      <span class="bs-rgrp__lbl">Merch Finish</span>
+      <button type="button" class="bs-rbtn is-active" data-finish="primary">Brand Primary</button>
+      <button type="button" class="bs-rbtn" data-finish="dark">Executive Dark</button>
+      <button type="button" class="bs-rbtn" data-finish="light">Crisp White</button>
+    </div>
+    <div class="bs-rgrp">
+      <span class="bs-rgrp__lbl">Export SVG</span>
+      <button type="button" class="bs-rbtn" data-download-svg="primary">Primary</button>
+      <button type="button" class="bs-rbtn" data-download-svg="mono_dark">Mono Dark</button>
+      <button type="button" class="bs-rbtn" data-download-svg="mono_light">White Reversed</button>
+      <button type="button" class="bs-rbtn" data-download-svg="icon_only">Square Icon</button>
+    </div>
+  </div>
+
+  <!-- ==================== TAB 1: LOGO STUDIO ==================== -->
+  <section class="bs-panel is-active" data-bs-panel="studio">
+    <div class="bs-workspace">
+      <div class="bs-stage-col">
+        <div class="bs-canvas-hero" id="primaryStage">
+          <div class="bs-canvas-meta">
+            <span id="stageMetaLeft">PRIMARY VECTOR LOCKUP · HORIZONTAL</span>
+            <span id="stageMetaRight">SCALABLE SVG · 0 LOSS PRINT &amp; DIGITAL</span>
+          </div>
+          <div class="bs-canvas-hero__frame" id="primaryLogoContainer"></div>
+        </div>
+
+        <div class="bs-variants-strip">
+          <div class="bs-variant-cell">
+            <div class="bs-variant-cell__head">
+              <span>Reversed White Lockup</span>
+              <button type="button" class="bs-link-act" data-download-svg="mono_light">Download SVG</button>
+            </div>
+            <div class="bs-variant-cell__box bs-variant-cell__box--dark" id="reversedPreviewBox"></div>
+          </div>
+          <div class="bs-variant-cell">
+            <div class="bs-variant-cell__head">
+              <span>Dark Monochrome (Print / Fax)</span>
+              <button type="button" class="bs-link-act" data-download-svg="mono_dark">Download SVG</button>
+            </div>
+            <div class="bs-variant-cell__box" id="monoDarkPreviewBox"></div>
+          </div>
+          <div class="bs-variant-cell">
+            <div class="bs-variant-cell__head">
+              <span>Square Icon / Favicon</span>
+              <button type="button" class="bs-link-act" data-download-svg="icon_only">Download SVG</button>
+            </div>
+            <div class="bs-variant-cell__box" id="iconOnlyPreviewBox"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT INSPECTOR -->
+      <aside class="bs-inspector" aria-label="Brand identity controls">
+        <div class="bs-sec">
+          <h3 class="bs-sec__title">1. Brand Identity</h3>
+          <div class="bs-field">
+            <label for="inpBrandName">Company / Brand Name</label>
+            <input type="text" id="inpBrandName" class="bs-input" value="{{ default_brand_name }}">
+          </div>
+          <div class="bs-field">
+            <label for="inpTagline">Tagline / Positioning Line</label>
+            <input type="text" id="inpTagline" class="bs-input" value="Verified Integrity" placeholder="e.g. Precision Engineering">
+          </div>
+          <div class="bs-field">
+            <label for="inpIndustry">Industry Sector</label>
+            <select id="inpIndustry" class="bs-select">
+              {% for ind in industries %}
+              <option value="{{ ind }}">{{ ind }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="bs-sec">
+          <h3 class="bs-sec__title">
+            <span>2. Vector Brand Mark (24 Geometric Icons)</span>
+          </h3>
+          <div class="bs-icon-grid" id="iconPickerGrid"></div>
+        </div>
+
+        <div class="bs-sec">
+          <h3 class="bs-sec__title">3. Executive Color System</h3>
+          <div class="bs-palette-grid" id="palettePickerGrid"></div>
+          <div class="bs-color-row">
+            <div class="bs-color-cell">
+              <span>Primary</span>
+              <input type="color" id="clrPrimary" value="#002769">
+            </div>
+            <div class="bs-color-cell">
+              <span>Secondary</span>
+              <input type="color" id="clrSecondary" value="#02982e">
+            </div>
+            <div class="bs-color-cell">
+              <span>Accent</span>
+              <input type="color" id="clrAccent" value="#1d4ed8">
+            </div>
+            <div class="bs-color-cell">
+              <span>Ink Dark</span>
+              <input type="color" id="clrDark" value="#0f172a">
+            </div>
+            <div class="bs-color-cell">
+              <span>Surface</span>
+              <input type="color" id="clrLight" value="#f4f7fc">
+            </div>
+          </div>
+        </div>
+
+        <div class="bs-sec">
+          <h3 class="bs-sec__title">4. Typography &amp; Tracking</h3>
+          <div class="bs-field">
+            <label for="inpFontPairing">Font Pairing</label>
+            <select id="inpFontPairing" class="bs-select">
+              {% for f in fonts %}
+              <option value="{{ f.id }}">{{ f.name }} — {{ f.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="bs-field">
+            <label for="inpLetterSpacing">Wordmark Tracking: <strong id="lblTracking">1.5px</strong></label>
+            <input type="range" id="inpLetterSpacing" min="0" max="6" step="0.5" value="1.5" style="width:100%;">
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ==================== TAB 2: SMASHING-LOGO CONCEPT GENERATOR ==================== -->
+  <section class="bs-panel" data-bs-panel="generator">
+    <div class="bs-gen-bar">
+      <div class="bs-field" style="margin:0;">
+        <label for="genBrandName">Brand Name</label>
+        <input type="text" id="genBrandName" class="bs-input" value="{{ default_brand_name }}">
+      </div>
+      <div class="bs-field" style="margin:0;">
+        <label for="genTagline">Tagline</label>
+        <input type="text" id="genTagline" class="bs-input" value="Verified Integrity">
+      </div>
+      <div class="bs-field" style="margin:0;">
+        <label for="genIndustry">Industry</label>
+        <select id="genIndustry" class="bs-select">
+          {% for ind in industries %}
+          <option value="{{ ind }}">{{ ind }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="bs-field" style="margin:0;">
+        <label for="genArchetype">Brand Personality</label>
+        <select id="genArchetype" class="bs-select">
+          <option value="modern_corporate">Modern Executive</option>
+          <option value="heritage_authority">Heritage &amp; Legal</option>
+          <option value="tech_precision">Tech &amp; Precision</option>
+          <option value="luxury_minimal">Luxury Architectural</option>
+        </select>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="bs-rbtn" id="btnToggleConceptBg">Dark Preview</button>
+        <button type="button" class="bs-rbtn bs-rbtn--emerald" id="btnGenerateConcepts" style="height:36px; padding:0 18px;">
+          Generate 12 Concepts
+        </button>
+      </div>
+    </div>
+    <div class="bs-concepts-grid" id="conceptsGrid"></div>
+  </section>
+
+  <!-- ==================== TAB 3: BRANDED MERCHANDISE & MOCKUPS (10 REAL-WORLD ITEMS) ==================== -->
+  <section class="bs-panel" data-bs-panel="mockups">
+    <div class="bs-mockups-header">
+      <div>
+        <h2>Live Branded Merchandise &amp; Physical Application Samples</h2>
+        <p>Every item renders your exact vector logo, color system, and tagline live. Switch finishes in the ribbon above or export any mockup as a vector SVG.</p>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button type="button" class="bs-rbtn" data-bs-jump="studio">Edit Logo in Studio</button>
+        <button type="button" class="bs-rbtn bs-rbtn--emerald" id="btnSaveFromMockups">Save Brand Kit</button>
+      </div>
+    </div>
+    <div class="bs-mockups-grid" id="mockupsGrid"></div>
+  </section>
+
+  <!-- ==================== TAB 4: EXECUTIVE BRAND GUIDELINES BOOK ==================== -->
+  <section class="bs-panel" data-bs-panel="guidelines">
+    <div class="bs-guide-wrap" id="guidelinesContainer"></div>
+  </section>
+
+  <!-- ==================== TAB 5: SAVED BRAND KITS ==================== -->
+  <section class="bs-panel" data-bs-panel="kits">
+    <div class="bs-mockups-header">
+      <div>
+        <h2>Organization Brand Identity Kits</h2>
+        <p>Saved vector identities ready to load into Studio, print as Brand Books, or publish into TRUSTSEAL Media Library for Letterheads &amp; Stamps.</p>
+      </div>
+      <button type="button" class="bs-rbtn bs-rbtn--emerald" id="btnNewDraftKit">+ New Brand Identity</button>
+    </div>
+    <div style="background:#ffffff; flex:1 1 auto; padding:0;">
+      <table class="bs-table" id="savedKitsTable">
+        <thead>
+          <tr>
+            <th style="width:130px;">Reference</th>
+            <th style="width:220px;">Vector Preview</th>
+            <th>Brand Name &amp; Tagline</th>
+            <th>Palette</th>
+            <th>Industry / Layout</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="savedKitsTbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+
+<div class="bs-toast" id="bsToast" role="status" aria-live="polite"></div>
+{% endblock %}
+
+{% block extra_body %}
+<script>
+(function () {
+  "use strict";
+
+  const BRAND_ICONS = {{ icons | tojson }};
+  const BRAND_PALETTES = {{ palettes | tojson }};
+  const FONT_PAIRINGS = {{ fonts | tojson }};
+  const MOCKUP_CATALOG = {{ mockups | tojson }};
+  const INITIAL_KITS = {{ saved_kits | map(attribute='id') | list | tojson }};
+
+  const ICONS_BY_ID = Object.fromEntries(BRAND_ICONS.map(i => [i.id, i]));
+  const FONTS_BY_ID = Object.fromEntries(FONT_PAIRINGS.map(f => [f.id, f]));
+
+  const state = {
+    kitId: null,
+    kitRef: null,
+    brand_name: {{ default_brand_name | tojson }} || "TRUSTSEAL Enterprise",
+    tagline: "Verified Integrity",
+    industry: "Technology & SaaS",
+    archetype: "modern_corporate",
+    icon_id: "shield_check",
+    logo_layout: "horizontal",
+    font_id: "inter_clean",
+    font_heading: FONT_PAIRINGS[0].heading,
+    font_body: FONT_PAIRINGS[0].body,
+    letter_spacing: 1.5,
+    primary_color: "#002769",
+    secondary_color: "#02982e",
+    accent_color: "#1d4ed8",
+    dark_color: "#0f172a",
+    light_color: "#f4f7fc",
+    stageBg: "light",
+    merchFinish: "primary",
+    conceptDarkBg: false,
+    generatedConcepts: [],
+    savedKits: [],
+  };
+
+  /* ---------- Utilities ---------- */
+  function escXml(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function initials(name) {
+    const words = String(name || "TS").trim().split(/[\s\-_&]+/).filter(Boolean);
+    if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+    if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+    return "TS";
+  }
+
+  function hexToRgb(hex) {
+    const clean = (hex || "#002769").replace("#", "");
+    const h = clean.length === 3 ? clean.split("").map(c => c + c).join("") : clean.padEnd(6, "0");
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+
+  function hexToCmyk(hex) {
+    const [r, g, b] = hexToRgb(hex).map(v => v / 255);
+    const k = 1 - Math.max(r, g, b);
+    if (k >= 0.999) return [0, 0, 0, 100];
+    const c = (1 - r - k) / (1 - k);
+    const m = (1 - g - k) / (1 - k);
+    const y = (1 - b - k) / (1 - k);
+    return [Math.round(c * 100), Math.round(m * 100), Math.round(y * 100), Math.round(k * 100)];
+  }
+
+  function showToast(msg) {
+    const el = document.getElementById("bsToast");
+    el.textContent = msg;
+    el.classList.add("is-show");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => el.classList.remove("is-show"), 3200);
+  }
+
+  function downloadSvg(svgMarkup, filename) {
+    const blob = new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function iconPaths(iconId, primary, secondary, contrast) {
+    const icon = ICONS_BY_ID[iconId] || BRAND_ICONS[0];
+    return icon.paths
+      .replace(/\{primary\}/g, primary)
+      .replace(/\{secondary\}/g, secondary)
+      .replace(/\{contrast\}/g, contrast);
+  }
+
+  /* ---------- Core Parametric Logo Renderer (mirrors Python engine) ---------- */
+  function renderLogoSvg(cfg, mode) {
+    const name = escXml((cfg.brand_name || "TRUSTSEAL").trim());
+    const tag = escXml((cfg.tagline || "").trim());
+    const p = cfg.primary_color || "#002769";
+    const s = cfg.secondary_color || "#02982e";
+    const d = cfg.dark_color || "#0f172a";
+    const ff = (cfg.font_heading || "Inter, sans-serif").replace(/"/g, "'");
+    const layout = cfg.logo_layout || "horizontal";
+    const ls = Number(cfg.letter_spacing ?? 1.5).toFixed(1);
+
+    let iconP = p, iconS = s, iconC = "#ffffff", txtMain = p, txtSub = "#475569";
+    if (mode === "mono_dark") {
+      iconP = d; iconS = d; iconC = "#ffffff"; txtMain = d; txtSub = d;
+    } else if (mode === "mono_light") {
+      iconP = "#ffffff"; iconS = "#ffffff"; iconC = p; txtMain = "#ffffff"; txtSub = "rgba(255,255,255,0.82)";
+    }
+
+    const mark = iconPaths(cfg.icon_id, iconP, iconS, iconC);
+
+    if (mode === "icon_only") {
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="${name} Mark"><g transform="translate(12,12) scale(1.5)">${mark}</g></svg>`;
+    }
+
+    const nameLen = Math.max((cfg.brand_name || "TRUSTSEAL").length, 4);
+    const titleFs = nameLen <= 12 ? 34 : (nameLen <= 17 ? 26 : (nameLen <= 22 ? 21 : 17));
+
+    if (layout === "stacked") {
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 220" role="img" aria-label="${name}">
+        <g transform="translate(168,22) scale(1.75)">${mark}</g>
+        <text x="210" y="152" text-anchor="middle" font-family="${ff}" font-size="${titleFs}" font-weight="800" letter-spacing="${ls}" fill="${txtMain}">${name.toUpperCase()}</text>
+        ${tag ? `<text x="210" y="182" text-anchor="middle" font-family="${ff}" font-size="13" font-weight="600" letter-spacing="2.4" fill="${txtSub}">${tag.toUpperCase()}</text>` : ""}
+      </svg>`;
+    }
+
+    if (layout === "emblem") {
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" role="img" aria-label="${name}">
+        <circle cx="160" cy="160" r="144" fill="none" stroke="${iconP}" stroke-width="5"/>
+        <circle cx="160" cy="160" r="133" fill="none" stroke="${iconS}" stroke-width="1.8" stroke-dasharray="4 4"/>
+        <g transform="translate(118,52) scale(1.75)">${mark}</g>
+        <text x="160" y="182" text-anchor="middle" font-family="${ff}" font-size="${Math.min(titleFs, 26)}" font-weight="800" letter-spacing="${ls}" fill="${txtMain}">${name.toUpperCase()}</text>
+        ${tag ? `<text x="160" y="210" text-anchor="middle" font-family="${ff}" font-size="11.5" font-weight="600" letter-spacing="2.2" fill="${txtSub}">${tag.toUpperCase()}</text>` : ""}
+        <line x1="108" y1="232" x2="212" y2="232" stroke="${iconS}" stroke-width="2.5"/>
+      </svg>`;
+    }
+
+    if (layout === "monogram") {
+      const init = escXml(initials(cfg.brand_name));
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 130" role="img" aria-label="${name}">
+        <rect x="18" y="18" width="94" height="94" rx="12" fill="${iconP}"/>
+        <rect x="18" y="102" width="94" height="10" rx="2" fill="${iconS}"/>
+        <text x="65" y="76" text-anchor="middle" font-family="${ff}" font-size="40" font-weight="800" letter-spacing="2" fill="${iconC}">${init}</text>
+        <text x="134" y="${tag ? 66 : 76}" font-family="${ff}" font-size="${titleFs}" font-weight="800" letter-spacing="${ls}" fill="${txtMain}">${name.toUpperCase()}</text>
+        ${tag ? `<text x="135" y="92" font-family="${ff}" font-size="12.5" font-weight="600" letter-spacing="2.2" fill="${txtSub}">${tag.toUpperCase()}</text>` : ""}
+      </svg>`;
+    }
+
+    if (layout === "wordmark") {
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 124" role="img" aria-label="${name}">
+        <text x="240" y="${tag ? 64 : 74}" text-anchor="middle" font-family="${ff}" font-size="${titleFs + 6}" font-weight="800" letter-spacing="${(Number(ls) + 1.5).toFixed(1)}" fill="${txtMain}">${name.toUpperCase()}</text>
+        <rect x="176" y="${tag ? 76 : 88}" width="128" height="3.5" fill="${iconS}"/>
+        ${tag ? `<text x="240" y="102" text-anchor="middle" font-family="${ff}" font-size="12.5" font-weight="600" letter-spacing="2.8" fill="${txtSub}">${tag.toUpperCase()}</text>` : ""}
+      </svg>`;
+    }
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 120" role="img" aria-label="${name}">
+      <g transform="translate(18,16) scale(1.85)">${mark}</g>
+      <text x="122" y="${tag ? 62 : 72}" font-family="${ff}" font-size="${titleFs}" font-weight="800" letter-spacing="${ls}" fill="${txtMain}">${name.toUpperCase()}</text>
+      ${tag ? `<text x="123" y="88" font-family="${ff}" font-size="12.5" font-weight="600" letter-spacing="2.3" fill="${txtSub}">${tag.toUpperCase()}</text>` : ""}
+    </svg>`;
+  }
+
+  /* ---------- 10 Bespoke Vector Branded Merchandise & Physical Mockups ---------- */
+  function renderMerchMockupSvg(mockupId, cfg, finish) {
+    const name = escXml((cfg.brand_name || "TRUSTSEAL").trim().toUpperCase());
+    const rawName = (cfg.brand_name || "TRUSTSEAL").trim();
+    const tag = escXml((cfg.tagline || "Verified Integrity").trim().toUpperCase());
+    const domain = escXml("www." + rawName.toLowerCase().replace(/[^a-z0-9]+/g, "") + ".com");
+    const p = cfg.primary_color || "#002769";
+    const s = cfg.secondary_color || "#02982e";
+    const d = cfg.dark_color || "#0f172a";
+    const l = cfg.light_color || "#f4f7fc";
+    const ff = (cfg.font_heading || "Inter, sans-serif").replace(/"/g, "'");
+
+    // Surface palette depending on selected finish
+    const surf = finish === "dark" ? d : (finish === "light" ? "#ffffff" : p);
+    const isLightSurf = finish === "light";
+    const inkOnSurf = isLightSurf ? p : "#ffffff";
+    const subOnSurf = isLightSurf ? "#475569" : "rgba(255,255,255,0.78)";
+    const markOnSurf = isLightSurf
+      ? iconPaths(cfg.icon_id, p, s, "#ffffff")
+      : iconPaths(cfg.icon_id, "#ffffff", s, p);
+    const markColor = iconPaths(cfg.icon_id, p, s, "#ffffff");
+    const markWhite = iconPaths(cfg.icon_id, "#ffffff", s, p);
+    const shortName = name.length > 16 ? name.slice(0, 16) : name;
+
+    switch (mockupId) {
+      case "business_card":
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 340" role="img" aria-label="Executive Business Cards">
+          <rect width="600" height="340" fill="#eef2f8"/>
+          <!-- Back Card (Brand Primary) -->
+          <g transform="translate(52,38)">
+            <rect x="6" y="10" width="320" height="186" rx="8" fill="rgba(15,23,42,0.12)"/>
+            <rect width="320" height="186" rx="8" fill="${surf}" stroke="${isLightSurf ? '#cbd5e1' : 'none'}"/>
+            <rect x="0" y="178" width="320" height="8" rx="2" fill="${s}"/>
+            <g transform="translate(132,36) scale(1.15)">${markOnSurf}</g>
+            <text x="160" y="122" text-anchor="middle" font-family="${ff}" font-size="18" font-weight="800" letter-spacing="2" fill="${inkOnSurf}">${shortName}</text>
+            <text x="160" y="142" text-anchor="middle" font-family="${ff}" font-size="8.5" font-weight="600" letter-spacing="2" fill="${subOnSurf}">${tag}</text>
+          </g>
+          <!-- Front Card (Crisp White Executive) -->
+          <g transform="translate(226,120)">
+            <rect x="6" y="10" width="320" height="186" rx="8" fill="rgba(15,23,42,0.16)"/>
+            <rect width="320" height="186" rx="8" fill="#ffffff" stroke="#d5dfee"/>
+            <rect x="0" y="0" width="8" height="186" rx="2" fill="${p}"/>
+            <rect x="8" y="0" width="3" height="186" fill="${s}"/>
+            <g transform="translate(26,22) scale(0.75)">${markColor}</g>
+            <text x="72" y="42" font-family="${ff}" font-size="14" font-weight="800" letter-spacing="1.4" fill="${p}">${shortName}</text>
+            <text x="72" y="56" font-family="${ff}" font-size="7.5" font-weight="600" letter-spacing="1.8" fill="#64748b">${tag}</text>
+            <line x1="28" y1="84" x2="292" y2="84" stroke="#e2e8f0" stroke-width="1"/>
+            <text x="28" y="108" font-family="${ff}" font-size="13" font-weight="700" fill="#0f172a">Elena Vance, CFA</text>
+            <text x="28" y="124" font-family="${ff}" font-size="9.5" font-weight="600" fill="${s}">MANAGING DIRECTOR</text>
+            <text x="28" y="148" font-family="${ff}" font-size="9" fill="#475569">+1 (800) 555-0194  ·  exec@${rawName.toLowerCase().replace(/[^a-z0-9]+/g,'') || 'brand'}.com</text>
+            <text x="28" y="164" font-family="${ff}" font-size="9" font-weight="600" fill="${p}">${domain}</text>
+          </g>
+        </svg>`;
+
+      case "pen":
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 340" role="img" aria-label="Engraved Corporate Pen">
+          <defs>
+            <linearGradient id="penBody" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="${surf}"/>
+              <stop offset="32%" stop-color="${isLightSurf ? '#f8fafc' : surf}" stop-opacity="0.88"/>
+              <stop offset="100%" stop-color="${d}"/>
+            </linearGradient>
+            <linearGradient id="chrome" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#f8fafc"/>
+              <stop offset="48%" stop-color="#cbd5e1"/>
+              <stop offset="100%" stop-color="#64748b"/>
+            </linearGradient>
+          </defs>
+          <rect width="600" height="340" fill="#eef2f8"/>
+          <!-- Presentation desk mat -->
+          <rect x="34" y="42" width="532" height="256" rx="10" fill="#ffffff" stroke="#d5dfee"/>
+          <line x1="34" y1="238" x2="566" y2="238" stroke="#e2e8f0" stroke-width="1"/>
+          <text x="58" y="272" font-family="${ff}" font-size="11" font-weight="700" letter-spacing="1.5" fill="#64748b">ANODIZED EXECUTIVE ROLLERBALL · LASER-ENGRAVED BARREL</text>
+          <!-- Drop shadow -->
+          <ellipse cx="304" cy="186" rx="225" ry="12" fill="rgba(15,23,42,0.14)"/>
+          <!-- Pen assembly tilted subtly -->
+          <g transform="translate(52,118) rotate(-4 248 26)">
+            <!-- Push crown -->
+            <rect x="444" y="12" width="28" height="28" rx="6" fill="url(#chrome)"/>
+            <!-- Main Barrel -->
+            <rect x="116" y="6" width="332" height="40" rx="6" fill="url(#penBody)" stroke="${isLightSurf ? '#cbd5e1' : 'none'}"/>
+            <!-- Specular top sheen -->
+            <rect x="122" y="10" width="320" height="6" rx="3" fill="rgba(255,255,255,0.22)"/>
+            <!-- Accent Ring -->
+            <rect x="296" y="6" width="8" height="40" fill="${s}"/>
+            <rect x="304" y="6" width="6" height="40" fill="url(#chrome)"/>
+            <!-- Metallic Pocket Clip -->
+            <path d="M324 3 H444 C449 3 451 8 446 11 H330 L322 14 Z" fill="url(#chrome)" stroke="#94a3b8" stroke-width="0.6"/>
+            <!-- Grip & Chrome Nib Cone -->
+            <polygon points="116,6 54,18 54,34 116,46" fill="url(#chrome)"/>
+            <polygon points="54,18 32,24 32,28 54,34" fill="#334155"/>
+            <circle cx="30" cy="26" r="2.6" fill="#0f172a"/>
+            <!-- Engraved Vector Logo & Wordmark on barrel -->
+            <g transform="translate(132,12) scale(0.56)">${markOnSurf}</g>
+            <text x="166" y="31" font-family="${ff}" font-size="13.5" font-weight="800" letter-spacing="1.6" fill="${inkOnSurf}">${shortName}</text>
+          </g>
+        </svg>`;
+
+      case "tshirt":
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 340" role="img" aria-label="Branded Corporate Polo and T-Shirt">
+          <rect width="600" height="340" fill="#eef2f8"/>
+          <!-- Shirt Shadow -->
+          <ellipse cx="298" cy="314" rx="130" ry="10" fill="rgba(15,23,42,0.12)"/>
+          <!-- Front Executive Polo / Tee -->
+          <g transform="translate(140,20)">
+            <path d="M98,18 L128,10 Q160,36 192,10 L222,18 L294,68 L266,126 L232,108 L232,282 Q160,290 88,282 L88,108 L54,126 L26,68 Z"
+                  fill="${surf}" stroke="${isLightSurf ? '#cbd5e1' : d}" stroke-width="2"/>
+            <!-- Collar & Placket -->
+            <path d="M126,10 Q160,44 194,10 L204,24 Q160,58 116,24 Z" fill="${isLightSurf ? '#e2e8f0' : 'rgba(0,0,0,0.22)'}"/>
+            <rect x="152" y="38" width="16" height="46" rx="3" fill="${isLightSurf ? '#f1f5f9' : 'rgba(255,255,255,0.1)'}" stroke="${s}" stroke-width="1.2"/>
+            <circle cx="160" cy="52" r="2.5" fill="${s}"/>
+            <circle cx="160" cy="68" r="2.5" fill="${s}"/>
+            <!-- Sleeve Trim Stripes -->
+            <path d="M29,74 L57,122" stroke="${s}" stroke-width="4"/>
+            <path d="M291,74 L263,122" stroke="${s}" stroke-width="4"/>
+            <!-- Left Chest Embroidered Crest -->
+            <g transform="translate(178,86) scale(0.72)">${markOnSurf}</g>
+            <text x="195" y="134" text-anchor="middle" font-family="${ff}" font-size="8.5" font-weight="800" letter-spacing="1.2" fill="${inkOnSurf}">${shortName.slice(0, 12)}</text>
+            <!-- Subtle Fabric Fold Shading -->
+            <path d="M94,116 L94,274" stroke="rgba(255,255,255,0.08)" stroke-width="4"/>
+            <path d="M226,116 L226,274" stroke="rgba(0,0,0,0.12)" stroke-width="4"/>
+          </g>
+          <!-- Apparel Spec Callout -->
+          <g transform="translate(440,56)">
+            <rect width="136" height="92" rx="6" fill="#ffffff" stroke="#d5dfee"/>
+            <text x="12" y="22" font-family="${ff}" font-size="9.5" font-weight="800" fill="${p}">EMBROIDERY SPEC</text>
+            <text x="12" y="40" font-family="${ff}" font-size="9" fill="#475569">Chest Crest: 85mm</text>
+            <text x="12" y="56" font-family="${ff}" font-size="9" fill="#475569">Thread: ${s.toUpperCase()}</text>
+            <text x="12" y="72" font-family="${ff}" font-size="9" fill="#475569">Garment: Pique 240g</text>
+          </g>
+        </svg>`;
+
+      case "cap":
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 340" role="img" aria-label="Embroidered Corporate Cap">
+          <rect width="600" height="340" fill="#eef2f8"/>
+          <ellipse cx="300" cy="276" rx="188" ry="18" fill="rgba(15,23,42,0.13)"/>
+          <g transform="translate(110,46)">
+            <!-- Crown Top Button -->
+            <ellipse cx="186" cy="24" rx="14" ry="7" fill="${s}"/>
+            <!-- 6-Panel Structured Crown -->
+            <path d="M52,164 C52,66 112,24 186,24 C260,24 320,66 320,164 Z" fill="${surf}" stroke="${isLightSurf ? '#cbd5e1' : d}" stroke-width="2"/>
+            <!-- Panel Seams -->
+            <path d="M186,24 C156,74 148,118 148,164" fill="none" stroke="${isLightSurf ? '#cbd5e1' : 'rgba(255,255,255,0.22)'}" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <path d="M186,24 C216,74 224,118 224,164" fill="none" stroke="${isLightSurf ? '#cbd5e1' : 'rgba(255,255,255,0.22)'}" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <!-- Curved Visor / Brim -->
+            <path d="M46,164 C118,144 268,144 358,186 C366,192 360,214 336,218 C246,204 128,196 42,188 C32,186 34,168 46,164 Z"
+                  fill="${isLightSurf ? p : d}" stroke="${s}" stroke-width="2.2"/>
+            <!-- Visor Contrast Edge -->
+            <path d="M48,176 C140,166 256,174 348,204" fill="none" stroke="${s}" stroke-width="2.5"/>
+            <!-- Embroidered Front Crown Emblem -->
+            <g transform="translate(154,54) scale(1.32)">${markOnSurf}</g>
+            <text x="186" y="138" text-anchor="middle" font-family="${ff}" font-size="13" font-weight="800" letter-spacing="1.6" fill="${inkOnSurf}">${shortName.slice(0, 14)}</text>
+          </g>
+        </svg>`;
+
+      case "car":
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 340" role="img" aria-label="Company Fleet Vehicle Wrap">
+          <rect width="600" height="340" fill="#eef2f8"/>
+          <!-- Road Surface -->
+          <rect x="0" y="254" width="600" height="86" fill="#dbe4f2"/>
+          <line x1="0" y1="254" x2="600" y2="254" stroke="#94a3b8" stroke-width="2"/>
+          <!-- Vehicle Shadow -->
+          <ellipse cx="300" cy="264" rx="236" ry="14" fill="rgba(15,23,42,0.22)"/>
+          <!-- Executive Fleet Crossover / Sedan Profile -->
+          <g transform="translate(46,72)">
+            <!-- Car Body Base -->
+            <path d="M48,148 L66,104 L148,54 C194,40 318,40 374,56 L444,104 L496,118 C508,122 512,140 508,166 L486,174 L42,174 C32,170 36,154 48,148 Z"
+                  fill="${surf}" stroke="${isLightSurf ? '#94a3b8' : d}" stroke-width="2"/>
+            <!-- Diagonal Brand Livery Accent Wrap -->
+            <polygon points="344,104 446,104 494,168 386,168" fill="${s}" fill-opacity="0.92"/>
+            <polygon points="318,104 338,104 380,168 360,168" fill="${isLightSurf ? p : '#ffffff'}" fill-opacity="0.3"/>
+            <!-- Windows (Tinted) -->
+            <path d="M158,64 L264,58 L264,102 L106,102 Z" fill="#1e293b"/>
+            <path d="M276,58 L364,64 L416,102 L276,102 Z" fill="#1e293b"/>
+            <!-- Headlight & Taillight -->
+            <polygon points="484,122 508,128 502,140 478,136" fill="#fef08a"/>
+            <polygon points="48,124 68,120 66,136 44,138" fill="#ef4444"/>
+            <!-- Door Line -->
+            <line x1="268" y1="104" x2="268" y2="168" stroke="rgba(15,23,42,0.2)" stroke-width="1.5"/>
+            <!-- Side Door Corporate Logo & Tagline -->
+            <g transform="translate(154,112) scale(0.86)">${markOnSurf}</g>
+            <text x="206" y="135" font-family="${ff}" font-size="16" font-weight="800" letter-spacing="1.4" fill="${inkOnSurf}">${shortName.slice(0, 14)}</text>
+            <text x="206" y="151" font-family="${ff}" font-size="8.5" font-weight="700" letter-spacing="1.6" fill="${subOnSurf}">${tag.slice(0, 26)}</text>
+            <text x="410" y="156" font-family="${ff}" font-size="8.5" font-weight="700" fill="#ffffff">${domain.slice(0, 20)}</text>
+            <!-- Wheels & Alloy Rims -->
+            <g transform="translate(126,174)">
+              <circle r="32" fill="#0f172a"/><circle r="20" fill="#cbd5e1"/><circle r="8" fill="${p}"/>
+            </g>
+            <g transform="translate(414,174)">
+              <circle r="32" fill="#0f172a"/><circle r="20" fill="#cbd5e1"/><circle r="8" fill="${p}"/>
+            </g>
+          </g>
+        </svg>`;
+
+      case "billboard":
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 340" role="img" aria-label="Highway Outdoor Billboard">
+          <defs>
+            <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#cfe0f7"/>
+              <stop offset="70%" stop-color="#edf4fc"/>
+              <stop offset="100%" stop-color="#cbd5e1"/>
+            </linearGradient>
+          </defs>
+          <rect width="600" height="340" fill="url(#skyGrad)"/>
+          <!-- Distant Horizon Skyline -->
+          <path d="M0,290 L70,278 L140,286 L240,272 L360,284 L480,274 L600,288 L600,340 L0,340 Z" fill="#94a3b8" fill-opacity="0.35"/>
+          <!-- Steel Monopole Support Column & Catwalk -->
+          <rect x="284" y="216" width="32" height="124" fill="#334155"/>
+          <rect x="296" y="216" width="8" height="124" fill="#64748b"/>
+          <rect x="52" y="212" width="496" height="8" fill="#1e293b"/>
+          <!-- Overhead Spotlights -->
+          <g fill="#1e293b">
+            <rect x="130" y="22" width="18" height="6"/><rect x="290" y="22" width="20" height="6"/><rect x="452" y="22" width="18" height="6"/>
+            <line x1="139" y1="28" x2="139" y2="38" stroke="#1e293b" stroke-width="3"/>
+            <line x1="300" y1="28" x2="300" y2="38" stroke="#1e293b" stroke-width="3"/>
+            <line x1="461" y1="28" x2="461" y2="38" stroke="#1e293b" stroke-width="3"/>
+          </g>
+          <!-- Billboard Outer Frame -->
+          <rect x="48" y="36" width="504" height="178" rx="4" fill="#0f172a"/>
+          <!-- Billboard Creative Canvas -->
+          <rect x="56" y="44" width="488" height="162" fill="${surf}"/>
+          <polygon points="384,44 544,44 544,206 324,206" fill="${s}" fill-opacity="0.18"/>
+          <rect x="56" y="198" width="488" height="8" fill="${s}"/>
+          <!-- Logo + Headline on Billboard -->
+          <g transform="translate(82,72) scale(1.65)">${markOnSurf}</g>
+          <text x="184" y="114" font-family="${ff}" font-size="28" font-weight="800" letter-spacing="1.6" fill="${inkOnSurf}">${shortName}</text>
+          <text x="186" y="142" font-family="${ff}" font-size="12" font-weight="700" letter-spacing="2.6" fill="${subOnSurf}">${tag}</text>
+          <rect x="186" y="158" width="144" height="24" rx="3" fill="${s}"/>
+          <text x="258" y="174" text-anchor="middle" font-family="${ff}" font-size="10.5" font-weight="800" letter-spacing="1" fill="#ffffff">${domain}</text>
+        </svg>`;
+
+      case "mug":
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 340" role="img" aria-label="Ceramic Executive Coffee Mug">
+          <rect width="600" height="340" fill="#eef2f8"/>
+          <rect x="0" y="252" width="600" height="88" fill="#dbe4f2"/>
+          <ellipse cx="288" cy="282" rx="112" ry="14" fill="rgba(15,23,42,0.16)"/>
+          <!-- Mug Handle -->
+          <path d="M366,104 C422,104 426,214 366,214" fill="none" stroke="${isLightSurf ? p : surf}" stroke-width="22" stroke-linecap="round"/>
+          <path d="M366,104 C412,104 416,214 366,214" fill="none" stroke="#eef2f8" stroke-width="10"/>
+          <!-- Mug Body -->
+          <path d="M188,78 L374,78 L368,262 C368,278 332,286 281,286 C230,286 194,278 194,262 Z"
+                fill="${surf}" stroke="${isLightSurf ? '#cbd5e1' : d}" stroke-width="2"/>
+          <!-- Rim -->
+          <ellipse cx="281" cy="78" rx="93" ry="14" fill="${isLightSurf ? '#f1f5f9' : d}" stroke="${s}" stroke-width="2.5"/>
+          <ellipse cx="281" cy="78" rx="82" ry="9" fill="#334155"/>
+          <!-- Cylindrical Highlight -->
+          <rect x="206" y="96" width="16" height="172" rx="8" fill="rgba(255,255,255,0.14)"/>
+          <!-- Brand Logo Centered on Mug -->
+          <g transform="translate(247,120) scale(1.4)">${markOnSurf}</g>
+          <text x="281" y="216" text-anchor="middle" font-family="${ff}" font-size="14" font-weight="800" letter-spacing="1.6" fill="${inkOnSurf}">${shortName.slice(0, 14)}</text>
+          <text x="281" y="234" text-anchor="middle" font-family="${ff}" font-size="8" font-weight="600" letter-spacing="1.8" fill="${subOnSurf}">${tag.slice(0, 22)}</text>
+        </svg>`;
+
+      case "tote":
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 340" role="img" aria-label="Conference Canvas Tote Bag">
+          <rect width="600" height="340" fill="#eef2f8"/>
+          <ellipse cx="300" cy="312" rx="116" ry="11" fill="rgba(15,23,42,0.14)"/>
+          <!-- Tote Straps -->
+          <path d="M244,114 C244,24 356,24 356,114" fill="none" stroke="${isLightSurf ? p : s}" stroke-width="14"/>
+          <path d="M254,114 C254,36 346,36 346,114" fill="none" stroke="#eef2f8" stroke-width="4"/>
+          <!-- Canvas Bag Body -->
+          <path d="M186,104 L414,104 L402,300 L198,300 Z" fill="${surf}" stroke="${isLightSurf ? '#cbd5e1' : d}" stroke-width="2"/>
+          <!-- Stitched Top Hem & Accent Band -->
+          <line x1="188" y1="120" x2="412" y2="120" stroke="${s}" stroke-width="2" stroke-dasharray="5 4"/>
+          <rect x="197" y="286" width="206" height="14" fill="${s}"/>
+          <!-- Printed Stacked Emblem -->
+          <g transform="translate(264,144) scale(1.5)">${markOnSurf}</g>
+          <text x="300" y="242" text-anchor="middle" font-family="${ff}" font-size="16" font-weight="800" letter-spacing="1.8" fill="${inkOnSurf}">${shortName.slice(0, 14)}</text>
+          <text x="300" y="262" text-anchor="middle" font-family="${ff}" font-size="8.5" font-weight="600" letter-spacing="2" fill="${subOnSurf}">${tag.slice(0, 24)}</text>
+        </svg>`;
+
+      case "office_wall":
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 340" role="img" aria-label="3D Office Reception Wall Signage">
+          <rect width="600" height="340" fill="#dde5f0"/>
+          <!-- Architectural Wall Panels -->
+          <line x1="120" y1="0" x2="120" y2="270" stroke="#cbd5e1" stroke-width="1"/>
+          <line x1="240" y1="0" x2="240" y2="270" stroke="#cbd5e1" stroke-width="1"/>
+          <line x1="360" y1="0" x2="360" y2="270" stroke="#cbd5e1" stroke-width="1"/>
+          <line x1="480" y1="0" x2="480" y2="270" stroke="#cbd5e1" stroke-width="1"/>
+          <!-- Overhead Recessed Downlight Cones -->
+          <polygon points="180,0 130,90 230,90" fill="#ffffff" fill-opacity="0.28"/>
+          <polygon points="300,0 245,90 355,90" fill="#ffffff" fill-opacity="0.28"/>
+          <polygon points="420,0 370,90 470,90" fill="#ffffff" fill-opacity="0.28"/>
+          <!-- Reception Desk Silhouette at Bottom -->
+          <rect x="0" y="268" width="600" height="72" fill="#1e293b"/>
+          <rect x="0" y="264" width="600" height="6" fill="${s}"/>
+          <!-- 3D Mounted Glass / Metal Plaque -->
+          <rect x="96" y="76" width="416" height="148" rx="6" fill="rgba(15,23,42,0.22)"/>
+          <rect x="90" y="70" width="416" height="148" rx="6" fill="${surf}" stroke="#94a3b8" stroke-width="1.5"/>
+          <!-- 4 Brushed Steel Standoff Bolts -->
+          <circle cx="108" cy="88" r="5" fill="#cbd5e1" stroke="#475569"/>
+          <circle cx="488" cy="88" r="5" fill="#cbd5e1" stroke="#475569"/>
+          <circle cx="108" cy="200" r="5" fill="#cbd5e1" stroke="#475569"/>
+          <circle cx="488" cy="200" r="5" fill="#cbd5e1" stroke="#475569"/>
+          <!-- Mounted Dimensional Logo -->
+          <g transform="translate(128,104) scale(1.5)">${markOnSurf}</g>
+          <text x="218" y="144" font-family="${ff}" font-size="24" font-weight="800" letter-spacing="1.6" fill="${inkOnSurf}">${shortName}</text>
+          <text x="220" y="168" font-family="${ff}" font-size="10.5" font-weight="700" letter-spacing="2.4" fill="${subOnSurf}">${tag}</text>
+        </svg>`;
+
+      case "social_kit":
+      default:
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 340" role="img" aria-label="Mobile App Icon and Social Media Header">
+          <rect width="600" height="340" fill="#eef2f8"/>
+          <!-- LinkedIn / X Cover Header Mockup -->
+          <g transform="translate(30,28)">
+            <rect width="540" height="144" rx="8" fill="${surf}" stroke="${isLightSurf ? '#cbd5e1' : 'none'}"/>
+            <rect x="0" y="138" width="540" height="6" fill="${s}"/>
+            <g transform="translate(36,36) scale(1.45)">${markOnSurf}</g>
+            <text x="122" y="74" font-family="${ff}" font-size="24" font-weight="800" letter-spacing="1.5" fill="${inkOnSurf}">${shortName}</text>
+            <text x="124" y="98" font-family="${ff}" font-size="10.5" font-weight="600" letter-spacing="2.2" fill="${subOnSurf}">${tag}</text>
+            <text x="514" y="122" text-anchor="end" font-family="${ff}" font-size="10" font-weight="700" fill="${subOnSurf}">${domain}</text>
+          </g>
+          <!-- iOS / Android App Icons Row -->
+          <g transform="translate(30,198)">
+            <rect width="108" height="108" rx="24" fill="${p}"/>
+            <g transform="translate(22,22) scale(1.32)">${markWhite}</g>
+            <text x="54" y="126" text-anchor="middle" font-family="${ff}" font-size="10" font-weight="700" fill="#334155">APP ICON (PRIMARY)</text>
+          </g>
+          <g transform="translate(166,198)">
+            <rect width="108" height="108" rx="24" fill="#ffffff" stroke="#cbd5e1"/>
+            <g transform="translate(22,22) scale(1.32)">${markColor}</g>
+            <text x="54" y="126" text-anchor="middle" font-family="${ff}" font-size="10" font-weight="700" fill="#334155">APP ICON (LIGHT)</text>
+          </g>
+          <g transform="translate(302,198)">
+            <rect width="268" height="108" rx="8" fill="#ffffff" stroke="#d5dfee"/>
+            <circle cx="48" cy="54" r="30" fill="${p}"/>
+            <g transform="translate(28,34) scale(0.84)">${markWhite}</g>
+            <text x="92" y="48" font-family="${ff}" font-size="14" font-weight="800" fill="#0f172a">${shortName.slice(0, 14)}</text>
+            <text x="92" y="66" font-family="${ff}" font-size="10" font-weight="600" fill="${s}">Official Verified Account</text>
+            <text x="92" y="82" font-family="${ff}" font-size="9.5" fill="#64748b">@${rawName.toLowerCase().replace(/[^a-z0-9]+/g,'') || 'brand'} · ${escXml(cfg.industry)}</text>
+          </g>
+        </svg>`;
+    }
+  }
+
+  /* ---------- Render Functions ---------- */
+  function renderLogoStudio() {
+    const primaryStage = document.getElementById("primaryStage");
+    primaryStage.classList.toggle("stage-dark", state.stageBg === "dark");
+    primaryStage.classList.toggle("stage-grid", state.stageBg === "grid");
+
+    const heroMode = state.stageBg === "dark" ? "mono_light" : "primary";
+    document.getElementById("primaryLogoContainer").innerHTML = renderLogoSvg(state, heroMode);
+    document.getElementById("reversedPreviewBox").style.background = state.primary_color;
+    document.getElementById("reversedPreviewBox").innerHTML = renderLogoSvg(state, "mono_light");
+    document.getElementById("monoDarkPreviewBox").innerHTML = renderLogoSvg(state, "mono_dark");
+    document.getElementById("iconOnlyPreviewBox").innerHTML = renderLogoSvg(state, "icon_only");
+
+    document.getElementById("stageMetaLeft").textContent =
+      `${heroMode === "mono_light" ? "REVERSED WHITE" : "PRIMARY VECTOR"} LOCKUP · ${state.logo_layout.toUpperCase()}`;
+
+    // Keep icon picker colors synced
+    document.querySelectorAll("#iconPickerGrid .bs-icon-btn").forEach(btn => {
+      btn.classList.toggle("is-active", btn.dataset.iconId === state.icon_id);
+    });
+    document.querySelectorAll("[data-layout]").forEach(btn => {
+      btn.classList.toggle("is-active", btn.dataset.layout === state.logo_layout);
+    });
+  }
+
+  function renderMockups() {
+    const grid = document.getElementById("mockupsGrid");
+    grid.innerHTML = MOCKUP_CATALOG.map(m => {
+      const svg = renderMerchMockupSvg(m.id, state, state.merchFinish);
+      return `<article class="bs-mockup-tile">
+        <div class="bs-mockup-tile__head">
+          <div>
+            <span class="bs-mockup-tile__cat">${escXml(m.category)}</span>
+            <span class="bs-mockup-tile__title">${escXml(m.name)}</span>
+          </div>
+          <button type="button" class="bs-link-act" data-dl-mockup="${m.id}">Download SVG</button>
+        </div>
+        <div class="bs-mockup-tile__stage">${svg}</div>
+      </article>`;
+    }).join("");
+
+    grid.querySelectorAll("[data-dl-mockup]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.dlMockup;
+        const svg = renderMerchMockupSvg(id, state, state.merchFinish);
+        const slug = (state.brand_name || "brand").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        downloadSvg(svg, `${slug}-mockup-${id}.svg`);
+      });
+    });
+  }
+
+  function renderGuidelines() {
+    const colors = [
+      { name: "Primary Brand", role: "Headers, primary logos, key actions, vehicle & signage base", hex: state.primary_color },
+      { name: "Secondary / Signal", role: "Accents, embroidery highlights, verification marks", hex: state.secondary_color },
+      { name: "Supporting Accent", role: "Interactive highlights, digital UI links & charts", hex: state.accent_color },
+      { name: "Executive Ink", role: "Typography, dark monochrome print & dark apparel", hex: state.dark_color },
+      { name: "Architectural Surface", role: "Clean canvas backgrounds, KPI strips & stationery tints", hex: state.light_color },
+    ];
+
+    const rowsHtml = colors.map(c => {
+      const [r, g, b] = hexToRgb(c.hex);
+      const [cy, m, y, k] = hexToCmyk(c.hex);
+      return `<tr>
+        <td><span class="bs-swatch-dot" style="width:28px;height:28px;background:${c.hex};vertical-align:middle;margin-right:10px;"></span><strong>${escXml(c.name)}</strong></td>
+        <td style="font-family:var(--ts-font-mono);font-weight:700;">${c.hex.toUpperCase()}</td>
+        <td style="font-family:var(--ts-font-mono);">rgb(${r}, ${g}, ${b})</td>
+        <td style="font-family:var(--ts-font-mono);">C${cy} M${m} Y${y} K${k}</td>
+        <td style="color:#475569;">${escXml(c.role)}</td>
+      </tr>`;
+    }).join("");
+
+    const fontObj = FONTS_BY_ID[state.font_id] || FONT_PAIRINGS[0];
+
+    document.getElementById("guidelinesContainer").innerHTML = `
+      <div class="bs-guide-cover" style="background:linear-gradient(115deg, ${state.dark_color} 0%, ${state.primary_color} 72%); border-bottom-color:${state.secondary_color};">
+        <div>
+          <div style="font-size:11.5px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${state.secondary_color};margin-bottom:8px;">OFFICIAL BRAND IDENTITY GUIDELINES · V1.0</div>
+          <h2>${escXml(state.brand_name)}</h2>
+          <p>${escXml(state.tagline)} &nbsp;·&nbsp; ${escXml(state.industry)}</p>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button type="button" class="ts-ed__btn" id="btnGuidePrintInline" style="background:#ffffff;color:#002769;border:0;height:36px;padding:0 16px;font-weight:700;border-radius:5px;cursor:pointer;">
+            Open Printable Brand Book (PDF)
+          </button>
+        </div>
+      </div>
+
+      <div class="bs-guide-band">
+        <h3>01 · Approved Vector Logo Lockups</h3>
+        <div class="bs-guide-lockups">
+          <div class="bs-guide-lockup"><span>Primary Full Color</span>${renderLogoSvg(state, "primary")}</div>
+          <div class="bs-guide-lockup bs-guide-lockup--dark" style="background:${state.primary_color};"><span>Reversed White</span>${renderLogoSvg(state, "mono_light")}</div>
+          <div class="bs-guide-lockup"><span>Dark Monochrome</span>${renderLogoSvg(state, "mono_dark")}</div>
+          <div class="bs-guide-lockup"><span>Square Brand Mark</span>${renderLogoSvg(state, "icon_only")}</div>
+        </div>
+      </div>
+
+      <div class="bs-guide-band">
+        <h3>02 · Clear Space &amp; Minimum Size Rules</h3>
+        <div style="display:flex;align-items:center;gap:36px;flex-wrap:wrap;">
+          <div class="bs-clearspace-box" style="border-color:${state.secondary_color};">
+            <span class="bs-clearspace-tag" style="color:${state.secondary_color};">CLEAR SPACE ≥ 1× ICON HEIGHT</span>
+            <div class="bs-clearspace-inner" style="border-color:${state.primary_color};">${renderLogoSvg(state, "primary")}</div>
+          </div>
+          <div style="max-width:460px;font-size:14px;line-height:1.7;color:#334155;">
+            <p style="margin:0 0 10px;"><strong>Exclusion Zone:</strong> Maintain a minimum clear space equal to <strong>1× the height of the primary mark</strong> around all four edges of the lockup.</p>
+            <p style="margin:0;"><strong>Minimum Reproduction:</strong> Digital lockups must render at least <strong>120px wide</strong> (print <strong>24mm</strong>). Square app/favicon icons scale cleanly down to <strong>24px × 24px</strong>.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bs-guide-band">
+        <h3>03 · Official Color System (HEX · RGB · CMYK)</h3>
+        <table class="bs-table">
+          <thead><tr><th>Color Role</th><th>HEX</th><th>RGB (Digital)</th><th>CMYK (Print)</th><th>Usage Application</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+
+      <div class="bs-guide-band">
+        <h3>04 · Typography Hierarchy (${escXml(fontObj.name)})</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;">
+          <div style="padding:18px;border:1px solid #d5dfee;background:#f8fafc;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;margin-bottom:6px;">HEADING &amp; DISPLAY TYPEFACE</div>
+            <div style="font-family:${state.font_heading};font-size:30px;font-weight:800;color:${state.primary_color};letter-spacing:-0.02em;">Aa Bb Cc 0123</div>
+            <div style="font-size:12.5px;color:#475569;margin-top:6px;">${escXml(state.font_heading)}</div>
+          </div>
+          <div style="padding:18px;border:1px solid #d5dfee;background:#f8fafc;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;margin-bottom:6px;">BODY &amp; SPECIFICATION TYPEFACE</div>
+            <div style="font-family:${state.font_body};font-size:16px;line-height:1.6;color:#1e293b;">Executive clarity across digital workspaces, commercial contracts, vehicle wraps, and physical brand collateral.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bs-guide-band" style="border-bottom:0;">
+        <h3>05 · Brand Governance — Do's &amp; Don'ts</h3>
+        <div class="bs-dos-grid">
+          <div>
+            <strong style="display:block;color:#02982e;margin-bottom:8px;font-size:13px;text-transform:uppercase;">Approved Usage (Do)</strong>
+            <ul class="bs-dos-list">
+              <li>Use official vector SVG files on crisp white or light architectural surfaces.</li>
+              <li>Use the Reversed White lockup on Brand Primary, dark apparel, and night-lit signage.</li>
+              <li>Use the Square Icon Mark for mobile app icons, favicons, embroidered caps, and pen clips.</li>
+              <li>Supply exact CMYK formulas from Section 03 to commercial print and merch vendors.</li>
+            </ul>
+          </div>
+          <div>
+            <strong style="display:block;color:#b91c1c;margin-bottom:8px;font-size:13px;text-transform:uppercase;">Prohibited Alterations (Don't)</strong>
+            <ul class="bs-dos-list">
+              <li>Never stretch, skew, rotate, or distort the aspect ratio of the mark or wordmark.</li>
+              <li>Never add drop shadows, outer glows, bevels, or unapproved color gradients.</li>
+              <li>Never place dark logos over busy photography without a solid high-contrast surface.</li>
+              <li>Never substitute unapproved display fonts or alter wordmark letter-spacing arbitrarily.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const printBtn = document.getElementById("btnGuidePrintInline");
+    if (printBtn) printBtn.addEventListener("click", openPrintableBrandBook);
+  }
+
+  function renderAllLive() {
+    renderLogoStudio();
+    renderMockups();
+    renderGuidelines();
+  }
+
+  /* ---------- Build Pickers ---------- */
+  function buildInspectorPickers() {
+    const iconGrid = document.getElementById("iconPickerGrid");
+    iconGrid.innerHTML = BRAND_ICONS.map(ic => {
+      const svg = `<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">${iconPaths(ic.id, "#002769", "#02982e", "#ffffff")}</svg>`;
+      return `<button type="button" class="bs-icon-btn ${ic.id === state.icon_id ? 'is-active' : ''}" data-icon-id="${ic.id}" title="${escXml(ic.name)} (${escXml(ic.category)})">${svg}</button>`;
+    }).join("");
+    iconGrid.querySelectorAll(".bs-icon-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        state.icon_id = btn.dataset.iconId;
+        renderAllLive();
+      });
+    });
+
+    const palGrid = document.getElementById("palettePickerGrid");
+    palGrid.innerHTML = BRAND_PALETTES.map(pal => `
+      <button type="button" class="bs-pal-btn ${pal.primary === state.primary_color ? 'is-active' : ''}" data-pal-id="${pal.id}" title="${escXml(pal.name)}">
+        <div class="bs-pal-bars">
+          <span style="background:${pal.primary};"></span>
+          <span style="background:${pal.secondary};"></span>
+          <span style="background:${pal.accent};"></span>
+          <span style="background:${pal.dark};"></span>
+        </div>
+        <span class="bs-pal-name">${escXml(pal.name.split(" ")[0])}</span>
+      </button>
+    `).join("");
+    palGrid.querySelectorAll(".bs-pal-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const pal = BRAND_PALETTES.find(x => x.id === btn.dataset.palId);
+        if (!pal) return;
+        applyPalette(pal);
+      });
+    });
+  }
+
+  function applyPalette(pal) {
+    state.primary_color = pal.primary;
+    state.secondary_color = pal.secondary;
+    state.accent_color = pal.accent;
+    state.dark_color = pal.dark;
+    state.light_color = pal.light;
+    syncInputsFromState();
+    document.querySelectorAll("#palettePickerGrid .bs-pal-btn").forEach(b => {
+      b.classList.toggle("is-active", b.dataset.palId === pal.id);
+    });
+    renderAllLive();
+  }
+
+  function syncInputsFromState() {
+    document.getElementById("appbarBrandName").value = state.brand_name;
+    document.getElementById("inpBrandName").value = state.brand_name;
+    document.getElementById("genBrandName").value = state.brand_name;
+    document.getElementById("inpTagline").value = state.tagline;
+    document.getElementById("genTagline").value = state.tagline;
+    document.getElementById("inpIndustry").value = state.industry;
+    document.getElementById("genIndustry").value = state.industry;
+    document.getElementById("clrPrimary").value = state.primary_color;
+    document.getElementById("clrSecondary").value = state.secondary_color;
+    document.getElementById("clrAccent").value = state.accent_color;
+    document.getElementById("clrDark").value = state.dark_color;
+    document.getElementById("clrLight").value = state.light_color;
+    document.getElementById("inpLetterSpacing").value = state.letter_spacing;
+    document.getElementById("lblTracking").textContent = `${Number(state.letter_spacing).toFixed(1)}px`;
+    const matchedFont = FONT_PAIRINGS.find(f => f.heading === state.font_heading);
+    if (matchedFont) {
+      state.font_id = matchedFont.id;
+      document.getElementById("inpFontPairing").value = matchedFont.id;
+    }
+    const refEl = document.getElementById("kitRefLabel");
+    if (state.kitRef) {
+      refEl.textContent = `Saved · ${state.kitRef}`;
+      refEl.className = "ts-ed__savestate ts-ed__savestate--saved";
+    } else {
+      refEl.textContent = "Unsaved Draft";
+      refEl.className = "ts-ed__savestate";
+    }
+  }
+
+  function loadConceptIntoStudio(c, switchTab) {
+    state.kitId = c.id || null;
+    state.kitRef = c.kit_ref || null;
+    state.brand_name = c.brand_name || state.brand_name;
+    state.tagline = c.tagline ?? state.tagline;
+    state.industry = c.industry || state.industry;
+    state.archetype = c.archetype || state.archetype;
+    state.icon_id = c.icon_id || "shield_check";
+    state.logo_layout = c.logo_layout || "horizontal";
+    state.font_heading = c.font_heading || FONT_PAIRINGS[0].heading;
+    state.font_body = c.font_body || FONT_PAIRINGS[0].body;
+    state.letter_spacing = Number(c.letter_spacing ?? 1.5);
+    state.primary_color = c.primary_color || "#002769";
+    state.secondary_color = c.secondary_color || "#02982e";
+    state.accent_color = c.accent_color || "#1d4ed8";
+    state.dark_color = c.dark_color || "#0f172a";
+    state.light_color = c.light_color || "#f4f7fc";
+    syncInputsFromState();
+    renderAllLive();
+    if (switchTab) activateTab(switchTab);
+  }
+
+  /* ---------- API Calls ---------- */
+  async function apiFetch(url, options) {
+    const opts = Object.assign({ headers: {} }, options || {});
+    opts.headers["X-Requested-With"] = "fetch";
+    if (opts.body && !opts.headers["Content-Type"]) {
+      opts.headers["Content-Type"] = "application/json";
+    }
+    const resp = await fetch(url, opts);
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || `Request failed (${resp.status})`);
+    return data;
+  }
+
+  async function generateConcepts() {
+    const brandName = (document.getElementById("genBrandName").value || state.brand_name).trim();
+    const tagline = document.getElementById("genTagline").value.trim();
+    const industry = document.getElementById("genIndustry").value;
+    const archetype = document.getElementById("genArchetype").value;
+    if (!brandName) { showToast("Enter a brand name first."); return; }
+
+    const btn = document.getElementById("btnGenerateConcepts");
+    btn.disabled = true;
+    btn.textContent = "Generating...";
+    try {
+      const data = await apiFetch("/api/brand-studio/generate", {
+        method: "POST",
+        body: JSON.stringify({ brand_name: brandName, tagline, industry, archetype, count: 12 }),
+      });
+      state.generatedConcepts = data.concepts || [];
+      renderConceptsGrid();
+      showToast(`Generated ${state.generatedConcepts.length} bespoke concepts for ${brandName}.`);
+    } catch (e) {
+      showToast(e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Generate 12 Concepts";
+    }
+  }
+
+  function renderConceptsGrid() {
+    const grid = document.getElementById("conceptsGrid");
+    grid.innerHTML = state.generatedConcepts.map((c, idx) => `
+      <div class="bs-concept-cell">
+        <div class="bs-concept-preview ${state.conceptDarkBg ? 'is-dark' : ''}">
+          ${state.conceptDarkBg ? c.mono_light_svg : c.primary_svg}
+        </div>
+        <div class="bs-concept-foot">
+          <div class="bs-concept-meta">
+            <strong>#${c.concept_index} · ${escXml(c.palette_name)}</strong>
+            <span>${escXml(c.logo_layout.toUpperCase())} · ${escXml(c.font_name)}</span>
+          </div>
+          <div class="bs-concept-acts">
+            <button type="button" class="bs-rbtn" data-use-concept="${idx}">Customize</button>
+            <button type="button" class="bs-rbtn bs-rbtn--emerald" data-mock-concept="${idx}">Preview Merch</button>
+          </div>
+        </div>
+      </div>
+    `).join("");
+
+    grid.querySelectorAll("[data-use-concept]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const c = state.generatedConcepts[Number(btn.dataset.useConcept)];
+        loadConceptIntoStudio(c, "studio");
+        showToast(`Loaded Concept #${c.concept_index} into Logo Studio.`);
+      });
+    });
+    grid.querySelectorAll("[data-mock-concept]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const c = state.generatedConcepts[Number(btn.dataset.mockConcept)];
+        loadConceptIntoStudio(c, "mockups");
+        showToast(`Previewing Concept #${c.concept_index} across 10 branded items.`);
+      });
+    });
+  }
+
+  async function saveCurrentKit() {
+    const payload = {
+      brand_name: state.brand_name.trim() || "TRUSTSEAL Enterprise",
+      tagline: state.tagline.trim(),
+      industry: state.industry,
+      archetype: state.archetype,
+      icon_id: state.icon_id,
+      logo_layout: state.logo_layout,
+      font_heading: state.font_heading,
+      font_body: state.font_body,
+      letter_spacing: Number(state.letter_spacing),
+      primary_color: state.primary_color,
+      secondary_color: state.secondary_color,
+      accent_color: state.accent_color,
+      dark_color: state.dark_color,
+      light_color: state.light_color,
+    };
+    const refEl = document.getElementById("kitRefLabel");
+    refEl.textContent = "Saving...";
+    refEl.className = "ts-ed__savestate ts-ed__savestate--saving";
+
+    const url = state.kitId ? `/api/brand-studio/kits/${state.kitId}` : "/api/brand-studio/kits";
+    const method = state.kitId ? "PATCH" : "POST";
+    const res = await apiFetch(url, { method, body: JSON.stringify(payload) });
+    const kit = res.kit;
+    state.kitId = kit.id;
+    state.kitRef = kit.kit_ref;
+    syncInputsFromState();
+    await loadSavedKits();
+    showToast(`Saved Brand Identity Kit ${kit.kit_ref}.`);
+    return kit;
+  }
+
+  async function publishCurrentToMedia() {
+    try {
+      const kit = state.kitId ? { id: state.kitId, kit_ref: state.kitRef } : await saveCurrentKit();
+      const res = await apiFetch(`/api/brand-studio/kits/${kit.id}/publish-media`, {
+        method: "POST",
+        body: JSON.stringify({ variant: "primary" }),
+      });
+      showToast(`Published "${res.media_asset.name}" to TRUSTSEAL Media Library!`);
+      await loadSavedKits();
+    } catch (e) {
+      showToast(e.message);
+    }
+  }
+
+  async function openPrintableBrandBook() {
+    try {
+      const kit = state.kitId ? { id: state.kitId } : await saveCurrentKit();
+      window.open(`/brand-studio/guidelines/${kit.id}`, "_blank", "noopener");
+    } catch (e) {
+      showToast(e.message);
+    }
+  }
+
+  async function loadSavedKits() {
+    try {
+      const data = await apiFetch("/api/brand-studio/kits", { method: "GET" });
+      state.savedKits = data.kits || [];
+      document.getElementById("savedKitsCount").textContent = String(state.savedKits.length);
+      renderSavedKitsTable();
+    } catch (e) {
+      /* ignore silent startup */
+    }
+  }
+
+  function renderSavedKitsTable() {
+    const tbody = document.getElementById("savedKitsTbody");
+    if (!state.savedKits.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="padding:36px;text-align:center;color:#64748b;">No saved Brand Identity Kits yet. Customize your logo and click <strong>Save Brand Kit</strong>.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = state.savedKits.map(k => `
+      <tr>
+        <td style="font-family:var(--ts-font-mono);font-weight:700;color:#002769;">${escXml(k.kit_ref)}</td>
+        <td><div style="max-width:190px;max-height:54px;display:flex;align-items:center;">${k.primary_svg || ""}</div></td>
+        <td>
+          <strong style="display:block;color:#0f172a;">${escXml(k.brand_name)}</strong>
+          <span style="font-size:12px;color:#64748b;">${escXml(k.tagline || "—")}</span>
+        </td>
+        <td>
+          <span class="bs-swatch-dot" style="background:${k.primary_color};" title="Primary ${k.primary_color}"></span>
+          <span class="bs-swatch-dot" style="background:${k.secondary_color};" title="Secondary ${k.secondary_color}"></span>
+          <span class="bs-swatch-dot" style="background:${k.accent_color};" title="Accent ${k.accent_color}"></span>
+        </td>
+        <td style="font-size:12.5px;color:#334155;">${escXml(k.industry)} · ${escXml(k.logo_layout)}</td>
+        <td style="text-align:right;white-space:nowrap;">
+          <button type="button" class="bs-rbtn" data-kit-load="${k.id}">Edit</button>
+          <a class="bs-rbtn" href="/brand-studio/guidelines/${k.id}" target="_blank" rel="noopener" style="text-decoration:none;">Brand Book</a>
+          <a class="bs-rbtn" href="/api/brand-studio/kits/${k.id}/export/primary" style="text-decoration:none;">SVG</a>
+          <button type="button" class="bs-rbtn" data-kit-del="${k.id}" style="color:#b91c1c;">Delete</button>
+        </td>
+      </tr>
+    `).join("");
+
+    tbody.querySelectorAll("[data-kit-load]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const kit = state.savedKits.find(x => x.id === Number(btn.dataset.kitLoad));
+        if (kit) {
+          loadConceptIntoStudio(kit, "studio");
+          showToast(`Loaded ${kit.kit_ref} into Studio.`);
+        }
+      });
+    });
+    tbody.querySelectorAll("[data-kit-del]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = Number(btn.dataset.kitDel);
+        if (!confirm("Archive this Brand Identity Kit?")) return;
+        await apiFetch(`/api/brand-studio/kits/${id}`, { method: "DELETE" });
+        if (state.kitId === id) { state.kitId = null; state.kitRef = null; syncInputsFromState(); }
+        await loadSavedKits();
+        showToast("Brand Identity Kit archived.");
+      });
+    });
+  }
+
+  /* ---------- Tab & Event Wiring ---------- */
+  function activateTab(tabName) {
+    document.querySelectorAll("[data-bs-tab]").forEach(t => {
+      t.classList.toggle("ts-is-active", t.dataset.bsTab === tabName);
+    });
+    document.querySelectorAll("[data-bs-panel]").forEach(p => {
+      p.classList.toggle("is-active", p.dataset.bsPanel === tabName);
+    });
+    if (tabName === "generator" && !state.generatedConcepts.length) {
+      generateConcepts();
+    }
+    if (tabName === "kits") {
+      loadSavedKits();
+    }
+  }
+
+  function initEvents() {
+    document.querySelectorAll("[data-bs-tab]").forEach(t => {
+      t.addEventListener("click", () => activateTab(t.dataset.bsTab));
+    });
+    document.querySelectorAll("[data-bs-jump]").forEach(b => {
+      b.addEventListener("click", () => activateTab(b.dataset.bsJump));
+    });
+
+    // Layout buttons
+    document.querySelectorAll("[data-layout]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        state.logo_layout = btn.dataset.layout;
+        renderAllLive();
+      });
+    });
+
+    // Stage background buttons
+    document.querySelectorAll("[data-stage]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        state.stageBg = btn.dataset.stage;
+        document.querySelectorAll("[data-stage]").forEach(x => x.classList.toggle("is-active", x === btn));
+        renderLogoStudio();
+      });
+    });
+
+    // Merch finish buttons
+    document.querySelectorAll("[data-finish]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        state.merchFinish = btn.dataset.finish;
+        document.querySelectorAll("[data-finish]").forEach(x => x.classList.toggle("is-active", x === btn));
+        renderMockups();
+      });
+    });
+
+    // SVG export buttons
+    document.querySelectorAll("[data-download-svg]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.downloadSvg;
+        const svg = renderLogoSvg(state, mode);
+        const slug = (state.brand_name || "brand").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        downloadSvg(svg, `${slug}-${mode}.svg`);
+      });
+    });
+
+    // Brand name & tagline inputs (live sync)
+    function onNameChange(val) {
+      state.brand_name = val;
+      document.getElementById("appbarBrandName").value = val;
+      document.getElementById("inpBrandName").value = val;
+      document.getElementById("genBrandName").value = val;
+      renderAllLive();
+    }
+    document.getElementById("appbarBrandName").addEventListener("input", e => onNameChange(e.target.value));
+    document.getElementById("inpBrandName").addEventListener("input", e => onNameChange(e.target.value));
+    document.getElementById("inpTagline").addEventListener("input", e => {
+      state.tagline = e.target.value;
+      document.getElementById("genTagline").value = e.target.value;
+      renderAllLive();
+    });
+    document.getElementById("inpIndustry").addEventListener("change", e => {
+      state.industry = e.target.value;
+      document.getElementById("genIndustry").value = e.target.value;
+      renderAllLive();
+    });
+
+    // Custom colors
+    [["clrPrimary", "primary_color"], ["clrSecondary", "secondary_color"], ["clrAccent", "accent_color"], ["clrDark", "dark_color"], ["clrLight", "light_color"]].forEach(([id, key]) => {
+      document.getElementById(id).addEventListener("input", e => {
+        state[key] = e.target.value;
+        renderAllLive();
+      });
+    });
+
+    // Font pairing & tracking
+    document.getElementById("inpFontPairing").addEventListener("change", e => {
+      const f = FONTS_BY_ID[e.target.value];
+      if (!f) return;
+      state.font_id = f.id;
+      state.font_heading = f.heading;
+      state.font_body = f.body;
+      renderAllLive();
+    });
+    document.getElementById("inpLetterSpacing").addEventListener("input", e => {
+      state.letter_spacing = Number(e.target.value);
+      document.getElementById("lblTracking").textContent = `${state.letter_spacing.toFixed(1)}px`;
+      renderAllLive();
+    });
+
+    // Action buttons
+    document.getElementById("btnSaveKit").addEventListener("click", () => saveCurrentKit().catch(e => showToast(e.message)));
+    document.getElementById("btnSaveFromMockups").addEventListener("click", () => saveCurrentKit().catch(e => showToast(e.message)));
+    document.getElementById("btnPublishMedia").addEventListener("click", publishCurrentToMedia);
+    document.getElementById("btnPrintBook").addEventListener("click", openPrintableBrandBook);
+    document.getElementById("btnGenerateConcepts").addEventListener("click", generateConcepts);
+    document.getElementById("btnToggleConceptBg").addEventListener("click", e => {
+      state.conceptDarkBg = !state.conceptDarkBg;
+      e.target.classList.toggle("is-active", state.conceptDarkBg);
+      e.target.textContent = state.conceptDarkBg ? "Light Preview" : "Dark Preview";
+      renderConceptsGrid();
+    });
+    document.getElementById("btnNewDraftKit").addEventListener("click", () => {
+      state.kitId = null;
+      state.kitRef = null;
+      syncInputsFromState();
+      activateTab("studio");
+      showToast("Started a fresh Brand Identity draft.");
+    });
+  }
+
+  buildInspectorPickers();
+  syncInputsFromState();
+  initEvents();
+  renderAllLive();
+  if (INITIAL_KITS.length) loadSavedKits();
+})();
+</script>
+{% endblock %}

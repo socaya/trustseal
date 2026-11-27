@@ -33,6 +33,7 @@ SESSION_AUTH_ALLOWED_PREFIXES = (
     "/api/contract-templates",
     "/api/eidas",
     "/api/esignatures",
+    "/api/brand-studio",
 )
 
 PUBLIC_ENDPOINTS = frozenset((
