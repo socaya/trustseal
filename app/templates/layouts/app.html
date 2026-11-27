@@ -173,10 +173,10 @@
 
     <main class="ts-content" id="ts-main" tabindex="-1">
       <div class="ts-page">
-        {% block breadcrumbs %}{% endblock %}
         {% block page_header %}
         <div class="ts-page-header">
           <div class="ts-page-header__text">
+            {% block breadcrumbs %}{% endblock %}
             <h1 class="ts-page-title">{% block page_title %}{% endblock %}</h1>
             {% block page_description %}{% endblock %}
           </div>

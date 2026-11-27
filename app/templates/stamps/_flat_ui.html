@@ -30,83 +30,76 @@
   border-radius: 0 !important;
 }
 
-.ts-page-header {
-  margin-bottom: 20px;
-}
-.ts-page-title {
-  font-size: var(--ts-fs-page-title, 21px) !important;
-  font-weight: 600 !important;
-  letter-spacing: -0.02em;
-  color: var(--ts-text, #091e42);
-}
 .ts-page-header__actions {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   align-items: center;
 }
 
-/* Quiet borderless sub-navigation */
+/* Unified TrustSeal Brand Sub-Navigation */
 .st-subnav {
   display: flex;
-  gap: 4px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  gap: 6px;
+  border-bottom: 1.5px solid #dbe4f2;
   margin-bottom: 22px;
 }
 .st-subnav__link {
-  padding: 9px 14px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ts-text-muted, #42526e);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
   text-decoration: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
+  border-bottom: 2.5px solid transparent;
+  margin-bottom: -1.5px;
   transition: color 120ms ease, background 120ms ease;
 }
 .st-subnav__link:hover {
-  color: var(--ts-text, #091e42);
-  background: rgba(15, 23, 42, 0.03);
+  color: #002769;
+  background: #f4f7fc;
 }
 .st-subnav__link.is-active {
-  color: var(--ts-brand-primary, #002769);
-  font-weight: 600;
-  border-bottom-color: var(--ts-brand-primary, #002769);
+  color: #002769;
+  font-weight: 700;
+  border-bottom-color: #002769;
 }
 
-/* Borderless KPI tiles separated by calm canvas whitespace */
+/* Unified Hairline-Divided TrustSeal KPI Strip (no fragmented cards) */
 .st-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  background: transparent;
-  border: 0;
-  margin-bottom: 20px;
+  gap: 0;
+  background: #f4f7fc;
+  border: 1px solid #dbe4f2;
+  margin-bottom: 22px;
 }
 .st-metric {
-  background: var(--ts-surface, #ffffff);
-  border: 1px solid var(--ts-border, #ebeef2);
-  padding: 16px 18px;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid #dbe4f2;
+  padding: 18px 22px;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
+.st-metric:last-child { border-right: 0; }
 .st-metric__label {
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ts-text-subtle, #718494);
+  letter-spacing: 0.05em;
+  color: #475569;
 }
 .st-metric__value {
-  font-size: 22px;
-  font-weight: 600;
+  font-size: 26px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
-  color: var(--ts-text, #1d3648);
-  line-height: 1.2;
+  color: #002769;
+  line-height: 1.15;
 }
 .st-metric__sub {
-  font-size: 12px;
-  color: var(--ts-text-subtle, #718494);
+  font-size: 13px;
+  color: #64748b;
 }
 @media (max-width: 820px) {
   .st-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }

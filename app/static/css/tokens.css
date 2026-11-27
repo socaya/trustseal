@@ -63,14 +63,14 @@
   --ts-font-mono:             ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
   /* Restrained operational type scale -------------------------- */
-  --ts-fs-display:            26px;
-  --ts-fs-page-title:         21px;
-  --ts-fs-section:            16px;
-  --ts-fs-subsection:         14.5px;
-  --ts-fs-body:               13.5px;
-  --ts-fs-label:              12.5px;
-  --ts-fs-meta:               12px;
-  --ts-fs-micro:              11px;
+  --ts-fs-display:            28px;
+  --ts-fs-page-title:         24px;
+  --ts-fs-section:            17px;
+  --ts-fs-subsection:         15px;
+  --ts-fs-body:               14px;
+  --ts-fs-label:              13.5px;
+  --ts-fs-meta:               12.5px;
+  --ts-fs-micro:              11.5px;
 
   --ts-lh-tight:              1.25;
   --ts-lh-base:               1.5;

@@ -1505,3 +1505,154 @@ dialog.pms-drawer::backdrop { background: rgba(15, 23, 42, 0.36); backdrop-filte
   .pms-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pme-lifecycle ol { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* ============================================================================
+   11. TRUSTSEAL EXECUTIVE BRAND HARMONIZATION LAYER
+   Aligns Project Studio with the platform-wide Navy (#002769) & Emerald (#02982e)
+   executive header, slate KPI strip, branded tables, and calm navigation.
+   ============================================================================ */
+.pme-shell .ts-ed__appbar {
+  height: 50px;
+  background: linear-gradient(110deg, #00163d 0%, #002769 62%, #013688 100%);
+  border-bottom: 2.5px solid #02982e;
+  color: #ffffff;
+}
+.pme-brand-badge {
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #7ee29a;
+  box-shadow: none;
+}
+.pme-shell .ts-ed__brand strong { color: #ffffff; font-size: 14.5px; }
+.pme-shell .ts-ed__brand small { color: rgba(219, 231, 255, 0.82); font-size: 12px; }
+.pme-shell .ts-ed__divider { background: rgba(255, 255, 255, 0.22); }
+.pme-shell .ts-ed__savestate { color: rgba(219, 231, 255, 0.86); }
+.pme-appbar-code { color: #7ee29a !important; font-weight: 700; }
+.pme-appbar-meta { color: rgba(235, 242, 255, 0.92); }
+.pme-appbar-meta--ok { color: #7ee29a; }
+.pme-appbar-meta--ok::before { background: #22c55e; }
+.pme-appbar-meta--warn { color: #fde68a; }
+.pme-appbar-meta--bad { color: #fca5a5; }
+.pme-appbar-select {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.26) !important;
+}
+.pme-appbar-select option { color: #0f172a; background: #ffffff; }
+.pme-cmdk-trigger {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.26);
+  color: rgba(235, 242, 255, 0.9);
+}
+.pme-cmdk-trigger:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #ffffff;
+}
+.pme-cmdk-trigger kbd {
+  background: rgba(0, 22, 61, 0.55);
+  border-color: rgba(255, 255, 255, 0.24);
+  color: #dbe7ff;
+}
+.pme-shell .ts-ed__appbar .ts-ed__btn {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}
+.pme-shell .ts-ed__appbar .ts-ed__btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+.pme-shell .ts-ed__appbar .ts-ed__btn--primary {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #002769;
+  font-weight: 600;
+}
+.pme-shell .ts-ed__appbar .ts-ed__btn--primary:hover {
+  background: #eef4ff;
+  color: #001a4d;
+}
+
+.pme-subbar,
+.pme-shell .pme-subbar.ts-ed__ribbon {
+  height: 44px;
+  background: #f4f7fc;
+  border-bottom: 1px solid #dbe4f2;
+}
+.pme-tabs-seg {
+  background: #e5edf8;
+  border-radius: 6px;
+}
+.pme-shell .ts-ed__tab { font-size: 13px; color: #334155; }
+.pme-shell .ts-ed__tab.ts-is-active {
+  background: #002769;
+  color: #ffffff;
+  box-shadow: none;
+}
+.pme-rtool { font-size: 13px; color: #1e293b; }
+.pme-rtool:hover { background: #e5edf8; color: #002769; }
+.pme-rtool.ts-is-active {
+  background: #ffffff;
+  color: #002769;
+  border-color: #cbd9ee;
+  font-weight: 600;
+}
+
+.pme-detail-side {
+  background: #f4f7fc;
+  border-right: 1px solid #dbe4f2;
+}
+.pme-detail-side__grp { color: #002769; font-weight: 700; }
+.pme-detail-nav { font-size: 13.5px; color: #1e293b; border-left: 3px solid transparent; border-radius: 0; }
+.pme-detail-nav:hover { background: #e8f0fb; color: #002769; }
+.pme-detail-nav.is-active {
+  background: #ffffff;
+  color: #002769;
+  border-left-color: #002769;
+  font-weight: 700;
+}
+
+.pme-shell .pms-metrics,
+.pme-shell .pms-kpis {
+  background: #f4f7fc;
+  border: 1px solid #dbe4f2;
+  border-radius: 0;
+  gap: 0;
+}
+.pme-shell .pms-metric,
+.pme-shell .pms-kpi {
+  background: transparent;
+  border: 0;
+  border-right: 1px solid #dbe4f2;
+  border-radius: 0;
+  box-shadow: none;
+}
+.pme-shell .pms-metric:last-child,
+.pme-shell .pms-kpi:last-child { border-right: 0; }
+.pme-shell .pms-metric strong,
+.pme-shell .pms-kpi strong,
+.pme-shell .pms-kpi__val { color: #002769; }
+
+.pme-shell .pms-card,
+.pme-shell .pms-panel {
+  border-color: #dbe4f2;
+  border-top: 2px solid #002769;
+  border-radius: 0;
+  box-shadow: none;
+}
+.pme-shell .pms-card h3,
+.pme-shell .pms-panel h3,
+.pme-shell .pms-section-head h2 { color: #002769; }
+
+.pme-shell table thead th {
+  background: #f4f7fc;
+  color: #002769;
+  font-size: 12px;
+  font-weight: 700;
+  border-bottom: 1.5px solid #002769;
+}
+.pme-shell table tbody td {
+  font-size: 14px;
+  border-bottom-color: #e6edf7;
+}
