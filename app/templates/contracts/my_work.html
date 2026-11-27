@@ -9,31 +9,27 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pm_studio.css') }}">
 {% include "stamps/_flat_ui.html" %}
 
+{% set _mv = active_view if active_view is defined else 'work' %}
+{% set _mv_titles = {'work': 'My Work', 'timesheet': 'My Timesheet', 'expenses': 'My Expenses'} %}
 {% set pm_ribbon_ctx = 'my_work' %}
 {% set pm_ribbon_tab = 'Work' %}
-{% set pm_crumb_label = 'My Work' %}
+{% set pm_crumb_label = _mv_titles.get(_mv, 'My Work') %}
 
 <div class="pme-shell ts-ed">
   {% include "contracts/_pm_ribbon.html" %}
 
   <main class="pme-content">
-    <div class="pms-hero">
-      <div>
-        <h1>My Work</h1>
-        <p>See your project assignments, record weekly effort and complete pending governance approvals.</p>
-      </div>
-    </div>
-
+    {% if _mv == 'work' %}
     <section class="pms-metrics" aria-label="My Work summary">
       <div class="pms-metric">
         <span class="pms-metric-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="18" height="18"><path d="M4 5h16v15H4zM8 3v4m8-4v4M8 13l2 2 5-5"/></svg></span>
         <span><small>Assigned open tasks</small><strong>{{ my_tasks|length }}</strong></span>
       </div>
-      <div class="pms-metric">
+      <a class="pms-metric" href="{{ url_for('contracts_views.my_work_page', view='timesheet') }}">
         <span class="pms-metric-icon pms-metric-icon--green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="18" height="18"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
         <span><small>This week ({{ week_days[0].short }}–{{ week_days[-1].short }})</small><strong>{{ week_total_hours }}h</strong></span>
-      </div>
-      <a class="pms-metric" href="#approvals">
+      </a>
+      <a class="pms-metric" href="{{ url_for('contracts_views.projects_page', section='approvals') }}">
         <span class="pms-metric-icon pms-metric-icon--amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="18" height="18"><path d="m5 12 4 4L19 6"/></svg></span>
         <span><small>Pending approvals</small><strong>{{ pending_approvals|length }}</strong></span>
       </a>
@@ -49,13 +45,67 @@
       </div>
     </section>
 
-    {# ======================= WEEKLY TIMESHEET GRID (PM-13.03) ======================= #}
-    <section class="pms-panel" id="timesheet" style="margin-bottom:14px;">
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <section class="pms-panel">
+        <div class="pms-panel-header"><h2>My Assigned Tasks ({{ my_tasks|length }})</h2></div>
+        <div class="pms-table-scroll">
+          <table>
+            <thead><tr><th>Task</th><th>Project</th><th>Due</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for t in my_tasks %}
+              <tr>
+                <td><strong>{{ t.title }}</strong></td>
+                <td><a class="pms-row-name" href="{{ url_for('contracts_views.project_detail_page', project_id=t.project_id) }}">{{ t.project_name }}</a></td>
+                <td>{{ t.due_date or '—' }}</td>
+                <td>
+                  <select class="st-select mw-task-st" data-pid="{{ t.project_id }}" data-tid="{{ t.id }}" style="min-height:28px;font-size:12px;">
+                    {% for st in ['todo','in_progress','review','done','blocked'] %}
+                    <option value="{{ st }}" {% if t.status == st %}selected{% endif %}>{{ st|replace('_',' ')|title }}</option>
+                    {% endfor %}
+                  </select>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" style="text-align:center;padding:22px;color:#4c6273;">No open tasks currently assigned to you.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="pms-panel" id="approvals">
+        <div class="pms-panel-header"><h2>Pending Approvals Awaiting Your Review ({{ pending_approvals|length }})</h2></div>
+        <div class="pms-table-scroll">
+          <table>
+            <thead><tr><th>Subject</th><th>Hash</th><th style="text-align:right;">Decision</th></tr></thead>
+            <tbody>
+              {% for a in pending_approvals %}
+              <tr>
+                <td><strong>{{ a.subject_title }}</strong></td>
+                <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#4c6273;">{{ a.subject_hash[:12] }}…</td>
+                <td style="text-align:right;white-space:nowrap;">
+                  <button type="button" class="pms-btn pms-btn--primary pms-btn--sm mw-ap-dec" data-pid="{{ a.project_id }}" data-aid="{{ a.id }}" data-hash="{{ a.subject_hash }}" data-dec="approved">Approve</button>
+                  <button type="button" class="pms-btn pms-btn--plain pms-btn--sm mw-ap-dec" data-pid="{{ a.project_id }}" data-aid="{{ a.id }}" data-hash="{{ a.subject_hash }}" data-dec="rejected">Reject</button>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="3" style="text-align:center;padding:22px;color:#4c6273;">No pending approvals awaiting your review.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    {% elif _mv == 'timesheet' %}
+    {# ======================= DEDICATED PAGE: MY TIMESHEET ======================= #}
+    <section class="pms-panel" id="timesheet">
       <div class="pms-panel-header">
         <div>
-          <h2>Personal Weekly Timesheet Grid (Mon–Sun)</h2>
-          <div class="pms-card__sub">Log hours against authorized project activities; submit for manager review and immutable cost posting.</div>
+          <h2>My Weekly Timesheet ({{ week_days[0].short }}–{{ week_days[-1].short }})</h2>
+          <div class="pms-card__sub">Log hours against authorized project activities and submit for manager approval.</div>
         </div>
+        <strong style="font-size:13px;color:#002769;">Total: {{ week_total_hours }}h</strong>
       </div>
 
       <form id="mw-quick-ts" class="pms-tools">
@@ -65,7 +115,6 @@
             <option value="{{ p.id }}">{{ p.project_code }} · {{ p.name }}</option>
             {% endfor %}
           </select>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
         </span>
         <input type="date" id="mw-ts-date" class="ts-input" style="width:138px;" value="{{ today_iso }}" required>
         <input type="number" step="0.25" min="0.25" max="24" id="mw-ts-hrs" class="ts-input" style="width:82px;" placeholder="Hours" value="2.00" required>
@@ -99,7 +148,7 @@
               <td style="text-align:right;font-weight:700;">{{ '{:.2f}h'.format(row.total) }}</td>
             </tr>
             {% else %}
-            <tr><td colspan="9" style="text-align:center;padding:24px;color:#4c6273;">No hours logged this week yet. Use the ribbon above to record your time.</td></tr>
+            <tr><td colspan="9" style="text-align:center;padding:24px;color:#4c6273;">No hours logged this week yet. Use the form above to record your time.</td></tr>
             {% endfor %}
           </tbody>
           <tfoot>
@@ -115,61 +164,9 @@
       </div>
     </section>
 
-    {# ======================= MY ASSIGNED TASKS & PENDING APPROVALS ======================= #}
-    <div class="pms-studio-grid">
-      <section class="pms-panel">
-        <div class="pms-panel-header"><h2>My Assigned Tasks ({{ my_tasks|length }})</h2></div>
-        <div class="pms-table-scroll">
-          <table>
-            <thead><tr><th>Task</th><th>Project</th><th>Due</th><th>Status</th></tr></thead>
-            <tbody>
-              {% for t in my_tasks %}
-              <tr>
-                <td><strong>{{ t.title }}</strong></td>
-                <td><a class="pms-row-name" href="{{ url_for('contracts_views.project_detail_page', project_id=t.project_id) }}">{{ t.project_name }}</a></td>
-                <td>{{ t.due_date or '—' }}</td>
-                <td>
-                  <select class="st-select mw-task-st" data-pid="{{ t.project_id }}" data-tid="{{ t.id }}" style="min-height:28px;font-size:12px;">
-                    {% for st in ['todo','in_progress','review','done','blocked'] %}
-                    <option value="{{ st }}" {% if t.status == st %}selected{% endif %}>{{ st|replace('_',' ')|title }}</option>
-                    {% endfor %}
-                  </select>
-                </td>
-              </tr>
-              {% else %}
-              <tr><td colspan="4" style="text-align:center;padding:22px;color:#4c6273;">No open tasks currently assigned to you.</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="pms-panel" id="approvals">
-        <div class="pms-panel-header"><h2>Pending Governance Approvals ({{ pending_approvals|length }})</h2></div>
-        <div class="pms-table-scroll">
-          <table>
-            <thead><tr><th>Subject</th><th>Hash</th><th style="text-align:right;">Decision</th></tr></thead>
-            <tbody>
-              {% for a in pending_approvals %}
-              <tr>
-                <td><strong>{{ a.subject_title }}</strong></td>
-                <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#4c6273;">{{ a.subject_hash[:12] }}…</td>
-                <td style="text-align:right;white-space:nowrap;">
-                  <button type="button" class="pms-btn pms-btn--primary pms-btn--sm mw-ap-dec" data-pid="{{ a.project_id }}" data-aid="{{ a.id }}" data-hash="{{ a.subject_hash }}" data-dec="approved">Approve</button>
-                  <button type="button" class="pms-btn pms-btn--plain pms-btn--sm mw-ap-dec" data-pid="{{ a.project_id }}" data-aid="{{ a.id }}" data-hash="{{ a.subject_hash }}" data-dec="rejected">Reject</button>
-                </td>
-              </tr>
-              {% else %}
-              <tr><td colspan="3" style="text-align:center;padding:22px;color:#4c6273;">No pending approvals awaiting your review.</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-
-    {# ======================= MY EXPENSES (WORK -> PERSONAL -> MY EXPENSES) ======================= #}
-    <section class="pms-panel" id="expenses" style="margin-top:14px;">
+    {% elif _mv == 'expenses' %}
+    {# ======================= DEDICATED PAGE: MY EXPENSES ======================= #}
+    <section class="pms-panel" id="expenses">
       <div class="pms-panel-header">
         <h2>My Expenses ({{ my_expenses|length if my_expenses is defined else 0 }})</h2>
       </div>
@@ -208,6 +205,7 @@
         </table>
       </div>
     </section>
+    {% endif %}
   </main>
 
   <footer class="pme-statusbar">

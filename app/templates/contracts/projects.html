@@ -15,7 +15,17 @@
   'contracts': ('Contract Overview', 'All project contracts, addendums, amendments and No-Cost Extensions (NCEs).'),
   'obligations': ('Contract obligations', 'Track contractual deadlines, owners and acceptance across linked projects.'),
   'spend': ('Contract Spend & Burn Rate', 'Track contract spend, commitments, remaining ceiling and monthly burn rates.'),
-  'templates': ('Administration & Templates', 'Manage reusable project templates, delivery methodologies and governance defaults.')
+  'templates': ('Administration & Templates', 'Manage reusable project templates, delivery methodologies and governance defaults.'),
+  'resources': ('Resource Directory', 'Organization-wide project resource allocations, roles and staffing.'),
+  'capacity': ('Capacity & Utilization', 'Cross-project FTE load and over-allocation visibility by team member.'),
+  'equipment': ('Equipment & Assets', 'Organization-wide equipment reservations and logistics custody schedule.'),
+  'timesheets': ('Team Timesheets', 'Organization-wide time entries, billable effort and approval status.'),
+  'procurement': ('Procurement & Awards', 'Cross-project purchase requisitions, supplier awards and commitments.'),
+  'budgets': ('Budgets & Commitments', 'Cross-project approved budgets, posted actuals, commitments and available funds.'),
+  'approvals': ('Approvals & Change Requests', 'Organization-wide governance approvals and baseline change requests.'),
+  'raid': ('RAID Register', 'Cross-project risks, issues, severity exposure and mitigation status.'),
+  'compliance': ('Compliance, HSE & Quality', 'Organization-wide permits, safeguards, HSE incidents and QA inspections.'),
+  'reports': ('Executive Reports', 'Portfolio health scorecard and cross-project results indicators.')
 } %}
 {% set cur_title, cur_desc = sec_titles.get(sec, sec_titles['projects']) %}
 
@@ -27,7 +37,7 @@
 {% include "stamps/_flat_ui.html" %}
 
 {% set pm_ribbon_ctx = 'projects' %}
-{% set pm_ribbon_tab = 'Contracts' if sec in ('contracts','obligations','spend') else ('Plan' if sec in ('portfolios','programmes') else ('File' if sec == 'templates' else 'Home')) %}
+{% set pm_ribbon_tab = 'Contracts' if sec in ('contracts','obligations','procurement','budgets','spend') else ('Resources' if sec in ('resources','capacity','equipment','timesheets') else ('Review' if sec in ('approvals','raid','compliance','reports') else ('Plan' if sec in ('portfolios','programmes','intake') else ('File' if sec == 'templates' else 'Home')))) %}
 {% set pm_crumb_label = cur_title %}
 
 <div class="pme-shell ts-ed">
@@ -596,6 +606,314 @@
           </tbody>
         </table>
       </div>
+    </div>
+
+    {# ======================= SECTION: RESOURCE DIRECTORY ======================= #}
+    {% elif sec == 'resources' %}
+    {% set _res = workspace_data.get('resources', []) if workspace_data is defined else [] %}
+    <section class="pms-panel">
+      <div class="pms-panel-header"><h2>Resource Directory ({{ _res|length }})</h2></div>
+      <div class="pms-table-scroll">
+        <table>
+          <thead><tr><th>Resource</th><th>Role</th><th>Project</th><th style="text-align:right;">FTE %</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for r in _res %}
+            <tr>
+              <td><strong>{{ r.resource_name }}</strong></td>
+              <td>{{ r.role_title }}</td>
+              <td><a class="pms-row-name" href="{{ url_for('contracts_views.project_detail_page', project_id=r.project_id) }}">{{ r.project_name }}</a><span class="pms-row-meta">{{ r.project_code }}</span></td>
+              <td style="text-align:right;font-weight:600;">{{ r.allocation_pct }}%</td>
+              <td><span class="pms-state pms-state--good">{{ r.status|title }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" style="text-align:center;padding:28px;color:#4c6273;">No resource allocations recorded across organization projects yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    {# ======================= SECTION: CAPACITY & UTILIZATION ======================= #}
+    {% elif sec == 'capacity' %}
+    {% set _cap = workspace_data.get('capacity', []) if workspace_data is defined else [] %}
+    <section class="pms-panel">
+      <div class="pms-panel-header"><h2>Capacity &amp; Utilization ({{ _cap|length }})</h2></div>
+      <div class="pms-table-scroll">
+        <table>
+          <thead><tr><th>Team Member</th><th>Primary Role</th><th style="text-align:right;">Active Projects</th><th style="text-align:right;">Total Allocation</th><th>Capacity Status</th></tr></thead>
+          <tbody>
+            {% for c in _cap %}
+            <tr>
+              <td><strong>{{ c.resource_name }}</strong></td>
+              <td>{{ c.role_title }}</td>
+              <td style="text-align:right;">{{ c.projects_count }}</td>
+              <td style="text-align:right;font-weight:700;">{{ c.total_fte }}%</td>
+              <td><span class="pms-state {% if c.total_fte > 100 %}pms-state--bad{% elif c.total_fte >= 80 %}pms-state--warn{% else %}pms-state--good{% endif %}">{% if c.total_fte > 100 %}Over-allocated{% elif c.total_fte >= 80 %}Near capacity{% else %}Available{% endif %}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" style="text-align:center;padding:28px;color:#4c6273;">No capacity data yet. Allocate resources inside projects to track utilization.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    {# ======================= SECTION: EQUIPMENT & ASSETS ======================= #}
+    {% elif sec == 'equipment' %}
+    {% set _eq = workspace_data.get('equipment', []) if workspace_data is defined else [] %}
+    <section class="pms-panel">
+      <div class="pms-panel-header"><h2>Equipment &amp; Asset Bookings ({{ _eq|length }})</h2></div>
+      <div class="pms-table-scroll">
+        <table>
+          <thead><tr><th>Asset / Equipment</th><th>Project</th><th>Booking Window</th><th style="text-align:right;">Quantity</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for a in _eq %}
+            <tr>
+              <td><strong>{{ a.asset_name }}</strong></td>
+              <td><a class="pms-row-name" href="{{ url_for('contracts_views.project_detail_page', project_id=a.project_id) }}">{{ a.project_name }}</a><span class="pms-row-meta">{{ a.project_code }}</span></td>
+              <td>{{ a.start_date }} → {{ a.end_date }}</td>
+              <td style="text-align:right;">{{ a.quantity }} {{ a.unit }}</td>
+              <td><span class="pms-state pms-state--good">{{ a.status|title }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" style="text-align:center;padding:28px;color:#4c6273;">No equipment or logistics bookings recorded across organization projects yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    {# ======================= SECTION: TEAM TIMESHEETS ======================= #}
+    {% elif sec == 'timesheets' %}
+    {% set _ts = workspace_data.get('timesheets', []) if workspace_data is defined else [] %}
+    <section class="pms-panel">
+      <div class="pms-panel-header"><h2>Team Timesheets ({{ _ts|length }})</h2></div>
+      <div class="pms-table-scroll">
+        <table>
+          <thead><tr><th>Date</th><th>Team Member</th><th>Project</th><th style="text-align:right;">Hours</th><th>Billable</th><th>Notes</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for t in _ts %}
+            <tr>
+              <td>{{ t.work_date }}</td>
+              <td><strong>{{ t.username }}</strong></td>
+              <td><a class="pms-row-name" href="{{ url_for('contracts_views.project_detail_page', project_id=t.project_id) }}">{{ t.project_name }}</a><span class="pms-row-meta">{{ t.project_code }}</span></td>
+              <td style="text-align:right;font-weight:700;">{{ t.hours }}h</td>
+              <td>{{ 'Billable' if t.billable else 'Non-billable' }}</td>
+              <td>{{ t.notes or '—' }}</td>
+              <td><span class="pms-state {% if t.status == 'approved' %}pms-state--good{% elif t.status == 'returned' %}pms-state--bad{% else %}pms-state--info{% endif %}">{{ t.status|title }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" style="text-align:center;padding:28px;color:#4c6273;">No team timesheet entries logged yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    {# ======================= SECTION: PROCUREMENT & AWARDS ======================= #}
+    {% elif sec == 'procurement' %}
+    {% set _pr = workspace_data.get('procurement', []) if workspace_data is defined else [] %}
+    <section class="pms-panel">
+      <div class="pms-panel-header"><h2>Procurement &amp; Supplier Awards ({{ _pr|length }})</h2></div>
+      <div class="pms-table-scroll">
+        <table>
+          <thead><tr><th>PR #</th><th>Item &amp; Supplier</th><th>Project</th><th style="text-align:right;">Amount</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for p in _pr %}
+            <tr>
+              <td style="font-family:var(--ts-font-mono);font-size:12px;color:#002769;font-weight:700;">{{ p.req_number }}</td>
+              <td><strong>{{ p.title }}</strong>{% if p.supplier_name %}<span class="pms-row-meta">{{ p.supplier_name }}</span>{% endif %}</td>
+              <td><a class="pms-row-name" href="{{ url_for('contracts_views.project_detail_page', project_id=p.project_id) }}">{{ p.project_name }}</a><span class="pms-row-meta">{{ p.project_code }}</span></td>
+              <td style="text-align:right;font-weight:600;">{{ p.currency }} {{ p.awarded_amount or p.estimated_amount }}</td>
+              <td><span class="pms-state {% if p.status == 'awarded' %}pms-state--good{% else %}pms-state--info{% endif %}">{{ p.status|title }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" style="text-align:center;padding:28px;color:#4c6273;">No procurement requisitions logged across organization projects yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    {# ======================= SECTION: BUDGETS & COMMITMENTS ======================= #}
+    {% elif sec == 'budgets' %}
+    {% set _bd = workspace_data.get('budgets', []) if workspace_data is defined else [] %}
+    <section class="pms-panel">
+      <div class="pms-panel-header"><h2>Budgets &amp; Commitments ({{ _bd|length }} projects)</h2></div>
+      <div class="pms-table-scroll">
+        <table>
+          <thead><tr><th>Project</th><th style="text-align:right;">Approved Budget</th><th style="text-align:right;">Posted Actuals</th><th style="text-align:right;">Open Commitments</th><th style="text-align:right;">Available</th><th>Utilization</th></tr></thead>
+          <tbody>
+            {% for b in _bd %}
+            <tr>
+              <td><a class="pms-row-name" href="{{ url_for('contracts_views.project_detail_page', project_id=b.project_id) }}">{{ b.project_name }}</a><span class="pms-row-meta">{{ b.project_code }}</span></td>
+              <td style="text-align:right;font-weight:600;">{{ b.currency }} {{ '{:,.2f}'.format(b.approved_budget) }}</td>
+              <td style="text-align:right;">{{ b.currency }} {{ '{:,.2f}'.format(b.actuals) }}</td>
+              <td style="text-align:right;">{{ b.currency }} {{ '{:,.2f}'.format(b.commitments) }}</td>
+              <td style="text-align:right;font-weight:600;color:{{ '#17664c' if b.available >= 0 else '#8a3041' }};">{{ b.currency }} {{ '{:,.2f}'.format(b.available) }}</td>
+              <td><span class="pms-meter"><span class="pms-track"><i style="width:{{ [b.util_pct, 100]|min }}%;"></i></span>{{ b.util_pct }}%</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align:center;padding:28px;color:#4c6273;">No project budgets configured yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    {# ======================= SECTION: APPROVALS & CHANGE REQUESTS ======================= #}
+    {% elif sec == 'approvals' %}
+    {% set _ap = workspace_data.get('approvals', []) if workspace_data is defined else [] %}
+    {% set _cr = workspace_data.get('change_requests', []) if workspace_data is defined else [] %}
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <section class="pms-panel">
+        <div class="pms-panel-header"><h2>Governance Approvals ({{ _ap|length }})</h2></div>
+        <div class="pms-table-scroll">
+          <table>
+            <thead><tr><th>Subject</th><th>Project</th><th>Hash</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for a in _ap %}
+              <tr>
+                <td><strong>{{ a.subject_title }}</strong></td>
+                <td><a class="pms-row-name" href="{{ url_for('contracts_views.project_detail_page', project_id=a.project_id) }}">{{ a.project_name }}</a><span class="pms-row-meta">{{ a.project_code }}</span></td>
+                <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#4c6273;">{{ a.subject_hash[:12] }}…</td>
+                <td><span class="pms-state {% if a.status == 'approved' %}pms-state--good{% elif a.status == 'rejected' %}pms-state--bad{% else %}pms-state--warn{% endif %}">{{ a.status|title }}</span></td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" style="text-align:center;padding:24px;color:#4c6273;">No governance approvals logged yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="pms-panel">
+        <div class="pms-panel-header"><h2>Change Requests ({{ _cr|length }})</h2></div>
+        <div class="pms-table-scroll">
+          <table>
+            <thead><tr><th>CR #</th><th>Title</th><th>Project</th><th style="text-align:right;">Cost / Schedule Impact</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for c in _cr %}
+              <tr>
+                <td style="font-family:var(--ts-font-mono);font-size:12px;color:#002769;font-weight:700;">{{ c.cr_number }}</td>
+                <td><strong>{{ c.title }}</strong></td>
+                <td><a class="pms-row-name" href="{{ url_for('contracts_views.project_detail_page', project_id=c.project_id) }}">{{ c.project_name }}</a><span class="pms-row-meta">{{ c.project_code }}</span></td>
+                <td style="text-align:right;">{{ c.cost_impact }} · {{ c.schedule_impact_days }}d</td>
+                <td><span class="pms-state {% if c.status == 'approved' %}pms-state--good{% elif c.status == 'rejected' %}pms-state--bad{% else %}pms-state--info{% endif %}">{{ c.status|title }}</span></td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" style="text-align:center;padding:24px;color:#4c6273;">No change requests submitted yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    {# ======================= SECTION: RAID REGISTER ======================= #}
+    {% elif sec == 'raid' %}
+    {% set _rd = workspace_data.get('raid', []) if workspace_data is defined else [] %}
+    <section class="pms-panel">
+      <div class="pms-panel-header"><h2>Organization RAID Register ({{ _rd|length }})</h2></div>
+      <div class="pms-table-scroll">
+        <table>
+          <thead><tr><th>Risk / Issue</th><th>Project</th><th>Category</th><th>Severity</th><th>Owner</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for r in _rd %}
+            <tr>
+              <td><strong>{{ r.title }}</strong>{% if r.mitigation_plan %}<span class="pms-row-meta">{{ r.mitigation_plan }}</span>{% endif %}</td>
+              <td><a class="pms-row-name" href="{{ url_for('contracts_views.project_detail_page', project_id=r.project_id) }}">{{ r.project_name }}</a><span class="pms-row-meta">{{ r.project_code }}</span></td>
+              <td>{{ r.category|title }}</td>
+              <td><span class="pms-state {% if r.severity == 'critical' %}pms-state--bad{% elif r.severity == 'high' %}pms-state--warn{% else %}pms-state--info{% endif %}">{{ r.severity|title }}</span></td>
+              <td>{{ r.owner_name or '—' }}</td>
+              <td><span class="pms-state {% if r.status in ('mitigated','closed') %}pms-state--good{% else %}pms-state--warn{% endif %}">{{ r.status|title }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align:center;padding:28px;color:#4c6273;">No risks or issues logged across organization projects yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    {# ======================= SECTION: COMPLIANCE, HSE & QUALITY ======================= #}
+    {% elif sec == 'compliance' %}
+    {% set _cp = workspace_data.get('compliance', []) if workspace_data is defined else [] %}
+    {% set _qa = workspace_data.get('qa', []) if workspace_data is defined else [] %}
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <section class="pms-panel">
+        <div class="pms-panel-header"><h2>Permits, Safeguards &amp; HSE ({{ _cp|length }})</h2></div>
+        <div class="pms-table-scroll">
+          <table>
+            <thead><tr><th>Type</th><th>Title</th><th>Project</th><th>Expiry</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for c in _cp %}
+              <tr>
+                <td><span class="pms-state pms-state--info">{{ c.record_type|replace('_',' ')|upper }}</span></td>
+                <td><strong>{{ c.title }}</strong></td>
+                <td><a class="pms-row-name" href="{{ url_for('contracts_views.project_detail_page', project_id=c.project_id) }}">{{ c.project_name }}</a><span class="pms-row-meta">{{ c.project_code }}</span></td>
+                <td>{{ c.expiry_date or '—' }}</td>
+                <td><span class="pms-state {% if c.is_expired %}pms-state--bad{% else %}pms-state--good{% endif %}">{{ c.status|title }}</span></td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" style="text-align:center;padding:24px;color:#4c6273;">No permits or HSE records logged yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="pms-panel">
+        <div class="pms-panel-header"><h2>Quality Inspections &amp; CAPA ({{ _qa|length }})</h2></div>
+        <div class="pms-table-scroll">
+          <table>
+            <thead><tr><th>Type</th><th>Title</th><th>Project</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for q in _qa %}
+              <tr>
+                <td><span class="pms-state pms-state--info">{{ q.record_type|upper }}</span></td>
+                <td><strong>{{ q.title }}</strong></td>
+                <td><a class="pms-row-name" href="{{ url_for('contracts_views.project_detail_page', project_id=q.project_id) }}">{{ q.project_name }}</a><span class="pms-row-meta">{{ q.project_code }}</span></td>
+                <td><span class="pms-state pms-state--good">{{ q.status|title }}</span></td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" style="text-align:center;padding:24px;color:#4c6273;">No quality records logged yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    {# ======================= SECTION: EXECUTIVE REPORTS ======================= #}
+    {% elif sec == 'reports' %}
+    {% set _ind = workspace_data.get('indicators', []) if workspace_data is defined else [] %}
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <section class="pms-metrics">
+        <div class="pms-metric"><span><small>Total Projects</small><strong>{{ mc.total }}</strong></span></div>
+        <div class="pms-metric"><span><small>On Track</small><strong style="color:#17664c;">{{ mc.on_track }}</strong></span></div>
+        <div class="pms-metric"><span><small>At Risk / Delayed</small><strong style="color:#85500c;">{{ mc.attention }}</strong></span></div>
+        <div class="pms-metric"><span><small>Deliverables Accepted</small><strong>{{ portfolio.deliverables_pct }}%</strong></span></div>
+      </section>
+      <section class="pms-panel">
+        <div class="pms-panel-header"><h2>Results Framework &amp; Indicators ({{ _ind|length }})</h2></div>
+        <div class="pms-table-scroll">
+          <table>
+            <thead><tr><th>Code</th><th>Level</th><th>Indicator</th><th>Project</th><th style="text-align:right;">Target</th></tr></thead>
+            <tbody>
+              {% for i in _ind %}
+              <tr>
+                <td style="font-family:var(--ts-font-mono);font-size:12px;color:#002769;font-weight:700;">{{ i.indicator_code }}</td>
+                <td><span class="pms-state pms-state--info">{{ i.level|upper }}</span></td>
+                <td><strong>{{ i.title }}</strong></td>
+                <td><a class="pms-row-name" href="{{ url_for('contracts_views.project_detail_page', project_id=i.project_id) }}">{{ i.project_name }}</a><span class="pms-row-meta">{{ i.project_code }}</span></td>
+                <td style="text-align:right;">{{ i.target_value or '—' }} {{ i.unit }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" style="text-align:center;padding:28px;color:#4c6273;">No results indicators defined across organization projects yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
     {% endif %}
   </main>

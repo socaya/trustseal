@@ -177,7 +177,28 @@ def projects_page():
 
     # UI-05 & UI-06: Server-side search, multi-facet filtering, deterministic sorting & pagination
     active_section = (request.args.get("section") or "projects").strip().lower()
-    if active_section not in ("home", "projects", "portfolios", "programmes", "intake", "contracts", "obligations", "spend", "templates"):
+    _valid_sections = (
+        "home",
+        "projects",
+        "portfolios",
+        "programmes",
+        "intake",
+        "contracts",
+        "obligations",
+        "spend",
+        "templates",
+        "resources",
+        "capacity",
+        "equipment",
+        "timesheets",
+        "procurement",
+        "budgets",
+        "approvals",
+        "raid",
+        "compliance",
+        "reports",
+    )
+    if active_section not in _valid_sections:
         active_section = "projects"
 
     q_str = (request.args.get("q") or "").strip()
@@ -395,10 +416,191 @@ def projects_page():
     start_idx = (page - 1) * per_page
     paged_projects = filtered[start_idx : start_idx + per_page]
 
+    # Dedicated org-wide workspace page datasets (loaded on demand for each top-level ribbon page)
+    workspace_data: dict[str, list] = {}
+    if active_section in ("resources", "capacity"):
+        from app.models.project_management import ProjectResourceAllocation
+
+        allocs = (
+            ProjectResourceAllocation.query.filter_by(organization_id=org_id)
+            .order_by(ProjectResourceAllocation.id.desc())
+            .all()
+        )
+        res_rows = []
+        cap_map: dict[str, dict] = {}
+        for a in allocs:
+            d = a.to_dict()
+            pi = proj_by_id.get(a.project_id)
+            d["project_name"] = pi["name"] if pi else f"Project #{a.project_id}"
+            d["project_code"] = pi["project_code"] if pi else "—"
+            res_rows.append(d)
+            rname = d.get("resource_name") or "Unassigned"
+            entry = cap_map.setdefault(
+                rname,
+                {"resource_name": rname, "role_title": d.get("role_title") or "—", "projects_count": 0, "total_fte": 0},
+            )
+            entry["projects_count"] += 1
+            entry["total_fte"] += int(d.get("allocation_pct") or 0)
+        workspace_data["resources"] = res_rows
+        workspace_data["capacity"] = sorted(cap_map.values(), key=lambda x: x["total_fte"], reverse=True)
+    elif active_section == "equipment":
+        from app.models.project_enterprise_ext import ProjectAssetBooking
+
+        workspace_data["equipment"] = [
+            {
+                **b.to_dict(),
+                "project_name": (proj_by_id.get(b.project_id) or {}).get("name", f"Project #{b.project_id}"),
+                "project_code": (proj_by_id.get(b.project_id) or {}).get("project_code", "—"),
+            }
+            for b in ProjectAssetBooking.query.filter_by(organization_id=org_id)
+            .order_by(ProjectAssetBooking.id.desc())
+            .all()
+        ]
+    elif active_section == "timesheets":
+        from app.models.project_management import ProjectTimeEntry
+        from app.models.user import User
+
+        umap = {u.id: u.username for u in User.query.filter_by(organization_id=org_id).all()}
+        workspace_data["timesheets"] = [
+            {
+                **t.to_dict(),
+                "username": umap.get(t.user_id, f"User #{t.user_id}"),
+                "project_name": (proj_by_id.get(t.project_id) or {}).get("name", f"Project #{t.project_id}"),
+                "project_code": (proj_by_id.get(t.project_id) or {}).get("project_code", "—"),
+            }
+            for t in ProjectTimeEntry.query.filter_by(organization_id=org_id)
+            .order_by(ProjectTimeEntry.work_date.desc(), ProjectTimeEntry.id.desc())
+            .limit(200)
+            .all()
+        ]
+    elif active_section == "procurement":
+        from app.models.project_enterprise_ext import ProjectProcurement
+
+        workspace_data["procurement"] = [
+            {
+                **pr.to_dict(),
+                "project_name": (proj_by_id.get(pr.project_id) or {}).get("name", f"Project #{pr.project_id}"),
+                "project_code": (proj_by_id.get(pr.project_id) or {}).get("project_code", "—"),
+            }
+            for pr in ProjectProcurement.query.filter_by(organization_id=org_id)
+            .order_by(ProjectProcurement.id.desc())
+            .all()
+        ]
+    elif active_section == "budgets":
+        from app.models.project_management import ProjectBudgetLine
+
+        blines = ProjectBudgetLine.query.filter_by(organization_id=org_id).all()
+        bl_by_p: dict[int, float] = {}
+        for bl in blines:
+            bl_by_p[bl.project_id] = bl_by_p.get(bl.project_id, 0.0) + float(bl.planned_amount or 0)
+        act_by_p: dict[int, float] = {}
+        com_by_p: dict[int, float] = {}
+        for ce in org_costs:
+            amt = float(ce.amount or 0)
+            if ce.event_type == "actual":
+                act_by_p[ce.project_id] = act_by_p.get(ce.project_id, 0.0) + amt
+            elif ce.event_type == "commitment":
+                com_by_p[ce.project_id] = com_by_p.get(ce.project_id, 0.0) + amt
+            elif ce.event_type == "reversal":
+                act_by_p[ce.project_id] = act_by_p.get(ce.project_id, 0.0) - amt
+        b_rows = []
+        for pc in project_cards:
+            pid = pc["id"]
+            approved = bl_by_p.get(pid) or float(pc.get("budget_amount") or 0)
+            actuals = max(0.0, act_by_p.get(pid, 0.0))
+            comm = max(0.0, com_by_p.get(pid, 0.0))
+            avail = approved - actuals - comm
+            util = round(((actuals + comm) / approved) * 100.0, 1) if approved > 0 else 0.0
+            b_rows.append({
+                "project_id": pid,
+                "project_code": pc["project_code"],
+                "project_name": pc["name"],
+                "currency": pc.get("currency") or "USD",
+                "approved_budget": approved,
+                "actuals": actuals,
+                "commitments": comm,
+                "available": avail,
+                "util_pct": util,
+            })
+        workspace_data["budgets"] = b_rows
+    elif active_section == "approvals":
+        from app.models.project_enterprise_batch3 import ProjectApprovalRequest
+        from app.models.project_management import ProjectChangeRequest
+
+        workspace_data["approvals"] = [
+            {
+                **a.to_dict(),
+                "project_name": (proj_by_id.get(a.project_id) or {}).get("name", f"Project #{a.project_id}"),
+                "project_code": (proj_by_id.get(a.project_id) or {}).get("project_code", "—"),
+            }
+            for a in ProjectApprovalRequest.query.filter_by(organization_id=org_id)
+            .order_by(ProjectApprovalRequest.id.desc())
+            .all()
+        ]
+        workspace_data["change_requests"] = [
+            {
+                **cr.to_dict(),
+                "project_name": (proj_by_id.get(cr.project_id) or {}).get("name", f"Project #{cr.project_id}"),
+                "project_code": (proj_by_id.get(cr.project_id) or {}).get("project_code", "—"),
+            }
+            for cr in ProjectChangeRequest.query.filter_by(organization_id=org_id)
+            .order_by(ProjectChangeRequest.id.desc())
+            .all()
+        ]
+    elif active_section == "raid":
+        workspace_data["raid"] = [
+            {
+                **r.to_dict(),
+                "project_name": (proj_by_id.get(r.project_id) or {}).get("name", f"Project #{r.project_id}"),
+                "project_code": (proj_by_id.get(r.project_id) or {}).get("project_code", "—"),
+            }
+            for r in ProjectRisk.query.filter_by(organization_id=org_id)
+            .order_by(ProjectRisk.id.desc())
+            .all()
+        ]
+    elif active_section == "compliance":
+        from app.models.project_enterprise_ext import ProjectQualityRecord
+        from app.models.project_enterprise_batch3 import ProjectComplianceRecord
+
+        workspace_data["compliance"] = [
+            {
+                **c.to_dict(),
+                "project_name": (proj_by_id.get(c.project_id) or {}).get("name", f"Project #{c.project_id}"),
+                "project_code": (proj_by_id.get(c.project_id) or {}).get("project_code", "—"),
+            }
+            for c in ProjectComplianceRecord.query.filter_by(organization_id=org_id)
+            .order_by(ProjectComplianceRecord.id.desc())
+            .all()
+        ]
+        workspace_data["qa"] = [
+            {
+                **q.to_dict(),
+                "project_name": (proj_by_id.get(q.project_id) or {}).get("name", f"Project #{q.project_id}"),
+                "project_code": (proj_by_id.get(q.project_id) or {}).get("project_code", "—"),
+            }
+            for q in ProjectQualityRecord.query.filter_by(organization_id=org_id)
+            .order_by(ProjectQualityRecord.id.desc())
+            .all()
+        ]
+    elif active_section == "reports":
+        from app.models.project_enterprise_ext import ProjectIndicator
+
+        workspace_data["indicators"] = [
+            {
+                **i.to_dict(),
+                "project_name": (proj_by_id.get(i.project_id) or {}).get("name", f"Project #{i.project_id}"),
+                "project_code": (proj_by_id.get(i.project_id) or {}).get("project_code", "—"),
+            }
+            for i in ProjectIndicator.query.filter_by(organization_id=org_id)
+            .order_by(ProjectIndicator.id.desc())
+            .all()
+        ]
+
     portfolio_prog = compute_deliverable_progress(all_delivs)
     return render_template(
         "contracts/projects.html",
         active_section=active_section,
+        workspace_data=workspace_data,
         global_obligations=global_obligations,
         global_contract_burns=global_contract_burns,
         global_contract_overview=global_contract_overview,
@@ -1063,8 +1265,13 @@ def my_work_page():
         for e in exp_raw
     ]
 
+    active_view = (request.args.get("view") or "work").strip().lower()
+    if active_view not in ("work", "timesheet", "expenses"):
+        active_view = "work"
+
     return render_template(
         "contracts/my_work.html",
+        active_view=active_view,
         my_projects=[p.to_dict() for p in projs],
         week_days=week_days,
         grid_rows=grid_rows,

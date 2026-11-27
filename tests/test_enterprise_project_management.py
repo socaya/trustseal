@@ -462,7 +462,7 @@ def test_enterprise_pm_batch3_modules_end_to_end(pg_app, pm_env):
     r_html = c_mgr.get(f"/projects/{pid}")
     assert r_html.status_code == 200
     assert b"Permits, Safeguards &amp; HSE Incidents" in r_html.data
-    assert b"External Client / Partner Portal Grants" in r_html.data
+    assert b"External Client &amp; Partner Portal Grants" in r_html.data
 
 
 def test_enterprise_pm_v21_timesheets_end_to_end(pg_app, pm_env):
@@ -520,7 +520,7 @@ def test_enterprise_pm_v21_timesheets_end_to_end(pg_app, pm_env):
     # Dedicated Project Timesheets tab renders HTTP 200
     r_html = c_mgr.get(f"/projects/{pid}")
     assert r_html.status_code == 200
-    assert b"Project Timesheets &amp; Effort Accounting (PM-13 v2.1)" in r_html.data
+    assert b"Project Timesheets &amp; Effort Accounting" in r_html.data
 
     # Now closure succeeds cleanly with zero unapproved time!
     assert c_mgr.post(f"/api/projects/{pid}/transition", headers=hdrs, json={"lifecycle_state": "closed"}).status_code == 200
@@ -573,10 +573,16 @@ def test_enterprise_pm_cpm_evm_my_work_and_timesheet_lock(pg_app, pm_env):
     assert evm["ac"] == "1600.00"   # 16h * 100.00
     assert evm["cpi"] is not None
 
-    # 4. /my-work page renders HTTP 200 with weekly grid & Gantt/EVM render on /projects/<id>
+    # 4. /my-work, /my-work?view=timesheet, /my-work?view=expenses render HTTP 200 & Gantt/EVM render on /projects/<id>
     r_mw = c_mgr.get("/my-work")
     assert r_mw.status_code == 200
-    assert b"Personal Weekly Timesheet Grid" in r_mw.data
+    assert b"My Assigned Tasks" in r_mw.data
+    r_ts = c_mgr.get("/my-work?view=timesheet")
+    assert r_ts.status_code == 200
+    assert b"My Weekly Timesheet" in r_ts.data
+    r_ex = c_mgr.get("/my-work?view=expenses")
+    assert r_ex.status_code == 200
+    assert b"My Expenses" in r_ex.data
 
     r_pd = c_mgr.get(f"/projects/{pid}")
     assert r_pd.status_code == 200
