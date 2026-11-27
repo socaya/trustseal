@@ -2,355 +2,923 @@
 {% set active_nav_item = 'overview' %}
 
 {% block title %}Overview · TRUSTSEAL{% endblock %}
-
-{% block page_title %}
-  {% if current_user and current_user.is_authenticated %}
-    {% set greeting_name = current_user.first_name or current_user.username %}
-    Welcome back, {{ greeting_name }}
-  {% else %}
-    Overview
-  {% endif %}
-{% endblock %}
-
+{% block page_header %}{% endblock %}
+{% block page_title %}{% endblock %}
 {% block page_description %}{% endblock %}
+{% block page_actions %}{% endblock %}
 
-{% block page_actions %}
-  <a class="ts-btn ts-btn--secondary" href="{{ url_for('workspace_assets_views.templates_hub_page') }}">TS Template Gallery</a>
-  <a class="ts-btn ts-btn--secondary" href="{{ url_for('contracts_views.projects_page') }}">Projects</a>
-  {% if 'tsd_views.new' in url_map_endpoints %}
-  <a class="ts-btn ts-btn--primary" href="{{ url_for('tsd_views.new') }}">+ New document</a>
-  {% elif 'document_views.create_document' in url_map_endpoints %}
-  <a class="ts-btn ts-btn--primary" href="{{ url_for('document_views.create_document') }}">+ Upload document</a>
-  {% endif %}
+{% block extra_head %}
+<style>
+  /* Full-screen edge-to-edge Overview shell — removes 1320px box constraint & plain white void */
+  .ts-content:has(.ov-shell),
+  .ts-page:has(.ov-shell),
+  #ts-main:has(.ov-shell),
+  #ts-main:has(.ov-shell) > .ts-page {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    background: #eef2f8 !important;
+  }
+  .ts-page:has(.ov-shell) > .ts-page-header { display: none !important; }
+
+  .ov-shell {
+    min-height: calc(100vh - var(--ts-topbar-h, 54px));
+    background: linear-gradient(180deg, #eef2f8 0%, #f3f6fb 100%);
+    color: #0f172a;
+    font-family: var(--ts-font, "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+    padding-bottom: 36px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---- 1. ARCHITECTURAL TRUSTSEAL BRAND HERO BANNER ---- */
+  .ov-hero {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(125deg, #00153c 0%, #002769 50%, #0e439c 100%);
+    color: #ffffff;
+    padding: 26px 28px 54px;
+  }
+  .ov-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 86% 18%, rgba(2, 152, 46, 0.28) 0%, transparent 42%),
+      radial-gradient(circle at 18% 92%, rgba(59, 130, 246, 0.24) 0%, transparent 45%),
+      linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+    pointer-events: none;
+  }
+  .ov-hero__inner {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .ov-hero__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #dbeafe;
+    margin-bottom: 10px;
+  }
+  .ov-hero__eyebrow i {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #34d399;
+    box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.25);
+    display: inline-block;
+  }
+  .ov-hero__title {
+    margin: 0 0 5px;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #ffffff;
+    line-height: 1.2;
+  }
+  .ov-hero__sub {
+    margin: 0;
+    font-size: 13.5px;
+    color: rgba(226, 232, 240, 0.88);
+  }
+  .ov-hero__actions {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap;
+  }
+  .ov-hbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 9px;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 140ms ease, transform 120ms ease, box-shadow 140ms ease;
+  }
+  .ov-hbtn--white {
+    background: #ffffff;
+    color: #002769;
+    box-shadow: 0 2px 8px rgba(0, 15, 45, 0.22);
+  }
+  .ov-hbtn--white:hover { background: #eff6ff; color: #001a47; transform: translateY(-1px); text-decoration: none; }
+  .ov-hbtn--glass {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    color: #ffffff;
+  }
+  .ov-hbtn--glass:hover { background: rgba(255, 255, 255, 0.20); color: #ffffff; text-decoration: none; }
+  .ov-hbtn--emerald {
+    background: #02982e;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(2, 152, 46, 0.28);
+  }
+  .ov-hbtn--emerald:hover { background: #027d26; color: #ffffff; transform: translateY(-1px); text-decoration: none; }
+
+  /* ---- 2. FULL-WIDTH WORKSPACE BODY ---- */
+  .ov-body {
+    padding: 0 28px;
+    margin-top: -30px;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* 5 Brand-Accented Elevated KPI Cards */
+  .ov-kpis {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+  .ov-kpi {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px 18px;
+    border-radius: 12px;
+    background: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.07);
+    box-shadow: 0 6px 20px rgba(0, 39, 105, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+    text-decoration: none;
+    color: inherit;
+    overflow: hidden;
+    transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+  }
+  .ov-kpi::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3.5px;
+    background: var(--kpi-accent, #002769);
+  }
+  .ov-kpi:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(0, 39, 105, 0.11);
+    border-color: rgba(0, 39, 105, 0.18);
+    text-decoration: none;
+  }
+  .ov-kpi--navy    { --kpi-accent: #002769; --kpi-bg: #eff4fc; --kpi-fg: #002769; }
+  .ov-kpi--indigo  { --kpi-accent: #4338ca; --kpi-bg: #eef2ff; --kpi-fg: #4338ca; }
+  .ov-kpi--sky     { --kpi-accent: #0284c7; --kpi-bg: #e0f2fe; --kpi-fg: #0369a1; }
+  .ov-kpi--amber   { --kpi-accent: #d97706; --kpi-bg: #fffbeb; --kpi-fg: #b45309; }
+  .ov-kpi--emerald { --kpi-accent: #02982e; --kpi-bg: #ecfdf5; --kpi-fg: #047857; }
+
+  .ov-kpi__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .ov-kpi__label {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #475569;
+  }
+  .ov-kpi__ico {
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    background: var(--kpi-bg);
+    color: var(--kpi-fg);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .ov-kpi__val {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
+    color: #0f172a;
+    line-height: 1.1;
+  }
+  .ov-kpi--emerald .ov-kpi__val { color: #047857; }
+  .ov-kpi__sub {
+    font-size: 11.5px;
+    color: #64748b;
+    line-height: 1.35;
+  }
+
+  /* 6 Colored Brand-Tinted Studio Quick-Launch Tiles */
+  .ov-actions {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .ov-action {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 12px 14px;
+    border-radius: 11px;
+    background: var(--act-bg, #ffffff);
+    border: 1px solid var(--act-bd, rgba(15, 23, 42, 0.08));
+    text-decoration: none;
+    color: #0f172a;
+    transition: transform 130ms ease, box-shadow 130ms ease, border-color 130ms ease;
+  }
+  .ov-action:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+    border-color: var(--act-fg, #002769);
+    text-decoration: none;
+  }
+  .ov-action__ico {
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    background: #ffffff;
+    color: var(--act-fg, #002769);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.07);
+  }
+  .ov-action__k {
+    display: block;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--act-fg, #002769);
+  }
+  .ov-action__v {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #0f172a;
+    margin-top: 1px;
+    white-space: nowrap;
+  }
+  .ov-act--navy    { --act-bg: #edf3fc; --act-bd: rgba(0, 39, 105, 0.14); --act-fg: #002769; }
+  .ov-act--sky     { --act-bg: #e8f5fe; --act-bd: rgba(2, 132, 199, 0.16); --act-fg: #0369a1; }
+  .ov-act--indigo  { --act-bg: #eef2ff; --act-bd: rgba(67, 56, 202, 0.15); --act-fg: #4338ca; }
+  .ov-act--emerald { --act-bg: #e9fbf0; --act-bd: rgba(2, 152, 46, 0.16); --act-fg: #047857; }
+  .ov-act--amber   { --act-bg: #fef7e6; --act-bd: rgba(217, 119, 6, 0.18); --act-fg: #b45309; }
+  .ov-act--teal    { --act-bg: #e7f8f6; --act-bd: rgba(13, 148, 136, 0.16); --act-fg: #0f766e; }
+
+  /* Full-Width 2-Column Main Operational Workspace */
+  .ov-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.85fr) minmax(330px, 1fr);
+    gap: 18px;
+    align-items: start;
+  }
+  .ov-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+
+  /* Modern Brand-Header Elevated Cards */
+  .ov-card {
+    background: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.07);
+    border-radius: 13px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+    overflow: hidden;
+  }
+  .ov-card__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 18px;
+    background: linear-gradient(90deg, var(--ch-tint, #f5f8ff) 0%, #ffffff 65%);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  }
+  .ov-card__head--indigo  { --ch-tint: #f2f4ff; }
+  .ov-card__head--sky     { --ch-tint: #eef7ff; }
+  .ov-card__head--emerald { --ch-tint: #eefbf3; }
+
+  .ov-card__title-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .ov-card__dot {
+    width: 9px; height: 9px; border-radius: 3px;
+    background: #002769;
+    flex-shrink: 0;
+  }
+  .ov-card__dot--indigo  { background: #4338ca; }
+  .ov-card__dot--sky     { background: #0284c7; }
+  .ov-card__dot--emerald { background: #02982e; }
+  .ov-card__title {
+    margin: 0;
+    font-size: 14.5px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: #0f172a;
+  }
+  .ov-card__count {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(0, 39, 105, 0.08);
+    color: #002769;
+  }
+  .ov-link {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #002769;
+    text-decoration: none;
+    padding: 4px 9px;
+    border-radius: 7px;
+    transition: background 120ms ease;
+  }
+  .ov-link:hover { background: #eff4fc; text-decoration: none; }
+
+  /* Crisp Modern Data Tables */
+  .ov-table-wrap { overflow-x: auto; }
+  .ov-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .ov-table thead th {
+    background: #f8fafd;
+    color: #64748b;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.055em;
+    padding: 10px 16px;
+    text-align: left;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+    white-space: nowrap;
+  }
+  .ov-table tbody td {
+    padding: 11px 16px;
+    color: #334155;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.045);
+    vertical-align: middle;
+  }
+  .ov-table tbody tr:last-child td { border-bottom: 0; }
+  .ov-table tbody tr { transition: background 100ms ease; }
+  .ov-table tbody tr:hover td { background: #f6f9ff; }
+
+  .ov-doc-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .ov-doc-ico {
+    width: 28px; height: 28px;
+    border-radius: 7px;
+    background: #eff4fc;
+    color: #002769;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .ov-doc-link { font-weight: 600; color: #0f172a; text-decoration: none; }
+  .ov-doc-link:hover { color: #002769; }
+  .ov-ref-pill {
+    font-family: var(--ts-font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: #002769;
+    background: #eff4fc;
+    padding: 2px 7px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+
+  /* Calm Dot-Status Lozenges */
+  .ov-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    background: #f1f5f9;
+    color: #475569;
+    white-space: nowrap;
+  }
+  .ov-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; }
+  .ov-pill--ok   { background: #ecfdf5; color: #065f46; }
+  .ov-pill--ok::before { background: #059669; }
+  .ov-pill--info { background: #eff6ff; color: #1e40af; }
+  .ov-pill--info::before { background: #2563eb; }
+  .ov-pill--warn { background: #fffbeb; color: #92400e; }
+  .ov-pill--warn::before { background: #d97706; }
+
+  .ov-btn-soft {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 11px;
+    border-radius: 7px;
+    background: #eef2ff;
+    color: #3730a3;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .ov-btn-soft:hover { background: #4338ca; color: #ffffff; text-decoration: none; }
+
+  /* Right Sidebar Project Cards */
+  .ov-proj-list { padding: 14px 16px; display: flex; flex-direction: column; gap: 11px; }
+  .ov-proj-item {
+    display: block;
+    padding: 13px 14px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #f8fbff 0%, #ffffff 100%);
+    border: 1px solid rgba(2, 132, 199, 0.14);
+    border-left: 3.5px solid #0284c7;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 130ms ease, box-shadow 130ms ease, border-color 130ms ease;
+  }
+  .ov-proj-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(2, 132, 199, 0.10);
+    border-color: rgba(2, 132, 199, 0.32);
+    text-decoration: none;
+  }
+  .ov-proj-item__top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .ov-proj-item__name { font-size: 13.5px; font-weight: 700; color: #0f172a; margin: 5px 0 8px; }
+  .ov-prog { display: flex; align-items: center; gap: 9px; }
+  .ov-prog__track { flex: 1; height: 6px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+  .ov-prog__fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #002769 0%, #02982e 100%); }
+  .ov-prog__pct { font-size: 11.5px; font-weight: 700; color: #047857; font-variant-numeric: tabular-nums; }
+
+  /* Brand & Trust Assets Card */
+  .ov-trust-banner {
+    margin: 14px 16px 6px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #002769 0%, #065f46 100%);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+  }
+  .ov-trust-banner__ico {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: rgba(255, 255, 255, 0.16);
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .ov-trust-banner strong { display: block; font-size: 13px; font-weight: 700; }
+  .ov-trust-banner span { display: block; font-size: 11.5px; color: rgba(226, 232, 240, 0.88); }
+
+  .ov-asset-list { padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .ov-asset-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 9px;
+    background: #f8fafd;
+    border: 1px solid rgba(15, 23, 42, 0.06);
+    text-decoration: none;
+    color: #0f172a;
+    font-size: 12.5px;
+    font-weight: 500;
+    transition: background 120ms ease, border-color 120ms ease;
+  }
+  .ov-asset-row:hover { background: #eff4fc; border-color: rgba(0, 39, 105, 0.16); text-decoration: none; }
+  .ov-asset-row__left { display: inline-flex; align-items: center; gap: 9px; }
+  .ov-asset-row__ico {
+    width: 26px; height: 26px; border-radius: 7px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+
+  .ov-empty {
+    padding: 28px 20px;
+    text-align: center;
+    color: #64748b;
+    font-size: 13px;
+  }
+  .ov-more {
+    border: 0; border-radius: 7px; background: transparent; color: #64748b;
+    width: 28px; height: 28px; cursor: pointer; font-size: 15px;
+  }
+  .ov-more:hover { background: #eff4fc; color: #002769; }
+  .ov-ctx {
+    position: fixed; z-index: 1200; min-width: 176px;
+    background: #ffffff; border: 1px solid rgba(15, 23, 42, 0.10);
+    border-radius: 10px; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+    padding: 5px;
+  }
+  .ov-ctx[hidden] { display: none !important; }
+  .ov-ctx__item {
+    display: block; width: 100%; text-align: left; border: 0; border-radius: 7px;
+    background: transparent; padding: 8px 12px; font-size: 12.5px;
+    color: #1e293b; cursor: pointer;
+  }
+  .ov-ctx__item:hover { background: #eff4fc; color: #002769; }
+
+  @media (max-width: 1240px) {
+    .ov-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .ov-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .ov-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 720px) {
+    .ov-hero { padding: 20px 16px 46px; }
+    .ov-body { padding: 0 16px; }
+    .ov-kpis, .ov-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="st-flat ov-full">
-  {% include "stamps/_flat_ui.html" %}
-  {% set m = metrics if metrics is defined else {} %}
+{% set m = metrics if metrics is defined else {} %}
+{% set greeting_name = (current_user.first_name or current_user.username) if (current_user and current_user.is_authenticated) else 'there' %}
+{% set org_name = current_user.organization.name if (current_user and current_user.is_authenticated and current_user.organization) else 'TRUSTSEAL Workspace' %}
 
-  <!-- Executive Workspace KPI Strip (5 Full-Width Cards) -->
-  <section class="ov-kpis" aria-label="Workspace metrics">
-    <a class="st-metric ov-kpi-link" href="{{ url_for('tsd_views.library') if 'tsd_views.library' in url_map_endpoints else '#' }}">
-      <span class="st-metric__label">Live Documents</span>
-      <span class="st-metric__value">{{ m.get('docs_total', 0) }}</span>
-      <span class="st-metric__sub">Active .tsd workspace records</span>
-    </a>
-    <a class="st-metric ov-kpi-link" href="{{ url_for('workspace_assets_views.signed_contracts_page') if 'workspace_assets_views.signed_contracts_page' in url_map_endpoints else '#' }}">
-      <span class="st-metric__label">Contracts</span>
-      <span class="st-metric__value">{{ m.get('contracts_total', 0) }}</span>
-      <span class="st-metric__sub">{{ m.get('contracts_signed', 0) }} executed &amp; sealed</span>
-    </a>
-    <a class="st-metric ov-kpi-link" href="{{ url_for('contracts_views.projects_page') if 'contracts_views.projects_page' in url_map_endpoints else '#' }}">
-      <span class="st-metric__label">Active Projects</span>
-      <span class="st-metric__value">{{ m.get('projects_total', 0) }}</span>
-      <span class="st-metric__sub">Matters, deals &amp; deliverables</span>
-    </a>
-    <a class="st-metric ov-kpi-link" href="{{ url_for('workspace_assets_views.signatures_hub_page') if 'workspace_assets_views.signatures_hub_page' in url_map_endpoints else '#' }}">
-      <span class="st-metric__label">Brand &amp; Signing Assets</span>
-      <span class="st-metric__value">{{ m.get('stamps_total', 0) + m.get('letterheads_total', 0) + m.get('signatures_total', 0) }}</span>
-      <span class="st-metric__sub">{{ m.get('stamps_total', 0) }} stamps · {{ m.get('letterheads_total', 0) }} letterheads · {{ m.get('signatures_total', 0) }} signatures</span>
-    </a>
-    <a class="st-metric ov-kpi-link" href="{{ url_for('workspace_assets_views.templates_hub_page') if 'workspace_assets_views.templates_hub_page' in url_map_endpoints else '#' }}">
-      <span class="st-metric__label">TS Template Catalog</span>
-      <span class="st-metric__value" style="color:#02982E;">3,325+</span>
-      <span class="st-metric__sub">Docs, Policies, SACCO, Contracts &amp; Stamps</span>
-    </a>
-  </section>
-
-  <!-- Quick Actions strip (6 Full-Width Executive Shortcuts) -->
-  <section class="ov-actions" aria-label="Quick actions">
-    {% if 'tsd_views.new' in url_map_endpoints %}
-    <a class="ov-action" href="{{ url_for('tsd_views.new') }}">
-      <span class="ov-action__k">Document</span>
-      <span class="ov-action__v">New .tsd draft →</span>
-    </a>
-    {% endif %}
-    {% if 'workspace_assets_views.templates_hub_page' in url_map_endpoints %}
-    <a class="ov-action" href="{{ url_for('workspace_assets_views.templates_hub_page') }}">
-      <span class="ov-action__k">Templates</span>
-      <span class="ov-action__v">Browse 3,300+ blueprints →</span>
-    </a>
-    {% endif %}
-    {% if 'workspace_assets_views.signed_contracts_page' in url_map_endpoints %}
-    <a class="ov-action" href="{{ url_for('workspace_assets_views.signed_contracts_page') }}">
-      <span class="ov-action__k">Contracts</span>
-      <span class="ov-action__v">Open Contract Studio →</span>
-    </a>
-    {% endif %}
-    {% if 'workspace_assets_views.signatures_hub_page' in url_map_endpoints %}
-    <a class="ov-action" href="{{ url_for('workspace_assets_views.signatures_hub_page') }}">
-      <span class="ov-action__k">Signatures</span>
-      <span class="ov-action__v">OTP Signatory Vault →</span>
-    </a>
-    {% endif %}
-    {% if 'tsd_stamps_views.studio_new' in url_map_endpoints %}
-    <a class="ov-action" href="{{ url_for('tsd_stamps_views.studio_new') }}">
-      <span class="ov-action__k">Stamp Studio</span>
-      <span class="ov-action__v">Design company seal →</span>
-    </a>
-    {% endif %}
-    {% if 'tsd_stamps_views.verify_page' in url_map_endpoints %}
-    <a class="ov-action" href="{{ url_for('tsd_stamps_views.verify_page') }}">
-      <span class="ov-action__k">Forensics</span>
-      <span class="ov-action__v">Verify document or seal →</span>
-    </a>
-    {% endif %}
-  </section>
-
-  <!-- Full-Width 2-Column Operational Workspace Grid -->
-  <div class="ov-grid">
-    <div class="ov-grid__main">
-      <!-- Recent documents -->
-      <section class="st-panel">
-        <div class="st-panel__head">
-          <h2 class="st-panel__title">Recent Documents</h2>
-          {% if 'tsd_views.library' in url_map_endpoints %}
-          <a class="ov-link" href="{{ url_for('tsd_views.library') }}">All documents →</a>
-          {% endif %}
-        </div>
-        {% if recent_documents %}
-        <div style="overflow-x:auto;">
-          <table class="st-table">
-            <thead>
-              <tr>
-                <th>Document</th>
-                <th>Reference</th>
-                <th>Status</th>
-                <th>Owner</th>
-                <th>Updated</th>
-                <th style="width:44px;text-align:right;"></th>
-              </tr>
-            </thead>
-            <tbody id="ov-docs-tbody">
-              {% for doc in recent_documents %}
-                {% set status = (doc.get('status') or 'draft')|lower %}
-                {% set tag_cls = 'st-tag--ok' if status in ('signed','completed','sealed','finalized')
-                              else 'st-tag--info' if status in ('pending','review','awaiting_signatures')
-                              else 'st-tag--warn' if status == 'archived'
-                              else '' %}
-                <tr data-url="{{ doc.get('url') or '#' }}" data-title="{{ doc.get('title', 'Untitled') }}">
-                  <td style="font-weight:600;">
-                    <a href="{{ doc.get('url') or '#' }}" style="color:#091e42;text-decoration:none;">{{ doc.get('title', 'Untitled') }}</a>
-                  </td>
-                  <td style="color:#64748b;font-family:var(--ts-font-mono);font-size:11.5px;">{{ doc.get('reference') or '—' }}</td>
-                  <td><span class="st-tag {{ tag_cls }}">{{ status|replace('_',' ')|capitalize }}</span></td>
-                  <td style="color:#42526e;">{{ doc.get('owner_name') or '—' }}</td>
-                  <td style="color:#64748b;white-space:nowrap;">{{ doc.get('updated_label') or '—' }}</td>
-                  <td style="text-align:right;">
-                    <button type="button" class="ov-more" aria-label="Actions">⋮</button>
-                  </td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        {% else %}
-        <div class="st-empty">
-          <div class="st-empty__title">No documents yet</div>
-          <div class="st-empty__actions">
-            <a class="ts-btn ts-btn--primary" href="{{ url_for('tsd_views.new') }}">Create your first document</a>
-          </div>
-        </div>
+<div class="ov-shell">
+  <!-- ======================= 1. FULL-WIDTH BRAND HERO COMMAND BANNER ======================= -->
+  <section class="ov-hero" aria-label="Workspace overview banner">
+    <div class="ov-hero__inner">
+      <div>
+        <span class="ov-hero__eyebrow"><i></i> {{ org_name }} · Verified Integrity Active</span>
+        <h1 class="ov-hero__title">Welcome back, {{ greeting_name }}</h1>
+        <p class="ov-hero__sub">
+          {{ m.get('docs_total', 0) }} live documents · {{ m.get('contracts_total', 0) }} contracts · {{ m.get('projects_total', 0) }} active projects · AWS KMS PAdES &amp; audit chain operational
+        </p>
+      </div>
+      <div class="ov-hero__actions">
+        {% if 'contracts_views.projects_page' in url_map_endpoints %}
+        <a class="ov-hbtn ov-hbtn--glass" href="{{ url_for('contracts_views.projects_page') }}">Project Studio</a>
         {% endif %}
-      </section>
-
-      <!-- Recent Contracts -->
-      <section class="st-panel" style="margin-top:16px;">
-        <div class="st-panel__head">
-          <h2 class="st-panel__title">Active Contracts</h2>
-          <a class="ov-link" href="{{ url_for('workspace_assets_views.signed_contracts_page') }}">All contracts →</a>
-        </div>
-        {% if recent_contracts %}
-        <div style="overflow-x:auto;">
-          <table class="st-table">
-            <thead>
-              <tr>
-                <th>Contract #</th>
-                <th>Agreement</th>
-                <th>Counterparty</th>
-                <th>Status</th>
-                <th style="text-align:right;">Open</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for c in recent_contracts %}
-              <tr>
-                <td style="font-family:var(--ts-font-mono);font-size:11.5px;color:#002769;font-weight:600;">{{ c.contract_number }}</td>
-                <td style="font-weight:600;color:#091e42;">{{ c.title }}</td>
-                <td style="color:#42526e;">{{ c.counterparty }}</td>
-                <td><span class="st-tag {% if c.status == 'SIGNED' %}st-tag--ok{% elif c.status == 'SUSPENDED' %}st-tag--warn{% else %}st-tag--info{% endif %}">{{ c.status }}</span></td>
-                <td style="text-align:right;"><a class="ts-btn ts-btn--secondary ts-btn--sm" href="{{ c.url }}">Studio →</a></td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        {% else %}
-        <div class="st-empty" style="padding:24px;">
-          <div class="st-empty__title">No contracts created yet</div>
-          <a class="ts-btn ts-btn--secondary ts-btn--sm" href="{{ url_for('workspace_assets_views.templates_hub_page') }}" style="margin-top:8px;">Create from Contract Templates →</a>
-        </div>
+        {% if 'workspace_assets_views.signed_contracts_page' in url_map_endpoints %}
+        <a class="ov-hbtn ov-hbtn--glass" href="{{ url_for('workspace_assets_views.signed_contracts_page') }}">Contracts</a>
         {% endif %}
-      </section>
+        {% if 'workspace_assets_views.templates_hub_page' in url_map_endpoints %}
+        <a class="ov-hbtn ov-hbtn--emerald" href="{{ url_for('workspace_assets_views.templates_hub_page') }}">Template Gallery</a>
+        {% endif %}
+        {% if 'tsd_views.new' in url_map_endpoints %}
+        <a class="ov-hbtn ov-hbtn--white" href="{{ url_for('tsd_views.new') }}">+ New Document</a>
+        {% elif 'document_views.create_document' in url_map_endpoints %}
+        <a class="ov-hbtn ov-hbtn--white" href="{{ url_for('document_views.create_document') }}">+ Upload Document</a>
+        {% endif %}
+      </div>
     </div>
+  </section>
 
-    <aside class="ov-grid__side">
-      <!-- Active Projects Summary -->
-      <section class="st-panel">
-        <div class="st-panel__head">
-          <h2 class="st-panel__title">Project Portfolio</h2>
-          <a class="ov-link" href="{{ url_for('contracts_views.projects_page') }}">All projects →</a>
-        </div>
-        {% if active_projects %}
-        <div style="padding:12px 14px;display:flex;flex-direction:column;gap:12px;">
-          {% for p in active_projects %}
-          <a href="{{ p.url }}" style="display:block;padding:10px 12px;border:1px solid #e2e8f0;background:#fafbfd;text-decoration:none;color:inherit;">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
-              <span style="font-family:var(--ts-font-mono);font-size:11px;font-weight:700;color:#002769;">{{ p.code }}</span>
-              <span class="st-tag st-tag--ok" style="font-size:10px;">{{ p.contracts_total }} contract(s)</span>
-            </div>
-            <div style="font-weight:700;font-size:13px;color:#0f172a;margin:3px 0 6px;">{{ p.name }}</div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <div style="flex:1;height:5px;background:#e2e8f0;"><div style="width:{{ p.deliverables_pct }}%;height:100%;background:#02982E;"></div></div>
-              <span style="font-size:11px;font-weight:600;color:#475569;">{{ p.deliverables_pct }}%</span>
-            </div>
-          </a>
-          {% endfor %}
-        </div>
-        {% else %}
-        <div style="padding:18px;font-size:12.5px;color:#64748b;">No active projects yet.</div>
-        {% endif %}
-      </section>
+  <!-- ======================= 2. FULL-SCREEN ELEVATED WORKSPACE BODY ======================= -->
+  <div class="ov-body">
 
-      <!-- Brand & Trust Readiness -->
-      <section class="st-panel" style="margin-top:16px;">
-        <div class="st-panel__head">
-          <h2 class="st-panel__title">Brand &amp; Trust Assets</h2>
+    <!-- 5 Color-Accented Executive KPI Cards -->
+    <section class="ov-kpis" aria-label="Workspace metrics">
+      <a class="ov-kpi ov-kpi--navy" href="{{ url_for('tsd_views.library') if 'tsd_views.library' in url_map_endpoints else '#' }}">
+        <div class="ov-kpi__top">
+          <span class="ov-kpi__label">Live Documents</span>
+          <span class="ov-kpi__ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></svg>
+          </span>
         </div>
-        <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;">
-          <a href="{{ url_for('tsd_stamps_views.library') }}" style="display:flex;justify-content:space-between;padding:8px 10px;border:1px solid #eef2f7;text-decoration:none;color:#0f172a;">
-            <span>Official Stamps &amp; Seals</span><strong style="color:#002769;">{{ m.get('stamps_total', 0) }} →</strong>
-          </a>
-          <a href="{{ url_for('workspace_assets_views.letterheads_page') }}" style="display:flex;justify-content:space-between;padding:8px 10px;border:1px solid #eef2f7;text-decoration:none;color:#0f172a;">
-            <span>Corporate Letterheads</span><strong style="color:#002769;">{{ m.get('letterheads_total', 0) }} →</strong>
-          </a>
-          <a href="{{ url_for('workspace_assets_views.signatures_hub_page') }}" style="display:flex;justify-content:space-between;padding:8px 10px;border:1px solid #eef2f7;text-decoration:none;color:#0f172a;">
-            <span>Registered Signatories</span><strong style="color:#02982E;">{{ m.get('signatures_total', 0) }} →</strong>
-          </a>
-          <a href="{{ url_for('verify_views.verify_form') }}" style="display:flex;justify-content:space-between;padding:8px 10px;border:1px solid #eef2f7;text-decoration:none;color:#0f172a;">
-            <span>Public Verification Portal</span><strong style="color:#475569;">Open →</strong>
-          </a>
-        </div>
-      </section>
-    </aside>
-  </div>
+        <span class="ov-kpi__val">{{ m.get('docs_total', 0) }}</span>
+        <span class="ov-kpi__sub">Encrypted .tsd workspace records</span>
+      </a>
 
-  <!-- Recent activity -->
-  {% if recent_events %}
-  <section class="st-panel" style="margin-top: 18px;">
-    <div class="st-panel__head">
-      <h2 class="st-panel__title">Recent activity</h2>
-      {% if 'admin_audit.audit_security_page' in url_map_endpoints %}
-      <a class="ov-link" href="{{ url_for('admin_audit.audit_security_page') }}">Audit log →</a>
-      {% elif 'evidence_views.list_retentions' in url_map_endpoints %}
-      <a class="ov-link" href="{{ url_for('evidence_views.list_retentions') }}">Evidence →</a>
+      <a class="ov-kpi ov-kpi--indigo" href="{{ url_for('workspace_assets_views.signed_contracts_page') if 'workspace_assets_views.signed_contracts_page' in url_map_endpoints else '#' }}">
+        <div class="ov-kpi__top">
+          <span class="ov-kpi__label">Contracts</span>
+          <span class="ov-kpi__ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </span>
+        </div>
+        <span class="ov-kpi__val">{{ m.get('contracts_total', 0) }}</span>
+        <span class="ov-kpi__sub">{{ m.get('contracts_signed', 0) }} executed &amp; sealed</span>
+      </a>
+
+      <a class="ov-kpi ov-kpi--sky" href="{{ url_for('contracts_views.projects_page') if 'contracts_views.projects_page' in url_map_endpoints else '#' }}">
+        <div class="ov-kpi__top">
+          <span class="ov-kpi__label">Active Projects</span>
+          <span class="ov-kpi__ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          </span>
+        </div>
+        <span class="ov-kpi__val">{{ m.get('projects_total', 0) }}</span>
+        <span class="ov-kpi__sub">Delivery, WBS, spend &amp; burn</span>
+      </a>
+
+      <a class="ov-kpi ov-kpi--amber" href="{{ url_for('workspace_assets_views.signatures_hub_page') if 'workspace_assets_views.signatures_hub_page' in url_map_endpoints else '#' }}">
+        <div class="ov-kpi__top">
+          <span class="ov-kpi__label">Brand &amp; Signing Assets</span>
+          <span class="ov-kpi__ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="5"/><path d="M5 20h14v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2z"/></svg>
+          </span>
+        </div>
+        <span class="ov-kpi__val">{{ m.get('stamps_total', 0) + m.get('letterheads_total', 0) + m.get('signatures_total', 0) }}</span>
+        <span class="ov-kpi__sub">{{ m.get('stamps_total', 0) }} stamps · {{ m.get('letterheads_total', 0) }} letterheads · {{ m.get('signatures_total', 0) }} signers</span>
+      </a>
+
+      <a class="ov-kpi ov-kpi--emerald" href="{{ url_for('workspace_assets_views.templates_hub_page') if 'workspace_assets_views.templates_hub_page' in url_map_endpoints else '#' }}">
+        <div class="ov-kpi__top">
+          <span class="ov-kpi__label">TS Template Catalog</span>
+          <span class="ov-kpi__ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          </span>
+        </div>
+        <span class="ov-kpi__val">3,325+</span>
+        <span class="ov-kpi__sub">Docs, Contracts, Policies &amp; Stamps</span>
+      </a>
+    </section>
+
+    <!-- 6 Brand-Tinted Studio Quick-Launch Tiles -->
+    <section class="ov-actions" aria-label="Quick actions">
+      {% if 'tsd_views.new' in url_map_endpoints %}
+      <a class="ov-action ov-act--navy" href="{{ url_for('tsd_views.new') }}">
+        <span class="ov-action__ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 5v14M5 12h14"/></svg></span>
+        <span><span class="ov-action__k">Document</span><span class="ov-action__v">New .tsd draft →</span></span>
+      </a>
       {% endif %}
+      {% if 'contracts_views.projects_page' in url_map_endpoints %}
+      <a class="ov-action ov-act--sky" href="{{ url_for('contracts_views.projects_page') }}">
+        <span class="ov-action__ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>
+        <span><span class="ov-action__k">Projects</span><span class="ov-action__v">Project Studio →</span></span>
+      </a>
+      {% endif %}
+      {% if 'workspace_assets_views.signed_contracts_page' in url_map_endpoints %}
+      <a class="ov-action ov-act--indigo" href="{{ url_for('workspace_assets_views.signed_contracts_page') }}">
+        <span class="ov-action__ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+        <span><span class="ov-action__k">Contracts</span><span class="ov-action__v">Contract Studio →</span></span>
+      </a>
+      {% endif %}
+      {% if 'workspace_assets_views.signatures_hub_page' in url_map_endpoints %}
+      <a class="ov-action ov-act--emerald" href="{{ url_for('workspace_assets_views.signatures_hub_page') }}">
+        <span class="ov-action__ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg></span>
+        <span><span class="ov-action__k">Signatures</span><span class="ov-action__v">Signatory Vault →</span></span>
+      </a>
+      {% endif %}
+      {% if 'tsd_stamps_views.studio_new' in url_map_endpoints %}
+      <a class="ov-action ov-act--amber" href="{{ url_for('tsd_stamps_views.studio_new') }}">
+        <span class="ov-action__ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="8" r="5"/><path d="M5 20h14v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2z"/></svg></span>
+        <span><span class="ov-action__k">Stamp Studio</span><span class="ov-action__v">Design seal →</span></span>
+      </a>
+      {% endif %}
+      {% if 'tsd_stamps_views.verify_page' in url_map_endpoints %}
+      <a class="ov-action ov-act--teal" href="{{ url_for('tsd_stamps_views.verify_page') }}">
+        <span class="ov-action__ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 2l8 3v6c0 5-3.4 8.9-8 11-4.6-2.1-8-6-8-11V5l8-3z"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <span><span class="ov-action__k">Forensics</span><span class="ov-action__v">Verify PDF / seal →</span></span>
+      </a>
+      {% endif %}
+    </section>
+
+    <!-- Full-Width 2-Column Operational Workspace -->
+    <div class="ov-grid">
+      <div class="ov-col">
+        <!-- Recent Documents -->
+        <section class="ov-card">
+          <div class="ov-card__head">
+            <div class="ov-card__title-wrap">
+              <span class="ov-card__dot"></span>
+              <h2 class="ov-card__title">Recent Documents</h2>
+              <span class="ov-card__count">{{ recent_documents|length }}</span>
+            </div>
+            {% if 'tsd_views.library' in url_map_endpoints %}
+            <a class="ov-link" href="{{ url_for('tsd_views.library') }}">All documents →</a>
+            {% endif %}
+          </div>
+          {% if recent_documents %}
+          <div class="ov-table-wrap">
+            <table class="ov-table">
+              <thead>
+                <tr>
+                  <th>Document</th>
+                  <th>Reference</th>
+                  <th>Status</th>
+                  <th>Owner</th>
+                  <th>Updated</th>
+                  <th style="width:44px;text-align:right;"></th>
+                </tr>
+              </thead>
+              <tbody id="ov-docs-tbody">
+                {% for doc in recent_documents %}
+                  {% set status = (doc.get('status') or 'draft')|lower %}
+                  {% set pill_cls = 'ov-pill--ok' if status in ('signed','completed','sealed','finalized')
+                                else 'ov-pill--info' if status in ('pending','review','awaiting_signatures')
+                                else 'ov-pill--warn' if status == 'archived'
+                                else '' %}
+                  <tr data-url="{{ doc.get('url') or '#' }}" data-title="{{ doc.get('title', 'Untitled') }}">
+                    <td>
+                      <div class="ov-doc-cell">
+                        <span class="ov-doc-ico" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                        </span>
+                        <a class="ov-doc-link" href="{{ doc.get('url') or '#' }}">{{ doc.get('title', 'Untitled') }}</a>
+                      </div>
+                    </td>
+                    <td><span class="ov-ref-pill">{{ doc.get('reference') or '—' }}</span></td>
+                    <td><span class="ov-pill {{ pill_cls }}">{{ status|replace('_',' ')|capitalize }}</span></td>
+                    <td style="white-space:nowrap;">{{ doc.get('owner_name') or '—' }}</td>
+                    <td style="color:#64748b;white-space:nowrap;">{{ doc.get('updated_label') or '—' }}</td>
+                    <td style="text-align:right;">
+                      <button type="button" class="ov-more" aria-label="Actions">⋮</button>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="ov-empty">
+            <p style="margin:0 0 12px;font-weight:600;color:#0f172a;">No documents created yet</p>
+            <a class="ov-btn-soft" href="{{ url_for('tsd_views.new') }}">Create your first document →</a>
+          </div>
+          {% endif %}
+        </section>
+
+        <!-- Active Contracts -->
+        <section class="ov-card">
+          <div class="ov-card__head ov-card__head--indigo">
+            <div class="ov-card__title-wrap">
+              <span class="ov-card__dot ov-card__dot--indigo"></span>
+              <h2 class="ov-card__title">Active Contracts</h2>
+              <span class="ov-card__count" style="background:rgba(67,56,202,0.10);color:#3730a3;">{{ recent_contracts|length }}</span>
+            </div>
+            <a class="ov-link" href="{{ url_for('workspace_assets_views.signed_contracts_page') }}">All contracts →</a>
+          </div>
+          {% if recent_contracts %}
+          <div class="ov-table-wrap">
+            <table class="ov-table">
+              <thead>
+                <tr>
+                  <th>Contract #</th>
+                  <th>Agreement</th>
+                  <th>Counterparty</th>
+                  <th>Status</th>
+                  <th style="text-align:right;">Open</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for c in recent_contracts %}
+                <tr>
+                  <td><span class="ov-ref-pill" style="background:#eef2ff;color:#3730a3;">{{ c.contract_number }}</span></td>
+                  <td style="font-weight:600;color:#0f172a;">{{ c.title }}</td>
+                  <td>{{ c.counterparty }}</td>
+                  <td><span class="ov-pill {% if c.status == 'SIGNED' %}ov-pill--ok{% elif c.status == 'SUSPENDED' %}ov-pill--warn{% else %}ov-pill--info{% endif %}">{{ c.status|title }}</span></td>
+                  <td style="text-align:right;"><a class="ov-btn-soft" href="{{ c.url }}">Studio →</a></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="ov-empty">
+            <p style="margin:0 0 12px;font-weight:600;color:#0f172a;">No contracts created yet</p>
+            <a class="ov-btn-soft" href="{{ url_for('workspace_assets_views.templates_hub_page') }}">Create from Contract Templates →</a>
+          </div>
+          {% endif %}
+        </section>
+      </div>
+
+      <!-- Right Executive Column -->
+      <aside class="ov-col">
+        <!-- Project Portfolio -->
+        <section class="ov-card">
+          <div class="ov-card__head ov-card__head--sky">
+            <div class="ov-card__title-wrap">
+              <span class="ov-card__dot ov-card__dot--sky"></span>
+              <h2 class="ov-card__title">Project Portfolio</h2>
+              <span class="ov-card__count" style="background:rgba(2,132,199,0.12);color:#0369a1;">{{ active_projects|length }}</span>
+            </div>
+            <a class="ov-link" href="{{ url_for('contracts_views.projects_page') }}">All projects →</a>
+          </div>
+          {% if active_projects %}
+          <div class="ov-proj-list">
+            {% for p in active_projects %}
+            <a class="ov-proj-item" href="{{ p.url }}">
+              <div class="ov-proj-item__top">
+                <span class="ov-ref-pill" style="background:#e0f2fe;color:#0369a1;">{{ p.code }}</span>
+                <span class="ov-pill ov-pill--ok">{{ p.contracts_total }} contract(s)</span>
+              </div>
+              <div class="ov-proj-item__name">{{ p.name }}</div>
+              <div class="ov-prog">
+                <div class="ov-prog__track"><div class="ov-prog__fill" style="width:{{ p.deliverables_pct }}%;"></div></div>
+                <span class="ov-prog__pct">{{ p.deliverables_pct }}%</span>
+              </div>
+            </a>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="ov-empty">No active projects yet.</div>
+          {% endif %}
+        </section>
+
+        <!-- Brand & Trust Readiness -->
+        <section class="ov-card">
+          <div class="ov-card__head ov-card__head--emerald">
+            <div class="ov-card__title-wrap">
+              <span class="ov-card__dot ov-card__dot--emerald"></span>
+              <h2 class="ov-card__title">Brand &amp; Trust Assets</h2>
+            </div>
+          </div>
+
+          <div class="ov-trust-banner">
+            <span class="ov-trust-banner__ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 2l8 3v6c0 5-3.4 8.9-8 11-4.6-2.1-8-6-8-11V5l8-3z"/><path d="m9 12 2 2 4-4"/></svg>
+            </span>
+            <div>
+              <strong>Cryptographic Trust Ready</strong>
+              <span>PAdES KMS sealing &amp; hash-chained audit active</span>
+            </div>
+          </div>
+
+          <div class="ov-asset-list">
+            <a class="ov-asset-row" href="{{ url_for('tsd_stamps_views.library') }}">
+              <span class="ov-asset-row__left">
+                <span class="ov-asset-row__ico" style="background:#fffbeb;color:#b45309;">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="8" r="5"/><path d="M5 20h14v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2z"/></svg>
+                </span>
+                Official Stamps &amp; Seals
+              </span>
+              <strong style="color:#002769;">{{ m.get('stamps_total', 0) }} →</strong>
+            </a>
+            <a class="ov-asset-row" href="{{ url_for('workspace_assets_views.letterheads_page') }}">
+              <span class="ov-asset-row__left">
+                <span class="ov-asset-row__ico" style="background:#eff4fc;color:#002769;">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="4" y="3" width="16" height="18"/><path d="M4 8h16M8 13h8"/></svg>
+                </span>
+                Corporate Letterheads
+              </span>
+              <strong style="color:#002769;">{{ m.get('letterheads_total', 0) }} →</strong>
+            </a>
+            <a class="ov-asset-row" href="{{ url_for('workspace_assets_views.signatures_hub_page') }}">
+              <span class="ov-asset-row__left">
+                <span class="ov-asset-row__ico" style="background:#ecfdf5;color:#047857;">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>
+                </span>
+                Registered Signatories
+              </span>
+              <strong style="color:#047857;">{{ m.get('signatures_total', 0) }} →</strong>
+            </a>
+            <a class="ov-asset-row" href="{{ url_for('verify_views.verify_form') }}">
+              <span class="ov-asset-row__left">
+                <span class="ov-asset-row__ico" style="background:#e7f8f6;color:#0f766e;">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 2l8 3v6c0 5-3.4 8.9-8 11-4.6-2.1-8-6-8-11V5l8-3z"/><path d="m9 12 2 2 4-4"/></svg>
+                </span>
+                Public Verification Portal
+              </span>
+              <strong style="color:#0f766e;">Open →</strong>
+            </a>
+          </div>
+        </section>
+      </aside>
     </div>
-    <div style="overflow-x:auto;">
-      <table class="st-table">
-        <thead>
-          <tr>
-            <th>Event</th>
-            <th>Details</th>
-            <th>Time</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for ev in recent_events %}
-          <tr>
-            <td style="font-weight:600;">{{ ev.action }}</td>
-            <td style="color:#42526e;max-width:460px;">{{ ev.summary }}</td>
-            <td style="color:#64748b;">{{ ev.when }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </section>
-  {% endif %}
+
+    {% if recent_events %}
+    <section class="ov-card" style="margin-top:18px;">
+      <div class="ov-card__head">
+        <div class="ov-card__title-wrap">
+          <span class="ov-card__dot"></span>
+          <h2 class="ov-card__title">Recent Activity</h2>
+        </div>
+        {% if 'admin_audit.audit_security_page' in url_map_endpoints %}
+        <a class="ov-link" href="{{ url_for('admin_audit.audit_security_page') }}">Audit log →</a>
+        {% elif 'evidence_views.list_retentions' in url_map_endpoints %}
+        <a class="ov-link" href="{{ url_for('evidence_views.list_retentions') }}">Evidence →</a>
+        {% endif %}
+      </div>
+      <div class="ov-table-wrap">
+        <table class="ov-table">
+          <thead><tr><th>Event</th><th>Details</th><th>Time</th></tr></thead>
+          <tbody>
+            {% for ev in recent_events %}
+            <tr>
+              <td style="font-weight:600;color:#0f172a;">{{ ev.action }}</td>
+              <td style="max-width:460px;">{{ ev.summary }}</td>
+              <td style="color:#64748b;">{{ ev.when }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+  </div>
 </div>
 
 <div id="ov-ctx" class="ov-ctx" hidden role="menu">
   <button type="button" class="ov-ctx__item" data-act="open">Open document</button>
   <button type="button" class="ov-ctx__item" data-act="copy">Copy link</button>
 </div>
-
-<style>
-  .ov-full { width: 100%; }
-  .ov-kpis {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 12px;
-    margin-bottom: 14px;
-  }
-  .ov-kpi-link { text-decoration: none; color: inherit; transition: border-color 0.14s ease, box-shadow 0.14s ease; }
-  .ov-kpi-link:hover { border-color: #002769; box-shadow: 0 4px 14px rgba(0, 39, 105, 0.08); text-decoration: none; }
-  .ov-actions {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 10px;
-    margin-bottom: 16px;
-  }
-  .ov-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.85fr) minmax(300px, 1fr);
-    gap: 16px;
-    align-items: start;
-  }
-  @media (max-width: 1120px) {
-    .ov-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .ov-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .ov-grid { grid-template-columns: 1fr; }
-  }
-  @media (max-width: 720px) {
-    .ov-kpis, .ov-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  }
-    gap: 10px;
-  }
-  @media (max-width: 820px) { .ov-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  .ov-action {
-    display: flex; flex-direction: column; gap: 3px;
-    padding: 13px 16px;
-    background: #ffffff;
-    text-decoration: none;
-    transition: background 120ms ease;
-  }
-  .ov-action:hover { background: #eef4fc; text-decoration: none; }
-  .ov-action__k {
-    font-size: 10.5px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.06em; color: #7a869a;
-  }
-  .ov-action__v { font-size: 13px; font-weight: 600; color: #1e4b9e; }
-  .ov-link { font-size: 12px; font-weight: 600; color: #1e4b9e; text-decoration: none; }
-  .ov-link:hover { text-decoration: underline; }
-  .ov-more {
-    border: 0; background: transparent; color: #64748b;
-    width: 28px; height: 28px; cursor: pointer; font-size: 15px;
-  }
-  .ov-more:hover { background: #eef2f7; color: #091e42; }
-  .ov-ctx {
-    position: fixed; z-index: 1200; min-width: 170px;
-    background: #ffffff; box-shadow: 0 8px 24px rgba(9, 30, 66, 0.14);
-    padding: 4px 0;
-  }
-  .ov-ctx__item {
-    display: block; width: 100%; text-align: left; border: 0;
-    background: transparent; padding: 8px 14px; font-size: 12.5px;
-    color: #091e42; cursor: pointer;
-  }
-  .ov-ctx__item:hover { background: #f1f5f9; color: #1e4b9e; }
-</style>
 
 <script>
 (function () {
@@ -362,7 +930,7 @@
   function openAt(row, x, y) {
     activeRow = row;
     menu.hidden = false;
-    var mw = menu.offsetWidth || 170, mh = menu.offsetHeight || 80;
+    var mw = menu.offsetWidth || 176, mh = menu.offsetHeight || 82;
     menu.style.left = Math.min(x, window.innerWidth - mw - 8) + 'px';
     menu.style.top = Math.min(y, window.innerHeight - mh - 8) + 'px';
   }
@@ -371,7 +939,7 @@
     if (!btn) return;
     e.stopPropagation();
     var r = btn.getBoundingClientRect();
-    openAt(btn.closest('tr'), r.right - 170, r.bottom + 4);
+    openAt(btn.closest('tr'), r.right - 176, r.bottom + 4);
   });
   tbody.addEventListener('contextmenu', function (e) {
     var tr = e.target.closest('tr');
