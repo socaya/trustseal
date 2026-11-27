@@ -54,6 +54,7 @@
       <button type="button" class="pms-seg__btn is-active" data-pmsec="projects">Projects ({{ projects|length }})</button>
       <button type="button" class="pms-seg__btn" data-pmsec="portfolios">Portfolios &amp; Programmes ({{ (portfolios|length if portfolios is defined else 0) + (programmes|length if programmes is defined else 0) }})</button>
       <button type="button" class="pms-seg__btn" data-pmsec="intake">Demand &amp; Intake ({{ intakes|length if intakes is defined else 0 }})</button>
+      <button type="button" class="pms-seg__btn" data-pmsec="templates">Project Templates ({{ project_templates|length if project_templates is defined else 0 }})</button>
     </nav>
   </div>
 
@@ -323,6 +324,46 @@
       </table>
     </section>
   </div>
+
+  {# ======================= SECTION 4: REUSABLE PROJECT TEMPLATES (PM-31) ======================= #}
+  <div data-pmpane="templates" hidden>
+    <section class="pms-card">
+      <div class="pms-card__head">
+        <div>
+          <h3 class="pms-card__title">Reusable Project Templates (PM-31)</h3>
+          <div class="pms-card__sub">Versioned WBS &amp; Stage-Gate blueprints — instantiate a governed project in one click</div>
+        </div>
+        <button type="button" class="ts-btn ts-btn--primary ts-btn--sm" id="ptpl-toggle-btn">+ New Template</button>
+      </div>
+      <div class="pms-drawer" id="ptpl-drawer" hidden>
+        <form id="ptpl-create-form" class="pms-form-grid">
+          <input type="text" id="ptpl-name" class="ts-input" placeholder="Template name (e.g. Enterprise ERP Rollout)…" required>
+          <select id="ptpl-cat" class="st-select">{% for key, lbl in categories %}<option value="{{ key }}">{{ lbl }}</option>{% endfor %}</select>
+          <select id="ptpl-meth" class="st-select"><option value="hybrid">Hybrid</option><option value="predictive">Predictive</option><option value="agile">Agile</option></select>
+          <button type="submit" class="ts-btn ts-btn--primary ts-btn--sm">Save Blueprint</button>
+        </form>
+      </div>
+      <div class="pms-card__table-wrap">
+        <table class="st-table">
+          <thead><tr><th>Code</th><th>Template Name</th><th>Category</th><th>Methodology</th><th>WBS / Gates</th><th style="text-align:right;">Action</th></tr></thead>
+          <tbody>
+            {% for pt in (project_templates if project_templates is defined else []) %}
+            <tr>
+              <td style="font-family:var(--ts-font-mono);font-weight:700;color:#002769;">{{ pt.code }}</td>
+              <td style="font-weight:600;">{{ pt.name }} <span class="st-tag st-tag--info" style="font-size:10px;">v{{ pt.version }}</span></td>
+              <td>{{ pt.category|replace('_',' ')|title }}</td>
+              <td>{{ pt.delivery_methodology|title }}</td>
+              <td style="font-size:12px;color:#64748b;">{{ pt.default_wbs|length }} WBS · {{ pt.default_gates|length }} gates</td>
+              <td style="text-align:right;"><button type="button" class="ts-btn ts-btn--primary ts-btn--sm ptpl-inst-btn" data-ptid="{{ pt.id }}" data-ptname="{{ pt.name }}">Instantiate Project →</button></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align:center;padding:24px;color:#718494;">No reusable project templates yet. Click <strong>+ New Template</strong> above to create a blueprint.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
 </div>
 
 <!-- Create Project Modal -->
@@ -544,6 +585,45 @@
       fetch('/api/project-intakes/' + btn.dataset.iid + '/convert', {
         method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d.ok && d.project) window.location.href = '/projects/' + d.project.id;
+      });
+    });
+  });
+
+  // Reusable Project Templates (PM-31)
+  var ptToggle = document.getElementById('ptpl-toggle-btn');
+  if (ptToggle) {
+    ptToggle.addEventListener('click', function () {
+      var dr = document.getElementById('ptpl-drawer');
+      if (dr) dr.hidden = !dr.hidden;
+    });
+  }
+  var ptForm = document.getElementById('ptpl-create-form');
+  if (ptForm) {
+    ptForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = document.getElementById('ptpl-name').value.trim();
+      if (!name) return;
+      fetch('/api/project-templates', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({
+          name: name,
+          category: document.getElementById('ptpl-cat').value,
+          delivery_methodology: document.getElementById('ptpl-meth').value,
+        }),
+      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
+    });
+  }
+  document.querySelectorAll('.ptpl-inst-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var customName = window.prompt('New project name:', btn.dataset.ptname + ' — Rollout');
+      if (!customName) return;
+      fetch('/api/project-templates/' + btn.dataset.ptid + '/instantiate', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({ name: customName.trim() }),
       }).then(function (r) { return r.json(); }).then(function (d) {
         if (d.ok && d.project) window.location.href = '/projects/' + d.project.id;
       });

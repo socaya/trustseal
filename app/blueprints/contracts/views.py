@@ -474,11 +474,17 @@ def project_detail_page(project_id: int):
     cpm_schedule = compute_critical_path(proj)
     evm_metrics = compute_project_evm(proj, financials=financials)
 
+    all_org_projects = [
+        {"id": p.id, "project_code": p.project_code, "name": p.name}
+        for p in Project.query.filter_by(organization_id=org_id).order_by(Project.updated_at.desc()).limit(50).all()
+    ]
+
     overall_prog = compute_deliverable_progress(all_proj_delivs)
     templates = ensure_default_templates(org_id, actor)
     return render_template(
         "contracts/project_detail.html",
         project=proj.to_dict(),
+        all_org_projects=all_org_projects,
         contracts=contracts,
         deliverable_rows=deliverable_rows,
         key_term_rows=key_term_rows,

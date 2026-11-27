@@ -13,24 +13,36 @@
 {% endblock %}
 
 {% block content %}
-<div class="st-flat">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pm_studio.css') }}">
+<div class="st-flat" style="display:flex;flex-direction:column;gap:18px;">
   {% include "stamps/_flat_ui.html" %}
 
-  <section class="st-metrics" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));" aria-label="My Work summary">
-    <div class="st-metric">
-      <span class="st-metric__label">Assigned Open Tasks</span>
-      <span class="st-metric__value">{{ my_tasks|length }}</span>
-      <span class="st-metric__sub">Across active organization projects</span>
+  <section class="pms-kpis" aria-label="My Work summary">
+    <div class="pms-kpi">
+      <span class="pms-kpi__label">Assigned Open Tasks</span>
+      <span class="pms-kpi__val">{{ my_tasks|length }}</span>
+      <span class="pms-kpi__sub">Across active organization projects</span>
     </div>
-    <div class="st-metric">
-      <span class="st-metric__label">This Week Logged</span>
-      <span class="st-metric__value" style="color:#002769;">{{ week_total_hours }}h</span>
-      <span class="st-metric__sub">{{ week_days[0].iso }} → {{ week_days[-1].iso }}</span>
+    <div class="pms-kpi">
+      <span class="pms-kpi__label">This Week Logged</span>
+      <span class="pms-kpi__val" style="color:#002769;">{{ week_total_hours }}h</span>
+      <span class="pms-kpi__sub">{{ week_days[0].iso }} → {{ week_days[-1].iso }}</span>
     </div>
-    <div class="st-metric">
-      <span class="st-metric__label">Pending Approvals</span>
-      <span class="st-metric__value">{{ pending_approvals|length }}</span>
-      <span class="st-metric__sub">Awaiting your independent review (SoD)</span>
+    <div class="pms-kpi">
+      <span class="pms-kpi__label">Pending Approvals</span>
+      <span class="pms-kpi__val">{{ pending_approvals|length }}</span>
+      <span class="pms-kpi__sub">Awaiting your independent review (SoD)</span>
+    </div>
+    <div class="pms-kpi" style="border-left:3px solid #002769;">
+      <span class="pms-kpi__label">Live Work Timer (PM-13.02)</span>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px;">
+        <span id="mw-timer-display" style="font-family:var(--ts-font-mono);font-size:20px;font-weight:700;color:#0f172a;">00:00:00</span>
+        <div style="display:inline-flex;gap:4px;">
+          <button type="button" id="mw-timer-toggle" class="ts-btn ts-btn--primary ts-btn--sm">▶ Start</button>
+          <button type="button" id="mw-timer-stop" class="ts-btn ts-btn--secondary ts-btn--sm" hidden>■ Log</button>
+        </div>
+      </div>
+      <span class="pms-kpi__sub">Stop &amp; Log posts elapsed time to selected project</span>
     </div>
   </section>
 
@@ -188,6 +200,46 @@
       });
     });
   });
+
+  // Live Work Timer (PM-13.02: Start / Pause / Stop & Log)
+  var tDisp = document.getElementById('mw-timer-display');
+  var tBtn = document.getElementById('mw-timer-toggle');
+  var tStop = document.getElementById('mw-timer-stop');
+  var tSec = 0, tInt = null;
+  function _fmt(s) {
+    var h = String(Math.floor(s / 3600)).padStart(2, '0');
+    var m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+    var sc = String(s % 60).padStart(2, '0');
+    return h + ':' + m + ':' + sc;
+  }
+  if (tBtn && tStop) {
+    tBtn.addEventListener('click', function () {
+      if (tInt) {
+        clearInterval(tInt); tInt = null;
+        tBtn.textContent = '▶ Resume';
+      } else {
+        tStop.hidden = false;
+        tBtn.textContent = '❚❚ Pause';
+        tInt = setInterval(function () { tSec += 1; tDisp.textContent = _fmt(tSec); }, 1000);
+      }
+    });
+    tStop.addEventListener('click', function () {
+      if (tInt) { clearInterval(tInt); tInt = null; }
+      var hrs = Math.max(0.25, Math.round((tSec / 3600) * 4) / 4).toFixed(2);
+      var pid = (document.getElementById('mw-ts-proj') || {}).value;
+      if (!pid) return;
+      fetch('/api/projects/' + pid + '/timesheets', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+        body: JSON.stringify({
+          work_date: document.getElementById('mw-ts-date').value,
+          hours: hrs,
+          notes: 'Logged via Live Timer (' + _fmt(tSec) + ')',
+          submit: true,
+        }),
+      }).then(function (r) { return r.json(); }).then(function (d) { if (d.ok) window.location.reload(); });
+    });
+  }
 })();
 </script>
 {% endblock %}

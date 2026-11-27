@@ -21,7 +21,15 @@
     <div class="pms-topbar__left">
       <a class="pms-back" href="{{ url_for('contracts_views.projects_page') }}">← Projects</a>
       <span class="pms-code">{{ project.project_code }}</span>
+      {% if all_org_projects is defined and all_org_projects|length > 1 %}
+      <select id="pms-switcher" class="st-select" aria-label="Switch project" style="height:30px;font-size:13px;font-weight:700;color:#0f172a;border-radius:6px;padding:2px 8px;max-width:280px;">
+        {% for op in all_org_projects %}
+        <option value="{{ op.id }}" {% if op.id == project.id %}selected{% endif %}>{{ op.name }} ({{ op.project_code }})</option>
+        {% endfor %}
+      </select>
+      {% else %}
       <h1 class="pms-title">{{ project.name }}</h1>
+      {% endif %}
       <span class="pms-pill pms-pill--stage">{{ (project.lifecycle_state or 'executing')|replace('_',' ')|upper }}</span>
       <span class="pms-pill {% if h.rag == 'on_track' %}pms-pill--ok{% elif h.rag == 'at_risk' %}pms-pill--warn{% else %}pms-pill--bad{% endif %}">
         <span class="pms-dot"></span>{{ h.label }} · {{ h.score }}
@@ -1248,6 +1256,14 @@
 
 <script>
 (function () {
+  // Canonical Project Switcher
+  var sw = document.getElementById('pms-switcher');
+  if (sw) {
+    sw.addEventListener('change', function () {
+      if (sw.value) window.location.href = '/projects/' + sw.value + (window.location.hash || '');
+    });
+  }
+
   // Studio Left-Rail Navigation (persisted in URL hash for deep-linking)
   function activatePane(target) {
     document.querySelectorAll('[data-pdtab]').forEach(function (b) {
