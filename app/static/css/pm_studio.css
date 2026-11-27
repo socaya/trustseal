@@ -61,7 +61,7 @@
   background: var(--pms-canvas);
   color: var(--pms-ink);
   font-family: var(--ts-font, "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif) !important;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
@@ -123,12 +123,11 @@
   background: rgba(15, 23, 42, 0.09);
 }
 .pme-shell .ts-ed__savestate {
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--pms-muted);
-  background: #f1f5f9;
-  padding: 2px 9px;
-  border-radius: var(--pms-r-pill);
+  background: transparent;
+  padding: 0;
 }
 
 /* Modern Command Palette Trigger Pill (Linear / Attio style) */
@@ -220,39 +219,37 @@
 .pme-appbar-select:hover { border-color: var(--pms-border) !important; background: #f8fafc !important; }
 .pme-appbar-code {
   font-family: var(--ts-font-mono);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 700;
   color: var(--pms-navy);
-  background: var(--pms-navy-soft);
-  padding: 2px 8px;
-  border-radius: 6px;
+  background: transparent;
+  padding: 0;
   white-space: nowrap;
 }
 .pme-appbar-meta {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
-  font-weight: 500;
-  padding: 2px 9px;
-  border-radius: var(--pms-r-pill);
-  background: #f1f5f9;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 0;
+  background: transparent;
   color: var(--pms-ink-2);
   white-space: nowrap;
 }
 .pme-appbar-meta::before {
   content: "";
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: currentColor;
+  background: #94a3b8;
   flex-shrink: 0;
 }
-.pme-appbar-meta--ok   { background: var(--pms-green-bg); color: var(--pms-green-ink); }
+.pme-appbar-meta--ok   { background: transparent; color: var(--pms-green-ink); }
 .pme-appbar-meta--ok::before { background: var(--pms-green); }
-.pme-appbar-meta--warn { background: var(--pms-amber-bg); color: var(--pms-amber-ink); }
+.pme-appbar-meta--warn { background: transparent; color: var(--pms-amber-ink); }
 .pme-appbar-meta--warn::before { background: var(--pms-amber); }
-.pme-appbar-meta--bad  { background: var(--pms-red-bg); color: var(--pms-red-ink); }
+.pme-appbar-meta--bad  { background: transparent; color: var(--pms-red-ink); }
 .pme-appbar-meta--bad::before { background: var(--pms-red); }
 
 /* Row 2: Slim Unified Modern Navigation Ribbon (42px — Tabs + Inline Horizontal Sub-Menu Pills) */
@@ -575,11 +572,11 @@
   border: 0;
   border-radius: 7px;
   background: transparent;
-  padding: 6px 10px;
-  min-height: 32px;
+  padding: 7px 10px;
+  min-height: 34px;
   margin-bottom: 1px;
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--pms-ink-2);
   text-align: left;
@@ -593,17 +590,16 @@
   font-weight: 600;
 }
 .pme-detail-nav__cnt {
-  font-size: 11px;
-  color: var(--pms-subtle);
+  font-size: 12px;
+  color: var(--pms-muted);
   font-variant-numeric: tabular-nums;
-  padding: 1px 6px;
-  border-radius: var(--pms-r-pill);
-  background: rgba(15, 23, 42, 0.04);
+  padding: 0;
+  background: transparent;
 }
 .pme-detail-nav.is-active .pme-detail-nav__cnt {
-  background: rgba(0, 39, 105, 0.10);
+  background: transparent;
   color: var(--pms-navy);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .pme-detail-stage {
@@ -1036,12 +1032,12 @@ a.pms-metric:hover {
 .pme-shell thead th,
 .pme-shell .st-table thead th {
   background: var(--pms-surface-tint) !important;
-  font-size: 11px !important;
-  color: var(--pms-muted) !important;
-  font-weight: 600 !important;
+  font-size: 12px !important;
+  color: #475569 !important;
+  font-weight: 700 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.045em !important;
-  padding: 11px 16px !important;
+  padding: 12px 16px !important;
   border: 0 !important;
   border-bottom: 1px solid var(--pms-hairline) !important;
   white-space: nowrap;
@@ -1051,11 +1047,11 @@ a.pms-metric:hover {
 .pme-shell tbody td,
 .pme-shell .st-table tbody td {
   background: #ffffff !important;
-  padding: 12px 16px !important;
-  font-size: 13px !important;
+  padding: 13px 16px !important;
+  font-size: 14px !important;
   color: var(--pms-ink-2);
   border: 0 !important;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.045) !important;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.05) !important;
   vertical-align: middle;
 }
 .pme-shell tbody tr:last-child td { border-bottom: 0 !important; }
@@ -1065,7 +1061,7 @@ body.pm-density-comfortable .pme-shell tbody td { padding-block: 16px !important
 .pme-shell tbody tr.is-row-selected td { background: #f0f5ff !important; }
 #prj-register-table tbody tr { cursor: pointer; }
 
-/* Soft Initials Avatar (Linear / Attio / Asana warmth) */
+/* Subtle Initials Avatar */
 .pme-row-ident {
   display: inline-flex;
   align-items: center;
@@ -1075,74 +1071,72 @@ body.pm-density-comfortable .pme-shell tbody td { padding-block: 16px !important
 .pme-avatar {
   width: 30px;
   height: 30px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #eff4fc 0%, #e0ebfb 100%);
-  color: var(--pms-navy);
-  font-size: 11px;
+  border-radius: 7px;
+  background: #002769;
+  color: #ffffff;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.02em;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  border: 1px solid rgba(0, 39, 105, 0.08);
 }
 
 .pms-row-name { color: var(--pms-ink); font-weight: 600; text-decoration: none; display: inline-block; }
 .pms-row-name:hover { color: var(--pms-navy); text-decoration: none; }
-.pms-row-meta { display: block; margin-top: 2px; color: var(--pms-muted); font-size: 11.5px; font-weight: 400; }
+.pms-row-meta { display: block; margin-top: 2px; color: var(--pms-muted); font-size: 12.5px; font-weight: 400; }
 
-/* Calm Soft Dot-Status Lozenges (Linear / Stripe / Attio style — Title Case, Soft Pastel) */
+/* Plain Typographic Semantic Statuses (ZERO AI Filled Chips / Pastel Backgrounds) */
 .pms-state,
 .pme-shell .st-tag {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 6px !important;
-  padding: 3px 10px !important;
-  border-radius: var(--pms-r-pill) !important;
-  font-size: 11.5px !important;
-  font-weight: 500 !important;
+  gap: 7px !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
   letter-spacing: 0 !important;
   text-transform: none !important;
   white-space: nowrap !important;
-  background: #f1f5f9 !important;
+  background: transparent !important;
   color: #475569 !important;
   border: 0 !important;
-  line-height: 1.35 !important;
+  line-height: 1.4 !important;
 }
 .pms-state::before,
 .pme-shell .st-tag::before {
   content: "" !important;
   display: inline-block !important;
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #94a3b8;
   flex-shrink: 0;
 }
-.pms-state--good, .pme-shell .st-tag--ok   { background: var(--pms-green-bg) !important; color: var(--pms-green-ink) !important; }
+.pms-state--good, .pme-shell .st-tag--ok   { background: transparent !important; color: var(--pms-green-ink) !important; }
 .pms-state--good::before, .pme-shell .st-tag--ok::before { background: var(--pms-green); }
-.pms-state--warn, .pme-shell .st-tag--warn { background: var(--pms-amber-bg) !important; color: var(--pms-amber-ink) !important; }
+.pms-state--warn, .pme-shell .st-tag--warn { background: transparent !important; color: var(--pms-amber-ink) !important; }
 .pms-state--warn::before, .pme-shell .st-tag--warn::before { background: var(--pms-amber); }
-.pms-state--bad,  .pme-shell .st-tag--bad  { background: var(--pms-red-bg) !important; color: var(--pms-red-ink) !important; }
+.pms-state--bad,  .pme-shell .st-tag--bad  { background: transparent !important; color: var(--pms-red-ink) !important; }
 .pms-state--bad::before, .pme-shell .st-tag--bad::before { background: var(--pms-red); }
-.pms-state--info, .pme-shell .st-tag--info { background: var(--pms-blue-bg) !important; color: var(--pms-blue-ink) !important; }
+.pms-state--info, .pme-shell .st-tag--info { background: transparent !important; color: var(--pms-navy) !important; }
 .pms-state--info::before, .pme-shell .st-tag--info::before { background: var(--pms-blue); }
 
 .pms-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 10px;
-  border-radius: var(--pms-r-pill);
-  font-size: 11.5px;
-  font-weight: 600;
-  background: var(--pms-navy-soft);
+  padding: 0;
+  font-size: 13px;
+  font-weight: 700;
+  background: transparent;
   color: var(--pms-navy);
 }
-.pms-pill--ok   { background: var(--pms-green-bg); color: var(--pms-green-ink); }
-.pms-pill--warn { background: var(--pms-amber-bg); color: var(--pms-amber-ink); }
-.pms-pill--bad  { background: var(--pms-red-bg); color: var(--pms-red-ink); }
+.pms-pill--ok   { background: transparent; color: var(--pms-green-ink); }
+.pms-pill--warn { background: transparent; color: var(--pms-amber-ink); }
+.pms-pill--bad  { background: transparent; color: var(--pms-red-ink); }
 
 /* Smooth Pill Progress Bars */
 .pms-meter { display: inline-flex; align-items: center; gap: 8px; color: var(--pms-ink-2); font-size: 12px; font-weight: 500; min-width: 88px; }

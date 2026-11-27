@@ -272,72 +272,58 @@ body.ts-auth-split-body {
 .ts-auth-aside > * { position: relative; z-index: 1; }
 .ts-auth-aside__logo img { height: 34px; width: auto; display: block; }
 .ts-auth-aside__eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 11px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.10);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #dbeafe;
-  margin-bottom: 18px;
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #34d399;
+  margin-bottom: 14px;
 }
-.ts-auth-aside__eyebrow i {
-  width: 6px; height: 6px; border-radius: 50%; background: #34d399; display: inline-block;
-}
+.ts-auth-aside__eyebrow i { display: none; }
 .ts-auth-aside__title {
   margin: 0 0 12px;
-  font-size: 29px;
+  font-size: 31px;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: -0.025em;
   color: #ffffff;
-  max-width: 19ch;
+  max-width: 18ch;
 }
 .ts-auth-aside__lede {
   margin: 0 0 28px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
-  color: rgba(226, 232, 240, 0.86);
-  max-width: 44ch;
+  color: rgba(226, 232, 240, 0.90);
+  max-width: 42ch;
 }
-.ts-auth-pillars {
-  display: grid;
-  gap: 10px;
-}
+.ts-auth-pillars { display: grid; gap: 12px; }
 .ts-auth-pillar {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.065);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
+.ts-auth-pillar:last-child { border-bottom: 0; }
 .ts-auth-pillar__ico {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.12);
-  color: #93c5fd;
+  color: #60a5fa;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  margin-top: 2px;
   flex-shrink: 0;
 }
 .ts-auth-pillar strong {
   display: block;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: #ffffff;
   margin-bottom: 2px;
 }
 .ts-auth-pillar span {
   display: block;
-  font-size: 12px;
-  color: rgba(226, 232, 240, 0.78);
+  font-size: 13px;
+  color: rgba(226, 232, 240, 0.84);
   line-height: 1.4;
 }
 .ts-auth-aside__foot {
@@ -479,15 +465,11 @@ body.ts-auth-split-body {
   transform: translateY(-1px);
 }
 .ts-auth-sso-note {
-  margin-top: 18px;
-  padding: 11px 14px;
-  border-radius: 10px;
-  background: #f8fafc;
-  border: 1px solid rgba(15, 23, 42, 0.06);
+  margin-top: 16px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 12px;
+  gap: 8px;
+  font-size: 13px;
   color: #475569;
   line-height: 1.45;
 }
