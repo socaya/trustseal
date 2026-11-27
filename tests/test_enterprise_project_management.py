@@ -584,5 +584,88 @@ def test_enterprise_pm_cpm_evm_my_work_and_timesheet_lock(pg_app, pm_env):
     assert b"EVM Scorecard:" in r_pd.data
 
 
+def test_srs_server_side_register_and_obligations(pg_app, pm_env):
+    """SRS UI-05/06 & CON-02/SCR-10: Server-side search/filter/sort/pagination and Contract Obligations Register."""
+    from app.extensions import db
+    from app.models.tsd_document import TSDocument
+    from app.services.tsd_format import encrypt_content_envelope, pack_content, sha256_hex
+
+    hdrs = {"X-Requested-With": "fetch"}
+    c = _client_for(pg_app, pm_env["mgr_a"])
+
+    # Create two projects with distinct names and budgets
+    p1 = c.post("/api/projects", headers=hdrs, json={
+        "name": "Alpha Solar Rollout",
+        "project_code": "PRJ-ALPHA",
+        "category": "construction",
+        "budget_amount": "50000",
+        "currency": "USD",
+    }).get_json()["project"]["id"]
+    p2 = c.post("/api/projects", headers=hdrs, json={
+        "name": "Beta Cloud Migration",
+        "project_code": "PRJ-BETA",
+        "category": "it_software",
+        "budget_amount": "150000",
+        "currency": "USD",
+    }).get_json()["project"]["id"]
+
+    # Server-side search + facet filter
+    r_flt = c.get("/projects?q=Alpha&status=active&contracts=free&sort=name&dir=asc&page=1&per_page=10")
+    assert r_flt.status_code == 200
+    assert b"Alpha Solar Rollout" in r_flt.data
+    assert b"Beta Cloud Migration" not in r_flt.data
+    assert "Showing 1\u20131 of 1 project(s)".encode("utf-8") in r_flt.data
+
+    # Server-side sorting & pagination (budget desc, per_page=1 -> Beta on page 1, Alpha on page 2)
+    r_p1 = c.get("/projects?sort=budget&dir=desc&page=1&per_page=1")
+    assert r_p1.status_code == 200
+    assert b"Beta Cloud Migration" in r_p1.data
+    assert b"Alpha Solar Rollout" not in r_p1.data
+    assert b"Page 1 of 2" in r_p1.data
+
+    r_p2 = c.get("/projects?sort=budget&dir=desc&page=2&per_page=1")
+    assert r_p2.status_code == 200
+    assert b"Alpha Solar Rollout" in r_p2.data
+    assert b"Beta Cloud Migration" not in r_p2.data
+    assert b"Page 2 of 2" in r_p2.data
+
+    # Link a contract to Alpha and add a ContractObligation
+    env = pack_content(html="<h1>Alpha EPC Supply Contract</h1><p>Supply terms.</p>", description="Alpha EPC")
+    ct = encrypt_content_envelope(env, organization_id=pm_env["org_a"].id)
+    doc = TSDocument(
+        organization_id=pm_env["org_a"].id,
+        created_by_id=pm_env["mgr_a"].id,
+        title="Alpha EPC Supply Contract",
+        status="draft",
+        ciphertext=ct,
+        ciphertext_sha256=sha256_hex(ct),
+        plaintext_bytes=len(env),
+        version=1,
+    )
+    db.session.add(doc)
+    db.session.commit()
+
+    r_link = c.post(f"/api/projects/{p1}/link-contract", headers=hdrs, json={"document_id": doc.id})
+    assert r_link.status_code == 200
+
+    r_ob = c.post(f"/api/contracts/{doc.id}/obligations", headers=hdrs, json={
+        "title": "Submit Q4 Environmental Compliance Certificate",
+        "owner_role": "Supplier HSE Lead",
+        "due_date": "2026-12-15",
+    })
+    assert r_ob.status_code in (200, 201)
+
+    # Verify /projects/<id> renders horizontal primary tabs + More menu + Contract Obligations Register
+    r_det = c.get(f"/projects/{p1}")
+    assert r_det.status_code == 200
+    assert b"Contract Obligations Register" in r_det.data
+    assert b"Submit Q4 Environmental Compliance Certificate" in r_det.data
+    assert b"Procurement &amp; Contracts" in r_det.data
+    assert b"Requirements &amp; Agile" in r_det.data
+    assert b"pms-more__menu" in r_det.data
+    assert b"pms-rail" not in r_det.data
+
+
+
 
 

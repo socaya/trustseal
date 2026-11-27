@@ -1,7 +1,7 @@
 """HTML views for Projects Hub and Contract Templates Studio."""
 from __future__ import annotations
 
-from flask import Blueprint, abort, render_template
+from flask import Blueprint, abort, render_template, request
 from flask_login import current_user, login_required
 
 from app.models.contract_workflow import (
@@ -175,15 +175,91 @@ def projects_page():
         .all()
     ]
 
+    # UI-05 & UI-06: Server-side search, multi-facet filtering, deterministic sorting & pagination
+    q_str = (request.args.get("q") or "").strip()
+    f_cat = (request.args.get("category") or "ALL").strip()
+    f_status = (request.args.get("status") or "ALL").strip()
+    f_health = (request.args.get("health") or "ALL").strip()
+    f_contracts = (request.args.get("contracts") or "ALL").strip()
+    sort_by = (request.args.get("sort") or "updated").strip()
+    sort_dir = (request.args.get("dir") or "desc").strip().lower()
+    if sort_dir not in ("asc", "desc"):
+        sort_dir = "desc"
+    try:
+        per_page = max(1, min(100, int(request.args.get("per_page") or 25)))
+    except ValueError:
+        per_page = 25
+    try:
+        page = max(1, int(request.args.get("page") or 1))
+    except ValueError:
+        page = 1
+
+    filtered = []
+    q_low = q_str.lower()
+    for pc in project_cards:
+        if f_cat != "ALL" and pc["category"] != f_cat:
+            continue
+        if f_status != "ALL" and pc["status"] != f_status:
+            continue
+        if f_health != "ALL" and pc["health"]["rag"] != f_health:
+            continue
+        if f_contracts == "with" and pc["contracts_total"] <= 0:
+            continue
+        if f_contracts == "free" and pc["contracts_total"] > 0:
+            continue
+        if q_low:
+            hay = f"{pc['project_code']} {pc['name']} {pc.get('client_name') or ''} {pc['category']}".lower()
+            if q_low not in hay:
+                continue
+        filtered.append(pc)
+
+    def _sort_key(item):
+        if sort_by == "name":
+            return (item["name"].lower(), item["id"])
+        if sort_by == "code":
+            return (item["project_code"].lower(), item["id"])
+        if sort_by == "budget":
+            return (float(item["budget_amount"] or 0), item["id"])
+        if sort_by == "health":
+            return (int(item["health"]["score"]), item["id"])
+        if sort_by == "progress":
+            return (int(item["deliverables_pct"]), item["id"])
+        return (item.get("created_at") or "", item["id"])
+
+    filtered.sort(key=_sort_key, reverse=(sort_dir == "desc"))
+    total_filtered = len(filtered)
+    total_pages = max(1, (total_filtered + per_page - 1) // per_page)
+    page = min(page, total_pages)
+    start_idx = (page - 1) * per_page
+    paged_projects = filtered[start_idx : start_idx + per_page]
+
     portfolio_prog = compute_deliverable_progress(all_delivs)
     return render_template(
         "contracts/projects.html",
-        projects=project_cards,
+        projects=paged_projects,
+        all_projects_count=len(project_cards),
         categories=PROJECT_CATEGORIES,
         portfolios=portfolios_list,
         programmes=programmes_list,
         intakes=intakes_list,
         project_templates=proj_templates_list,
+        filters={
+            "q": q_str,
+            "category": f_cat,
+            "status": f_status,
+            "health": f_health,
+            "contracts": f_contracts,
+            "sort": sort_by,
+            "dir": sort_dir,
+        },
+        pager={
+            "page": page,
+            "per_page": per_page,
+            "total": total_filtered,
+            "total_pages": total_pages,
+            "start": (start_idx + 1) if total_filtered else 0,
+            "end": min(start_idx + per_page, total_filtered),
+        },
         portfolio={
             "total_budget": total_budget,
             "total_committed": total_committed,
@@ -474,6 +550,36 @@ def project_detail_page(project_id: int):
     cpm_schedule = compute_critical_path(proj)
     evm_metrics = compute_project_evm(proj, financials=financials)
 
+    from app.models.contract_workflow import ContractObligation
+
+    obligations_raw = (
+        ContractObligation.query.filter(
+            ContractObligation.organization_id == org_id,
+            ContractObligation.contract_id.in_(wf_ids),
+        )
+        .order_by(ContractObligation.due_date.asc(), ContractObligation.id.asc())
+        .all()
+        if wf_ids
+        else []
+    )
+    wf_doc_map = {w.id: w.document_id for w in wfs}
+    obligation_rows = [
+        {
+            "id": ob.id,
+            "contract_id": ob.contract_id,
+            "document_id": wf_doc_map.get(ob.contract_id),
+            "contract_number": (wf_meta.get(ob.contract_id) or {}).get("contract_number", ""),
+            "contract_url": (wf_meta.get(ob.contract_id) or {}).get("url", "#"),
+            "title": ob.title,
+            "category": ob.category or "general",
+            "owner_name": ob.owner_name or "Unassigned",
+            "due_date": ob.due_date or "—",
+            "status": ob.status or "open",
+        }
+        for ob in obligations_raw
+        if ob.contract_id in wf_meta
+    ]
+
     all_org_projects = [
         {"id": p.id, "project_code": p.project_code, "name": p.name}
         for p in Project.query.filter_by(organization_id=org_id).order_by(Project.updated_at.desc()).limit(50).all()
@@ -485,6 +591,7 @@ def project_detail_page(project_id: int):
         "contracts/project_detail.html",
         project=proj.to_dict(),
         all_org_projects=all_org_projects,
+        obligation_rows=obligation_rows,
         contracts=contracts,
         deliverable_rows=deliverable_rows,
         key_term_rows=key_term_rows,

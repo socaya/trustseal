@@ -19,142 +19,164 @@
 <div class="pms-root">
   {% include "stamps/_flat_ui.html" %}
 
-  {# ======================= PORTFOLIO EXECUTIVE KPI STRIP ======================= #}
-  <section class="pms-kpis" aria-label="Project portfolio KPIs">
-    <div class="pms-kpi">
-      <span class="pms-kpi__label">Active Projects</span>
-      <span class="pms-kpi__val">{{ projects|length }}</span>
-      <span class="pms-kpi__sub">Contract-free or governing 1–N TSD contracts</span>
+  {# ======================= COMPACT SUMMARY STRIP (UI-03) ======================= #}
+  <section class="pms-summary-strip" aria-label="Project portfolio summary">
+    <div class="pms-stat">
+      <span class="pms-stat__label">Projects</span>
+      <span class="pms-stat__val">{{ all_projects_count if all_projects_count is defined else projects|length }}</span>
+      <span class="pms-stat__sub">Standalone &amp; contract-linked</span>
     </div>
-    <div class="pms-kpi">
-      <span class="pms-kpi__label">Governed TSD Contracts</span>
-      <span class="pms-kpi__val">{{ projects|sum(attribute='contracts_total') }}</span>
-      <span class="pms-kpi__sub">{{ projects|sum(attribute='contracts_signed') }} signed · {{ projects|sum(attribute='contracts_draft') }} draft · {{ projects|sum(attribute='contracts_suspended') }} suspended</span>
+    <div class="pms-stat">
+      <span class="pms-stat__label">Governed Contracts</span>
+      <span class="pms-stat__val">{{ projects|sum(attribute='contracts_total') }}</span>
+      <span class="pms-stat__sub">{{ projects|sum(attribute='contracts_signed') }} signed · {{ projects|sum(attribute='contracts_draft') }} draft</span>
     </div>
-    <div class="pms-kpi">
-      <span class="pms-kpi__label">Portfolio Deliverables</span>
-      <span class="pms-kpi__val" style="color:#15623d;">{{ portfolio.deliverables_pct if portfolio is defined else 0 }}%</span>
-      <span class="pms-kpi__sub">{{ portfolio.deliverables_accepted if portfolio is defined else 0 }} / {{ portfolio.deliverables_total if portfolio is defined else 0 }} milestones accepted</span>
+    <div class="pms-stat">
+      <span class="pms-stat__label">Deliverables</span>
+      <span class="pms-stat__val" style="color:#15623d;">{{ portfolio.deliverables_pct if portfolio is defined else 0 }}%</span>
+      <span class="pms-stat__sub">{{ portfolio.deliverables_accepted if portfolio is defined else 0 }} / {{ portfolio.deliverables_total if portfolio is defined else 0 }} accepted</span>
     </div>
-    <div class="pms-kpi">
-      <span class="pms-kpi__label">Tasks &amp; Risks (RAID)</span>
-      <span class="pms-kpi__val" style="color:#002769;">{{ portfolio.open_tasks if portfolio is defined else 0 }}</span>
-      <span class="pms-kpi__sub">open task(s) · {{ portfolio.open_risks if portfolio is defined else 0 }} open risk(s)</span>
+    <div class="pms-stat">
+      <span class="pms-stat__label">Open Work &amp; Risks</span>
+      <span class="pms-stat__val">{{ portfolio.open_tasks if portfolio is defined else 0 }}</span>
+      <span class="pms-stat__sub">open task(s) · {{ portfolio.open_risks if portfolio is defined else 0 }} open risk(s)</span>
     </div>
-    <div class="pms-kpi">
-      <span class="pms-kpi__label">Portfolio Budget</span>
-      <span class="pms-kpi__val">{{ ('USD {:,.0f}'.format(portfolio.total_budget)) if (portfolio is defined and portfolio.total_budget) else '—' }}</span>
-      <span class="pms-kpi__sub">Committed: USD {{ '{:,.0f}'.format(portfolio.total_committed or 0) if portfolio is defined else '0' }} · {{ portfolio.probations_active if portfolio is defined else 0 }} probation(s)</span>
+    <div class="pms-stat">
+      <span class="pms-stat__label">Portfolio Budget</span>
+      <span class="pms-stat__val">{{ ('USD {:,.0f}'.format(portfolio.total_budget)) if (portfolio is defined and portfolio.total_budget) else '—' }}</span>
+      <span class="pms-stat__sub">Committed: USD {{ '{:,.0f}'.format(portfolio.total_committed or 0) if portfolio is defined else '0' }}</span>
     </div>
   </section>
 
-  {# ======================= SEGMENTED STUDIO SUBNAV ======================= #}
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-    <nav class="pms-seg" role="tablist" aria-label="Enterprise PM sections">
-      <button type="button" class="pms-seg__btn is-active" data-pmsec="projects">Projects ({{ projects|length }})</button>
-      <button type="button" class="pms-seg__btn" data-pmsec="portfolios">Portfolios &amp; Programmes ({{ (portfolios|length if portfolios is defined else 0) + (programmes|length if programmes is defined else 0) }})</button>
-      <button type="button" class="pms-seg__btn" data-pmsec="intake">Demand &amp; Intake ({{ intakes|length if intakes is defined else 0 }})</button>
-      <button type="button" class="pms-seg__btn" data-pmsec="templates">Project Templates ({{ project_templates|length if project_templates is defined else 0 }})</button>
+  {# ======================= UNDERLINE VIEW TABS (UI-02) ======================= #}
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;background:#ffffff;padding:0 14px;">
+    <nav class="pms-tabs" style="border-bottom:0;" role="tablist" aria-label="Enterprise PM sections">
+      <button type="button" class="pms-tab is-active" data-pmsec="projects">Projects<span class="pms-tab__cnt">{{ all_projects_count if all_projects_count is defined else projects|length }}</span></button>
+      <button type="button" class="pms-tab" data-pmsec="portfolios">Portfolios &amp; Programmes<span class="pms-tab__cnt">{{ (portfolios|length if portfolios is defined else 0) + (programmes|length if programmes is defined else 0) }}</span></button>
+      <button type="button" class="pms-tab" data-pmsec="intake">Demand &amp; Intake<span class="pms-tab__cnt">{{ intakes|length if intakes is defined else 0 }}</span></button>
+      <button type="button" class="pms-tab" data-pmsec="templates">Templates<span class="pms-tab__cnt">{{ project_templates|length if project_templates is defined else 0 }}</span></button>
     </nav>
-    <div class="pms-seg" aria-label="Project view mode">
-      <button type="button" class="pms-seg__btn is-active" data-pview="table" id="prj-v-table">Table</button>
-      <button type="button" class="pms-seg__btn" data-pview="cards" id="prj-v-cards">Cards</button>
-      <button type="button" class="pms-seg__btn" data-pview="kanban" id="prj-v-kanban">Status Board</button>
+    <div class="pms-tabs" style="border-bottom:0;" aria-label="Register layout">
+      <button type="button" class="pms-tab is-active" data-pview="table" id="prj-v-table">Table</button>
+      <button type="button" class="pms-tab" data-pview="cards" id="prj-v-cards">Cards</button>
+      <button type="button" class="pms-tab" data-pview="kanban" id="prj-v-kanban">Status Board</button>
     </div>
   </div>
 
-  <div data-pmpane="projects" style="display:flex;flex-direction:column;gap:18px;">
-  {# ======================= ADVANCED SEARCH & MULTI-FACET FILTER BAR ======================= #}
-  <section class="pms-filterbar" aria-label="Advanced project search and filters">
-    <div class="pms-filterbar__row">
+  <div data-pmpane="projects" style="display:flex;flex-direction:column;gap:12px;">
+  {# ======================= SERVER-SIDE SEARCH & FILTER TOOLBAR (UI-05 / UI-06) ======================= #}
+  {% set flt = filters if filters is defined else {'q': '', 'category': 'ALL', 'status': 'ALL', 'health': 'ALL', 'contracts': 'ALL', 'sort': 'updated', 'dir': 'desc'} %}
+  {% set pgr = pager if pager is defined else {'page': 1, 'per_page': 25, 'total': projects|length, 'total_pages': 1, 'start': 1 if projects else 0, 'end': projects|length} %}
+  <form method="GET" action="{{ url_for('contracts_views.projects_page') }}" class="pms-toolbar" id="prj-filter-form">
+    <div class="pms-toolbar__row">
       <div class="pms-search-wrap">
         <span class="pms-search-wrap__icon">⌕</span>
-        <input type="search" id="prj-search" class="ts-input pms-search-input" placeholder="Search projects by code, name, sponsor, or category…">
+        <input type="search" name="q" id="prj-search" class="ts-input pms-search-input" value="{{ flt.q }}" placeholder="Search code, project name, sponsor, or category…">
       </div>
-      <div class="pms-filterbar__controls">
-        <select id="prj-cat-filter" class="st-select" aria-label="Filter by category">
+      <div class="pms-toolbar__controls">
+        <select name="category" id="prj-cat-filter" class="st-select" aria-label="Filter by category">
           <option value="ALL">Category: All</option>
           {% for key, lbl in categories %}
-          <option value="{{ key }}">{{ lbl }}</option>
+          <option value="{{ key }}" {% if flt.category == key %}selected{% endif %}>{{ lbl }}</option>
           {% endfor %}
         </select>
-        <select id="prj-status-filter" class="st-select" aria-label="Filter by status">
+        <select name="status" id="prj-status-filter" class="st-select" aria-label="Filter by status">
           <option value="ALL">Status: All</option>
-          <option value="active">Active</option>
-          <option value="on_hold">On Hold</option>
-          <option value="completed">Completed</option>
-          <option value="archived">Archived</option>
+          {% for st_k, st_l in [('active','Active'),('on_hold','On Hold'),('completed','Completed'),('archived','Archived')] %}
+          <option value="{{ st_k }}" {% if flt.status == st_k %}selected{% endif %}>{{ st_l }}</option>
+          {% endfor %}
         </select>
-        <select id="prj-health-filter" class="st-select" aria-label="Filter by health">
+        <select name="health" id="prj-health-filter" class="st-select" aria-label="Filter by health">
           <option value="ALL">Health: All</option>
-          <option value="on_track">On Track</option>
-          <option value="at_risk">At Risk</option>
-          <option value="critical">Critical</option>
+          {% for h_k, h_l in [('on_track','On Track'),('at_risk','At Risk'),('critical','Critical')] %}
+          <option value="{{ h_k }}" {% if flt.health == h_k %}selected{% endif %}>{{ h_l }}</option>
+          {% endfor %}
         </select>
-        <select id="prj-contract-filter" class="st-select" aria-label="Filter by contract linkage">
+        <select name="contracts" id="prj-contract-filter" class="st-select" aria-label="Filter by contracts">
           <option value="ALL">Contracts: Any</option>
-          <option value="with">With TSD Contracts</option>
-          <option value="free">Contract-Free</option>
+          <option value="with" {% if flt.contracts == 'with' %}selected{% endif %}>With Contracts</option>
+          <option value="free" {% if flt.contracts == 'free' %}selected{% endif %}>Contract-Free</option>
         </select>
+        <input type="hidden" name="sort" value="{{ flt.sort }}">
+        <input type="hidden" name="dir" value="{{ flt.dir }}">
+        <input type="hidden" name="per_page" value="{{ pgr.per_page }}">
+        <button type="submit" class="ts-btn ts-btn--secondary">Apply</button>
       </div>
     </div>
-    <div class="pms-filterbar__row" style="padding-top:2px;">
-      <div class="pms-filterbar__tokens" id="prj-active-tokens">
-        <span id="prj-match-count">Showing {{ projects|length }} of {{ projects|length }} projects</span>
+    <div class="pms-active-bar">
+      <div>
+        <span>Showing {{ pgr.start }}–{{ pgr.end }} of {{ pgr.total }} project(s)</span>
+        {% if flt.q or flt.category != 'ALL' or flt.status != 'ALL' or flt.health != 'ALL' or flt.contracts != 'ALL' %}
+          <a class="pms-filter-link" href="{{ url_for('contracts_views.projects_page') }}">Clear filters</a>
+        {% endif %}
+      </div>
+      <div style="display:inline-flex;align-items:center;gap:10px;">
+        <span>Sort:</span>
+        {% set next_dir = 'asc' if flt.dir == 'desc' else 'desc' %}
+        <a class="pms-filter-link" style="margin-left:0;" href="{{ url_for('contracts_views.projects_page', q=flt.q, category=flt.category, status=flt.status, health=flt.health, contracts=flt.contracts, sort='name', dir=next_dir, per_page=pgr.per_page) }}">Name</a>
+        <a class="pms-filter-link" style="margin-left:0;" href="{{ url_for('contracts_views.projects_page', q=flt.q, category=flt.category, status=flt.status, health=flt.health, contracts=flt.contracts, sort='code', dir=next_dir, per_page=pgr.per_page) }}">Code</a>
+        <a class="pms-filter-link" style="margin-left:0;" href="{{ url_for('contracts_views.projects_page', q=flt.q, category=flt.category, status=flt.status, health=flt.health, contracts=flt.contracts, sort='budget', dir=next_dir, per_page=pgr.per_page) }}">Budget</a>
+        <a class="pms-filter-link" style="margin-left:0;" href="{{ url_for('contracts_views.projects_page', q=flt.q, category=flt.category, status=flt.status, health=flt.health, contracts=flt.contracts, sort='health', dir=next_dir, per_page=pgr.per_page) }}">Health</a>
       </div>
     </div>
-  </section>
+  </form>
 
-  {# ======================= VIEW 1: CLEAN UNCROWDED PORTFOLIO TABLE ======================= #}
+  {# ======================= VIEW 1: COMPACT SEMANTIC PROJECT REGISTER (UI-04) ======================= #}
   <section class="pms-card" id="prj-table-wrap">
     <div class="pms-card__table-wrap">
     <table class="st-table">
       <thead>
         <tr>
-          <th style="width:125px;">Code</th>
+          <th style="width:120px;">Code</th>
           <th>Project &amp; Sponsor</th>
           <th>Status</th>
           <th>Health</th>
           <th>Delivery &amp; Work</th>
-          <th>Budget</th>
-          <th style="width:160px;text-align:right;">Workspace</th>
+          <th style="text-align:right;">Budget</th>
+          <th style="width:130px;text-align:right;">Workspace</th>
         </tr>
       </thead>
       <tbody id="prj-tbody">
         {% for p in projects %}
         {% set h = p.health if p.health is defined else {'rag': 'on_track', 'label': 'On Track', 'score': 100} %}
         <tr data-prj-item="1" data-cat="{{ p.category }}" data-status="{{ p.status }}" data-health="{{ h.rag }}" data-contracts="{{ 'with' if p.contracts_total > 0 else 'free' }}" data-hay="{{ (p.project_code ~ ' ' ~ p.name ~ ' ' ~ (p.client_name or '') ~ ' ' ~ p.category)|lower }}">
-          <td style="font-family:var(--ts-font-mono);font-size:12px;color:#002769;font-weight:700;">
+          <td style="font-family:var(--ts-font-mono);font-size:12px;color:#002769;font-weight:600;">
             <a href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}" style="color:inherit;text-decoration:none;">{{ p.project_code }}</a>
           </td>
           <td>
-            <div style="font-weight:700;font-size:13.5px;color:#0f172a;">
-              <a href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}" style="color:inherit;text-decoration:none;">{{ p.name }}</a>
-              {% if p.is_default %}<span class="st-tag" style="margin-left:6px;">Default</span>{% endif %}
-            </div>
-            <div style="font-size:12px;color:#64748b;margin-top:2px;">{{ p.category|replace('_', ' ')|title }}{% if p.client_name %} · {{ p.client_name }}{% endif %} · {{ p.contracts_total }} contract(s)</div>
+            <a href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}" style="font-weight:700;color:#0f172a;text-decoration:none;">{{ p.name }}</a>
+            <span style="font-size:11.5px;color:#64748b;margin-left:8px;">{{ p.category|replace('_', ' ')|title }}{% if p.client_name %} · {{ p.client_name }}{% endif %} · {{ p.contracts_total }} contract(s)</span>
           </td>
           <td><span class="st-tag {% if p.status == 'active' %}st-tag--ok{% elif p.status == 'on_hold' %}st-tag--warn{% else %}st-tag--info{% endif %}">{{ p.status|replace('_', ' ')|title }}</span></td>
           <td>
             <span class="st-tag {% if h.rag == 'on_track' %}st-tag--ok{% elif h.rag == 'at_risk' %}st-tag--warn{% else %}st-tag--bad{% endif %}">{{ h.label }} · {{ h.score }}</span>
           </td>
-          <td>
-            <div style="display:flex;align-items:center;gap:10px;">
-              <div style="width:76px;height:5px;background:#eef1f5;"><div style="width:{{ p.deliverables_pct }}%;height:100%;background:#15623d;"></div></div>
-              <span style="font-size:12px;font-weight:600;color:#334155;font-variant-numeric:tabular-nums;">{{ p.deliverables_pct }}%</span>
-            </div>
-            <div style="font-size:11.5px;color:#64748b;margin-top:3px;">{{ p.tasks_done }}/{{ p.tasks_total }} tasks{% if p.open_risks %} · <span style="color:#a32929;font-weight:600;">{{ p.open_risks }} risk(s)</span>{% endif %}</div>
+          <td style="font-size:12px;color:#475569;font-variant-numeric:tabular-nums;">
+            <strong>{{ p.deliverables_pct }}%</strong> · {{ p.tasks_done }}/{{ p.tasks_total }} tasks{% if p.open_risks %} · <span style="color:#a32929;">{{ p.open_risks }} risk(s)</span>{% endif %}
           </td>
-          <td style="font-weight:600;color:#1e293b;font-variant-numeric:tabular-nums;">
+          <td style="text-align:right;font-weight:600;color:#1e293b;font-variant-numeric:tabular-nums;">
             {{ (p.currency ~ ' ' ~ ('{:,.0f}'.format(p.budget_amount))) if p.budget_amount else '—' }}
           </td>
           <td style="text-align:right;white-space:nowrap;">
-            <a class="ts-btn ts-btn--primary ts-btn--sm" href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}">Open PM Studio →</a>
+            <a class="ts-btn ts-btn--secondary" href="{{ url_for('contracts_views.project_detail_page', project_id=p.id) }}">Open →</a>
           </td>
         </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;padding:20px;color:#64748b;">No projects match the current filters. <a href="{{ url_for('contracts_views.projects_page') }}" style="color:#002769;">Clear filters</a></td></tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
+    <div class="pms-pager">
+      <span>Showing {{ pgr.start }}–{{ pgr.end }} of {{ pgr.total }} · Page {{ pgr.page }} of {{ pgr.total_pages }}</span>
+      <div class="pms-pager__nav">
+        {% if pgr.page > 1 %}
+        <a class="ts-btn ts-btn--secondary" href="{{ url_for('contracts_views.projects_page', q=flt.q, category=flt.category, status=flt.status, health=flt.health, contracts=flt.contracts, sort=flt.sort, dir=flt.dir, page=pgr.page - 1, per_page=pgr.per_page) }}">← Prev</a>
+        {% endif %}
+        {% if pgr.page < pgr.total_pages %}
+        <a class="ts-btn ts-btn--secondary" href="{{ url_for('contracts_views.projects_page', q=flt.q, category=flt.category, status=flt.status, health=flt.health, contracts=flt.contracts, sort=flt.sort, dir=flt.dir, page=pgr.page + 1, per_page=pgr.per_page) }}">Next →</a>
+        {% endif %}
+      </div>
     </div>
   </section>
 
@@ -460,63 +482,13 @@
     });
   });
 
-  function applyPortfolioFilter() {
-    var q = (document.getElementById('prj-search').value || '').trim().toLowerCase();
-    var cat = document.getElementById('prj-cat-filter').value;
-    var st = document.getElementById('prj-status-filter').value;
-    var hl = (document.getElementById('prj-health-filter') || {}).value || 'ALL';
-    var ct = (document.getElementById('prj-contract-filter') || {}).value || 'ALL';
-    var totalRows = 0, visibleRows = 0;
-    document.querySelectorAll('[data-prj-item]').forEach(function (el) {
-      var hlOk = (hl === 'ALL') || (hl === 'ATTENTION' ? (el.dataset.health === 'at_risk' || el.dataset.health === 'critical') : el.dataset.health === hl);
-      var ctOk = (ct === 'ALL') || ((el.dataset.contracts || 'free') === ct);
-      var ok = (cat === 'ALL' || el.dataset.cat === cat)
-        && (st === 'ALL' || el.dataset.status === st)
-        && hlOk && ctOk
-        && (!q || (el.dataset.hay || '').indexOf(q) !== -1);
-      el.hidden = !ok;
-      if (el.tagName === 'TR') { totalRows += 1; if (ok) visibleRows += 1; }
+  var fltForm = document.getElementById('prj-filter-form');
+  if (fltForm) {
+    ['prj-cat-filter', 'prj-status-filter', 'prj-health-filter', 'prj-contract-filter'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('change', function () { fltForm.submit(); });
     });
-    var tokWrap = document.getElementById('prj-active-tokens');
-    if (tokWrap) {
-      var parts = [];
-      if (cat !== 'ALL') parts.push('Category: ' + cat.replace(/_/g, ' '));
-      if (st !== 'ALL') parts.push('Status: ' + st.replace(/_/g, ' '));
-      if (hl !== 'ALL') parts.push('Health: ' + hl.replace(/_/g, ' '));
-      if (ct !== 'ALL') parts.push('Contracts: ' + ct);
-      if (q) parts.push('Search: "' + q.replace(/</g, '&lt;') + '"');
-      var html = '<span>Showing ' + visibleRows + ' of ' + totalRows + ' projects</span>';
-      if (parts.length) {
-        html += '<span style="color:#475569;margin-left:10px;">· Filtered by ' + parts.join(', ') + '</span>';
-        html += '<button type="button" class="ts-btn ts-btn--ghost ts-btn--sm" data-clr="all" style="margin-left:6px;text-decoration:underline;">Reset filters</button>';
-      }
-      tokWrap.innerHTML = html;
-      tokWrap.querySelectorAll('[data-clr]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          document.getElementById('prj-cat-filter').value = 'ALL';
-          document.getElementById('prj-status-filter').value = 'ALL';
-          document.getElementById('prj-health-filter').value = 'ALL';
-          document.getElementById('prj-contract-filter').value = 'ALL';
-          document.getElementById('prj-search').value = '';
-          applyPortfolioFilter();
-        });
-      });
-    }
   }
-  ['prj-search', 'prj-cat-filter', 'prj-status-filter', 'prj-health-filter', 'prj-contract-filter'].forEach(function (id) {
-    var el = document.getElementById(id);
-    if (el) el.addEventListener(id === 'prj-search' ? 'input' : 'change', applyPortfolioFilter);
-  });
-  document.querySelectorAll('[data-qchip]').forEach(function (chip) {
-    chip.addEventListener('click', function () {
-      document.querySelectorAll('[data-qchip]').forEach(function (c) { c.classList.toggle('is-active', c === chip); });
-      var qm = chip.dataset.qchip;
-      document.getElementById('prj-status-filter').value = (qm === 'active') ? 'active' : 'ALL';
-      document.getElementById('prj-health-filter').value = (qm === 'attention') ? 'at_risk' : 'ALL';
-      document.getElementById('prj-contract-filter').value = (qm === 'with_contracts') ? 'with' : ((qm === 'contract_free') ? 'free' : 'ALL');
-      applyPortfolioFilter();
-    });
-  });
 
   var tblWrap = document.getElementById('prj-table-wrap');
   var cardsWrap = document.getElementById('prj-cards-wrap');

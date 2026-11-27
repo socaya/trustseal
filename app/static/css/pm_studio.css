@@ -1,11 +1,9 @@
 /* ==========================================================================
-   TrustSeal PM Studio — Swiss Minimalist Soft-Tonal Design System
-   Inspired by Dribbble minimalist enterprise PM systems:
-   - Strictly 0px border-radius everywhere (crisp architectural geometry)
-   - Zero boxy borders (separation via soft tonal surfaces & generous whitespace)
-   - Warm muted canvas (#f4f5f7) + pure white (#ffffff) elevated planes
-   - Soft recessed inputs (#f1f3f6) with bottom focus accent (no box outlines)
-   - Low-saturation pastel status indicators & airy uncrowded tables
+   TrustSeal PM Engine — Compact Flat UI (SRS §4.2 UI-01..UI-15)
+   - Square corners (0px border-radius), zero gradients, zero decorative borders
+   - Compact enterprise density — no unnecessary whitespace or bloated cards
+   - Plain-text typographic statuses with 6px semantic markers (zero filled chips)
+   - Flat underline tabs for primary workspace navigation + More dropdown
    ========================================================================== */
 
 .pms-root,
@@ -15,7 +13,6 @@
   border-radius: 0 !important;
 }
 
-/* Override harsh flat-ui borders inside PM Studio surfaces */
 .pms-root .st-panel,
 .pms-root .st-metric,
 .pms-root .ts-btn,
@@ -33,53 +30,49 @@
   box-shadow: none !important;
 }
 
-.pms-root .ts-btn--secondary,
-.pms-shell .ts-btn--secondary {
-  background: #eef1f5 !important;
-  color: #1e293b !important;
-}
-.pms-root .ts-btn--secondary:hover,
-.pms-shell .ts-btn--secondary:hover {
-  background: #e2e7ee !important;
-}
+/* Primary & Secondary Actions (UI-03: filled color restricted to primary CTA) */
 .pms-root .ts-btn--primary,
 .pms-shell .ts-btn--primary {
   background: #002769 !important;
   color: #ffffff !important;
+  padding: 6px 12px !important;
+  font-size: 12.5px !important;
 }
 .pms-root .ts-btn--primary:hover,
-.pms-shell .ts-btn--primary:hover {
-  background: #001d4f !important;
+.pms-shell .ts-btn--primary:hover { background: #001d4f !important; }
+
+.pms-root .ts-btn--secondary,
+.pms-shell .ts-btn--secondary {
+  background: #eceff3 !important;
+  color: #1e293b !important;
+  padding: 6px 11px !important;
+  font-size: 12.5px !important;
 }
+.pms-root .ts-btn--secondary:hover,
+.pms-shell .ts-btn--secondary:hover { background: #e1e6ed !important; }
+
 .pms-root .ts-btn--ghost,
 .pms-shell .ts-btn--ghost {
   background: transparent !important;
-  color: #64748b !important;
+  color: #475569 !important;
+  padding: 5px 8px !important;
+  font-size: 12px !important;
 }
 .pms-root .ts-btn--ghost:hover,
-.pms-shell .ts-btn--ghost:hover {
-  background: #f1f3f6 !important;
-  color: #0f172a !important;
-}
+.pms-shell .ts-btn--ghost:hover { background: #eef1f5 !important; color: #0f172a !important; }
 
-/* Soft tonal recessed inputs (no boxy border, crisp bottom focus bar) */
+/* Compact Recessed Inputs (Zero Box Borders, Bottom Focus Bar) */
 .pms-root .ts-input,
 .pms-root .ts-select,
 .pms-root .st-select,
 .pms-shell .ts-input,
 .pms-shell .ts-select,
 .pms-shell .st-select {
-  background: #f2f4f7 !important;
+  background: #f1f3f6 !important;
   color: #0f172a !important;
-  padding: 8px 12px !important;
-  font-size: 13px;
-  transition: background 0.14s ease, box-shadow 0.14s ease;
-}
-.pms-root .ts-input:hover,
-.pms-root .st-select:hover,
-.pms-shell .ts-input:hover,
-.pms-shell .st-select:hover {
-  background: #eaeef3 !important;
+  padding: 6px 10px !important;
+  font-size: 12.5px !important;
+  min-height: 30px;
 }
 .pms-root .ts-input:focus,
 .pms-root .st-select:focus,
@@ -90,16 +83,15 @@
   box-shadow: inset 0 -2px 0 #002769 !important;
 }
 
-/* Quiet Typographic Status Indicators — ZERO AI chips or colored badge boxes */
+/* UI-02: Plain-Text Statuses with 6px Semantic Markers (Zero Filled Chips) */
 .pms-root .st-tag,
 .pms-shell .st-tag {
   display: inline-flex !important;
   align-items: center !important;
   gap: 6px !important;
   padding: 0 !important;
-  font-size: 12.5px !important;
+  font-size: 12px !important;
   font-weight: 500 !important;
-  letter-spacing: 0 !important;
   background: transparent !important;
   color: #475569 !important;
   text-transform: none !important;
@@ -107,283 +99,217 @@
 .pms-root .st-tag::before,
 .pms-shell .st-tag::before {
   content: "";
-  display: inline-block;
   width: 6px;
   height: 6px;
   background: #94a3b8;
   flex-shrink: 0;
 }
-.pms-root .st-tag--ok,
-.pms-shell .st-tag--ok {
-  background: transparent !important;
-  color: #15623d !important;
-}
-.pms-root .st-tag--ok::before,
-.pms-shell .st-tag--ok::before {
-  background: #16a34a;
-}
-.pms-root .st-tag--warn,
-.pms-shell .st-tag--warn {
-  background: transparent !important;
-  color: #9a5b13 !important;
-}
-.pms-root .st-tag--warn::before,
-.pms-shell .st-tag--warn::before {
-  background: #d97706;
-}
-.pms-root .st-tag--bad,
-.pms-shell .st-tag--bad {
-  background: transparent !important;
-  color: #a32929 !important;
-}
-.pms-root .st-tag--bad::before,
-.pms-shell .st-tag--bad::before {
-  background: #dc2626;
-}
-.pms-root .st-tag--info,
-.pms-shell .st-tag--info {
-  background: transparent !important;
-  color: #334155 !important;
-}
-.pms-root .st-tag--info::before,
-.pms-shell .st-tag--info::before {
-  background: #002769;
-}
+.pms-root .st-tag--ok, .pms-shell .st-tag--ok { color: #15623d !important; }
+.pms-root .st-tag--ok::before, .pms-shell .st-tag--ok::before { background: #16a34a; }
+.pms-root .st-tag--warn, .pms-shell .st-tag--warn { color: #9a5b13 !important; }
+.pms-root .st-tag--warn::before, .pms-shell .st-tag--warn::before { background: #d97706; }
+.pms-root .st-tag--bad, .pms-shell .st-tag--bad { color: #a32929 !important; }
+.pms-root .st-tag--bad::before, .pms-shell .st-tag--bad::before { background: #dc2626; }
+.pms-root .st-tag--info, .pms-shell .st-tag--info { color: #1e3a8a !important; }
+.pms-root .st-tag--info::before, .pms-shell .st-tag--info::before { background: #002769; }
 
 /* ==========================================================================
-   FULL-BLEED SOFT TONAL CANVAS
+   COMPACT FULL-WIDTH WORKSPACE SHELL
    ========================================================================== */
 .pms-root {
-  background: #f4f5f7;
-  padding: 24px 28px 36px;
+  background: #f5f6f8;
+  padding: 12px 18px 24px;
   margin: -12px -12px 0;
-  min-height: calc(100vh - 110px);
+  min-height: calc(100vh - 96px);
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 12px;
 }
 
 .pms-shell {
   display: flex;
   flex-direction: column;
-  gap: 0;
   margin: -12px -12px 0;
-  background: #f4f5f7;
-  min-height: calc(100vh - 110px);
+  background: #f5f6f8;
+  min-height: calc(100vh - 96px);
 }
 
-/* Top Studio Command Bar — pure white plane, zero borders */
-.pms-topbar {
+/* Compact Project Header Bar (Breadcrumb + Switcher + Status + Actions) */
+.pms-header {
+  background: #ffffff;
+  padding: 10px 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pms-header__top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  padding: 18px 32px;
-  background: #ffffff;
+  gap: 12px;
   flex-wrap: wrap;
 }
-.pms-topbar__left {
+.pms-header__left {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-width: 0;
+  gap: 10px;
   flex-wrap: wrap;
+  min-width: 0;
 }
-.pms-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12.5px;
-  font-weight: 600;
+.pms-crumb {
+  font-size: 12px;
   color: #64748b;
   text-decoration: none;
-  padding: 6px 12px;
-  background: #f4f5f7;
-  transition: background 0.12s, color 0.12s;
+  font-weight: 500;
 }
-.pms-back:hover { background: #e8ecf2; color: #0f172a; }
-
+.pms-crumb:hover { color: #002769; text-decoration: underline; }
+.pms-sep { color: #cbd5e1; font-size: 12px; }
 .pms-code {
   font-family: var(--ts-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 12px;
   font-weight: 600;
   color: #64748b;
-  background: transparent;
-  padding: 0;
-  letter-spacing: 0.03em;
 }
 .pms-title {
   margin: 0;
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 700;
   color: #0f172a;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
 }
-.pms-pill {
+.pms-meta-text {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   font-size: 12px;
   font-weight: 600;
-  padding: 0;
-  background: transparent;
-  white-space: nowrap;
+  color: #475569;
 }
-.pms-pill--stage { color: #64748b; }
-.pms-pill--ok    { color: #15623d; }
-.pms-pill--warn  { color: #9a5b13; }
-.pms-pill--bad   { color: #a32929; }
-.pms-dot { width: 6px; height: 6px; background: currentColor; }
+.pms-meta-text--ok   { color: #15623d; }
+.pms-meta-text--warn { color: #9a5b13; }
+.pms-meta-text--bad  { color: #a32929; }
+.pms-dot { width: 6px; height: 6px; background: currentColor; display: inline-block; }
 
-.pms-topbar__actions {
+.pms-header__actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
-/* Studio Body: Soft Left Rail + Airy Main Canvas */
-.pms-body {
-  display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
-  flex: 1;
-  min-height: 0;
-  gap: 24px;
-  padding: 24px 32px 36px;
-}
-
-.pms-rail {
-  background: #ffffff;
-  padding: 20px 12px;
+/* UI-02: Flat Underline Navigation Tabs + More Dropdown */
+.pms-tabs {
   display: flex;
-  flex-direction: column;
-  gap: 22px;
-  align-self: start;
-}
-.pms-rail__group {
-  display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 2px;
+  border-bottom: 1px solid #e6e9ef;
+  flex-wrap: wrap;
 }
-.pms-rail__label {
-  font-size: 10px;
+.pms-tab {
+  border: 0;
+  background: transparent;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  position: relative;
+  white-space: nowrap;
+}
+.pms-tab:hover { color: #0f172a; }
+.pms-tab.is-active {
+  color: #002769;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #94a3b8;
-  padding: 0 12px 8px;
+  box-shadow: inset 0 -2px 0 #002769 !important;
 }
-.pms-nav-btn {
+.pms-tab__cnt {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.pms-tab.is-active .pms-tab__cnt { color: #002769; }
+
+.pms-more {
+  position: relative;
+  display: inline-block;
+}
+.pms-more__menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 210px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  z-index: 400;
+  padding: 4px 0;
+}
+.pms-more__menu[hidden] { display: none !important; }
+.pms-more__item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
   width: 100%;
   text-align: left;
-  padding: 10px 12px;
   border: 0;
   background: transparent;
-  color: #475569;
-  font-size: 13px;
-  font-weight: 500;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  color: #334155;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s;
 }
-.pms-nav-btn:hover {
-  background: #f4f5f7;
-  color: #0f172a;
-}
-.pms-nav-btn.is-active {
-  background: #f0f4fb;
-  color: #002769;
-  font-weight: 700;
-  box-shadow: inset 3px 0 0 #002769 !important;
-}
-.pms-nav-btn__count {
-  font-size: 11.5px;
-  font-weight: 500;
-  color: #94a3b8;
-  background: transparent;
-  padding: 0;
-  font-variant-numeric: tabular-nums;
-}
-.pms-nav-btn.is-active .pms-nav-btn__count {
-  background: transparent;
-  color: #002769;
-  font-weight: 600;
-}
+.pms-more__item:hover { background: #f3f5f8; color: #002769; }
+.pms-more__item.is-active { font-weight: 700; color: #002769; background: #eef3fb; }
 
-/* Main Workspace Canvas */
+/* Main Full-Width Canvas (Zero Wasted Sidebars) */
 .pms-canvas {
-  min-width: 0;
-  overflow-x: hidden;
+  padding: 14px 20px 24px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 12px;
+  min-width: 0;
 }
-
 .pms-pane[hidden] { display: none !important; }
 .pms-pane {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 12px;
 }
 
-/* Section Header */
-.pms-sec-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-.pms-sec-title {
-  margin: 0;
-  font-size: 21px;
-  font-weight: 700;
-  color: #0f172a;
-  letter-spacing: -0.02em;
-}
-.pms-sec-sub {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: #64748b;
-}
-
-/* Soft Tonal Executive KPI Strip (No Borders, Crisp Whitespace) */
-.pms-kpis {
+/* Compact Inline Summary Strip (Replaces Tall Bloated KPI Cards) */
+.pms-summary-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  gap: 1px;
+  background: #e6e9ef;
 }
-.pms-kpi {
+.pms-stat {
   background: #ffffff;
-  padding: 20px 22px;
+  padding: 10px 14px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
 }
-.pms-kpi__label {
-  font-size: 10.5px;
+.pms-stat__label {
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   color: #8893a2;
 }
-.pms-kpi__val {
-  font-size: 24px;
+.pms-stat__val {
+  font-size: 18px;
   font-weight: 700;
   color: #0f172a;
   font-variant-numeric: tabular-nums;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
-.pms-kpi__sub {
-  font-size: 12px;
+.pms-stat__sub {
+  font-size: 11.5px;
   color: #64748b;
 }
 
-/* Borderless Elevated Surface Cards */
+/* Clean Flat Surface Block (Zero Borders, Tight Padding) */
 .pms-card {
   background: #ffffff;
   overflow: hidden;
@@ -392,250 +318,193 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 18px 24px;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #f0f2f5;
   flex-wrap: wrap;
 }
 .pms-card__title {
   margin: 0;
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 700;
   color: #0f172a;
-  letter-spacing: -0.01em;
 }
 .pms-card__sub {
-  font-size: 12.5px;
+  font-size: 11.5px;
   color: #64748b;
-  margin-top: 3px;
 }
 .pms-card__body {
-  padding: 20px 24px;
+  padding: 12px 16px;
 }
 .pms-card__table-wrap {
   overflow-x: auto;
 }
 
-/* Advanced Search & Multi-Facet Filter Bar (Dribbble Minimalist Pattern) */
-.pms-filterbar {
+/* Compact Single-Row Filter Toolbar (UI-05 / UI-06) */
+.pms-toolbar {
   background: #ffffff;
-  padding: 16px 22px;
+  padding: 10px 14px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
-.pms-filterbar__row {
+.pms-toolbar__row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 .pms-search-wrap {
   position: relative;
-  flex: 1 1 280px;
-  max-width: 420px;
+  flex: 1 1 240px;
+  max-width: 380px;
 }
 .pms-search-wrap__icon {
   position: absolute;
-  left: 12px;
+  left: 10px;
   top: 50%;
   transform: translateY(-50%);
   color: #94a3b8;
-  font-size: 13px;
+  font-size: 12px;
   pointer-events: none;
 }
 .pms-search-input {
   width: 100%;
-  padding: 9px 12px 9px 34px !important;
-  background: #f2f4f7 !important;
-  border: 0 !important;
-  font-size: 13px;
-  color: #0f172a;
+  padding: 6px 10px 6px 28px !important;
 }
-.pms-filterbar__controls {
+.pms-toolbar__controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
-.pms-filterbar__tokens {
+.pms-active-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 10px;
   font-size: 12px;
   color: #64748b;
 }
-.pms-token {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: #eaf0fb;
+.pms-filter-link {
   color: #002769;
-  font-size: 11.5px;
+  text-decoration: none;
   font-weight: 600;
+  margin-left: 8px;
 }
-.pms-token button {
-  border: 0;
-  background: transparent;
-  color: #002769;
-  cursor: pointer;
-  padding: 0 2px;
-  font-weight: 700;
-}
-.pms-quick-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.pms-chip {
-  border: 0;
-  background: #f2f4f7;
-  color: #475569;
-  padding: 5px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-.pms-chip:hover { background: #e6eaf0; color: #0f172a; }
-.pms-chip.is-active { background: #002769; color: #ffffff; }
+.pms-filter-link:hover { text-decoration: underline; }
 
-/* Collapsible Action Drawer (Soft Recessed Surface, Zero Borders) */
+/* Collapsible Action Drawer */
 .pms-drawer {
-  padding: 18px 24px;
+  padding: 12px 16px;
   background: #f7f9fb;
+  border-bottom: 1px solid #eceff4;
 }
 .pms-drawer[hidden] { display: none !important; }
 .pms-form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 8px;
   align-items: end;
 }
 
-/* 2-Column Split Grid */
-.pms-grid-2 {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
-  gap: 22px;
-}
-.pms-grid-2 > * { min-width: 0; }
-
-/* Airy, Uncrowded Borderless Tables */
+/* Compact Semantic Tables (UI-04) */
 .pms-card .st-table,
 .pms-root .st-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 12.5px;
   border: 0 !important;
 }
 .pms-card .st-table th,
 .pms-root .st-table th {
   background: #fafbfc;
-  color: #8893a2;
+  color: #64748b;
   font-size: 10.5px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 13px 18px;
+  letter-spacing: 0.06em;
+  padding: 8px 14px;
   border: 0 !important;
+  border-bottom: 1px solid #eceff4 !important;
   text-align: left;
   white-space: nowrap;
 }
+.pms-card .st-table th a {
+  color: inherit;
+  text-decoration: none;
+}
+.pms-card .st-table th a:hover { color: #002769; }
 .pms-card .st-table td,
 .pms-root .st-table td {
-  padding: 15px 18px;
+  padding: 9px 14px;
   border: 0 !important;
-  border-top: 1px solid #f2f4f7 !important;
+  border-bottom: 1px solid #f2f4f7 !important;
   color: #1e293b;
   vertical-align: middle;
   word-break: break-word;
 }
+.pms-card .st-table tbody tr:nth-child(even) td,
+.pms-root .st-table tbody tr:nth-child(even) td {
+  background: #fcfcfd;
+}
 .pms-card .st-table tbody tr:hover td,
 .pms-root .st-table tbody tr:hover td {
-  background: #f8fafd;
+  background: #f3f6fb;
 }
 
-/* Stage Gate Horizontal Grid (Tonal Surfaces, No Borders) */
-.pms-gates-grid {
+/* Pagination Footer (UI-06) */
+.pms-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 9px 14px;
+  background: #fafbfc;
+  font-size: 12px;
+  color: #475569;
+}
+.pms-pager__nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Compact 2-Column Grid where appropriate */
+.pms-grid-2 {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
   gap: 12px;
 }
+.pms-grid-2 > * { min-width: 0; }
+
+/* Stage Gate Strip */
+.pms-gates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+  gap: 8px;
+}
 .pms-gate {
-  padding: 14px 16px;
+  padding: 9px 11px;
   background: #f4f5f7;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
-.pms-gate--approved {
-  background: #e9f6ef;
-}
+.pms-gate--approved { background: #eaf6ef; }
 
-/* Segmented Bar (Flat, Square, Tonal) */
-.pms-seg {
-  display: inline-flex;
-  background: #e9ecf1;
-  padding: 3px;
-  gap: 2px;
-}
-.pms-seg__btn {
-  border: 0;
-  background: transparent;
-  padding: 8px 16px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #475569;
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-.pms-seg__btn.is-active {
-  background: #ffffff;
-  color: #002769;
-}
+/* Legacy class aliases for my_work.html compatibility */
+.pms-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 1px; background: #e6e9ef; }
+.pms-kpi  { background: #ffffff; padding: 10px 14px; display: flex; flex-direction: column; gap: 3px; }
+.pms-kpi__label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #8893a2; }
+.pms-kpi__val   { font-size: 18px; font-weight: 700; color: #0f172a; font-variant-numeric: tabular-nums; }
+.pms-kpi__sub   { font-size: 11.5px; color: #64748b; }
 
-/* Borderless Portfolio Cards Grid */
-.pms-project-card {
-  background: #ffffff;
-  padding: 22px 24px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 16px;
-  transition: background 0.14s ease;
-}
-.pms-project-card:hover { background: #fbfcff; }
-
-/* Borderless Kanban Columns */
-.pms-kanban-col {
-  background: #ebedf2;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.pms-kanban-card {
-  display: block;
-  padding: 16px;
-  background: #ffffff;
-  text-decoration: none;
-  color: inherit;
-}
-.pms-kanban-card:hover { background: #f8fafd; }
-
-@media (max-width: 980px) {
-  .pms-body { grid-template-columns: 1fr; padding: 16px; }
-  .pms-rail {
-    flex-direction: row;
-    overflow-x: auto;
-    padding: 10px 12px;
-    gap: 10px;
-  }
-  .pms-rail__group { flex-direction: row; align-items: center; gap: 4px; }
-  .pms-rail__label { display: none; }
-  .pms-nav-btn { white-space: nowrap; width: auto; }
+@media (max-width: 900px) {
   .pms-grid-2 { grid-template-columns: 1fr; }
+  .pms-header { padding: 8px 12px 0; }
+  .pms-canvas { padding: 10px 12px 20px; }
 }
